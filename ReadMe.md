@@ -113,6 +113,7 @@ Below is a curated list of tool ideas waiting to be built. Each idea is a potent
 | Base64 Encoder / Decoder — encode and decode Base64      | Easy       |
 | Curl Builder — build curl commands visually              | Medium     |
 | Query String Builder — build and parse URL query strings | Easy       |
+| YAML ↔ JSON Converter — convert between YAML and JSON formats | Easy |
 
 ### Developer Utilities
 
@@ -125,6 +126,8 @@ Below is a curated list of tool ideas waiting to be built. Each idea is a potent
 | Hash Generator — generate MD5, SHA-1, SHA-256 hashes         | Easy       |
 | Password Generator — generate strong random passwords        | Easy       |
 | QR Code Generator — create QR codes from text or URLs        | Easy       |
+| Git Ignore Generator — generate .gitignore files for selected technologies | Easy |
+| Commit Message Generator — create conventional commit messages | Easy |
 
 ### Browser & Network
 
@@ -230,7 +233,14 @@ This repository is a proud participant in **[Social Summer of Code (SSoC)](https
 | `Easy`   | 20     | Straightforward tool: single feature, minimal logic / Enhancement of an existing tool. |
 | `Medium` | 30     | More complex tool: multiple features, interactive UI.                                  |
 
-> There are **no Hard labels** in this project. Every tool is self-contained and approachable.
+> Difficulty is based on learning value and implementation complexity.
+>
+> - **Easy**: Simple tools that help contributors learn concepts in the simplest possible way.
+> - **Medium**: Tools that provide a strong learning experience while remaining approachable and understandable.
+>
+> There are currently **no Hard labels** in this project. The one-file-tool philosophy keeps contributions focused, self-contained, and beginner-friendly.
+>
+> Contributors are encouraged to create polished user interfaces, thoughtful features, and strong learning experiences while keeping implementations simple and avoiding unnecessary complexity.
 >
 > Labels are assigned by the maintainer and are **slightly negotiable**, if you feel a difficulty is miscategorised, open a discussion.
 
@@ -262,3 +272,5 @@ This project is designed for static hosting. Works perfectly on:
   <br>
   Open Source with purpose. One file at a time.
 </p>
+
+
