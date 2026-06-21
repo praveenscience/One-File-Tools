@@ -1802,6 +1802,19 @@
         }
       }
 
+      function looksLikeHtml(text) {
+        if (!text) return false;
+        const trimmed = text.trim().toLowerCase();
+        return (
+          trimmed.startsWith("<!doctype") ||
+          trimmed.includes("<html") ||
+          trimmed.includes("<body") ||
+          trimmed.includes("<head") ||
+          trimmed.includes("<meta") ||
+          trimmed.includes("<title")
+        );
+      }
+
       /* -------------------------------------------------------
    14. FETCH PAGE
    ------------------------------------------------------- */
@@ -1819,7 +1832,14 @@
                 () =>
                   fetch("/api/fetch?url=" + encodeURIComponent(url)).then((r) => {
                     if (!r.ok) throw new Error(r.status);
-                    return r.text();
+                    // Ensure the response is from our proxy function, not a SPA fallback to index.html
+                    if (!r.headers.get("x-proxy-success")) {
+                      throw new Error("Proxy response missing validation header");
+                    }
+                    return r.text().then((text) => {
+                      if (!looksLikeHtml(text)) throw new Error("Invalid HTML response");
+                      return text;
+                    });
                   })
               ]
             : []),
@@ -1827,18 +1847,27 @@
           () =>
             fetch(url).then((r) => {
               if (!r.ok) throw new Error(r.status);
-              return r.text();
+              return r.text().then((text) => {
+                if (!looksLikeHtml(text)) throw new Error("Invalid HTML response");
+                return text;
+              });
             }),
           /* 3. Public CORS proxies as last resort */
           () =>
             fetch("https://api.allorigins.win/raw?url=" + encodeURIComponent(url)).then((r) => {
               if (!r.ok) throw new Error(r.status);
-              return r.text();
+              return r.text().then((text) => {
+                if (!looksLikeHtml(text)) throw new Error("Invalid HTML response");
+                return text;
+              });
             }),
           () =>
             fetch("https://corsproxy.io/?" + encodeURIComponent(url)).then((r) => {
               if (!r.ok) throw new Error(r.status);
-              return r.text();
+              return r.text().then((text) => {
+                if (!looksLikeHtml(text)) throw new Error("Invalid HTML response");
+                return text;
+              });
             })
         ];
 
