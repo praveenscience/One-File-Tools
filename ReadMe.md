@@ -31,6 +31,7 @@ Every tool in this collection is a standalone `.html` file containing all the HT
 | #   | Tool                                                    | Category  | Description                                                                              | Live                                                                       |
 | --- | ------------------------------------------------------- | --------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | 1   | [Open Graph Inspector](tools/open-graph-inspector.html) | Web & SEO | Analyze meta tags, social previews, and SEO metadata for any URL with actionable scores. | [Try it](https://one-file-tools.pages.dev/tools/open-graph-inspector.html) |
+| 2   | [UUID Generator](tools/uuid-generator.html)             | Developer | Generate random v4 UUIDs instantly, offline.                                             | [Try it](https://one-file-tools.pages.dev/tools/uuid-generator.html)       |
 
 > **Want to see your tool here?** Check out the [Contributing Guide](Contributing.md) and pick an idea from the [Ideas Board](#ideas-board).
 
@@ -119,7 +120,6 @@ Below is a curated list of tool ideas waiting to be built. Each idea is a potent
 
 | Idea                                                         | Difficulty |
 | ------------------------------------------------------------ | ---------- |
-| UUID Generator — generate UUIDs (v4)                         | Easy       |
 | Timestamp Converter — convert Unix timestamps to human dates | Easy       |
 | Regex Tester — test regular expressions with live matching   | Medium     |
 | Cron Expression Builder — build and explain cron schedules   | Medium     |
