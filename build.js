@@ -161,7 +161,7 @@ const toolsData = tools.map((tool) => ({
   file: `tools/${tool.id}.html`,
   thumbnail: `tools/${tool.id}.png`,
   github: `${site.github}/blob/main/tools/${tool.id}.html`,
-  live: `tools/${tool.id}.html`
+  live: `${site.url}/tools/${tool.id}`
 }));
 
 // Group tools by category
