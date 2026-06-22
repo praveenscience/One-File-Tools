@@ -32,7 +32,8 @@ Every tool in this collection is a standalone `.html` file containing all the HT
 | --- | ------------------------------------------------------- | --------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | 1   | [Border Radius Generator](tools/border-radius-generator.html) | Web & SEO | CSS border-radius playground. | [Try it](https://one-file-tools.pages.dev/tools/border-radius-generator) |
 | 2   | [Open Graph Inspector](tools/open-graph-inspector.html) | Web & SEO | Analyze meta tags, social previews, and SEO metadata for any URL with actionable scores. | [Try it](https://one-file-tools.pages.dev/tools/open-graph-inspector) |
-| 3   | [UUID Generator](tools/uuid-generator.html)             | Developer | Generate random v4 UUIDs instantly, offline.                                             | [Try it](https://one-file-tools.pages.dev/tools/uuid-generator)       |
+| 3   | [JSON Formatter](tools/json-formatter.html) | JSON & API | Format, validate, and minify JSON locally in your browser. | [Try it](https://one-file-tools.pages.dev/tools/json-formatter) |
+| 4   | [UUID Generator](tools/uuid-generator.html)             | Developer | Generate random v4 UUIDs instantly, offline.                                             | [Try it](https://one-file-tools.pages.dev/tools/uuid-generator)       |
 
 > **Want to see your tool here?** Check out the [Contributing Guide](Contributing.md) and pick an idea from the [Ideas Board](#ideas-board).
 
@@ -108,7 +109,6 @@ Below is a curated list of tool ideas waiting to be built. Each idea is a potent
 
 | Idea                                                     | Difficulty |
 | -------------------------------------------------------- | ---------- |
-| JSON Formatter — format, validate, and minify JSON       | Easy       |
 | JSON Diff Viewer — compare two JSON objects              | Medium     |
 | JWT Decoder — decode and inspect JSON Web Tokens         | Easy       |
 | URL Encoder / Decoder — encode and decode URL strings    | Easy       |
