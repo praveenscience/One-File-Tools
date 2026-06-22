@@ -392,26 +392,58 @@ Built for One File Tools.
             type: "Direct Request"
           };
         } catch (e) {
-          // Direct fetch failed (likely CORS or network error), fallback to our proxy
-          const proxyUrl = `/api/fetch-headers?url=${encodeURIComponent(url)}`;
-          const proxyResponse = await fetch(proxyUrl);
+          // Direct fetch failed (likely CORS or network error).
+          // Fallback to our proxy (works on Cloudflare Pages) or public proxies.
           
-          if (!proxyResponse.ok) {
-            let errorText = "Unknown Error";
+          const attempts = [
+            async () => {
+              const proxyUrl = `/api/fetch-headers?url=${encodeURIComponent(url)}`;
+              const proxyResponse = await fetch(proxyUrl);
+              if (!proxyResponse.ok) {
+                let errorText = "The backend proxy is not reachable (are you running locally without Wrangler?)";
+                try {
+                  const errJson = await proxyResponse.json();
+                  if (errJson.error) errorText = errJson.error;
+                } catch(err) {}
+                throw new Error(errorText);
+              }
+              const data = await proxyResponse.json();
+              if (data.error) throw new Error(data.error);
+              return { ...data, type: "Cloudflare Proxy" };
+            },
+            async () => {
+              // Fallback to public corsproxy.io for local testing
+              const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+              const proxyResponse = await fetch(proxyUrl);
+              if (!proxyResponse.ok) throw new Error("CORS Proxy failed");
+              
+              const headersObj = {};
+              for (const [key, value] of proxyResponse.headers.entries()) {
+                // Filter out corsproxy's own headers if needed, but we'll just show them for local testing
+                headersObj[key] = value;
+              }
+              
+              return {
+                url: proxyResponse.url,
+                status: proxyResponse.status,
+                statusText: proxyResponse.statusText,
+                durationMs: "N/A",
+                headers: headersObj,
+                type: "Public Proxy (Local Test)"
+              };
+            }
+          ];
+
+          let lastError = e.message;
+          for (const attempt of attempts) {
             try {
-              const errJson = await proxyResponse.json();
-              errorText = errJson.error || proxyResponse.statusText;
-            } catch(e) {}
-            throw new Error(`Proxy Error: ${errorText}`);
+              return await attempt();
+            } catch (err) {
+              lastError = err.message;
+            }
           }
           
-          const data = await proxyResponse.json();
-          if (data.error) throw new Error(data.error);
-          
-          return {
-            ...data,
-            type: "Proxied Request"
-          };
+          throw new Error(`Proxy Error: ${lastError}`);
         }
       }
 
