@@ -30,8 +30,9 @@ Every tool in this collection is a standalone `.html` file containing all the HT
 
 | #   | Tool                                                    | Category  | Description                                                                              | Live                                                                       |
 | --- | ------------------------------------------------------- | --------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| 1   | [Open Graph Inspector](tools/open-graph-inspector.html) | Web & SEO | Analyze meta tags, social previews, and SEO metadata for any URL with actionable scores. | [Try it](https://one-file-tools.pages.dev/tools/open-graph-inspector.html) |
-| 2   | [UUID Generator](tools/uuid-generator.html)             | Developer | Generate random v4 UUIDs instantly, offline.                                             | [Try it](https://one-file-tools.pages.dev/tools/uuid-generator.html)       |
+| 1   | [Border Radius Generator](tools/border-radius-generator.html) | Web & SEO | CSS border-radius playground. | [Try it](https://one-file-tools.pages.dev/tools/border-radius-generator) |
+| 2   | [Open Graph Inspector](tools/open-graph-inspector.html) | Web & SEO | Analyze meta tags, social previews, and SEO metadata for any URL with actionable scores. | [Try it](https://one-file-tools.pages.dev/tools/open-graph-inspector) |
+| 3   | [UUID Generator](tools/uuid-generator.html)             | Developer | Generate random v4 UUIDs instantly, offline.                                             | [Try it](https://one-file-tools.pages.dev/tools/uuid-generator)       |
 
 > **Want to see your tool here?** Check out the [Contributing Guide](Contributing.md) and pick an idea from the [Ideas Board](#ideas-board).
 
