@@ -34,6 +34,7 @@ Every tool in this collection is a standalone `.html` file containing all the HT
 | 2   | [Open Graph Inspector](tools/open-graph-inspector.html) | Web & SEO | Analyze meta tags, social previews, and SEO metadata for any URL with actionable scores. | [Try it](https://one-file-tools.pages.dev/tools/open-graph-inspector) |
 | 3   | [JSON Formatter](tools/json-formatter.html) | JSON & API | Format, validate, and minify JSON locally in your browser. | [Try it](https://one-file-tools.pages.dev/tools/json-formatter) |
 | 4   | [UUID Generator](tools/uuid-generator.html)             | Developer | Generate random v4 UUIDs instantly, offline.                                             | [Try it](https://one-file-tools.pages.dev/tools/uuid-generator)       |
+| 5 | TNEB Electricity Tariff Comparison Calculator | Developer Utilities | Compare electricity tariffs and estimate costs. | [Try it] (https://one-file-tools.pages.dev/tools/electricity-tariff-comparison-calculator.html) |
 
 > **Want to see your tool here?** Check out the [Contributing Guide](Contributing.md) and pick an idea from the [Ideas Board](#ideas-board).
 
