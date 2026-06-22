@@ -138,7 +138,7 @@ Below is a curated list of tool ideas waiting to be built. Each idea is a potent
 | Viewport / Screen Info — display device and viewport details | Easy       |
 | Cookie Viewer — view and manage browser cookies              | Easy       |
 | LocalStorage Explorer — browse and edit localStorage         | Easy       |
-| HTTP Header Inspector — view response headers for a URL      | Medium     |
+
 
 ### Accessibility
 
