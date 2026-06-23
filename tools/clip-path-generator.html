@@ -1,0 +1,574 @@
+<!--
+Clip Path Generator
+Single-file CSS clip-path generator.
+Built for One File Tools.
+-->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Clip Path Generator - One File Tools</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <style>
+      :root {
+        --bg: #0b0f19;
+        --grid-line: #131c2d;
+        --panel: #111827;
+        --panel-border: #1e293b;
+        --accent: #f43f5e;
+        --accent-hover: #e11d48;
+        --accent-glow: rgba(244, 63, 94, 0.2);
+        --text: #f8fafc;
+        --text-muted: #94a3b8;
+        --text-dim: #64748b;
+        --radius-sm: 8px;
+        --radius-md: 14px;
+        --font-sans: "Inter", system-ui, sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+        --font-display: "Space Grotesk", sans-serif;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg);
+        background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+        background-size: 28px 28px;
+        color: var(--text);
+        padding: 48px 20px 64px;
+        min-height: 100vh;
+      }
+
+      .app {
+        max-width: 1000px;
+        margin: 0 auto;
+      }
+
+      .hero {
+        text-align: center;
+        margin-bottom: 40px;
+      }
+
+      .eyebrow {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        color: var(--accent);
+        text-transform: uppercase;
+        margin-bottom: 14px;
+      }
+
+      .wordmark {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: clamp(36px, 6vw, 52px);
+        letter-spacing: -0.01em;
+        line-height: 1.1;
+      }
+
+      .tagline {
+        color: var(--text-muted);
+        font-size: 16px;
+        margin-top: 12px;
+      }
+
+      .studio {
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-md);
+        padding: 32px;
+        box-shadow: 0 24px 48px -14px rgba(0, 0, 0, 0.5);
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 1fr 340px;
+        gap: 32px;
+      }
+
+      /* Workspace */
+      .editor-pane {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .workspace {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        background: #1e293b;
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+        background-image: 
+          linear-gradient(45deg, #0f172a 25%, transparent 25%, transparent 75%, #0f172a 75%, #0f172a), 
+          linear-gradient(45deg, #0f172a 25%, transparent 25%, transparent 75%, #0f172a 75%, #0f172a);
+        background-size: 20px 20px;
+        background-position: 0 0, 10px 10px;
+        touch-action: none; /* Prevent scrolling when dragging */
+      }
+
+      .preview-target {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(135deg, #f43f5e 0%, #8b5cf6 100%);
+        transition: clip-path 0.1s ease-out;
+      }
+
+      .handles-layer {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+
+      .connecting-lines {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+
+      .connecting-lines polygon {
+        fill: rgba(244, 63, 94, 0.1);
+        stroke: var(--accent);
+        stroke-width: 2;
+        stroke-dasharray: 4 4;
+      }
+
+      .handle {
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        background: #fff;
+        border: 3px solid var(--accent);
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+        cursor: grab;
+        pointer-events: auto;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+        transition: transform 0.1s, box-shadow 0.1s;
+      }
+
+      .handle:hover {
+        transform: translate(-50%, -50%) scale(1.2);
+        box-shadow: 0 4px 12px rgba(244, 63, 94, 0.4);
+      }
+
+      .handle:active {
+        cursor: grabbing;
+        transform: translate(-50%, -50%) scale(0.9);
+      }
+
+      /* Controls */
+      .controls-pane {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      .section-title {
+        font-family: var(--font-mono);
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 12px;
+      }
+
+      .presets-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+
+      .preset-btn {
+        background: var(--bg);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 10px;
+        color: var(--text);
+        font-family: var(--font-sans);
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-align: center;
+      }
+
+      .preset-btn:hover {
+        border-color: var(--accent);
+        background: rgba(244, 63, 94, 0.05);
+      }
+
+      .preset-btn.active {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+        font-weight: 600;
+      }
+
+      .output-area {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      textarea {
+        flex: 1;
+        min-height: 120px;
+        background: var(--bg);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 16px;
+        font-family: var(--font-mono);
+        font-size: 14px;
+        color: var(--accent);
+        resize: none;
+        outline: none;
+        transition: border-color 0.2s;
+        line-height: 1.5;
+      }
+
+      textarea:focus {
+        border-color: var(--accent);
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        font-family: var(--font-sans);
+        font-size: 14px;
+        font-weight: 600;
+        border: none;
+        border-radius: var(--radius-sm);
+        padding: 12px 24px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .btn-primary {
+        background: var(--accent);
+        color: #fff;
+      }
+
+      .btn-primary:hover {
+        background: var(--accent-hover);
+        transform: translateY(-1px);
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background: var(--text);
+        color: var(--bg);
+        padding: 12px 24px;
+        border-radius: 99px;
+        font-family: var(--font-sans);
+        font-weight: 600;
+        font-size: 14px;
+        opacity: 0;
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        z-index: 100;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      }
+
+      .toast.show {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+      }
+
+      @media (max-width: 800px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+        .workspace {
+          max-height: 60vh;
+        }
+        .presets-grid {
+          grid-template-columns: repeat(4, 1fr);
+        }
+      }
+      @media (max-width: 500px) {
+        .presets-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="hero">
+        <div class="eyebrow">CSS Tools</div>
+        <h1 class="wordmark">Clip Path Generator</h1>
+        <p class="tagline">Visually create complex CSS clip-path shapes and copy the code.</p>
+      </header>
+
+      <main class="studio">
+        <div class="layout">
+          <!-- Workspace -->
+          <div class="editor-pane">
+            <div class="section-title">Visual Editor</div>
+            <div class="workspace" id="workspace">
+              <div class="preview-target" id="previewTarget"></div>
+              <svg class="connecting-lines" id="connectingLines">
+                <polygon id="svgPolygon" points=""></polygon>
+              </svg>
+              <div class="handles-layer" id="handlesLayer"></div>
+            </div>
+          </div>
+
+          <!-- Controls -->
+          <div class="controls-pane">
+            <div>
+              <div class="section-title">Presets</div>
+              <div class="presets-grid" id="presetsGrid">
+                <!-- Injected via JS -->
+              </div>
+            </div>
+
+            <div class="output-area">
+              <div class="section-title">CSS Output</div>
+              <textarea id="cssOutput" readonly></textarea>
+              <button class="btn btn-primary" id="copyBtn">Copy CSS Code</button>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <div class="toast" id="toast">Copied to clipboard!</div>
+
+    <script>
+      const workspace = document.getElementById("workspace");
+      const previewTarget = document.getElementById("previewTarget");
+      const handlesLayer = document.getElementById("handlesLayer");
+      const svgPolygon = document.getElementById("svgPolygon");
+      const cssOutput = document.getElementById("cssOutput");
+      const copyBtn = document.getElementById("copyBtn");
+      const presetsGrid = document.getElementById("presetsGrid");
+      const toast = document.getElementById("toast");
+
+      // Presets definition
+      const presets = {
+        Triangle: [
+          { x: 50, y: 0 },
+          { x: 0, y: 100 },
+          { x: 100, y: 100 }
+        ],
+        Trapezoid: [
+          { x: 20, y: 0 },
+          { x: 80, y: 0 },
+          { x: 100, y: 100 },
+          { x: 0, y: 100 }
+        ],
+        Parallelogram: [
+          { x: 25, y: 0 },
+          { x: 100, y: 0 },
+          { x: 75, y: 100 },
+          { x: 0, y: 100 }
+        ],
+        Rhombus: [
+          { x: 50, y: 0 },
+          { x: 100, y: 50 },
+          { x: 50, y: 100 },
+          { x: 0, y: 50 }
+        ],
+        Pentagon: [
+          { x: 50, y: 0 },
+          { x: 100, y: 38 },
+          { x: 82, y: 100 },
+          { x: 18, y: 100 },
+          { x: 0, y: 38 }
+        ],
+        Hexagon: [
+          { x: 50, y: 0 },
+          { x: 100, y: 25 },
+          { x: 100, y: 75 },
+          { x: 50, y: 100 },
+          { x: 0, y: 75 },
+          { x: 0, y: 25 }
+        ],
+        Star: [
+          { x: 50, y: 0 },
+          { x: 61, y: 35 },
+          { x: 98, y: 35 },
+          { x: 68, y: 57 },
+          { x: 79, y: 91 },
+          { x: 50, y: 70 },
+          { x: 21, y: 91 },
+          { x: 32, y: 57 },
+          { x: 2, y: 35 },
+          { x: 39, y: 35 }
+        ],
+        Chevron: [
+          { x: 50, y: 0 },
+          { x: 100, y: 50 },
+          { x: 50, y: 100 },
+          { x: 0, y: 50 },
+          { x: 25, y: 50 }
+        ],
+        Cross: [
+          { x: 35, y: 0 },
+          { x: 65, y: 0 },
+          { x: 65, y: 35 },
+          { x: 100, y: 35 },
+          { x: 100, y: 65 },
+          { x: 65, y: 65 },
+          { x: 65, y: 100 },
+          { x: 35, y: 100 },
+          { x: 35, y: 65 },
+          { x: 0, y: 65 },
+          { x: 0, y: 35 },
+          { x: 35, y: 35 }
+        ]
+      };
+
+      // Modify chevron to a proper arrow/chevron shape
+      presets.Chevron = [
+        { x: 100, y: 50 },
+        { x: 75, y: 100 },
+        { x: 0, y: 100 },
+        { x: 25, y: 50 },
+        { x: 0, y: 0 },
+        { x: 75, y: 0 }
+      ];
+
+      let points = [];
+      let draggedPointIndex = null;
+      let isDragging = false;
+
+      function initPresets() {
+        Object.keys(presets).forEach((key, index) => {
+          const btn = document.createElement("button");
+          btn.className = "preset-btn";
+          if (index === 0) btn.classList.add("active");
+          btn.textContent = key;
+          btn.onclick = () => {
+            document.querySelectorAll(".preset-btn").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            loadPreset(key);
+          };
+          presetsGrid.appendChild(btn);
+        });
+      }
+
+      function loadPreset(name) {
+        // Deep copy preset points
+        points = presets[name].map(p => ({ ...p }));
+        renderHandles();
+        updateClipPath();
+      }
+
+      function renderHandles() {
+        handlesLayer.innerHTML = "";
+        points.forEach((point, i) => {
+          const handle = document.createElement("div");
+          handle.className = "handle";
+          handle.style.left = `${point.x}%`;
+          handle.style.top = `${point.y}%`;
+          
+          handle.addEventListener("pointerdown", (e) => startDrag(e, i));
+          handlesLayer.appendChild(handle);
+        });
+      }
+
+      function updateClipPath() {
+        // Build polygon string
+        const polyString = points.map(p => `${Math.round(p.x)}% ${Math.round(p.y)}%`).join(", ");
+        const clipVal = `polygon(${polyString})`;
+        
+        // Update Target CSS
+        previewTarget.style.clipPath = clipVal;
+        
+        // Update Output Text
+        cssOutput.value = `clip-path: ${clipVal};`;
+        
+        // Update SVG connecting lines
+        const rect = workspace.getBoundingClientRect();
+        // map percentages to absolute pixels for SVG lines
+        const svgPoints = points.map(p => `${(p.x / 100) * rect.width},${(p.y / 100) * rect.height}`).join(" ");
+        svgPolygon.setAttribute("points", svgPoints);
+      }
+
+      // Resize observer to keep SVG lines accurate when window resizes
+      const resizeObserver = new ResizeObserver(() => {
+        updateClipPath();
+      });
+      resizeObserver.observe(workspace);
+
+      function startDrag(e, index) {
+        e.preventDefault();
+        isDragging = true;
+        draggedPointIndex = index;
+        document.body.style.cursor = "grabbing";
+      }
+
+      function onPointerMove(e) {
+        if (!isDragging || draggedPointIndex === null) return;
+        
+        // Remove preset active state if they edit manually
+        document.querySelectorAll(".preset-btn").forEach(b => b.classList.remove("active"));
+        
+        const rect = workspace.getBoundingClientRect();
+        
+        // Calculate percentages, clamped 0-100
+        let x = ((e.clientX - rect.left) / rect.width) * 100;
+        let y = ((e.clientY - rect.top) / rect.height) * 100;
+        
+        x = Math.max(0, Math.min(100, x));
+        y = Math.max(0, Math.min(100, y));
+
+        points[draggedPointIndex].x = x;
+        points[draggedPointIndex].y = y;
+
+        // Update DOM Handle visually (no re-render needed for performance)
+        const handle = handlesLayer.children[draggedPointIndex];
+        handle.style.left = `${x}%`;
+        handle.style.top = `${y}%`;
+
+        updateClipPath();
+      }
+
+      function onPointerUp() {
+        isDragging = false;
+        draggedPointIndex = null;
+        document.body.style.cursor = "default";
+      }
+
+      // Global listeners
+      window.addEventListener("pointermove", onPointerMove);
+      window.addEventListener("pointerup", onPointerUp);
+
+      // Copy Button
+      copyBtn.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(cssOutput.value);
+          toast.classList.add("show");
+          setTimeout(() => toast.classList.remove("show"), 2500);
+        } catch (err) {
+          console.error("Failed to copy", err);
+        }
+      });
+
+      // Init
+      initPresets();
+      loadPreset("Triangle");
+
+    </script>
+  </body>
+</html>
