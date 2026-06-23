@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Format, validate, and minify JSON locally in your browser." />
+    <title>JSON Formatter — One File Tools</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <script>
+      (() => {
+        try {
+          const saved = localStorage.getItem("json-formatter-theme");
+          document.documentElement.dataset.theme = saved || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        } catch {
+          document.documentElement.dataset.theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        }
+      })();
+    </script>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+      :root {
+        color-scheme: light;
+        --bg: #fff;
+        --surface: #f8fafc;
+        --surface-2: #f1f5f9;
+        --text: #172033;
+        --muted: #64748b;
+        --border: #dbe3ee;
+        --border-strong: #cbd5e1;
+        --accent: #4f46e5;
+        --accent-hover: #4338ca;
+        --accent-soft: #eef2ff;
+        --success: #087f5b;
+        --success-soft: #ecfdf5;
+        --error: #c2413b;
+        --error-soft: #fff1f0;
+        --warning: #9a6700;
+        --warning-soft: #fff8e6;
+        --shadow: 0 16px 40px rgba(31, 41, 55, 0.08);
+        --radius: 14px;
+        --radius-sm: 9px;
+        --ui: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+      html[data-theme="dark"] {
+        color-scheme: dark;
+        --bg: #0b1020;
+        --surface: #11182a;
+        --surface-2: #182136;
+        --text: #e8edf7;
+        --muted: #99a6ba;
+        --border: #263249;
+        --border-strong: #35435d;
+        --accent: #818cf8;
+        --accent-hover: #a5b4fc;
+        --accent-soft: #20254c;
+        --success: #5ee0b1;
+        --success-soft: #102e2a;
+        --error: #ff8a80;
+        --error-soft: #381d26;
+        --warning: #f8cb71;
+        --warning-soft: #342a16;
+        --shadow: 0 20px 50px rgba(0, 0, 0, 0.26);
+      }
+      html {
+        min-width: 320px;
+        background: var(--bg);
+      }
+      body {
+        min-height: 100vh;
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 1rem/1.5 var(--ui);
+      }
+      button,
+      textarea,
+      input {
+        font: inherit;
+      }
+      button {
+        color: inherit;
+      }
+      svg {
+        display: block;
+      }
+      .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+      .app {
+        width: min(1500px, 100%);
+        min-height: 100vh;
+        margin: auto;
+        padding: 0 28px 22px;
+        display: flex;
+        flex-direction: column;
+      }
+      header {
+        min-height: 102px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+        border-bottom: 1px solid var(--border);
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+      }
+      .brand-mark {
+        min-width: 58px;
+        color: var(--accent);
+        font: 800 2.7rem/1 var(--mono);
+        letter-spacing: -0.25em;
+        transform: translateX(-0.12em);
+      }
+      h1 {
+        margin: 0 0 2px;
+        font-size: clamp(1.45rem, 2vw, 1.85rem);
+        line-height: 1.2;
+        letter-spacing: -0.035em;
+      }
+      .brand p {
+        margin: 0;
+        color: var(--muted);
+      }
+      .icon-button,
+      .button,
+      .segment-label {
+        min-height: 42px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        background: var(--bg);
+        cursor: pointer;
+        transition: 140ms ease;
+      }
+      .icon-button:hover,
+      .button:hover,
+      .segment-label:hover {
+        border-color: var(--border-strong);
+        background: var(--surface);
+      }
+      .icon-button:focus-visible,
+      .button:focus-visible,
+      .segment-input:focus-visible + .segment-label,
+      textarea:focus-visible,
+      pre:focus-visible,
+      a:focus-visible {
+        outline: 3px solid color-mix(in srgb, var(--accent) 28%, transparent);
+        outline-offset: 2px;
+      }
+      .icon-button:active,
+      .button:active {
+        transform: translateY(1px);
+      }
+      .icon-button {
+        width: 46px;
+        padding: 0;
+        display: grid;
+        place-items: center;
+      }
+      .icon-button svg,
+      .button svg {
+        width: 18px;
+        height: 18px;
+        flex: none;
+      }
+      .sun-icon,
+      html[data-theme="dark"] .moon-icon {
+        display: none;
+      }
+      html[data-theme="dark"] .sun-icon {
+        display: block;
+      }
+      .toolbar {
+        min-height: 74px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border-bottom: 1px solid var(--border);
+      }
+      .button {
+        min-width: 106px;
+        padding: 0 16px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 9px;
+        font-size: 0.9rem;
+        font-weight: 700;
+      }
+      .button-primary {
+        border-color: var(--accent);
+        background: var(--accent);
+        color: #fff;
+        box-shadow: 0 7px 18px color-mix(in srgb, var(--accent) 22%, transparent);
+      }
+      .button-primary:hover {
+        border-color: var(--accent-hover);
+        background: var(--accent-hover);
+      }
+      .button-quiet {
+        min-width: auto;
+        border-color: transparent;
+        background: transparent;
+        color: var(--muted);
+      }
+      .button-small {
+        min-width: auto;
+        min-height: 36px;
+        padding: 0 12px;
+        font-size: 0.82rem;
+      }
+      .button:disabled {
+        cursor: not-allowed;
+        opacity: 0.48;
+        transform: none;
+      }
+      .divider {
+        width: 1px;
+        height: 32px;
+        margin: 0 8px;
+        background: var(--border);
+      }
+      .indent-control {
+        padding: 0;
+        display: inline-grid;
+        grid-template-columns: repeat(2, 1fr);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+      }
+      .segment-input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+        pointer-events: none;
+      }
+      .segment-label {
+        min-width: 92px;
+        border: 0;
+        border-radius: 0;
+        display: grid;
+        place-items: center;
+        color: var(--muted);
+        font-size: 0.85rem;
+        font-weight: 700;
+      }
+      .segment-label + .segment-input + .segment-label {
+        border-left: 1px solid var(--border);
+      }
+      .segment-input:checked + .segment-label {
+        background: var(--accent);
+        color: #fff;
+      }
+      .shortcut {
+        margin-left: 2px;
+        padding: 1px 5px;
+        border: 1px solid currentColor;
+        border-radius: 4px;
+        font: 600 0.68rem var(--mono);
+        opacity: 0.68;
+      }
+      .status {
+        min-height: 66px;
+        margin: 16px 0 12px;
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        background: var(--surface);
+      }
+      .status[data-state="success"] {
+        border-color: color-mix(in srgb, var(--success) 32%, var(--border));
+        background: var(--success-soft);
+        color: var(--success);
+      }
+      .status[data-state="error"] {
+        border-color: color-mix(in srgb, var(--error) 34%, var(--border));
+        background: var(--error-soft);
+        color: var(--error);
+      }
+      .status[data-state="warning"] {
+        border-color: color-mix(in srgb, var(--warning) 34%, var(--border));
+        background: var(--warning-soft);
+        color: var(--warning);
+      }
+      .status-icon {
+        width: 26px;
+        height: 26px;
+        display: grid;
+        place-items: center;
+        flex: none;
+        border: 1px solid currentColor;
+        border-radius: 50%;
+      }
+      .status-icon svg {
+        width: 15px;
+      }
+      .status-copy strong,
+      .status-copy span {
+        display: block;
+      }
+      .status-copy strong {
+        font-size: 0.9rem;
+      }
+      .status-copy span {
+        margin-top: 1px;
+        color: var(--muted);
+        font-size: 0.82rem;
+      }
+      .workspace {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+      .panel {
+        min-width: 0;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface);
+        box-shadow: var(--shadow);
+      }
+      .panel-header {
+        min-height: 58px;
+        padding: 10px 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg);
+      }
+      .panel-title {
+        min-width: 0;
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+      }
+      .panel-title h2 {
+        margin: 0;
+        font-size: 0.95rem;
+        white-space: nowrap;
+      }
+      .panel-meta {
+        color: var(--muted);
+        font-size: 0.76rem;
+        white-space: nowrap;
+      }
+      .panel-actions {
+        display: flex;
+        gap: 8px;
+      }
+      .editor {
+        height: clamp(330px, 48vh, 540px);
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        overflow: hidden;
+      }
+      .line-numbers {
+        min-width: 52px;
+        height: 100%;
+        padding: 15px 12px 28px 8px;
+        overflow: hidden;
+        border-right: 1px solid var(--border);
+        color: var(--muted);
+        background: var(--surface-2);
+        font: 0.82rem/1.65 var(--mono);
+        text-align: right;
+        user-select: none;
+        white-space: pre;
+      }
+      .code-input,
+      .code-output {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 15px 16px 28px;
+        overflow: auto;
+        border: 0;
+        outline: 0;
+        background: var(--surface);
+        color: var(--text);
+        font: 0.82rem/1.65 var(--mono);
+        font-variant-ligatures: none;
+        tab-size: 2;
+        white-space: pre;
+      }
+      /* Custom Scrollbars */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--border-strong);
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: var(--muted);
+      }
+      .code-input,
+      .code-output,
+      .line-numbers {
+        scrollbar-width: thin;
+        scrollbar-color: var(--border-strong) transparent;
+      }
+      .code-input {
+        resize: none;
+        caret-color: var(--accent);
+      }
+      .code-input::placeholder,
+      .output-placeholder {
+        color: var(--muted);
+        opacity: 0.75;
+      }
+      .code-output code {
+        font: inherit;
+      }
+      .token-key {
+        color: #d13c46;
+      }
+      .token-string {
+        color: #2457c5;
+      }
+      .token-number {
+        color: #8a4fb3;
+      }
+      .token-boolean {
+        color: #087f5b;
+      }
+      .token-null {
+        color: #b45309;
+      }
+      html[data-theme="dark"] .token-key {
+        color: #ff7b86;
+      }
+      html[data-theme="dark"] .token-string {
+        color: #8ab4ff;
+      }
+      html[data-theme="dark"] .token-number {
+        color: #d6a4f0;
+      }
+      html[data-theme="dark"] .token-boolean {
+        color: #62d9ad;
+      }
+      html[data-theme="dark"] .token-null {
+        color: #f8cb71;
+      }
+      .stats {
+        min-height: 86px;
+        margin-top: 16px;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        background: var(--surface);
+      }
+      .stat {
+        min-width: 0;
+        padding: 14px 24px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      .stat + .stat {
+        border-left: 1px solid var(--border);
+      }
+      .stat-icon {
+        width: 42px;
+        height: 42px;
+        display: grid;
+        place-items: center;
+        flex: none;
+        border-radius: 50%;
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+      .stat-icon svg {
+        width: 20px;
+      }
+      .stat-copy span,
+      .stat-copy strong {
+        display: block;
+      }
+      .stat-copy span {
+        color: var(--muted);
+        font-size: 0.76rem;
+      }
+      .stat-copy strong {
+        margin-top: 1px;
+        overflow: hidden;
+        font-size: 1rem;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      footer {
+        margin-top: auto;
+        padding: 24px 0 2px;
+        color: var(--muted);
+        font-size: 0.82rem;
+        text-align: center;
+      }
+      footer a {
+        color: var(--accent);
+        font-weight: 700;
+        text-underline-offset: 3px;
+      }
+      @media (max-width: 860px) {
+        .app {
+          padding-inline: 18px;
+        }
+        .workspace {
+          grid-template-columns: 1fr;
+        }
+        .editor {
+          height: 380px;
+        }
+        .stat {
+          padding-inline: 16px;
+        }
+      }
+      @media (max-width: 620px) {
+        .app {
+          padding-inline: 12px;
+        }
+        header {
+          min-height: 88px;
+        }
+        .brand {
+          gap: 10px;
+        }
+        .brand-mark {
+          min-width: 42px;
+          font-size: 2rem;
+        }
+        .brand p {
+          max-width: 235px;
+          font-size: 0.78rem;
+        }
+        .toolbar {
+          padding: 12px 0;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+        .toolbar .button {
+          flex: 1 1 0;
+          min-width: 88px;
+        }
+        .divider {
+          display: none;
+        }
+        .indent-control {
+          width: 100%;
+          order: 2;
+        }
+        .segment-label {
+          min-width: 0;
+        }
+        .shortcut {
+          display: none;
+        }
+        .status {
+          align-items: flex-start;
+        }
+        .panel-header {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+        .panel-actions {
+          width: 100%;
+        }
+        .panel-actions .button {
+          flex: 1;
+        }
+        .editor {
+          height: 340px;
+        }
+        .line-numbers {
+          min-width: 42px;
+          padding-inline: 6px 8px;
+        }
+        .code-input,
+        .code-output {
+          padding-inline: 12px;
+          font-size: 0.78rem;
+        }
+        .stats {
+          grid-template-columns: 1fr;
+        }
+        .stat + .stat {
+          border-top: 1px solid var(--border);
+          border-left: 0;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">{ }</div>
+          <div>
+            <h1>JSON Formatter</h1>
+            <p>Format, validate, and minify JSON — right in your browser.</p>
+          </div>
+        </div>
+        <button class="icon-button" id="themeToggle" type="button" aria-label="Switch theme">
+          <svg class="moon-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20.2 15.2A8.5 8.5 0 0 1 8.8 3.8 8.5 8.5 0 1 0 20.2 15.2Z" /></svg>
+          <svg class="sun-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <circle cx="12" cy="12" r="3.5" />
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+          </svg>
+        </button>
+      </header>
+      <main>
+        <div class="toolbar" aria-label="JSON actions">
+          <button class="button button-primary" id="formatButton" type="button">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="m5 3-3 3 3 3M19 3l3 3-3 3M9 5l6 2-6 2M5 15l-3 3 3 3M19 15l3 3-3 3M9 17l6 2-6 2" /></svg><span>Format</span><span class="shortcut" aria-hidden="true">⌘↵</span>
+          </button>
+          <button class="button" id="minifyButton" type="button">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="m8 3-5 5 5 5M16 3l5 5-5 5M4 18h16" /></svg><span>Minify</span>
+          </button>
+          <button class="button button-quiet" id="clearButton" type="button">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 6h18M8 6V4h8v2M6 6l1 15h10l1-15M10 10v7M14 10v7" /></svg><span>Clear</span>
+          </button>
+          <span class="divider" aria-hidden="true"></span>
+          <fieldset class="indent-control">
+            <legend class="visually-hidden">Indent size</legend>
+            <input class="segment-input" type="radio" name="indent" id="indent2" value="2" checked /><label class="segment-label" for="indent2">2 spaces</label><input class="segment-input" type="radio" name="indent" id="indent4" value="4" /><label class="segment-label" for="indent4">4 spaces</label>
+          </fieldset>
+        </div>
+        <div class="status" id="status" data-state="success" role="status" aria-live="polite">
+          <span class="status-icon" id="statusIcon" aria-hidden="true"></span><span class="status-copy"><strong id="statusTitle">Valid JSON</strong><span id="statusDetail">JSON is valid and ready to format.</span></span>
+        </div>
+        <section class="workspace" aria-label="JSON editor workspace">
+          <article class="panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <h2><label for="jsonInput">Input JSON</label></h2>
+                <span class="panel-meta" id="inputMeta">0 characters</span>
+              </div>
+            </div>
+            <div class="editor">
+              <div class="line-numbers" id="inputLines" aria-hidden="true">1</div>
+              <textarea class="code-input" id="jsonInput" wrap="off" spellcheck="false" autocomplete="off" autocapitalize="off" aria-describedby="statusDetail" placeholder='Paste JSON here, for example: {"name":"Ada"}'></textarea>
+            </div>
+          </article>
+          <article class="panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <h2>Output JSON</h2>
+                <span class="panel-meta" id="outputMeta">0 characters</span>
+              </div>
+              <div class="panel-actions">
+                <button class="button button-small" id="copyButton" type="button" disabled>
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">
+                    <rect x="8" y="8" width="12" height="12" rx="2" />
+                    <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></svg
+                  ><span id="copyLabel">Copy</span></button
+                ><button class="button button-small" id="downloadButton" type="button" disabled>
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3v12M7 10l5 5 5-5M4 19h16" /></svg><span>Download</span>
+                </button>
+              </div>
+            </div>
+            <div class="editor">
+              <div class="line-numbers" id="outputLines" aria-hidden="true">1</div>
+              <pre class="code-output" id="jsonOutput" tabindex="0" aria-label="Formatted JSON output"><code><span class="output-placeholder">Formatted JSON will appear here.</span></code></pre>
+            </div>
+          </article>
+        </section>
+        <section class="stats" aria-label="JSON statistics">
+          <div class="stat">
+            <span class="stat-icon" aria-hidden="true"
+              ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <circle cx="8" cy="15" r="4" />
+                <path d="m11 12 8-8M16 4l4 4M14 9l3 3" /></svg></span
+            ><span class="stat-copy"><span>Keys</span><strong id="keyCount">0</strong></span>
+          </div>
+          <div class="stat">
+            <span class="stat-icon" aria-hidden="true"
+              ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h10M9 5v14M6 19h6M16 10h5M18.5 10v9M16 19h5" /></svg></span
+            ><span class="stat-copy"><span>Characters</span><strong id="characterCount">0</strong></span>
+          </div>
+          <div class="stat">
+            <span class="stat-icon" aria-hidden="true"
+              ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 2h8l4 4v16H6zM14 2v5h5" /></svg></span
+            ><span class="stat-copy"><span>File size</span><strong id="fileSize">0 B</strong></span>
+          </div>
+        </section>
+      </main>
+      <footer>Built for the browser. No uploads, no tracking. Part of <a href="https://github.com/praveenscience/One-File-Tools" target="_blank" rel="noopener noreferrer">One File Tools</a>.</footer>
+    </div>
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const input = $("jsonInput");
+      const output = $("jsonOutput");
+      const icons = {
+        success: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 12 4 4 10-10"/></svg>',
+        error: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 7v6M12 17h.01"/></svg>',
+        warning: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 8v5M12 17h.01"/></svg>',
+        neutral: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 8v4M12 16h.01"/></svg>'
+      };
+      let outputText = "";
+      let indentSize = 2;
+      let validationTimer;
+
+      function errorLocation(source, error) {
+        const message = String(error.message || "Invalid JSON");
+        const lineColumn = message.match(/line\s+(\d+)\s+column\s+(\d+)/i);
+        const positionMatch = message.match(/(?:at\s+)?position\s+(\d+)/i);
+        let position = null,
+          line = null,
+          column = null;
+        if (lineColumn) {
+          line = Number(lineColumn[1]);
+          column = Number(lineColumn[2]);
+          position =
+            source
+              .split("\n")
+              .slice(0, line - 1)
+              .reduce((sum, row) => sum + row.length + 1, 0) +
+            column -
+            1;
+        } else if (positionMatch) position = Math.min(Number(positionMatch[1]), source.length);
+        else if (/unexpected end|end of json input/i.test(message)) position = source.length;
+        if (position !== null && line === null) {
+          const before = source.slice(0, position);
+          line = before.split("\n").length;
+          column = position - before.lastIndexOf("\n");
+        }
+        let cleanMessage = message
+          .replace(/^JSON\.parse:\s*/i, "")
+          .replace(/\s+at\s+position\s+\d+(?:\s+\(line\s+\d+\s+column\s+\d+\))?/i, "")
+          .replace(/\s+in\s+JSON\s+at\s+position\s+\d+/i, "")
+          .replace(/\s+at\s+line\s+\d+\s+column\s+\d+(?:\s+of\s+the\s+JSON\s+data)?/i, "")
+          .replace(/\s+at\s+line\s+\d+(?:\s+of\s+the\s+JSON\s+data)?/i, "")
+          .trim();
+        if (cleanMessage) {
+          cleanMessage = cleanMessage.charAt(0).toUpperCase() + cleanMessage.slice(1);
+        }
+        return { position, line, column, message: cleanMessage };
+      }
+      function parse(source) {
+        try {
+          return { ok: true, value: JSON.parse(source) };
+        } catch (error) {
+          return { ok: false, location: errorLocation(source, error) };
+        }
+      }
+      function countKeys(value) {
+        if (Array.isArray(value)) return value.reduce((sum, item) => sum + countKeys(item), 0);
+        if (value && typeof value === "object") return Object.entries(value).reduce((sum, [, item]) => sum + 1 + countKeys(item), 0);
+        return 0;
+      }
+      function setStatus(state, title, detail) {
+        $("status").dataset.state = state;
+        $("statusIcon").innerHTML = icons[state] || icons.neutral;
+        $("statusTitle").textContent = title;
+        $("statusDetail").textContent = detail;
+      }
+      function showError(result, focus = false) {
+        const location = result.location;
+        setStatus("error", location.line !== null ? `Invalid JSON — line ${location.line}, column ${location.column}` : "Invalid JSON", location.message);
+        if (focus && location.position !== null) {
+          input.focus();
+          input.setSelectionRange(location.position, Math.min(location.position + 1, input.value.length));
+        }
+      }
+      function escapeHtml(value) {
+        return value.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[c]);
+      }
+      function highlight(json) {
+        const pattern = /("(?:\\u[\da-fA-F]{4}|\\[^u]|[^\\"])*"\s*:)|("(?:\\u[\da-fA-F]{4}|\\[^u]|[^\\"])*")|\b(true|false)\b|\b(null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g;
+        let html = "",
+          previous = 0;
+        json.replace(pattern, (token, key, string, boolean, nullToken, offset) => {
+          html += escapeHtml(json.slice(previous, offset));
+          const className = key ? "token-key" : string ? "token-string" : boolean ? "token-boolean" : nullToken ? "token-null" : "token-number";
+          html += `<span class="${className}">${escapeHtml(token)}</span>`;
+          previous = offset + token.length;
+          return token;
+        });
+        return html + escapeHtml(json.slice(previous));
+      }
+      function lineNumbers(element, text) {
+        element.textContent = Array.from({ length: Math.max(1, text.split("\n").length) }, (_, i) => i + 1).join("\n");
+      }
+      function bytesLabel(bytes) {
+        return bytes < 1024 ? `${bytes} B` : bytes < 1048576 ? `${(bytes / 1024).toFixed(bytes < 10240 ? 2 : 1)} KB` : `${(bytes / 1048576).toFixed(2)} MB`;
+      }
+      function stats(parsedValue) {
+        const text = outputText || input.value;
+        let value = parsedValue;
+        if (value === undefined && input.value.trim()) {
+          const result = parse(input.value);
+          if (result.ok) value = result.value;
+        }
+        $("keyCount").textContent = value === undefined ? "—" : countKeys(value).toLocaleString();
+        $("characterCount").textContent = text.length.toLocaleString();
+        $("fileSize").textContent = bytesLabel(new TextEncoder().encode(text).length);
+      }
+      function renderOutput(text) {
+        outputText = text;
+        output.innerHTML = text ? `<code>${highlight(text)}</code>` : '<code><span class="output-placeholder">Formatted JSON will appear here.</span></code>';
+        lineNumbers($("outputLines"), text);
+        output.scrollTop = 0;
+        output.scrollLeft = 0;
+        $("copyButton").disabled = !text;
+        $("downloadButton").disabled = !text;
+        $("outputMeta").textContent = `${text.length.toLocaleString()} ${text.length === 1 ? "character" : "characters"}`;
+        stats();
+      }
+      function updateInput() {
+        const length = input.value.length;
+        $("inputMeta").textContent = `${length.toLocaleString()} ${length === 1 ? "character" : "characters"}`;
+        lineNumbers($("inputLines"), input.value);
+      }
+      function transform(minify = false) {
+        const source = input.value.trim();
+        if (!source) {
+          renderOutput("");
+          setStatus("warning", "Nothing to process", "Paste or type JSON in the input editor first.");
+          input.focus();
+          return;
+        }
+        const result = parse(source);
+        if (!result.ok) {
+          renderOutput("");
+          showError(result, true);
+          return;
+        }
+        renderOutput(JSON.stringify(result.value, null, minify ? 0 : indentSize));
+        setStatus("success", minify ? "JSON minified" : "JSON formatted", minify ? "Valid JSON compressed to a single line." : `Valid JSON formatted with ${indentSize}-space indentation.`);
+      }
+      function validate() {
+        const source = input.value.trim();
+        if (!source) {
+          setStatus("neutral", "Ready for JSON", "Paste or type JSON, then format or minify it.");
+          stats();
+          return;
+        }
+        const result = parse(source);
+        if (result.ok) {
+          setStatus("success", "Valid JSON", "JSON is valid and ready to format.");
+          stats(result.value);
+        } else {
+          showError(result);
+          stats();
+        }
+      }
+      async function copyOutput() {
+        if (!outputText) return;
+        let copied = false;
+        try {
+          if (navigator.clipboard && isSecureContext) {
+            await navigator.clipboard.writeText(outputText);
+            copied = true;
+          }
+        } catch {
+          copied = false;
+        }
+        if (!copied) {
+          const helper = document.createElement("textarea");
+          helper.value = outputText;
+          helper.readOnly = true;
+          helper.style.cssText = "position:fixed;opacity:0";
+          document.body.appendChild(helper);
+          helper.select();
+          copied = document.execCommand("copy");
+          helper.remove();
+        }
+        if (copied) {
+          $("copyLabel").textContent = "Copied";
+          setTimeout(() => ($("copyLabel").textContent = "Copy"), 1600);
+        } else setStatus("error", "Copy failed", "Select the output and copy it manually.");
+      }
+      function downloadOutput() {
+        if (!outputText) return;
+        const url = URL.createObjectURL(new Blob([outputText], { type: "application/json;charset=utf-8" }));
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "formatted.json";
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+      }
+      function setTheme(theme, save = true) {
+        document.documentElement.dataset.theme = theme;
+        const next = theme === "dark" ? "light" : "dark";
+        $("themeToggle").ariaLabel = `Switch to ${next} theme`;
+        $("themeToggle").title = `Switch to ${next} theme`;
+        if (save)
+          try {
+            localStorage.setItem("json-formatter-theme", theme);
+          } catch {}
+      }
+      $("formatButton").addEventListener("click", () => transform(false));
+      $("minifyButton").addEventListener("click", () => transform(true));
+      $("clearButton").addEventListener("click", () => {
+        input.value = "";
+        renderOutput("");
+        updateInput();
+        validate();
+        input.focus();
+      });
+      $("copyButton").addEventListener("click", copyOutput);
+      $("downloadButton").addEventListener("click", downloadOutput);
+      document.querySelectorAll('input[name="indent"]').forEach((radio) =>
+        radio.addEventListener("change", () => {
+          indentSize = Number(radio.value);
+          if (outputText) transform(false);
+        })
+      );
+      input.addEventListener("input", () => {
+        renderOutput("");
+        updateInput();
+        clearTimeout(validationTimer);
+        validationTimer = setTimeout(validate, 220);
+      });
+      input.addEventListener("scroll", () => ($("inputLines").scrollTop = input.scrollTop));
+      output.addEventListener("scroll", () => ($("outputLines").scrollTop = output.scrollTop));
+      $("themeToggle").addEventListener("click", () => setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark"));
+      matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (event) => {
+        try {
+          if (!localStorage.getItem("json-formatter-theme")) setTheme(event.matches ? "dark" : "light", false);
+        } catch {
+          setTheme(event.matches ? "dark" : "light", false);
+        }
+      });
+      document.addEventListener("keydown", (event) => {
+        if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+          event.preventDefault();
+          transform(false);
+        }
+        if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "m") {
+          event.preventDefault();
+          transform(true);
+        }
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+          event.preventDefault();
+          $("clearButton").click();
+        }
+      });
+      input.value = '{"project":"One File Tools","offline":true,"features":["format","validate","minify"],"settings":{"indent":2,"theme":"system"}}';
+      setTheme(document.documentElement.dataset.theme || "light", false);
+      updateInput();
+      transform(false);
+    </script>
+  </body>
+</html>
