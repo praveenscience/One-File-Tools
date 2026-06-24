@@ -89,7 +89,7 @@ Below is a curated list of tool ideas waiting to be built. Each idea is a potent
 | Neumorphism Generator — create soft UI / neumorphic styles  | Easy       |
 | CSS Grid Generator — build CSS Grid layouts visually        | Medium     |
 | Flexbox Playground — experiment with Flexbox properties     | Medium     |
-| Clip Path Generator — create CSS clip-path shapes           | Medium     |
+
 | CSS Unit Converter — convert between px, rem, em, vw, vh    | Easy       |
 | Animation Cubic-Bezier Editor — design easing curves        | Medium     |
 
