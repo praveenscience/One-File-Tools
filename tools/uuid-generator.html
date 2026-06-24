@@ -301,24 +301,61 @@ Built for One File Tools.
 
       let currentCount = 1;
 
-      // Polyfill or fallback for crypto.randomUUID if needed
+      // Generate a cryptographically secure UUID v4 (RFC 4122 §4.4).
+      // Priority order:
+      //   1. crypto.randomUUID()       — native, available in Chrome 92+, Firefox 95+, Safari 15.4+
+      //   2. crypto.getRandomValues()  — CSPRNG fallback, available since Chrome 11 / Firefox 21 / Safari 6.1
+      //   3. Error                     — no crypto support; refuse to silently generate insecure UUIDs
       function generateUUID() {
-        if (typeof crypto !== "undefined" && crypto.randomUUID) {
+        // 1. Native implementation
+        if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
           return crypto.randomUUID();
         }
-        return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
-          const r = (Math.random() * 16) | 0,
-            v = c == "x" ? r : (r & 0x3) | 0x8;
-          return v.toString(16);
-        });
+
+        // 2. CSPRNG fallback via getRandomValues — builds a valid v4 UUID manually
+        if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+          const bytes = new Uint8Array(16);
+          crypto.getRandomValues(bytes);
+
+          // Set version 4 bits: bits 12-15 of byte 6 = 0100
+          bytes[6] = (bytes[6] & 0x0f) | 0x40;
+
+          // Set variant bits: bits 6-7 of byte 8 = 10 (RFC 4122 variant)
+          bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+          // Format as xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+          return [
+            bytes.slice(0, 4),
+            bytes.slice(4, 6),
+            bytes.slice(6, 8),
+            bytes.slice(8, 10),
+            bytes.slice(10, 16)
+          ]
+            .map((seg) => Array.from(seg).map((b) => b.toString(16).padStart(2, "0")).join(""))
+            .join("-");
+        }
+
+        // 3. No crypto support — surface a clear error instead of silently using Math.random()
+        throw new Error(
+          "Cryptographically secure random number generation is not available in this environment. " +
+          "UUID generation has been disabled to prevent insecure output."
+        );
       }
 
       function updateOutput() {
-        const uuids = [];
-        for (let i = 0; i < currentCount; i++) {
-          uuids.push(generateUUID());
+        try {
+          const uuids = [];
+          for (let i = 0; i < currentCount; i++) {
+            uuids.push(generateUUID());
+          }
+          outputEl.value = uuids.join("\n");
+          outputEl.style.color = "";
+        } catch (err) {
+          // generateUUID throws when no cryptographically secure RNG is available.
+          // Surface the error clearly rather than silently falling back to Math.random().
+          outputEl.value = "Error: " + err.message;
+          outputEl.style.color = "var(--accent)";
         }
-        outputEl.value = uuids.join("\n");
       }
 
       countBtns.forEach((btn) => {
