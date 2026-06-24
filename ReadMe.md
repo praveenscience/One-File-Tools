@@ -28,16 +28,17 @@ Every tool in this collection is a standalone `.html` file containing all the HT
   Keep it alphabetical within each category.
 -->
 
-| # | Tool                                                          | Category            | Description                                                                                                                      | Live                                                                     |
-| - | ------------------------------------------------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| 1 | [Aspect Ratio Calculator](tools/aspect-ratio-calculator.html) | Image Tools         | Calculate and simplify aspect ratios instantly. Supports common presets and outputs decimal ratio and CSS padding-bottom values. | [Try it](https://one-file-tools.pages.dev/tools/aspect-ratio-calculator) |
-| 2 | [Border Radius Generator](tools/border-radius-generator.html) | CSS Tools           | Visually create CSS border-radius values with live preview, presets, and copy-ready CSS output.                                  | [Try it](https://one-file-tools.pages.dev/tools/border-radius-generator) |
-| 3 | [Clip Path Generator](tools/clip-path-generator.html)         | CSS Tools           | Visually create complex CSS clip-path shapes and instantly copy the generated code.                                              | [Try it](https://one-file-tools.pages.dev/tools/clip-path-generator)     |
-| 4 | [Favicon Generator](tools/favicon-generator.html)             | Developer Utilities | Generate a complete favicon pack and integration tags from any image, offline.                                                   | [Try it](https://one-file-tools.pages.dev/tools/favicon-generator)       |
-| 5 | [JSON Formatter](tools/json-formatter.html)                   | JSON & API          | Format, validate, and minify JSON locally in your browser.                                                                       | [Try it](https://one-file-tools.pages.dev/tools/json-formatter)          |
-| 6 | [Open Graph Inspector](tools/open-graph-inspector.html)       | Web & SEO           | Analyze meta tags, social previews, and SEO metadata for any URL with actionable scores.                                         | [Try it](https://one-file-tools.pages.dev/tools/open-graph-inspector)    |
-| 7 | [UUID Generator](tools/uuid-generator.html)                   | Developer Utilities | Generate random v4 UUIDs instantly, offline.                                                                                     | [Try it](https://one-file-tools.pages.dev/tools/uuid-generator)          |
-| 8 | [GitHub Token Validator Plain](tools/github-token-validator-plain.html) | Developer Utilities | Validate GitHub personal access tokens with a plain terminal-style interface. | [Try it](http://127.0.0.1:5500/tools/github-token-validator-plain.html) |
+| # | Tool | Category | Description | Live |
+|---|------|----------|-------------|------|
+| 1 | [Aspect Ratio Calculator](tools/aspect-ratio-calculator.html) | Image Tools | Calculate and simplify aspect ratios instantly. Supports common presets and outputs decimal ratio and CSS padding-bottom values. | [Try it](https://one-file-tools.pages.dev/tools/aspect-ratio-calculator) |
+| 2 | [Border Radius Generator](tools/border-radius-generator.html) | CSS Tools | Visually create CSS border-radius values with live preview, presets, and copy-ready CSS output. | [Try it](https://one-file-tools.pages.dev/tools/border-radius-generator) |
+| 3 | [Clip Path Generator](tools/clip-path-generator.html) | CSS Tools | Visually create complex CSS clip-path shapes and instantly copy the generated code. | [Try it](https://one-file-tools.pages.dev/tools/clip-path-generator) |
+| 4 | [Favicon Generator](tools/favicon-generator.html) | Developer Utilities | Generate a complete favicon pack and integration tags from any image, offline. | [Try it](https://one-file-tools.pages.dev/tools/favicon-generator) |
+| 5 | [GitHub Token Validator Plain](tools/github-token-validator-plain.html) | Developer Utilities | Validate GitHub personal access tokens with a plain terminal-style interface. | [Try it](https://one-file-tools.pages.dev/tools/github-token-validator-plain) |
+| 6 | [JSON Formatter](tools/json-formatter.html) | JSON & API | Format, validate, and minify JSON locally in your browser. | [Try it](https://one-file-tools.pages.dev/tools/json-formatter) |
+| 7 | [Open Graph Inspector](tools/open-graph-inspector.html) | Web & SEO | Analyze meta tags, social previews, and SEO metadata for any URL with actionable scores. | [Try it](https://one-file-tools.pages.dev/tools/open-graph-inspector) |
+| 8 | [UUID Generator](tools/uuid-generator.html) | Developer Utilities | Generate random v4 UUIDs instantly, offline. | [Try it](https://one-file-tools.pages.dev/tools/uuid-generator) |
+
 
 > **Want to see your tool here?** Check out the [Contributing Guide](Contributing.md) and pick an idea from the [Ideas Board](#ideas-board).
 
