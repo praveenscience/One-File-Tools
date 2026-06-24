@@ -37,7 +37,7 @@ Every tool in this collection is a standalone `.html` file containing all the HT
 | 5 | [JSON Formatter](tools/json-formatter.html)                   | JSON & API          | Format, validate, and minify JSON locally in your browser.                                                                       | [Try it](https://one-file-tools.pages.dev/tools/json-formatter)          |
 | 6 | [Open Graph Inspector](tools/open-graph-inspector.html)       | Web & SEO           | Analyze meta tags, social previews, and SEO metadata for any URL with actionable scores.                                         | [Try it](https://one-file-tools.pages.dev/tools/open-graph-inspector)    |
 | 7 | [UUID Generator](tools/uuid-generator.html)                   | Developer Utilities | Generate random v4 UUIDs instantly, offline.                                                                                     | [Try it](https://one-file-tools.pages.dev/tools/uuid-generator)          |
-| 8 | [GitHub Token Validator Plain](tools/github-token-validator-plain.html) | Developer Utilities | Validate GitHub personal access tokens with a plain terminal-style interface. | [Try it](http://127.0.0.1:5500/tools/github-token-validator-plain.html) |
+| 8 | [GitHub Token Validator Plain](tools/github-token-validator-plain.html) | Developer Utilities | Validate GitHub personal access tokens with a plain terminal-style interface. | [Try it](tools/github-token-validator-plain.html) |
 
 > **Want to see your tool here?** Check out the [Contributing Guide](Contributing.md) and pick an idea from the [Ideas Board](#ideas-board).
 
