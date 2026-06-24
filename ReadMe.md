@@ -90,7 +90,7 @@ Below is a curated list of tool ideas waiting to be built. Each idea is a potent
 | ----------------------------------------------------------- | ---------- |
 | Box Shadow Generator — design box shadows with live preview | Easy       |
 | ~~Border Radius Generator~~ — ✅ [Built](tools/border-radius-generator.html) | Easy       |
-| Glassmorphism Generator — create frosted glass effects      | Easy       |
+
 | Neumorphism Generator — create soft UI / neumorphic styles  | Easy       |
 | CSS Grid Generator — build CSS Grid layouts visually        | Medium     |
 | Flexbox Playground — experiment with Flexbox properties     | Medium     |
