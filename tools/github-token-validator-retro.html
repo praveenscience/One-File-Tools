@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GitHub Token Validator Retro — One File Tools</title>
+    <meta name="description" content="Validate GitHub Personal Access Tokens and view account ownership and scopes with a retro terminal theme." />
+    <style>
+      /* Retro Green Phosphor CRT Terminal styling */
+      @import url("https://fonts.googleapis.com/css2?family=VT323&display=swap");
+
+      :root {
+        --color-bg: #030804;
+        --color-text: #00ff66;
+        --color-text-dim: #008833;
+        --color-text-glow: rgba(0, 255, 102, 0.6);
+        --color-border: #00ff66;
+        --color-error: #ff3333;
+        --color-error-glow: rgba(255, 51, 51, 0.6);
+        --color-success: #00ff66;
+        --color-success-glow: rgba(0, 255, 102, 0.8);
+        --font-mono: "VT323", "Courier New", Courier, monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background-color: var(--color-bg);
+        color: var(--color-text);
+        font-family: var(--font-mono);
+        font-size: 1.5rem;
+        line-height: 1.4;
+        min-height: 100vh;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        overflow-x: hidden;
+      }
+
+      /* CRT Scanline overlay */
+      .scanlines {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+        background-size: 100% 4px;
+        z-index: 1000;
+        pointer-events: none;
+      }
+
+      /* Vignette overlay */
+      .vignette {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(circle, transparent 50%, rgba(0, 0, 0, 0.7) 120%);
+        z-index: 1001;
+        pointer-events: none;
+      }
+
+      /* Screen flicker animation */
+      @keyframes flicker {
+        0% {
+          opacity: 0.99;
+        }
+        50% {
+          opacity: 1;
+        }
+        100% {
+          opacity: 0.99;
+        }
+      }
+
+      .terminal-screen {
+        width: 100%;
+        max-width: 720px;
+        background-color: rgba(2, 10, 3, 0.9);
+        border: 3px double var(--color-border);
+        box-shadow:
+          0 0 25px var(--color-text-glow),
+          inset 0 0 15px rgba(0, 255, 102, 0.15);
+        padding: 30px;
+        border-radius: 4px;
+        position: relative;
+        animation: flicker 0.15s infinite;
+      }
+
+      /* ASCII Art */
+      .ascii-art {
+        font-size: 0.75rem;
+        line-height: 1.15;
+        white-space: pre;
+        margin-bottom: 20px;
+        text-shadow: 0 0 5px var(--color-text-glow);
+        text-align: center;
+        display: flex;
+        justify-content: center;
+        overflow-x: auto;
+      }
+
+      header {
+        margin-bottom: 25px;
+        border-bottom: 1px dashed var(--color-border);
+        padding-bottom: 15px;
+      }
+
+      h1 {
+        font-size: 2.3rem;
+        text-align: center;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        text-shadow: 0 0 8px var(--color-text-glow);
+        margin-bottom: 8px;
+      }
+
+      .description {
+        font-size: 1.25rem;
+        text-align: center;
+        color: var(--color-text-dim);
+      }
+
+      .terminal-row {
+        margin-bottom: 20px;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 1.3rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        text-shadow: 0 0 5px var(--color-text-glow);
+      }
+
+      .input-container {
+        display: flex;
+        background-color: rgba(0, 0, 0, 0.6);
+        border: 1px solid var(--color-border);
+        padding: 8px 12px;
+        box-shadow: inset 0 0 8px rgba(0, 255, 102, 0.2);
+        align-items: center;
+      }
+
+      .prompt-indicator {
+        margin-right: 10px;
+        user-select: none;
+        text-shadow: 0 0 5px var(--color-text-glow);
+      }
+
+      input[type="text"],
+      input[type="password"] {
+        flex: 1;
+        background: transparent;
+        border: none;
+        outline: none;
+        color: var(--color-text);
+        font-family: var(--font-mono);
+        font-size: 1.4rem;
+        text-shadow: 0 0 5px var(--color-text-glow);
+        width: 100%;
+      }
+
+      input::placeholder {
+        color: var(--color-text-dim);
+        opacity: 0.5;
+      }
+
+      .control-panel {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 15px;
+        margin-top: 15px;
+      }
+
+      .checkbox-container {
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+        user-select: none;
+        font-size: 1.2rem;
+      }
+
+      .checkbox-container input {
+        display: none;
+      }
+
+      .custom-checkbox {
+        width: 18px;
+        height: 18px;
+        border: 1px solid var(--color-border);
+        margin-right: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.6);
+        box-shadow: inset 0 0 4px rgba(0, 255, 102, 0.2);
+      }
+
+      .checkbox-container input:checked + .custom-checkbox::after {
+        content: "[X]";
+        color: var(--color-text);
+        font-size: 1.1rem;
+        text-shadow: 0 0 3px var(--color-text-glow);
+      }
+
+      .checkbox-container input:not(:checked) + .custom-checkbox::after {
+        content: "[ ]";
+        color: var(--color-text-dim);
+        font-size: 1.1rem;
+      }
+
+      .checkbox-label {
+        text-shadow: 0 0 3px var(--color-text-glow);
+      }
+
+      .btn-validate {
+        background-color: transparent;
+        border: 1px solid var(--color-border);
+        color: var(--color-text);
+        font-family: var(--font-mono);
+        font-size: 1.4rem;
+        padding: 8px 24px;
+        cursor: pointer;
+        text-transform: uppercase;
+        box-shadow: 0 0 5px rgba(0, 255, 102, 0.2);
+        transition: all 0.2s ease;
+        text-shadow: 0 0 5px var(--color-text-glow);
+      }
+
+      .btn-validate:hover {
+        background-color: var(--color-text);
+        color: var(--color-bg);
+        box-shadow: 0 0 15px var(--color-text-glow);
+        text-shadow: none;
+      }
+
+      .btn-validate:active {
+        transform: scale(0.98);
+      }
+
+      .console-log {
+        background-color: rgba(0, 0, 0, 0.8);
+        border: 1px solid var(--color-border);
+        min-height: 180px;
+        padding: 15px;
+        box-shadow: inset 0 0 10px rgba(0, 255, 102, 0.15);
+        margin-top: 25px;
+        font-size: 1.3rem;
+        overflow-y: auto;
+        max-height: 250px;
+      }
+
+      .log-line {
+        margin-bottom: 6px;
+        word-break: break-all;
+      }
+
+      .log-line::before {
+        content: "> ";
+        color: var(--color-text-dim);
+      }
+
+      .log-error {
+        color: var(--color-error);
+        text-shadow: 0 0 5px var(--color-error-glow);
+      }
+
+      .log-error::before {
+        content: "❌ ";
+        color: var(--color-error);
+      }
+
+      .log-success {
+        color: var(--color-success);
+        text-shadow: 0 0 8px var(--color-success-glow);
+      }
+
+      .log-success::before {
+        content: "✓ ";
+        color: var(--color-success);
+      }
+
+      .blinking-cursor {
+        display: inline-block;
+        width: 10px;
+        height: 1.3rem;
+        background-color: var(--color-text);
+        margin-left: 4px;
+        animation: blink 1s infinite steps(2);
+        vertical-align: middle;
+      }
+
+      @keyframes blink {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0;
+        }
+      }
+
+      footer {
+        margin-top: 30px;
+        text-align: center;
+        font-size: 1.1rem;
+        color: var(--color-text-dim);
+      }
+
+      footer a {
+        color: var(--color-text);
+        text-decoration: none;
+        border-bottom: 1px dashed var(--color-text);
+      }
+
+      footer a:hover {
+        background-color: var(--color-text);
+        color: var(--color-bg);
+        text-shadow: none;
+      }
+
+      /* Adjust styling for validation state transitions */
+      .error-theme {
+        --color-border: var(--color-error);
+        --color-text: var(--color-error);
+        --color-text-glow: var(--color-error-glow);
+        --color-text-dim: #990000;
+      }
+
+      .success-theme {
+        --color-border: #00ff66;
+        --color-text: #00ff66;
+        --color-text-glow: var(--color-success-glow);
+      }
+
+      /* Responsive adjustments */
+      @media (max-width: 600px) {
+        body {
+          padding: 10px;
+          font-size: 1.2rem;
+        }
+        .terminal-screen {
+          padding: 15px;
+        }
+        h1 {
+          font-size: 1.8rem;
+        }
+        .ascii-art {
+          font-size: 0.6rem;
+        }
+        .btn-validate {
+          width: 100%;
+          text-align: center;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="scanlines"></div>
+    <div class="vignette"></div>
+
+    <div class="terminal-screen" id="screen">
+      <header>
+        <div class="ascii-art" aria-hidden="true">========================================= ___ ___ _____ _ _ _ _ ___ ___ ___ / __|_ _|_ _| || | | | | _ ) | _ \/ _ \ | (_ || | | | | __ | |_| | _ \ | / (_) | \___|___| |_| |_||_|\___/|___/ |_|_\\___/ =========================================</div>
+        <h1 id="main-title">GitHub Token Validator</h1>
+        <p class="description">Secure checking of GitHub Personal Access Tokens.</p>
+      </header>
+
+      <main>
+        <div class="terminal-row">
+          <label for="token">Input GitHub Access Token:</label>
+          <div class="input-container">
+            <span class="prompt-indicator">SYS_SECURE></span>
+            <input type="password" id="token" placeholder="ghp_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" autocomplete="off" />
+          </div>
+          <div class="control-panel">
+            <label class="checkbox-container">
+              <input type="checkbox" id="toggleVisibility" />
+              <span class="custom-checkbox"></span>
+              <span class="checkbox-label">Display input characters</span>
+            </label>
+            <button class="btn-validate" id="validateBtn">VALIDATE</button>
+          </div>
+        </div>
+
+        <div class="console-log" id="consoleLog" role="log" aria-live="polite">
+          <div class="log-line">SYSTEM READY. AWAITING TOKEN INPUT...<span class="blinking-cursor"></span></div>
+        </div>
+      </main>
+
+      <footer>
+        <p>Part of <a href="https://github.com/praveenscience/One-File-Tools" target="_blank" rel="noopener noreferrer">One File Tools</a></p>
+      </footer>
+    </div>
+
+    <script>
+      const consoleLog = document.getElementById("consoleLog");
+      const screen = document.getElementById("screen");
+      const tokenInput = document.getElementById("token");
+      const toggleVisibility = document.getElementById("toggleVisibility");
+      const validateBtn = document.getElementById("validateBtn");
+
+      toggleVisibility.addEventListener("change", () => {
+        if (toggleVisibility.checked) {
+          tokenInput.type = "text";
+        } else {
+          tokenInput.type = "password";
+        }
+      });
+
+      function clearLog() {
+        consoleLog.innerHTML = "";
+      }
+
+      function appendLog(text, type = "normal") {
+        // Remove trailing cursor if exists
+        const oldCursor = consoleLog.querySelector(".blinking-cursor");
+        if (oldCursor) {
+          oldCursor.remove();
+        }
+
+        const line = document.createElement("div");
+        line.className = "log-line";
+        if (type === "error") line.classList.add("log-error");
+        if (type === "success") line.classList.add("log-success");
+        line.textContent = text;
+
+        // Add cursor to the new line
+        const cursor = document.createElement("span");
+        cursor.className = "blinking-cursor";
+        line.appendChild(cursor);
+
+        consoleLog.appendChild(line);
+        consoleLog.scrollTop = consoleLog.scrollHeight;
+      }
+
+      const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+      validateBtn.addEventListener("click", async () => {
+        const token = tokenInput.value.trim();
+
+        // Reset theme classes
+        screen.className = "terminal-screen";
+        clearLog();
+
+        if (!token) {
+          appendLog("VALIDATING TOKEN INTEGRITY...");
+          await sleep(200);
+          screen.className = "terminal-screen error-theme";
+          appendLog("ERROR: SECURE STRING COMPROMISED. COMPONENT: NULL_TOKEN.", "error");
+          appendLog("PLEASE SUPPLY A VALID GITHUB PERSONAL ACCESS TOKEN.", "error");
+          return;
+        }
+
+        appendLog("INITIALIZING HANDSHAKE...");
+        await sleep(250);
+        appendLog("CONNECTING TO ENDPOINT: api.github.com...");
+        await sleep(250);
+        appendLog("SENDING AUTHORIZATION CREDENTIALS...");
+        await sleep(200);
+
+        try {
+          const response = await fetch("https://api.github.com/user", {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          });
+
+          appendLog(`RESPONSE RECEIVED: STATUS ${response.status} ${response.statusText}`);
+          await sleep(200);
+
+          if (!response.ok) {
+            screen.className = "terminal-screen error-theme";
+            appendLog("ACCESS REJECTED. CREDENTIAL INVALID.", "error");
+            return;
+          }
+
+          const userData = await response.json();
+          const scopes = response.headers.get("x-oauth-scopes") || "No scopes declared (or Fine-Grained Token)";
+
+          screen.className = "terminal-screen success-theme";
+          appendLog("SECURITY ACCESS GRANTED.", "success");
+          await sleep(150);
+          appendLog(`OWNER : ${userData.login}`, "success");
+          await sleep(150);
+          appendLog(`ID    : ${userData.id}`, "success");
+          await sleep(150);
+          appendLog(`SCOPES: ${scopes}`, "success");
+          await sleep(150);
+          appendLog("VALIDATION COMPLETE.", "success");
+        } catch (error) {
+          console.error(error);
+          screen.className = "terminal-screen error-theme";
+          appendLog("HARDWARE EXCEPTION ENCOUNTERED.", "error");
+          await sleep(150);
+          appendLog(`MESSAGE: ${error.message || "CONNECTION RESET"}`, "error");
+        }
+      });
+    </script>
+  </body>
+</html>
