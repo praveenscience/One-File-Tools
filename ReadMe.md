@@ -44,6 +44,7 @@ Every tool in this collection is a standalone `.html` file containing all the HT
 | 12 | [Open Graph Inspector](tools/open-graph-inspector.html) | Web & SEO | Analyze meta tags, social previews, and SEO metadata for any URL with actionable scores. | [Try it](https://one-file-tools.pages.dev/tools/open-graph-inspector) |
 | 13 | [Palette Generator](tools/palette-generator.html) | Color Tools | Generate unique, collision-free variation color schemes based on color theory metrics, offline. | [Try it](https://one-file-tools.pages.dev/tools/palette-generator) |
 | 14 | [UUID Generator](tools/uuid-generator.html) | Developer Utilities | Generate random v4 UUIDs instantly, offline. | [Try it](https://one-file-tools.pages.dev/tools/uuid-generator) |
+| 15 | [Box Shadow Generator](tools/box-shadow-generator.html) | CSS Tools | Generate customizable CSS box-shadows with live preview, color selection, opacity controls, inset support, and copy-ready CSS output. | [Try it](https://one-file-tools.pages.dev/tools/box-shadow-generator) |
 
 > **Want to see your tool here?** Check out the [Contributing Guide](Contributing.md) and pick an idea from the [Ideas Board](#ideas-board).
 
@@ -95,7 +96,7 @@ Below is a curated list of tool ideas waiting to be built. Each idea is a potent
 
 | Idea                                                        | Difficulty |
 | ----------------------------------------------------------- | ---------- |
-| Box Shadow Generator — design box shadows with live preview | Easy       |
+| ~~Box Shadow Generator~~ — ✅ [Built](tools/box-shadow-generator.html) | Easy |
 | ~~Border Radius Generator~~ — ✅ [Built](tools/border-radius-generator.html) | Easy |
 | ~~Clip Path Generator~~ — ✅ [Built](tools/clip-path-generator.html) | Medium |
 | ~~Glassmorphism Generator~~ — ✅ [Built](tools/glassmorphism-generator.html) | Easy |
@@ -106,6 +107,7 @@ Below is a curated list of tool ideas waiting to be built. Each idea is a potent
 | Animation Cubic-Bezier Editor — design easing curves        | Medium     |
 | CSS Easing Visualizer — draw cubic-bezier curves with animated preview | Medium |
 | Tailwind → Vanilla CSS Converter — paste Tailwind classes, get equivalent CSS | Medium |
+
 
 ### Text & Content
 
