@@ -681,7 +681,6 @@ Built for One File Tools.
           
         } else {
           // Curve Mode
-          previewTarget.style.clipPath = `url(#custom-curve-clip)`;
           
           // 1. Generate path for actual SVG clipPath (Units: objectBoundingBox from 0 to 1)
           const unitPath = getSmoothPath(points, 0.01, 0.01);
@@ -690,6 +689,9 @@ Built for One File Tools.
           // 2. Generate path for the visual dotted line overlay (Units: Absolute pixels of workspace)
           const absPath = getSmoothPath(points, rect.width / 100, rect.height / 100);
           svgDisplayPath.setAttribute("d", absPath);
+          
+          // Apply path directly via CSS path() for the live preview to avoid browser SVG reference caching issues
+          previewTarget.style.clipPath = `path('${absPath}')`;
           
           svgPolygon.style.display = "none";
           svgDisplayPath.style.display = "block";
@@ -723,9 +725,31 @@ Built for One File Tools.
         y = Math.max(0, Math.min(100, y));
         
         // Find closest edge to insert the point
+        let minDistance = Infinity;
         let insertIndex = points.length;
-        // Simple append for now
-        points.push({x, y});
+
+        for (let i = 0; i < points.length; i++) {
+          const p1 = points[i];
+          const p2 = points[(i + 1) % points.length];
+          
+          // distance from point to line segment squared
+          const l2 = (p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2;
+          let t = 0;
+          if (l2 !== 0) {
+            t = ((x - p1.x) * (p2.x - p1.x) + (y - p1.y) * (p2.y - p1.y)) / l2;
+            t = Math.max(0, Math.min(1, t));
+          }
+          const projX = p1.x + t * (p2.x - p1.x);
+          const projY = p1.y + t * (p2.y - p1.y);
+          const dist2 = (x - projX) ** 2 + (y - projY) ** 2;
+
+          if (dist2 < minDistance) {
+            minDistance = dist2;
+            insertIndex = i + 1;
+          }
+        }
+        
+        points.splice(insertIndex, 0, {x, y});
         renderHandles();
         updateClipPath();
       });
