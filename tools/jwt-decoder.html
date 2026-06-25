@@ -1,0 +1,738 @@
+<!--
+  JWT Decoder
+  Decode and inspect JSON Web Tokens — header, payload, signature — entirely offline.
+  Built for One File Tools.
+-->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Decode and inspect JSON Web Tokens (JWT) — header, payload, claims, and expiry — entirely in your browser." />
+    <title>JWT Decoder — One File Tools</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <style>
+      /* ── Reset ── */
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+      /* ── Design tokens ── */
+      :root {
+        --bg:           #0e1a2b;
+        --grid-line:    #16263d;
+        --panel:        #142440;
+        --panel-border: #23385c;
+        --accent:       #ff6b35;
+        --cyan:         #5eead4;
+        --green:        #4ade80;
+        --yellow:       #facc15;
+        --red:          #f87171;
+        --text:         #e9eff7;
+        --text-muted:   #8aa0c2;
+        --text-dim:     #4f6388;
+        --radius-sm:    8px;
+        --radius-md:    14px;
+        /* JWT part colours */
+        --jwt-header:  #f472b6;  /* pink  */
+        --jwt-payload: #facc15;  /* yellow */
+        --jwt-sig:     #818cf8;  /* indigo */
+      }
+
+      body {
+        font-family: "Inter", system-ui, sans-serif;
+        background-color: var(--bg);
+        background-image:
+          linear-gradient(var(--grid-line) 1px, transparent 1px),
+          linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+        background-size: 28px 28px;
+        color: var(--text);
+        padding: 48px 20px 80px;
+        min-height: 100vh;
+      }
+
+      .app { max-width: 780px; margin: 0 auto; }
+
+      /* ── Hero ── */
+      .hero { text-align: center; margin-bottom: 40px; animation: rise 0.45s ease both; }
+      .eyebrow {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        color: var(--cyan);
+        text-transform: uppercase;
+        margin-bottom: 14px;
+      }
+      .wordmark {
+        font-family: "Space Grotesk", sans-serif;
+        font-weight: 700;
+        font-size: clamp(38px, 7vw, 56px);
+        letter-spacing: -0.01em;
+        line-height: 1;
+      }
+      .tagline { color: var(--text-muted); font-size: 15px; margin-top: 10px; }
+
+      /* ── Panel ── */
+      .studio {
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-md);
+        padding: 28px 28px 32px;
+        box-shadow: 0 24px 48px -14px rgba(0,0,0,0.5);
+        animation: rise 0.45s ease 0.08s both;
+      }
+
+      /* ── Section label ── */
+      .section-label {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text-dim);
+        margin-bottom: 8px;
+      }
+
+      /* ── Token input ── */
+      .input-wrap { position: relative; margin-bottom: 20px; }
+      .token-input {
+        width: 100%;
+        min-height: 108px;
+        background: var(--bg);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 16px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 13px;
+        color: var(--text);
+        line-height: 1.65;
+        resize: vertical;
+        outline: none;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        word-break: break-all;
+      }
+      .token-input::placeholder { color: var(--text-dim); }
+      .token-input:focus {
+        border-color: var(--cyan);
+        box-shadow: 0 0 0 2px rgba(94,234,212,0.15);
+      }
+
+      /* Coloured token preview */
+      .token-coloured {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 13px;
+        line-height: 1.65;
+        word-break: break-all;
+        padding: 16px;
+        background: var(--bg);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        margin-bottom: 20px;
+        min-height: 60px;
+        display: none;
+      }
+      .token-coloured.visible { display: block; }
+      .part-header  { color: var(--jwt-header); }
+      .part-dot     { color: var(--text-dim); }
+      .part-payload { color: var(--jwt-payload); }
+      .part-sig     { color: var(--jwt-sig); }
+
+      /* ── Toolbar ── */
+      .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 24px;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font-family: "Inter", sans-serif;
+        font-size: 13px;
+        font-weight: 600;
+        border: none;
+        border-radius: var(--radius-sm);
+        padding: 10px 18px;
+        cursor: pointer;
+        transition: all 0.18s;
+      }
+      .btn svg { width: 15px; height: 15px; flex-shrink: 0; }
+      .btn-primary  { background: var(--accent); color: #1a0f08; }
+      .btn-primary:hover  { background: #ff7a4a; transform: translateY(-1px); }
+      .btn-secondary { background: var(--bg); color: var(--text); border: 1px solid var(--panel-border); }
+      .btn-secondary:hover { border-color: var(--text-muted); }
+      .btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid transparent; padding: 10px 14px; }
+      .btn-ghost:hover { color: var(--text); border-color: var(--panel-border); }
+
+      .spacer { flex: 1; }
+
+      /* ── Status badge ── */
+      .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 5px 12px;
+        border-radius: 999px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .status-badge .dot { width: 7px; height: 7px; border-radius: 50%; }
+      .status-valid   { background: rgba(74,222,128,0.12); color: var(--green); }
+      .status-valid   .dot { background: var(--green); }
+      .status-expired { background: rgba(250,204,21,0.12); color: var(--yellow); }
+      .status-expired .dot { background: var(--yellow); }
+      .status-invalid { background: rgba(248,113,113,0.12); color: var(--red); }
+      .status-invalid .dot { background: var(--red); }
+
+      /* ── Divider ── */
+      .divider { border: none; border-top: 1px solid var(--panel-border); margin: 24px 0; }
+
+      /* ── Parts grid ── */
+      .parts-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+      @media (max-width: 580px) { .parts-grid { grid-template-columns: 1fr; } }
+
+      .part-card {
+        background: var(--bg);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+      }
+      .part-card-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--panel-border);
+      }
+      .part-pill {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        padding: 3px 9px;
+        border-radius: 999px;
+      }
+      .pill-header  { background: rgba(244,114,182,0.15); color: var(--jwt-header); }
+      .pill-payload { background: rgba(250,204,21,0.15);  color: var(--jwt-payload); }
+      .pill-sig     { background: rgba(129,140,248,0.15); color: var(--jwt-sig); }
+
+      .part-copy-btn {
+        margin-left: auto;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        color: var(--text-dim);
+        padding: 2px 4px;
+        border-radius: 4px;
+        transition: color 0.15s;
+        display: flex;
+        align-items: center;
+      }
+      .part-copy-btn:hover { color: var(--text); }
+      .part-copy-btn svg { width: 14px; height: 14px; }
+
+      .part-body {
+        padding: 14px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        line-height: 1.7;
+        color: var(--text-muted);
+        white-space: pre-wrap;
+        word-break: break-all;
+        max-height: 240px;
+        overflow-y: auto;
+      }
+      /* JSON syntax colours inside part-body */
+      .part-body .jk { color: var(--cyan); }        /* key */
+      .part-body .js { color: var(--green); }       /* string value */
+      .part-body .jn { color: #fb923c; }            /* number */
+      .part-body .jb { color: var(--jwt-sig); }     /* boolean/null */
+
+      /* Signature spans full width */
+      .part-card.sig-card { grid-column: 1 / -1; }
+      .sig-card .part-body { color: var(--jwt-sig); word-break: break-all; }
+
+      /* ── Claims table ── */
+      .claims-section { margin-top: 16px; }
+      .claims-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      .claims-table th {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 10px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--text-dim);
+        text-align: left;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--panel-border);
+        background: var(--bg);
+      }
+      .claims-table td {
+        padding: 9px 12px;
+        border-bottom: 1px solid var(--panel-border);
+        vertical-align: top;
+      }
+      .claims-table tr:last-child td { border-bottom: none; }
+      .claims-table td:first-child {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        color: var(--cyan);
+        white-space: nowrap;
+        width: 120px;
+      }
+      .claims-table td:nth-child(2) { color: var(--text-muted); font-size: 12px; white-space: nowrap; width: 140px; }
+      .claims-table td:last-child { color: var(--text); word-break: break-word; }
+
+      .claim-tag {
+        display: inline-block;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 10px;
+        padding: 2px 7px;
+        border-radius: 4px;
+        background: rgba(94,234,212,0.1);
+        color: var(--cyan);
+        margin-right: 4px;
+      }
+      .time-expired { color: var(--red); }
+      .time-ok      { color: var(--green); }
+
+      /* ── Empty / error state ── */
+      .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: var(--text-dim);
+        font-size: 14px;
+        display: none;
+      }
+      .empty-state.visible { display: block; }
+      .empty-icon { font-size: 36px; margin-bottom: 12px; }
+
+      /* ── Scrollbar ── */
+      .part-body::-webkit-scrollbar { width: 4px; }
+      .part-body::-webkit-scrollbar-track { background: transparent; }
+      .part-body::-webkit-scrollbar-thumb { background: var(--panel-border); border-radius: 2px; }
+
+      /* ── Animation ── */
+      @keyframes rise {
+        from { opacity: 0; transform: translateY(8px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+
+      /* ── Responsive toolbar ── */
+      @media (max-width: 500px) {
+        .toolbar { flex-direction: column; align-items: stretch; }
+        .toolbar .spacer { display: none; }
+        .btn { justify-content: center; }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="app">
+
+      <!-- Hero -->
+      <header class="hero">
+        <div class="eyebrow">JSON & API</div>
+        <h1 class="wordmark">JWT Decoder</h1>
+        <p class="tagline">Decode and inspect JSON Web Tokens — header, payload, claims, and expiry — 100% offline.</p>
+      </header>
+
+      <!-- Main panel -->
+      <main class="studio">
+
+        <!-- Input -->
+        <div class="section-label">Paste your token</div>
+        <div class="input-wrap">
+          <textarea
+            id="tokenInput"
+            class="token-input"
+            placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+            spellcheck="false"
+            autocomplete="off"
+            aria-label="JWT token input"
+          ></textarea>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="toolbar">
+          <button class="btn btn-primary" id="decodeBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+            </svg>
+            Decode
+          </button>
+          <button class="btn btn-secondary" id="copyAllBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="11" height="11" rx="2"/>
+              <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>
+            </svg>
+            <span id="copyAllLabel">Copy JSON</span>
+          </button>
+          <button class="btn btn-ghost" id="clearBtn" title="Clear">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+            Clear
+          </button>
+          <div class="spacer"></div>
+          <div id="statusBadge" style="display:none"></div>
+        </div>
+
+        <!-- Coloured token preview -->
+        <div class="section-label" id="previewLabel" style="display:none">Token structure</div>
+        <div id="tokenColoured" class="token-coloured"></div>
+
+        <!-- Error state -->
+        <div id="emptyState" class="empty-state visible">
+          <div class="empty-icon">🔐</div>
+          <div>Paste a JWT above and click <strong>Decode</strong> to inspect it.</div>
+        </div>
+
+        <!-- Results -->
+        <div id="results" style="display:none">
+          <hr class="divider" />
+
+          <!-- Header + Payload cards -->
+          <div class="parts-grid">
+            <!-- Header -->
+            <div class="part-card">
+              <div class="part-card-header">
+                <span class="part-pill pill-header">Header</span>
+                <button class="part-copy-btn" id="copyHeaderBtn" title="Copy header JSON">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="9" y="9" width="11" height="11" rx="2"/>
+                    <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>
+                  </svg>
+                </button>
+              </div>
+              <div class="part-body" id="headerBody"></div>
+            </div>
+
+            <!-- Payload -->
+            <div class="part-card">
+              <div class="part-card-header">
+                <span class="part-pill pill-payload">Payload</span>
+                <button class="part-copy-btn" id="copyPayloadBtn" title="Copy payload JSON">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="9" y="9" width="11" height="11" rx="2"/>
+                    <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>
+                  </svg>
+                </button>
+              </div>
+              <div class="part-body" id="payloadBody"></div>
+            </div>
+
+            <!-- Signature -->
+            <div class="part-card sig-card">
+              <div class="part-card-header">
+                <span class="part-pill pill-sig">Signature</span>
+                <button class="part-copy-btn" id="copySigBtn" title="Copy signature">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="9" y="9" width="11" height="11" rx="2"/>
+                    <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>
+                  </svg>
+                </button>
+              </div>
+              <div class="part-body" id="sigBody"></div>
+            </div>
+          </div>
+
+          <!-- Claims table -->
+          <div class="claims-section" id="claimsSection" style="display:none">
+            <hr class="divider" />
+            <div class="section-label">Standard claims</div>
+            <div class="part-card">
+              <table class="claims-table" id="claimsTable">
+                <thead>
+                  <tr>
+                    <th>Claim</th>
+                    <th>Meaning</th>
+                    <th>Value</th>
+                  </tr>
+                </thead>
+                <tbody id="claimsBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+        </div><!-- /results -->
+
+      </main>
+    </div>
+
+    <script>
+      // ── DOM refs ──────────────────────────────────────────
+      const tokenInput     = document.getElementById("tokenInput");
+      const decodeBtn      = document.getElementById("decodeBtn");
+      const clearBtn       = document.getElementById("clearBtn");
+      const copyAllBtn     = document.getElementById("copyAllBtn");
+      const copyAllLabel   = document.getElementById("copyAllLabel");
+      const statusBadge    = document.getElementById("statusBadge");
+      const tokenColoured  = document.getElementById("tokenColoured");
+      const previewLabel   = document.getElementById("previewLabel");
+      const emptyState     = document.getElementById("emptyState");
+      const results        = document.getElementById("results");
+      const headerBody     = document.getElementById("headerBody");
+      const payloadBody    = document.getElementById("payloadBody");
+      const sigBody        = document.getElementById("sigBody");
+      const claimsSection  = document.getElementById("claimsSection");
+      const claimsBody     = document.getElementById("claimsBody");
+      const copyHeaderBtn  = document.getElementById("copyHeaderBtn");
+      const copyPayloadBtn = document.getElementById("copyPayloadBtn");
+      const copySigBtn     = document.getElementById("copySigBtn");
+
+      // State for copy-all
+      let decodedAll = null;
+
+      // ── Base64-url decode ─────────────────────────────────
+      function base64UrlDecode(str) {
+        // Pad and replace URL-safe chars
+        str = str.replace(/-/g, "+").replace(/_/g, "/");
+        const pad = str.length % 4;
+        if (pad === 2) str += "==";
+        else if (pad === 3) str += "=";
+        try {
+          return decodeURIComponent(
+            atob(str)
+              .split("")
+              .map(c => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+              .join("")
+          );
+        } catch {
+          return atob(str);
+        }
+      }
+
+      // ── Minimal JSON syntax highlighter ──────────────────
+      function syntaxHighlight(obj) {
+        const json = JSON.stringify(obj, null, 2);
+        return json.replace(
+          /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+          match => {
+            if (/^"/.test(match)) {
+              if (/:$/.test(match)) return `<span class="jk">${match}</span>`;
+              return `<span class="js">${match}</span>`;
+            }
+            if (/true|false|null/.test(match)) return `<span class="jb">${match}</span>`;
+            return `<span class="jn">${match}</span>`;
+          }
+        );
+      }
+
+      // ── Standard JWT claim metadata ───────────────────────
+      const CLAIM_META = {
+        iss: "Issuer",
+        sub: "Subject",
+        aud: "Audience",
+        exp: "Expires at",
+        nbf: "Not before",
+        iat: "Issued at",
+        jti: "JWT ID",
+      };
+
+      // ── Format a Unix timestamp ───────────────────────────
+      function fmtTime(ts) {
+        try {
+          return new Date(ts * 1000).toLocaleString();
+        } catch {
+          return String(ts);
+        }
+      }
+
+      // ── Copy helper ───────────────────────────────────────
+      async function copyText(text, labelEl, original) {
+        try {
+          await navigator.clipboard.writeText(text);
+          if (labelEl) { labelEl.textContent = "Copied!"; setTimeout(() => labelEl.textContent = original, 2000); }
+        } catch {
+          if (labelEl) { labelEl.textContent = "Error"; setTimeout(() => labelEl.textContent = original, 2000); }
+        }
+      }
+
+      // ── Set button icon feedback for icon-only buttons ────
+      function flashIcon(btn) {
+        const orig = btn.innerHTML;
+        btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><polyline points="20 6 9 17 4 12"/></svg>`;
+        setTimeout(() => btn.innerHTML = orig, 1800);
+      }
+
+      // ── Show status badge ─────────────────────────────────
+      function showStatus(type, text) {
+        statusBadge.style.display = "inline-flex";
+        statusBadge.className = `status-badge status-${type}`;
+        statusBadge.innerHTML = `<span class="dot"></span>${text}`;
+      }
+
+      // ── Main decode ───────────────────────────────────────
+      function decode() {
+        const raw = tokenInput.value.trim();
+
+        // Reset UI
+        emptyState.classList.remove("visible");
+        results.style.display = "none";
+        tokenColoured.classList.remove("visible");
+        previewLabel.style.display = "none";
+        statusBadge.style.display = "none";
+        decodedAll = null;
+
+        if (!raw) {
+          emptyState.classList.add("visible");
+          return;
+        }
+
+        const parts = raw.split(".");
+        if (parts.length !== 3) {
+          emptyState.classList.add("visible");
+          emptyState.innerHTML = `<div class="empty-icon">⚠️</div><div>Invalid JWT — expected 3 dot-separated parts, got <strong>${parts.length}</strong>.</div>`;
+          showStatus("invalid", "Invalid");
+          return;
+        }
+
+        // Parse header
+        let header, payload;
+        try {
+          header = JSON.parse(base64UrlDecode(parts[0]));
+        } catch {
+          emptyState.classList.add("visible");
+          emptyState.innerHTML = `<div class="empty-icon">⚠️</div><div>Could not decode <strong>header</strong>. Make sure the token is valid Base64url.</div>`;
+          showStatus("invalid", "Invalid");
+          return;
+        }
+        try {
+          payload = JSON.parse(base64UrlDecode(parts[1]));
+        } catch {
+          emptyState.classList.add("visible");
+          emptyState.innerHTML = `<div class="empty-icon">⚠️</div><div>Could not decode <strong>payload</strong>. Make sure the token is valid Base64url.</div>`;
+          showStatus("invalid", "Invalid");
+          return;
+        }
+
+        const signature = parts[2];
+        decodedAll = { header, payload, signature };
+
+        // Coloured token preview
+        tokenColoured.innerHTML =
+          `<span class="part-header">${parts[0]}</span>` +
+          `<span class="part-dot">.</span>` +
+          `<span class="part-payload">${parts[1]}</span>` +
+          `<span class="part-dot">.</span>` +
+          `<span class="part-sig">${parts[2]}</span>`;
+        tokenColoured.classList.add("visible");
+        previewLabel.style.display = "block";
+
+        // Render cards
+        headerBody.innerHTML  = syntaxHighlight(header);
+        payloadBody.innerHTML = syntaxHighlight(payload);
+        sigBody.textContent   = signature;
+
+        // Expiry status
+        const now = Math.floor(Date.now() / 1000);
+        if (payload.exp !== undefined) {
+          if (now > payload.exp) {
+            showStatus("expired", "Expired");
+          } else {
+            showStatus("valid", "Valid");
+          }
+        } else {
+          showStatus("valid", "Decoded");
+        }
+
+        // Standard claims table
+        const stdKeys = Object.keys(CLAIM_META);
+        const foundClaims = stdKeys.filter(k => payload[k] !== undefined);
+        if (foundClaims.length > 0) {
+          claimsBody.innerHTML = "";
+          foundClaims.forEach(k => {
+            const tr = document.createElement("tr");
+            let valueHtml = "";
+            const raw_val = payload[k];
+
+            // Time claims — format as human date
+            if (["exp", "nbf", "iat"].includes(k)) {
+              const formatted = fmtTime(raw_val);
+              let extraClass = "";
+              if (k === "exp") extraClass = now > raw_val ? "time-expired" : "time-ok";
+              valueHtml = `<span class="${extraClass}">${formatted}</span> <span class="claim-tag">${raw_val}</span>`;
+            } else if (Array.isArray(raw_val)) {
+              valueHtml = raw_val.map(v => `<span class="claim-tag">${v}</span>`).join(" ");
+            } else {
+              valueHtml = String(raw_val);
+            }
+
+            tr.innerHTML = `
+              <td>${k}</td>
+              <td>${CLAIM_META[k]}</td>
+              <td>${valueHtml}</td>
+            `;
+            claimsBody.appendChild(tr);
+          });
+          claimsSection.style.display = "block";
+        } else {
+          claimsSection.style.display = "none";
+        }
+
+        results.style.display = "block";
+      }
+
+      // ── Event listeners ───────────────────────────────────
+      decodeBtn.addEventListener("click", decode);
+
+      // Decode on paste automatically
+      tokenInput.addEventListener("paste", () => setTimeout(decode, 0));
+
+      // Decode on Enter (without shift)
+      tokenInput.addEventListener("keydown", e => {
+        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); decode(); }
+      });
+
+      clearBtn.addEventListener("click", () => {
+        tokenInput.value = "";
+        results.style.display = "none";
+        tokenColoured.classList.remove("visible");
+        previewLabel.style.display = "none";
+        statusBadge.style.display = "none";
+        emptyState.innerHTML = `<div class="empty-icon">🔐</div><div>Paste a JWT above and click <strong>Decode</strong> to inspect it.</div>`;
+        emptyState.classList.add("visible");
+        decodedAll = null;
+        tokenInput.focus();
+      });
+
+      copyAllBtn.addEventListener("click", () => {
+        if (!decodedAll) return;
+        copyText(JSON.stringify(decodedAll, null, 2), copyAllLabel, "Copy JSON");
+      });
+
+      copyHeaderBtn.addEventListener("click", async () => {
+        if (!decodedAll) return;
+        await navigator.clipboard.writeText(JSON.stringify(decodedAll.header, null, 2)).catch(() => {});
+        flashIcon(copyHeaderBtn);
+      });
+
+      copyPayloadBtn.addEventListener("click", async () => {
+        if (!decodedAll) return;
+        await navigator.clipboard.writeText(JSON.stringify(decodedAll.payload, null, 2)).catch(() => {});
+        flashIcon(copyPayloadBtn);
+      });
+
+      copySigBtn.addEventListener("click", async () => {
+        if (!decodedAll) return;
+        await navigator.clipboard.writeText(decodedAll.signature).catch(() => {});
+        flashIcon(copySigBtn);
+      });
+    </script>
+  </body>
+</html>
