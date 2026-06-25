@@ -115,6 +115,7 @@ Built for One File Tools.
         background-size: 20px 20px;
         background-position: 0 0, 10px 10px;
         touch-action: none; /* Prevent scrolling when dragging */
+        cursor: crosshair;
       }
 
       .preview-target {
@@ -122,6 +123,7 @@ Built for One File Tools.
         inset: 0;
         background: linear-gradient(135deg, #f43f5e 0%, #8b5cf6 100%);
         transition: clip-path 0.1s ease-out;
+        pointer-events: none;
       }
 
       .handles-layer {
@@ -138,7 +140,7 @@ Built for One File Tools.
         pointer-events: none;
       }
 
-      .connecting-lines polygon {
+      .connecting-lines polygon, .connecting-lines path {
         fill: rgba(244, 63, 94, 0.1);
         stroke: var(--accent);
         stroke-width: 2;
@@ -190,6 +192,7 @@ Built for One File Tools.
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         gap: 8px;
+        margin-bottom: 16px;
       }
 
       .preset-btn {
@@ -217,6 +220,83 @@ Built for One File Tools.
         font-weight: 600;
       }
 
+      .control-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+
+      .control-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .control-label {
+        font-size: 13px;
+        color: var(--text);
+        font-weight: 500;
+      }
+
+      .control-value {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--text-muted);
+        background: #0f172a;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+
+      input[type="range"] {
+        -webkit-appearance: none;
+        width: 100%;
+        background: transparent;
+      }
+      
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        height: 16px;
+        width: 16px;
+        border-radius: 50%;
+        background: var(--accent);
+        cursor: pointer;
+        margin-top: -6px;
+        box-shadow: 0 0 10px var(--accent-glow);
+      }
+      
+      input[type="range"]::-webkit-slider-runnable-track {
+        width: 100%;
+        height: 4px;
+        cursor: pointer;
+        background: var(--panel-border);
+        border-radius: 2px;
+      }
+
+      .toggle-switch {
+        display: flex;
+        background: var(--bg);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+      }
+      .toggle-btn {
+        flex: 1;
+        padding: 10px;
+        border: none;
+        background: transparent;
+        color: var(--text-muted);
+        font-family: var(--font-sans);
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .toggle-btn.active {
+        background: var(--panel-border);
+        color: var(--text);
+        font-weight: 600;
+      }
+
       .output-area {
         flex: 1;
         display: flex;
@@ -232,12 +312,13 @@ Built for One File Tools.
         border-radius: var(--radius-sm);
         padding: 16px;
         font-family: var(--font-mono);
-        font-size: 14px;
+        font-size: 13px;
         color: var(--accent);
         resize: none;
         outline: none;
         transition: border-color 0.2s;
         line-height: 1.5;
+        white-space: pre-wrap;
       }
 
       textarea:focus {
@@ -292,6 +373,14 @@ Built for One File Tools.
         opacity: 1;
       }
 
+      .helper-text {
+        font-size: 12px;
+        color: var(--text-dim);
+        margin-top: -4px;
+        margin-bottom: 16px;
+        line-height: 1.4;
+      }
+
       @media (max-width: 800px) {
         .layout {
           grid-template-columns: 1fr;
@@ -311,6 +400,15 @@ Built for One File Tools.
     </style>
   </head>
   <body>
+    <!-- Hidden SVG definition for responsive curved clipping -->
+    <svg width="0" height="0">
+      <defs>
+        <clipPath id="custom-curve-clip" clipPathUnits="objectBoundingBox">
+          <path id="svgCurvePathUnit" d=""></path>
+        </clipPath>
+      </defs>
+    </svg>
+
     <div class="app">
       <header class="hero">
         <div class="eyebrow">CSS Tools</div>
@@ -327,24 +425,48 @@ Built for One File Tools.
               <div class="preview-target" id="previewTarget"></div>
               <svg class="connecting-lines" id="connectingLines">
                 <polygon id="svgPolygon" points=""></polygon>
+                <path id="svgDisplayPath" d="" fill="none" style="display:none;"></path>
               </svg>
               <div class="handles-layer" id="handlesLayer"></div>
+            </div>
+            <div class="helper-text">
+              <strong>Tip:</strong> Double-click canvas to add a point. Double-click a handle to remove it.
             </div>
           </div>
 
           <!-- Controls -->
           <div class="controls-pane">
             <div>
-              <div class="section-title">Presets</div>
+              <div class="section-title">Shape Settings</div>
+              
+              <div class="control-group">
+                <div class="control-header">
+                  <label class="control-label">Path Type</label>
+                </div>
+                <div class="toggle-switch">
+                  <button class="toggle-btn active" id="btnPolygon">Polygon (Straight)</button>
+                  <button class="toggle-btn" id="btnCurve">Curve (Smooth)</button>
+                </div>
+              </div>
+
+              <div class="control-group" style="margin-top:20px;">
+                <div class="control-header">
+                  <label class="control-label" for="verticesRange">Regular Polygon Vertices</label>
+                  <span class="control-value" id="verticesVal">3</span>
+                </div>
+                <input type="range" id="verticesRange" min="3" max="20" value="3" step="1">
+              </div>
+
+              <div class="section-title" style="margin-top:24px;">Presets</div>
               <div class="presets-grid" id="presetsGrid">
                 <!-- Injected via JS -->
               </div>
             </div>
 
             <div class="output-area">
-              <div class="section-title">CSS Output</div>
+              <div class="section-title">Output Code</div>
               <textarea id="cssOutput" readonly></textarea>
-              <button class="btn btn-primary" id="copyBtn">Copy CSS Code</button>
+              <button class="btn btn-primary" id="copyBtn">Copy Code</button>
             </div>
           </div>
         </div>
@@ -358,10 +480,21 @@ Built for One File Tools.
       const previewTarget = document.getElementById("previewTarget");
       const handlesLayer = document.getElementById("handlesLayer");
       const svgPolygon = document.getElementById("svgPolygon");
+      const svgDisplayPath = document.getElementById("svgDisplayPath");
+      const svgCurvePathUnit = document.getElementById("svgCurvePathUnit");
+      
       const cssOutput = document.getElementById("cssOutput");
       const copyBtn = document.getElementById("copyBtn");
       const presetsGrid = document.getElementById("presetsGrid");
       const toast = document.getElementById("toast");
+      
+      const btnPolygon = document.getElementById("btnPolygon");
+      const btnCurve = document.getElementById("btnCurve");
+      const verticesRange = document.getElementById("verticesRange");
+      const verticesVal = document.getElementById("verticesVal");
+
+      // Modes
+      let isCurveMode = false;
 
       // Presets definition
       const presets = {
@@ -416,11 +549,12 @@ Built for One File Tools.
           { x: 39, y: 35 }
         ],
         Chevron: [
-          { x: 50, y: 0 },
           { x: 100, y: 50 },
-          { x: 50, y: 100 },
-          { x: 0, y: 50 },
-          { x: 25, y: 50 }
+          { x: 75, y: 100 },
+          { x: 0, y: 100 },
+          { x: 25, y: 50 },
+          { x: 0, y: 0 },
+          { x: 75, y: 0 }
         ],
         Cross: [
           { x: 35, y: 0 },
@@ -437,16 +571,6 @@ Built for One File Tools.
           { x: 35, y: 35 }
         ]
       };
-
-      // Modify chevron to a proper arrow/chevron shape
-      presets.Chevron = [
-        { x: 100, y: 50 },
-        { x: 75, y: 100 },
-        { x: 0, y: 100 },
-        { x: 25, y: 50 },
-        { x: 0, y: 0 },
-        { x: 75, y: 0 }
-      ];
 
       let points = [];
       let draggedPointIndex = null;
@@ -467,9 +591,28 @@ Built for One File Tools.
         });
       }
 
+      function generateRegularPolygon(numPoints) {
+        points = [];
+        for (let i = 0; i < numPoints; i++) {
+          const angle = (i * 2 * Math.PI) / numPoints - Math.PI / 2;
+          const x = 50 + 50 * Math.cos(angle);
+          const y = 50 + 50 * Math.sin(angle);
+          points.push({ x, y });
+        }
+        document.querySelectorAll(".preset-btn").forEach(b => b.classList.remove("active"));
+        renderHandles();
+        updateClipPath();
+      }
+
+      verticesRange.addEventListener("input", (e) => {
+        verticesVal.textContent = e.target.value;
+        generateRegularPolygon(parseInt(e.target.value));
+      });
+
       function loadPreset(name) {
-        // Deep copy preset points
         points = presets[name].map(p => ({ ...p }));
+        verticesRange.value = points.length;
+        verticesVal.textContent = points.length;
         renderHandles();
         updateClipPath();
       }
@@ -483,27 +626,133 @@ Built for One File Tools.
           handle.style.top = `${point.y}%`;
           
           handle.addEventListener("pointerdown", (e) => startDrag(e, i));
+          handle.addEventListener("dblclick", (e) => {
+            e.stopPropagation(); // prevent workspace dblclick
+            if (points.length > 3) {
+              points.splice(i, 1);
+              renderHandles();
+              updateClipPath();
+            }
+          });
           handlesLayer.appendChild(handle);
         });
       }
 
-      function updateClipPath() {
-        // Build polygon string
-        const polyString = points.map(p => `${Math.round(p.x)}% ${Math.round(p.y)}%`).join(", ");
-        const clipVal = `polygon(${polyString})`;
+      // Spline Math for Curve Mode
+      function getSmoothPath(pts, scaleX, scaleY, isUnit = false) {
+        if (pts.length < 3) return "";
+        const d = [];
+        const tension = 0.2;
         
-        // Update Target CSS
-        previewTarget.style.clipPath = clipVal;
-        
-        // Update Output Text
-        cssOutput.value = `clip-path: ${clipVal};`;
-        
-        // Update SVG connecting lines
-        const rect = workspace.getBoundingClientRect();
-        // map percentages to absolute pixels for SVG lines
-        const svgPoints = points.map(p => `${(p.x / 100) * rect.width},${(p.y / 100) * rect.height}`).join(" ");
-        svgPolygon.setAttribute("points", svgPoints);
+        for (let i = 0; i < pts.length; i++) {
+            const p0 = pts[(i - 1 + pts.length) % pts.length];
+            const p1 = pts[i];
+            const p2 = pts[(i + 1) % pts.length];
+            const p3 = pts[(i + 2) % pts.length];
+            
+            const cp1x = (p1.x + (p2.x - p0.x) * tension) * scaleX;
+            const cp1y = (p1.y + (p2.y - p0.y) * tension) * scaleY;
+            
+            const cp2x = (p2.x - (p3.x - p1.x) * tension) * scaleX;
+            const cp2y = (p2.y - (p3.y - p1.y) * tension) * scaleY;
+            
+            if (i === 0) d.push(`M ${p1.x * scaleX} ${p1.y * scaleY}`);
+            d.push(`C ${cp1x.toFixed(4)} ${cp1y.toFixed(4)}, ${cp2x.toFixed(4)} ${cp2y.toFixed(4)}, ${(p2.x * scaleX).toFixed(4)} ${(p2.y * scaleY).toFixed(4)}`);
+        }
+        return d.join(" ") + " Z";
       }
+
+      function updateClipPath() {
+        const rect = workspace.getBoundingClientRect();
+
+        if (!isCurveMode) {
+          // Polygon Mode
+          const polyString = points.map(p => `${Math.round(p.x)}% ${Math.round(p.y)}%`).join(", ");
+          const clipVal = `polygon(${polyString})`;
+          
+          previewTarget.style.clipPath = clipVal;
+          cssOutput.value = `clip-path: ${clipVal};`;
+          
+          const svgPoints = points.map(p => `${(p.x / 100) * rect.width},${(p.y / 100) * rect.height}`).join(" ");
+          svgPolygon.setAttribute("points", svgPoints);
+          
+          svgPolygon.style.display = "block";
+          svgDisplayPath.style.display = "none";
+          
+        } else {
+          // Curve Mode
+          
+          // 1. Generate path for actual SVG clipPath (Units: objectBoundingBox from 0 to 1)
+          const unitPath = getSmoothPath(points, 0.01, 0.01);
+          svgCurvePathUnit.setAttribute("d", unitPath);
+
+          // 2. Generate path for the visual dotted line overlay (Units: Absolute pixels of workspace)
+          const absPath = getSmoothPath(points, rect.width / 100, rect.height / 100);
+          svgDisplayPath.setAttribute("d", absPath);
+          
+          // Apply path directly via CSS path() for the live preview to avoid browser SVG reference caching issues
+          previewTarget.style.clipPath = `path('${absPath}')`;
+          
+          svgPolygon.style.display = "none";
+          svgDisplayPath.style.display = "block";
+
+          // 3. Generate HTML/CSS Output
+          cssOutput.value = `/* 1. Add this SVG block anywhere in your HTML body */
+<svg width="0" height="0" style="position:absolute;">
+  <defs>
+    <clipPath id="custom-curve-clip" clipPathUnits="objectBoundingBox">
+      <path d="${unitPath}"></path>
+    </clipPath>
+  </defs>
+</svg>
+
+/* 2. Apply this CSS to your element */
+.my-element {
+  clip-path: url(#custom-curve-clip);
+}`;
+        }
+      }
+
+      // Add point on canvas double click
+      workspace.addEventListener("dblclick", (e) => {
+        if (e.target.classList.contains("handle")) return; // handled separately
+        
+        const rect = workspace.getBoundingClientRect();
+        let x = ((e.clientX - rect.left) / rect.width) * 100;
+        let y = ((e.clientY - rect.top) / rect.height) * 100;
+        
+        x = Math.max(0, Math.min(100, x));
+        y = Math.max(0, Math.min(100, y));
+        
+        // Find closest edge to insert the point
+        let minDistance = Infinity;
+        let insertIndex = points.length;
+
+        for (let i = 0; i < points.length; i++) {
+          const p1 = points[i];
+          const p2 = points[(i + 1) % points.length];
+          
+          // distance from point to line segment squared
+          const l2 = (p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2;
+          let t = 0;
+          if (l2 !== 0) {
+            t = ((x - p1.x) * (p2.x - p1.x) + (y - p1.y) * (p2.y - p1.y)) / l2;
+            t = Math.max(0, Math.min(1, t));
+          }
+          const projX = p1.x + t * (p2.x - p1.x);
+          const projY = p1.y + t * (p2.y - p1.y);
+          const dist2 = (x - projX) ** 2 + (y - projY) ** 2;
+
+          if (dist2 < minDistance) {
+            minDistance = dist2;
+            insertIndex = i + 1;
+          }
+        }
+        
+        points.splice(insertIndex, 0, {x, y});
+        renderHandles();
+        updateClipPath();
+      });
 
       // Resize observer to keep SVG lines accurate when window resizes
       const resizeObserver = new ResizeObserver(() => {
@@ -513,6 +762,7 @@ Built for One File Tools.
 
       function startDrag(e, index) {
         e.preventDefault();
+        e.stopPropagation();
         isDragging = true;
         draggedPointIndex = index;
         document.body.style.cursor = "grabbing";
@@ -521,12 +771,10 @@ Built for One File Tools.
       function onPointerMove(e) {
         if (!isDragging || draggedPointIndex === null) return;
         
-        // Remove preset active state if they edit manually
         document.querySelectorAll(".preset-btn").forEach(b => b.classList.remove("active"));
         
         const rect = workspace.getBoundingClientRect();
         
-        // Calculate percentages, clamped 0-100
         let x = ((e.clientX - rect.left) / rect.width) * 100;
         let y = ((e.clientY - rect.top) / rect.height) * 100;
         
@@ -536,7 +784,6 @@ Built for One File Tools.
         points[draggedPointIndex].x = x;
         points[draggedPointIndex].y = y;
 
-        // Update DOM Handle visually (no re-render needed for performance)
         const handle = handlesLayer.children[draggedPointIndex];
         handle.style.left = `${x}%`;
         handle.style.top = `${y}%`;
@@ -545,14 +792,29 @@ Built for One File Tools.
       }
 
       function onPointerUp() {
-        isDragging = false;
-        draggedPointIndex = null;
-        document.body.style.cursor = "default";
+        if (isDragging) {
+          isDragging = false;
+          draggedPointIndex = null;
+          document.body.style.cursor = "default";
+        }
       }
 
-      // Global listeners
       window.addEventListener("pointermove", onPointerMove);
       window.addEventListener("pointerup", onPointerUp);
+
+      // Mode Toggles
+      btnPolygon.addEventListener("click", () => {
+        isCurveMode = false;
+        btnCurve.classList.remove("active");
+        btnPolygon.classList.add("active");
+        updateClipPath();
+      });
+      btnCurve.addEventListener("click", () => {
+        isCurveMode = true;
+        btnPolygon.classList.remove("active");
+        btnCurve.classList.add("active");
+        updateClipPath();
+      });
 
       // Copy Button
       copyBtn.addEventListener("click", async () => {
