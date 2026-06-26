@@ -79,7 +79,7 @@ Below is a curated list of tool ideas waiting to be built. Each idea is a potent
 | Base64 Image Converter — convert images to/from Base64               | Easy       |
 | ~~Favicon Generator~~ — ✅ [Built](tools/favicon-generator.html)     | Medium     |
 | Image Metadata Viewer — read EXIF and other metadata                 | Medium     |
-| Color Palette Extractor — extract dominant colors from an image      | Medium     |
+| ~~Color Palette Extractor~~ — ✅ [Built](tools/color-palette-extractor.html)      | Medium     |
 
 ### Color Tools
 
