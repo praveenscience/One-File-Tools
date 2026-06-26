@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TERMINAL_v1.0.4_STABLE</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet" />
+
+    <style>
+      :root {
+        --phosphor-green: #33ff33;
+        --dark-green: #003300;
+        --crt-bg: #0a0a0a;
+      }
+
+      * {
+        box-sizing: border-box;
+        font-family: "VT323", monospace;
+      }
+
+      body {
+        margin: 0;
+        background: #000;
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+      }
+
+      /* CRT SCREEN */
+      .crt-monitor {
+        position: relative;
+        width: 95%;
+        max-width: 600px;
+        height: 450px;
+        background: var(--crt-bg);
+        border: 20px solid #222;
+        border-radius: 30px;
+        box-shadow:
+          0 0 0 2px #444,
+          0 20px 50px rgba(0, 0, 0, 1),
+          inset 0 0 100px rgba(0, 0, 0, 0.8);
+        padding: 30px;
+        overflow: hidden;
+      }
+
+      /* scanlines */
+      .crt-monitor::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 255, 0, 0.06));
+        background-size:
+          100% 4px,
+          3px 100%;
+        pointer-events: none;
+      }
+
+      .screen-content {
+        position: relative;
+        z-index: 1;
+        color: var(--phosphor-green);
+        text-shadow: 0 0 8px var(--phosphor-green);
+      }
+
+      header {
+        display: flex;
+        justify-content: space-between;
+        border-bottom: 2px solid var(--phosphor-green);
+        margin-bottom: 15px;
+        padding-bottom: 5px;
+      }
+
+      #output {
+        font-size: 1.2rem;
+        height: 220px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+      }
+
+      form {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-top: 10px;
+      }
+
+      input {
+        width: 100%;
+        background: transparent;
+        border: none;
+        color: var(--phosphor-green);
+        font-size: 1.4rem;
+        outline: none;
+      }
+
+      button {
+        background: var(--phosphor-green);
+        color: var(--dark-green);
+        border: none;
+        padding: 5px 15px;
+        font-weight: bold;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background: #fff;
+      }
+
+      .cursor {
+        display: inline-block;
+        width: 10px;
+        height: 18px;
+        background: var(--phosphor-green);
+        animation: blink 0.8s infinite;
+      }
+
+      @keyframes blink {
+        50% {
+          opacity: 0;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="crt-monitor">
+      <div class="screen-content">
+        <header>
+          <span>CENTRAL_INTELLIGENCE_OS v4.2</span>
+          <span id="status">IDLE</span>
+        </header>
+
+        <div id="output">SYSTEM READY... ENTER GITHUB PERSONAL ACCESS TOKEN NOTE: USING GITHUB PUBLIC API ONLY</div>
+
+        <form id="form">
+          <span>&gt;</span>
+          <input type="text" id="token" placeholder="TOKEN_HERE" autocomplete="off" />
+          <button type="submit">RUN</button>
+        </form>
+
+        <div style="font-size: 0.8rem; opacity: 0.7">[SYSTEM] ACCESS KEYS SHOULD NOT BE SHARED <span class="cursor"></span></div>
+      </div>
+    </div>
+
+    <script>
+      const output = document.getElementById("output");
+      const form = document.getElementById("form");
+      const status = document.getElementById("status");
+
+      function typeWriter(text) {
+        output.innerHTML = "";
+        let i = 0;
+
+        function type() {
+          if (i < text.length) {
+            output.innerHTML += text.charAt(i);
+            i++;
+            setTimeout(type, 15);
+          }
+        }
+        type();
+      }
+
+      function setStatus(value) {
+        status.innerText = value;
+      }
+
+      async function getGitHubUser(token) {
+        if (!token || token.length < 10 || token.includes(" ")) {
+          typeWriter("ERROR: INVALID TOKEN FORMAT");
+          setStatus("ERROR");
+          return;
+        }
+
+        setStatus("AUTH_CHECK");
+
+        typeWriter("CONNECTING TO GITHUB API...\nVERIFYING TOKEN...");
+
+        try {
+          const response = await fetch("https://api.github.com/user", {
+            method: "GET",
+            headers: {
+              Authorization: "Bearer " + token,
+              Accept: "application/vnd.github+json"
+            }
+          });
+
+          if (!response.ok) {
+            throw new Error("AUTH_ERR_" + response.status);
+          }
+
+          const data = await response.json();
+
+          setStatus("AUTHORIZED");
+
+          setTimeout(() => {
+            const result = `
+---------------------------------
+AUTHORIZATION SUCCESS
+---------------------------------
+USERNAME : ${data.login}
+USER_ID  : ${data.id}
+NODE_ID  : ${data.node_id}
+BIO      : ${data.bio || "N/A"}
+---------------------------------
+`;
+            typeWriter(result);
+          }, 1000);
+        } catch (error) {
+          setStatus("DENIED");
+
+          setTimeout(() => {
+            typeWriter(
+              `AUTH FAILED
+REASON: ${error.message}
+CHECK TOKEN OR NETWORK CONNECTION`
+            );
+          }, 800);
+        }
+      }
+
+      form.onsubmit = (e) => {
+        e.preventDefault();
+        const token = document.getElementById("token").value.trim();
+        getGitHubUser(token);
+      };
+    </script>
+  </body>
+</html>

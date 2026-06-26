@@ -34,6 +34,7 @@ Closes #
 - [ ] I added a screenshot as `tools/<tool-name>.png` next to the HTML file
 - [ ] The tool works offline (no external API calls required for core functionality)
 - [ ] No external JS/CSS frameworks or CDN imports (Google Fonts are okay)
+- [ ] I ran `node sort-norm.js tools.json` to sort and normalize the tools registry
 - [ ] I ran `node build.js` and verified the landing page renders correctly
 
 ### For enhancements / bug fixes:
