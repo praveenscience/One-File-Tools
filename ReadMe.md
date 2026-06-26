@@ -44,6 +44,7 @@ Every tool in this collection is a standalone `.html` file containing all the HT
 | 15 | [Radii - Border Radius Generator](tools/border-radius-generator.html) | CSS Tools | Visually create CSS border-radius values with live preview, presets, and copy-ready CSS output. | [Try it](https://one-file-tools.pages.dev/tools/border-radius-generator) |
 | 16 | [Twitter / X Card Preview](tools/twitter-x-card-preview.html) | Web & SEO | Preview how Twitter/X cards appear with live updates for Summary and Summary Large Image layouts. | [Try it](https://one-file-tools.pages.dev/tools/twitter-x-card-preview) |
 | 17 | [UUID Generator](tools/uuid-generator.html) | Developer Utilities | Generate random v4 UUIDs instantly, offline. | [Try it](https://one-file-tools.pages.dev/tools/uuid-generator) |
+| 18 | [Cron Expression Builder](tools/cron-expression-builder.html) | Developer Utilities | Visually create, validate, and understand standard 5-field cron expressions with real-time explanations, presets, and upcoming execution time previews. | [Try it](https://one-file-tools.pages.dev/tools/cron-expression-builder) |
 
 > **Want to see your tool here?** Check out the [Contributing Guide](Contributing.md) and pick an idea from the [Ideas Board](#ideas-board).
 
@@ -140,7 +141,7 @@ Below is a curated list of tool ideas waiting to be built. Each idea is a potent
 | ------------------------------------------------------------ | ---------- |
 | Timestamp Converter — convert Unix timestamps to human dates | Easy       |
 | Regex Tester — test regular expressions with live matching   | Medium     |
-| Cron Expression Builder — build and explain cron schedules   | Medium     |
+| ~~Cron Expression Builder~~ — ✅ [Built](tools/cron-expression-builder.html) | Medium |
 | Hash Generator — generate MD5, SHA-1, SHA-256 hashes         | Easy       |
 | Password Generator — generate strong random passwords        | Easy       |
 | QR Code Generator — create QR codes from text or URLs        | Easy       |
