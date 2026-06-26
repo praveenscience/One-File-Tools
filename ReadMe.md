@@ -41,6 +41,7 @@ Every tool in this collection is a standalone `.html` file containing all the HT
 | 9 | [JWT Decoder](tools/jwt-decoder.html) | JSON & API | Decode and inspect JSON Web Tokens — header, payload, claims, and expiry — entirely in your browser. | [Try it](https://one-file-tools.pages.dev/tools/jwt-decoder) |
 | 10 | [Open Graph Inspector](tools/open-graph-inspector.html) | Web & SEO | Analyze meta tags, social previews, and SEO metadata for any URL with actionable scores. | [Try it](https://one-file-tools.pages.dev/tools/open-graph-inspector) |
 | 11 | [UUID Generator](tools/uuid-generator.html) | Developer Utilities | Generate random v4 UUIDs instantly, offline. | [Try it](https://one-file-tools.pages.dev/tools/uuid-generator) |
+| 12 | [Command Step Loader](tools/command-step-loader.html) | Developer Utilities | Load multiple terminal commands and navigate them sequentially with copy support. | [Try it](https://one-file-tools.pages.dev/tools/command-step-loader) |
 
 > **Want to see your tool here?** Check out the [Contributing Guide](Contributing.md) and pick an idea from the [Ideas Board](#ideas-board).
 
