@@ -1,0 +1,641 @@
+<!--
+Color Palette Extractor
+Single-file image dominant color extractor.
+Built for One File Tools.
+-->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Color Palette Extractor - One File Tools</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Feather Icons -->
+    <script src="https://unpkg.com/feather-icons"></script>
+
+    <style>
+      :root {
+        --bg: #0b0f19;
+        --grid-line: #131c2d;
+        --panel: #111827;
+        --panel-border: #1e293b;
+        --accent: #6366f1;
+        --accent-hover: #4f46e5;
+        --accent-glow: rgba(99, 102, 241, 0.2);
+        --text: #f8fafc;
+        --text-muted: #94a3b8;
+        --text-dim: #64748b;
+        --radius-sm: 12px;
+        --radius-md: 20px;
+        --font-sans: "Inter", system-ui, sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+        --font-display: "Space Grotesk", sans-serif;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg);
+        background-image: linear-gradient(var(--grid-line) 1px, transparent 1px),
+          linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+        background-size: 32px 32px;
+        background-position: center;
+        color: var(--text);
+        padding: 48px 20px 80px;
+        min-height: 100vh;
+      }
+
+      .app {
+        max-width: 900px;
+        margin: 0 auto;
+      }
+
+      .hero {
+        text-align: center;
+        margin-bottom: 48px;
+        position: relative;
+      }
+
+      .hero::before {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 300px;
+        height: 300px;
+        background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+        z-index: -1;
+        pointer-events: none;
+      }
+
+      .eyebrow {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        letter-spacing: 0.2em;
+        color: var(--accent);
+        text-transform: uppercase;
+        margin-bottom: 16px;
+        font-weight: 500;
+      }
+
+      .wordmark {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: clamp(32px, 6vw, 48px);
+        letter-spacing: -0.02em;
+        line-height: 1.1;
+        margin-bottom: 16px;
+      }
+
+      .tagline {
+        color: var(--text-muted);
+        font-size: 16px;
+        max-width: 500px;
+        margin: 0 auto;
+        line-height: 1.6;
+      }
+
+      .studio {
+        background: rgba(17, 24, 39, 0.7);
+        backdrop-filter: blur(12px);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-md);
+        padding: 32px;
+        box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.5);
+      }
+
+      /* Dropzone */
+      .dropzone {
+        border: 2px dashed var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 64px 24px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        background: rgba(15, 23, 42, 0.5);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .dropzone.dragover {
+        border-color: var(--accent);
+        background: rgba(99, 102, 241, 0.05);
+        transform: scale(1.02);
+      }
+
+      .dropzone-icon {
+        color: var(--accent);
+        margin-bottom: 16px;
+        opacity: 0.8;
+      }
+
+      .dropzone-title {
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+
+      .dropzone-text {
+        font-size: 14px;
+        color: var(--text-muted);
+      }
+
+      .file-input {
+        display: none;
+      }
+
+      /* Results Area */
+      .results {
+        display: none;
+        flex-direction: column;
+        gap: 32px;
+        animation: fadeIn 0.4s ease-out forwards;
+      }
+
+      .results.visible {
+        display: flex;
+      }
+
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 1fr 300px;
+        gap: 32px;
+        align-items: flex-start;
+      }
+
+      .preview-container {
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+        border: 1px solid var(--panel-border);
+        background: #000;
+        aspect-ratio: 4/3;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .preview-image {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+      }
+
+      .section-title {
+        font-family: var(--font-mono);
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      /* Palette */
+      .palette-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .color-swatch-container {
+        display: flex;
+        align-items: center;
+        background: rgba(15, 23, 42, 0.5);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 8px;
+        gap: 12px;
+        transition: all 0.2s;
+        cursor: pointer;
+        opacity: 0;
+        transform: translateX(10px);
+      }
+
+      .color-swatch-container.animate-in {
+        animation: slideIn 0.3s ease-out forwards;
+      }
+
+      @keyframes slideIn {
+        to { opacity: 1; transform: translateX(0); }
+      }
+
+      .color-swatch-container:hover {
+        background: rgba(30, 41, 59, 0.8);
+        border-color: var(--text-dim);
+      }
+
+      .swatch {
+        width: 48px;
+        height: 48px;
+        border-radius: 8px;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        border: 1px solid rgba(255,255,255,0.1);
+      }
+
+      .color-details {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .color-hex {
+        font-family: var(--font-mono);
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      .color-rgb {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+
+      .copy-icon {
+        color: var(--text-dim);
+        opacity: 0;
+        transition: opacity 0.2s;
+        margin-right: 8px;
+      }
+
+      .color-swatch-container:hover .copy-icon {
+        opacity: 1;
+      }
+
+      /* Action Bar */
+      .action-bar {
+        display: flex;
+        justify-content: center;
+        gap: 16px;
+        margin-top: 32px;
+        padding-top: 32px;
+        border-top: 1px solid var(--panel-border);
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        font-family: var(--font-sans);
+        font-size: 14px;
+        font-weight: 600;
+        border: none;
+        border-radius: 8px;
+        padding: 12px 24px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .btn-secondary {
+        background: rgba(30, 41, 59, 0.5);
+        color: var(--text);
+        border: 1px solid var(--panel-border);
+      }
+
+      .btn-secondary:hover {
+        background: rgba(30, 41, 59, 0.8);
+        border-color: var(--text-dim);
+      }
+
+      /* Toast */
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background: var(--text);
+        color: var(--bg);
+        padding: 12px 24px;
+        border-radius: 99px;
+        font-family: var(--font-sans);
+        font-weight: 600;
+        font-size: 14px;
+        opacity: 0;
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        z-index: 100;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .toast.show {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+      }
+
+      /* Responsive */
+      @media (max-width: 768px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+        .studio {
+          padding: 24px;
+        }
+        .dropzone {
+          padding: 48px 20px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="hero">
+        <div class="eyebrow">Image Tools</div>
+        <h1 class="wordmark">Palette Extractor</h1>
+        <p class="tagline">Extract dominant colors and generate beautiful palettes directly in your browser. 100% private and secure.</p>
+      </header>
+
+      <main class="studio">
+        <!-- Initial Upload State -->
+        <div class="dropzone" id="dropzone">
+          <i data-feather="upload-cloud" class="dropzone-icon" width="48" height="48"></i>
+          <h2 class="dropzone-title">Upload an Image</h2>
+          <p class="dropzone-text">Drag and drop or click to browse</p>
+          <input type="file" id="fileInput" class="file-input" accept="image/png, image/jpeg, image/webp" />
+        </div>
+
+        <!-- Results State -->
+        <div class="results" id="results">
+          <div class="layout">
+            <div class="preview-section">
+              <div class="section-title">Image Preview</div>
+              <div class="preview-container">
+                <img id="previewImage" class="preview-image" src="" alt="Preview" />
+              </div>
+            </div>
+            
+            <div class="palette-section">
+              <div class="section-title">
+                Extracted Palette
+                <span style="font-size: 11px; opacity: 0.5;">Click to copy HEX</span>
+              </div>
+              <div class="palette-grid" id="paletteGrid">
+                <!-- Colors injected here -->
+              </div>
+            </div>
+          </div>
+
+          <div class="action-bar">
+            <button class="btn btn-secondary" id="btnReset">
+              <i data-feather="refresh-cw" width="16" height="16"></i>
+              Extract Another Image
+            </button>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Hidden canvas for processing -->
+    <canvas id="processingCanvas" style="display: none;"></canvas>
+    
+    <div class="toast" id="toast">
+      <i data-feather="check" width="16" height="16"></i>
+      <span id="toastText">Copied to clipboard!</span>
+    </div>
+
+    <script>
+      // Initialize Icons
+      feather.replace();
+
+      // Elements
+      const dropzone = document.getElementById("dropzone");
+      const fileInput = document.getElementById("fileInput");
+      const results = document.getElementById("results");
+      const previewImage = document.getElementById("previewImage");
+      const paletteGrid = document.getElementById("paletteGrid");
+      const processingCanvas = document.getElementById("processingCanvas");
+      const ctx = processingCanvas.getContext("2d", { willReadFrequently: true });
+      const btnReset = document.getElementById("btnReset");
+      const toast = document.getElementById("toast");
+      const toastText = document.getElementById("toastText");
+
+      let currentPalette = [];
+
+      // Drag and Drop Events
+      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropzone.addEventListener(eventName, preventDefaults, false);
+      });
+
+      function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+
+      ['dragenter', 'dragover'].forEach(eventName => {
+        dropzone.addEventListener(eventName, () => dropzone.classList.add('dragover'), false);
+      });
+
+      ['dragleave', 'drop'].forEach(eventName => {
+        dropzone.addEventListener(eventName, () => dropzone.classList.remove('dragover'), false);
+      });
+
+      dropzone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const file = dt.files[0];
+        if (file && file.type.startsWith('image/')) {
+          handleFile(file);
+        }
+      });
+
+      dropzone.addEventListener('click', () => {
+        fileInput.click();
+      });
+
+      fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length) {
+          handleFile(e.target.files[0]);
+        }
+      });
+
+      btnReset.addEventListener('click', () => {
+        results.classList.remove('visible');
+        setTimeout(() => {
+          dropzone.style.display = 'block';
+          fileInput.value = '';
+          previewImage.src = '';
+          paletteGrid.innerHTML = '';
+        }, 300); // match animation duration
+      });
+
+      function handleFile(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            previewImage.src = e.target.result;
+            dropzone.style.display = 'none';
+            results.classList.add('visible');
+            extractColors(img);
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+
+      // --- Color Extraction Logic ---
+      
+      // Convert RGB to HEX
+      function rgbToHex(r, g, b) {
+        return "#" + (1 << 24 | r << 16 | g << 8 | b).toString(16).slice(1).toUpperCase();
+      }
+
+      // Calculate Euclidean distance squared between two RGB colors
+      function colorDistanceSq(c1, c2) {
+        return (c1.r - c2.r)**2 + (c1.g - c2.g)**2 + (c1.b - c2.b)**2;
+      }
+
+      function extractColors(img) {
+        paletteGrid.innerHTML = ''; // clear previous
+        
+        // Downscale image drastically for performance
+        // Max 150px on the longest edge
+        const MAX_DIM = 150;
+        let width = img.width;
+        let height = img.height;
+        
+        if (width > height) {
+          if (width > MAX_DIM) {
+            height *= MAX_DIM / width;
+            width = MAX_DIM;
+          }
+        } else {
+          if (height > MAX_DIM) {
+            width *= MAX_DIM / height;
+            height = MAX_DIM;
+          }
+        }
+
+        width = Math.max(1, Math.floor(width));
+        height = Math.max(1, Math.floor(height));
+
+        processingCanvas.width = width;
+        processingCanvas.height = height;
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const imageData = ctx.getImageData(0, 0, width, height).data;
+        const colorMap = new Map();
+
+        // 1. Quantization: Group colors into bins
+        // We drop the lowest 4 bits (divide by 16) to group similar shades.
+        // This creates 16x16x16 = 4096 possible color bins.
+        const SHIFT = 4;
+        
+        for (let i = 0; i < imageData.length; i += 4) {
+          // Ignore highly transparent pixels
+          if (imageData[i + 3] < 128) continue;
+          
+          const r = imageData[i];
+          const g = imageData[i + 1];
+          const b = imageData[i + 2];
+
+          // Ignore pure white/black boundaries which often skew results
+          if ((r > 250 && g > 250 && b > 250) || (r < 15 && g < 15 && b < 15)) continue;
+
+          // Quantize
+          const qR = r >> SHIFT;
+          const qG = g >> SHIFT;
+          const qB = b >> SHIFT;
+          
+          const key = `${qR},${qG},${qB}`;
+          
+          if (!colorMap.has(key)) {
+            // Store the actual first color encountered for this bin to keep it accurate
+            colorMap.set(key, { r, g, b, count: 1 });
+          } else {
+            colorMap.get(key).count++;
+          }
+        }
+
+        // 2. Sort bins by frequency (highest count first)
+        const sortedColors = Array.from(colorMap.values()).sort((a, b) => b.count - a.count);
+
+        // 3. Select Dominant Colors (with distance threshold)
+        const finalPalette = [];
+        const THRESHOLD = 2000; // minimum distance squared between colors
+
+        for (const color of sortedColors) {
+          let isDistinct = true;
+          for (const selected of finalPalette) {
+            if (colorDistanceSq(color, selected) < THRESHOLD) {
+              isDistinct = false;
+              break;
+            }
+          }
+
+          if (isDistinct) {
+            finalPalette.push(color);
+            if (finalPalette.length >= 6) break; // Maximum 6 colors
+          }
+        }
+
+        // Fallback: If we couldn't find 6 distinct colors, lower the threshold or just take what we have
+        if (finalPalette.length === 0) {
+           finalPalette.push({r:0, g:0, b:0}); // total fallback
+        }
+
+        renderPalette(finalPalette);
+      }
+
+      function renderPalette(colors) {
+        colors.forEach((color, index) => {
+          const hex = rgbToHex(color.r, color.g, color.b);
+          const rgbString = `rgb(${color.r}, ${color.g}, ${color.b})`;
+
+          const swatchEl = document.createElement('div');
+          swatchEl.className = 'color-swatch-container';
+          // Staggered animation
+          swatchEl.style.animationDelay = `${index * 0.08}s`;
+          swatchEl.classList.add('animate-in');
+          
+          swatchEl.innerHTML = `
+            <div class="swatch" style="background-color: ${hex}"></div>
+            <div class="color-details">
+              <span class="color-hex">${hex}</span>
+              <span class="color-rgb">${rgbString}</span>
+            </div>
+            <i data-feather="copy" class="copy-icon" width="18" height="18"></i>
+          `;
+
+          swatchEl.addEventListener('click', () => {
+            navigator.clipboard.writeText(hex).then(() => {
+              showToast(`Copied ${hex}`);
+            });
+          });
+
+          paletteGrid.appendChild(swatchEl);
+        });
+
+        // re-initialize new icons
+        feather.replace();
+      }
+
+      function showToast(msg) {
+        toastText.textContent = msg;
+        toast.classList.add("show");
+        setTimeout(() => toast.classList.remove("show"), 2500);
+      }
+    </script>
+  </body>
+</html>
