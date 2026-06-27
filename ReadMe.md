@@ -39,14 +39,16 @@ Every tool in this collection is a standalone `.html` file containing all the HT
 | 10 | [GitHub Token Validator Plain](tools/github-token-validator-plain.html) | Developer Utilities | Validate GitHub Personal Access Tokens with a clean, straightforward interface. | [Try it](https://one-file-tools.pages.dev/tools/github-token-validator-plain) |
 | 11 | [GitHub Token Validator Retro](tools/github-token-validator-retro.html) | Developer Utilities | Validate GitHub Personal Access Tokens with a retro terminal themed interface. | [Try it](https://one-file-tools.pages.dev/tools/github-token-validator-retro) |
 | 12 | [Glassmorphism Generator](tools/glassmorphism-generator.html) | CSS Tools | Generate sleek, frosted-glass UI effects for your components. | [Try it](https://one-file-tools.pages.dev/tools/glassmorphism-generator) |
-| 13 | [JSON Formatter](tools/json-formatter.html) | JSON & API | Format, validate, and minify JSON locally in your browser. | [Try it](https://one-file-tools.pages.dev/tools/json-formatter) |
-| 14 | [JWT Decoder](tools/jwt-decoder.html) | JSON & API | Decode and inspect JSON Web Tokens — header, payload, claims, and expiry — entirely in your browser. | [Try it](https://one-file-tools.pages.dev/tools/jwt-decoder) |
-| 15 | [Meta Tag Generator](tools/meta-tag-generator.html) | Web & SEO | Generate essential HTML meta tags with a live preview and copy-ready code. | [Try it](https://one-file-tools.pages.dev/tools/meta-tag-generator) |
-| 16 | [Open Graph Inspector](tools/open-graph-inspector.html) | Web & SEO | Analyze meta tags, social previews, and SEO metadata for any URL with actionable scores. | [Try it](https://one-file-tools.pages.dev/tools/open-graph-inspector) |
-| 17 | [Palette Generator](tools/palette-generator.html) | Color Tools | Generate unique, collision-free variation color schemes based on color theory metrics, offline. | [Try it](https://one-file-tools.pages.dev/tools/palette-generator) |
-| 18 | [Radii - Border Radius Generator](tools/border-radius-generator.html) | CSS Tools | Visually create CSS border-radius values with live preview, presets, and copy-ready CSS output. | [Try it](https://one-file-tools.pages.dev/tools/border-radius-generator) |
-| 19 | [Twitter / X Card Preview](tools/twitter-x-card-preview.html) | Web & SEO | Preview how Twitter/X cards appear with live updates for Summary and Summary Large Image layouts. | [Try it](https://one-file-tools.pages.dev/tools/twitter-x-card-preview) |
-| 20 | [UUID Generator](tools/uuid-generator.html) | Developer Utilities | Generate random v4 UUIDs instantly, offline. | [Try it](https://one-file-tools.pages.dev/tools/uuid-generator) |
+| 13 | [JSON Diff Viewer](tools/json-diff-viewer.html) | JSON & API | Compare two JSON objects semantically with added, removed, and modified value highlighting. | [Try it](https://one-file-tools.pages.dev/tools/json-diff-viewer) |
+| 14 | [JSON Formatter](tools/json-formatter.html) | JSON & API | Format, validate, and minify JSON locally in your browser. | [Try it](https://one-file-tools.pages.dev/tools/json-formatter) |
+| 15 | [JWT Decoder](tools/jwt-decoder.html) | JSON & API | Decode and inspect JSON Web Tokens — header, payload, claims, and expiry — entirely in your browser. | [Try it](https://one-file-tools.pages.dev/tools/jwt-decoder) |
+| 16 | [Meta Tag Generator](tools/meta-tag-generator.html) | Web & SEO | Generate essential HTML meta tags with a live preview and copy-ready code. | [Try it](https://one-file-tools.pages.dev/tools/meta-tag-generator) |
+| 17 | [Open Graph Inspector](tools/open-graph-inspector.html) | Web & SEO | Analyze meta tags, social previews, and SEO metadata for any URL with actionable scores. | [Try it](https://one-file-tools.pages.dev/tools/open-graph-inspector) |
+| 18 | [Palette Generator](tools/palette-generator.html) | Color Tools | Generate unique, collision-free variation color schemes based on color theory metrics, offline. | [Try it](https://one-file-tools.pages.dev/tools/palette-generator) |
+| 19 | [Password Generator](tools/password-generator.html) | Developer Utilities | Generate highly secure, cryptographic random passwords instantly. 100% offline, privacy guaranteed. | [Try it](https://one-file-tools.pages.dev/tools/password-generator) |
+| 20 | [Radii - Border Radius Generator](tools/border-radius-generator.html) | CSS Tools | Visually create CSS border-radius values with live preview, presets, and copy-ready CSS output. | [Try it](https://one-file-tools.pages.dev/tools/border-radius-generator) |
+| 21 | [Twitter / X Card Preview](tools/twitter-x-card-preview.html) | Web & SEO | Preview how Twitter/X cards appear with live updates for Summary and Summary Large Image layouts. | [Try it](https://one-file-tools.pages.dev/tools/twitter-x-card-preview) |
+| 22 | [UUID Generator](tools/uuid-generator.html) | Developer Utilities | Generate random v4 UUIDs instantly, offline. | [Try it](https://one-file-tools.pages.dev/tools/uuid-generator) |
 
 > **Want to see your tool here?** Check out the [Contributing Guide](Contributing.md) and pick an idea from the [Ideas Board](#ideas-board).
 
@@ -128,7 +130,7 @@ Below is a curated list of tool ideas waiting to be built. Each idea is a potent
 
 | Idea                                                     | Difficulty |
 | -------------------------------------------------------- | ---------- |
-| JSON Diff Viewer — compare two JSON objects              | Medium     |
+| ~~JSON Diff Viewer~~ — ✅ [Built](tools/json-diff-viewer.html) | Medium |
 | ~~JWT Decoder~~ — ✅ [Built](tools/jwt-decoder.html)     | Easy       |
 | URL Encoder / Decoder — encode and decode URL strings    | Easy       |
 | Base64 Encoder / Decoder — encode and decode Base64      | Easy       |
@@ -145,7 +147,7 @@ Below is a curated list of tool ideas waiting to be built. Each idea is a potent
 | Regex Tester — test regular expressions with live matching   | Medium     |
 | ~~Cron Expression Builder~~ — ✅ [Built](tools/cron-expression-builder.html) | Medium |
 | Hash Generator — generate MD5, SHA-1, SHA-256 hashes         | Easy       |
-| Password Generator — generate strong random passwords        | Easy       |
+| ~~Password Generator~~ — ✅ [Built](tools/password-generator.html)        | Easy       |
 | QR Code Generator — create QR codes from text or URLs        | Easy       |
 | Git Ignore Generator — generate .gitignore files for selected technologies | Easy |
 | Commit Message Generator — create conventional commit messages | Easy     |

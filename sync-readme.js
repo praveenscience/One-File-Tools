@@ -53,14 +53,17 @@ let readme = fs.readFileSync(readmePath, "utf-8");
 
 // Replace the table between "## Available Tools" and the blockquote after it
 const tableStart = readme.indexOf("| # | Tool | Category |");
-const tableEnd = readme.indexOf("\n\n> **Want to see your tool here?**");
+let tableEnd = readme.indexOf("\n\n> **Want to see your tool here?**");
+if (tableEnd === -1) {
+  tableEnd = readme.indexOf("\n> **Want to see your tool here?**");
+}
 
 if (tableStart === -1 || tableEnd === -1) {
   console.error("Could not find the Available Tools table markers in ReadMe.md");
   process.exit(1);
 }
 
-readme = readme.slice(0, tableStart) + table + readme.slice(tableEnd);
+readme = readme.slice(0, tableStart) + table + "\n\n" + readme.slice(tableEnd).replace(/^\n+/, "");
 
 fs.writeFileSync(readmePath, readme, "utf-8");
 
