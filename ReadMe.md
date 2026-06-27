@@ -145,7 +145,7 @@ Below is a curated list of tool ideas waiting to be built. Each idea is a potent
 | Regex Tester — test regular expressions with live matching   | Medium     |
 | ~~Cron Expression Builder~~ — ✅ [Built](tools/cron-expression-builder.html) | Medium |
 | Hash Generator — generate MD5, SHA-1, SHA-256 hashes         | Easy       |
-| Password Generator — generate strong random passwords        | Easy       |
+| ~~Password Generator~~ — ✅ [Built](tools/password-generator.html)        | Easy       |
 | QR Code Generator — create QR codes from text or URLs        | Easy       |
 | Git Ignore Generator — generate .gitignore files for selected technologies | Easy |
 | Commit Message Generator — create conventional commit messages | Easy     |
