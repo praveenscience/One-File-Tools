@@ -45,6 +45,7 @@ Every tool in this collection is a standalone `.html` file containing all the HT
 | 16 | [Twitter / X Card Preview](tools/twitter-x-card-preview.html) | Web & SEO | Preview how Twitter/X cards appear with live updates for Summary and Summary Large Image layouts. | [Try it](https://one-file-tools.pages.dev/tools/twitter-x-card-preview) |
 | 17 | [UUID Generator](tools/uuid-generator.html) | Developer Utilities | Generate random v4 UUIDs instantly, offline. | [Try it](https://one-file-tools.pages.dev/tools/uuid-generator) |
 | 18 | [Cron Expression Builder](tools/cron-expression-builder.html) | Developer Utilities | Visually create, validate, and understand standard 5-field cron expressions with real-time explanations, presets, and upcoming execution time previews. | [Try it](https://one-file-tools.pages.dev/tools/cron-expression-builder) |
+| 19| [JSON Diff Viewer](tools/json-diff-viewer.html) | JSON & API | Compare two JSON objects semantically with added, removed, and changed value highlighting while ignoring formatting differences. | [Try it](https://one-file-tools.pages.dev/tools/json-diff-viewer) |
 
 > **Want to see your tool here?** Check out the [Contributing Guide](Contributing.md) and pick an idea from the [Ideas Board](#ideas-board).
 
@@ -126,7 +127,7 @@ Below is a curated list of tool ideas waiting to be built. Each idea is a potent
 
 | Idea                                                     | Difficulty |
 | -------------------------------------------------------- | ---------- |
-| JSON Diff Viewer — compare two JSON objects              | Medium     |
+| ~~JSON Diff Viewer~~ — ✅ [Built](tools/json-diff-viewer.html) | Medium |
 | ~~JWT Decoder~~ — ✅ [Built](tools/jwt-decoder.html)     | Easy       |
 | URL Encoder / Decoder — encode and decode URL strings    | Easy       |
 | Base64 Encoder / Decoder — encode and decode Base64      | Easy       |
