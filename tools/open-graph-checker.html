@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Open Graph Checker | One File Tools</title>
+  <style>
+    /* ── Design Tokens ─────────────────────────────────────────────── */
+    :root {
+      --bg:          #f6f8fb;
+      --surface:     #ffffff;
+      --surface-2:   #f1f4f9;
+      --border:      #dde1ea;
+      --text:        #0d1117;
+      --text-2:      #525c6e;
+      --text-3:      #9ba5b7;
+      --accent:      #2563eb;
+      --accent-soft: #eff4ff;
+      --ok:          #16a34a;
+      --ok-bg:       #f0fdf4;
+      --warn:        #d97706;
+      --warn-bg:     #fffbeb;
+      --err:         #dc2626;
+      --err-bg:      #fef2f2;
+      --mono:        'JetBrains Mono','Fira Code','Cascadia Code',ui-monospace,monospace;
+      --radius:      8px;
+      --radius-lg:   12px;
+      --shadow:      0 1px 3px rgba(0,0,0,.07),0 4px 12px rgba(0,0,0,.05);
+    }
+    [data-theme="dark"] {
+      --bg:          #0b0d12;
+      --surface:     #111318;
+      --surface-2:   #191d27;
+      --border:      #252a36;
+      --text:        #e8edf5;
+      --text-2:      #8892a4;
+      --text-3:      #444e60;
+      --accent:      #3b82f6;
+      --accent-soft: #1a2340;
+      --ok:          #22c55e;
+      --ok-bg:       #052e16;
+      --warn:        #f59e0b;
+      --warn-bg:     #451a03;
+      --err:         #f87171;
+      --err-bg:      #3b0a0a;
+      --shadow:      0 1px 3px rgba(0,0,0,.4),0 4px 12px rgba(0,0,0,.3);
+    }
+
+    /* ── Reset ─────────────────────────────────────────────────────── */
+    *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+    html { font-size:14px; }
+    body {
+      font-family: system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+      transition: background .2s,color .2s;
+    }
+
+    /* ── Topbar ─────────────────────────────────────────────────────── */
+    .topbar {
+      position: sticky; top: 0; z-index: 50;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 1.5rem;
+      height: 52px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .topbar-brand { display:flex; align-items:center; gap:.6rem; }
+    .brand-icon {
+      width:28px; height:28px; border-radius:7px;
+      background: var(--accent); display:grid; place-items:center; color:#fff;
+    }
+    .brand-name { font-size:.9rem; font-weight:700; letter-spacing:-.01em; }
+    .topbar-right { display:flex; align-items:center; gap:.5rem; }
+    .icon-btn {
+      width:32px; height:32px; border-radius:8px;
+      border:1px solid var(--border);
+      background:var(--surface-2); cursor:pointer;
+      display:grid; place-items:center; color:var(--text-2);
+      transition:all .15s;
+    }
+    .icon-btn:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
+
+    /* ── Search hero ────────────────────────────────────────────────── */
+    .hero {
+      max-width: 720px; margin: 3rem auto 0;
+      padding: 0 1.5rem;
+      text-align: center;
+    }
+    .hero h1 {
+      font-size: 1.75rem; font-weight: 800;
+      letter-spacing: -.03em; margin-bottom:.5rem;
+    }
+    .hero-sub { color:var(--text-2); font-size:.9rem; margin-bottom:1.75rem; }
+    .search-row {
+      display:flex; gap:.6rem;
+      background:var(--surface);
+      border:1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding:.4rem .4rem .4rem .75rem;
+      box-shadow: var(--shadow);
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .search-row:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(37,99,235,.12), var(--shadow);
+    }
+    .search-icon { color:var(--text-3); flex-shrink:0; align-self:center; }
+    #urlInput {
+      flex:1; border:none; outline:none; background:transparent;
+      color:var(--text); font-size:.95rem; font-family:inherit;
+      min-width:0;
+    }
+    #urlInput::placeholder { color:var(--text-3); }
+    .btn-analyze {
+      background:var(--accent); color:#fff;
+      border:none; border-radius:8px;
+      padding:.55rem 1.2rem; font-size:.85rem; font-weight:600;
+      cursor:pointer; white-space:nowrap; flex-shrink:0;
+      transition:all .15s; display:flex; align-items:center; gap:.4rem;
+    }
+    .btn-analyze:hover { filter:brightness(1.1); }
+    .btn-analyze:disabled { opacity:.5; cursor:not-allowed; filter:none; }
+
+    /* Try examples */
+    .examples { margin-top:.9rem; display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; justify-content:center; }
+    .examples-label { font-size:.75rem; color:var(--text-3); }
+    .example-chip {
+      font-size:.72rem; color:var(--accent);
+      background:var(--accent-soft); border:none;
+      padding:.2rem .6rem; border-radius:20px;
+      cursor:pointer; font-family:inherit; font-weight:600;
+      transition:all .15s;
+    }
+    .example-chip:hover { filter:brightness(.95); }
+
+    /* ── States ─────────────────────────────────────────────────────── */
+    #stateArea { max-width:800px; margin:2rem auto; padding:0 1.5rem; }
+
+    .state-loader { text-align:center; padding:3rem 1rem; color:var(--text-2); }
+    .spinner {
+      width:32px; height:32px; border-radius:50%;
+      border:3px solid var(--border); border-top-color:var(--accent);
+      animation:spin 1s linear infinite; margin:0 auto 1rem;
+    }
+    .loader-step { font-size:.8rem; color:var(--text-3); margin-top:.4rem; font-family:var(--mono); }
+
+    .state-error {
+      background:var(--err-bg); border:1px solid var(--err);
+      border-radius:var(--radius); padding:1rem 1.25rem;
+      color:var(--err); font-size:.875rem; display:flex; gap:.75rem; align-items:flex-start;
+    }
+    .state-error svg { flex-shrink:0; margin-top:2px; }
+
+    /* ── Results ────────────────────────────────────────────────────── */
+    #results { display:none; }
+    #results.visible { display:block; }
+
+    /* Result layout */
+    .result-wrap {
+      max-width: 1160px; margin: 1.5rem auto;
+      padding: 0 1.5rem;
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 1.25rem;
+      align-items: start;
+    }
+    @media (max-width:800px) { .result-wrap { grid-template-columns:1fr; } }
+
+    /* ── Card ─────────────────────────────────────────────────────── */
+    .card {
+      background:var(--surface);
+      border:1px solid var(--border);
+      border-radius:var(--radius-lg);
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+    .card + .card { margin-top:1.25rem; }
+    .card-head {
+      padding:.75rem 1.1rem;
+      border-bottom:1px solid var(--border);
+      display:flex; align-items:center; gap:.5rem;
+    }
+    .card-head-ico {
+      width:20px; height:20px; border-radius:5px;
+      background:var(--accent-soft); display:grid; place-items:center; color:var(--accent);
+    }
+    .card-head-title {
+      font-size:.72rem; font-weight:700; letter-spacing:.06em;
+      text-transform:uppercase; color:var(--text-2);
+    }
+    .card-body { padding:1.1rem; }
+
+    /* ── Score ring ─────────────────────────────────────────────────── */
+    .score-wrap { display:flex; align-items:center; gap:1rem; padding-bottom:1rem; border-bottom:1px solid var(--border); margin-bottom:1rem; }
+    .ring-svg { width:72px; height:72px; flex-shrink:0; }
+    .ring-bg { fill:none; stroke:var(--border); stroke-width:4; }
+    .ring-fill { fill:none; stroke-width:4; stroke-linecap:round; transition:stroke-dasharray .8s cubic-bezier(.4,0,.2,1), stroke .4s; }
+    .ring-label { font-size:.42em; font-weight:800; fill:var(--text); font-family:system-ui,sans-serif; }
+    .score-meta h3 { font-size:1.1rem; font-weight:700; margin-bottom:.15rem; }
+    .score-meta p  { font-size:.78rem; color:var(--text-2); }
+
+    /* ── Checklist ──────────────────────────────────────────────────── */
+    .checklist { display:flex; flex-direction:column; gap:.45rem; }
+    .check-row {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:.45rem .65rem; border-radius:7px;
+      background:var(--surface-2); border:1px solid var(--border);
+      font-size:.78rem;
+    }
+    .check-left { display:flex; align-items:center; gap:.45rem; min-width:0; }
+    .dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+    .dot.ok   { background:var(--ok); }
+    .dot.warn { background:var(--warn); }
+    .dot.err  { background:var(--err); }
+    .check-key { font-family:var(--mono); font-size:.72rem; color:var(--text-2); white-space:nowrap; }
+    .check-badge {
+      font-size:.67rem; font-weight:700; padding:.15rem .5rem; border-radius:20px; flex-shrink:0;
+    }
+    .check-badge.ok   { background:var(--ok-bg);   color:var(--ok); }
+    .check-badge.warn { background:var(--warn-bg);  color:var(--warn); }
+    .check-badge.err  { background:var(--err-bg);   color:var(--err); }
+
+    /* ── Platform tabs ──────────────────────────────────────────────── */
+    .ptabs { display:flex; padding:0 1.1rem; border-bottom:1px solid var(--border); }
+    .ptab {
+      padding:.6rem .8rem; font-size:.78rem; font-weight:600;
+      color:var(--text-3); cursor:pointer; background:none;
+      border:none; border-bottom:2px solid transparent; margin-bottom:-1px;
+      display:flex; align-items:center; gap:.35rem; transition:all .15s; user-select:none;
+    }
+    .ptab:hover { color:var(--text); }
+    .ptab.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+    .ppanel { display:none; padding:1.1rem; animation:fadeUp .2s ease; }
+    .ppanel.active { display:block; }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(3px)} to{opacity:1;transform:translateY(0)} }
+
+    /* ── Social cards ───────────────────────────────────────────────── */
+    .og-card { border:1px solid var(--border); border-radius:10px; overflow:hidden; max-width:480px; }
+    .og-card-img {
+      width:100%; aspect-ratio:1.91/1; background:var(--surface-2);
+      background-size:cover; background-position:center;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .og-card-img .no-img { display:flex; flex-direction:column; align-items:center; gap:.35rem; color:var(--text-3); font-size:.75rem; }
+    .og-card-img .no-img svg { opacity:.4; }
+    .og-card-body { padding:.75rem 1rem; background:var(--surface); }
+    .og-card-domain { font-size:.7rem; text-transform:uppercase; color:var(--text-3); margin-bottom:.2rem; letter-spacing:.05em; }
+    .og-card-title  { font-size:.9rem; font-weight:700; color:var(--text); margin-bottom:.15rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .og-card-desc   { font-size:.78rem; color:var(--text-2); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+
+    /* Twitter overrides */
+    .og-card.twitter { border-radius:14px; }
+    .og-card.twitter .og-card-domain { text-transform:none; }
+    .og-card.twitter .og-card-title { font-size:.88rem; }
+
+    /* LinkedIn overrides */
+    .og-card.linkedin .og-card-body { background:var(--surface-2); border-top:1px solid var(--border); }
+    .og-card.linkedin .og-card-title { font-size:.85rem; }
+
+    /* ── Raw tags ───────────────────────────────────────────────────── */
+    .raw-table { width:100%; border-collapse:collapse; font-size:.78rem; }
+    .raw-table th {
+      text-align:left; padding:.4rem .65rem; font-size:.67rem;
+      font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+      color:var(--text-3); border-bottom:1px solid var(--border);
+    }
+    .raw-table td { padding:.45rem .65rem; border-bottom:1px solid var(--border); vertical-align:top; }
+    .raw-table tr:last-child td { border-bottom:none; }
+    .raw-table .td-key { font-family:var(--mono); font-size:.72rem; color:var(--accent); white-space:nowrap; padding-right:.75rem; }
+    .raw-table .td-val { color:var(--text-2); word-break:break-all; }
+    .no-tags { text-align:center; padding:2rem; color:var(--text-3); font-size:.82rem; }
+
+    /* ── Recommendations ────────────────────────────────────────────── */
+    .rec-list { display:flex; flex-direction:column; gap:.5rem; }
+    .rec-item {
+      display:flex; gap:.6rem; align-items:flex-start;
+      padding:.6rem .8rem; border-radius:8px;
+      border:1px solid var(--border); background:var(--surface-2);
+      font-size:.78rem;
+    }
+    .rec-icon { flex-shrink:0; margin-top:1px; }
+    .rec-text { color:var(--text-2); line-height:1.5; }
+    .rec-text strong { color:var(--text); font-weight:600; display:block; margin-bottom:.1rem; }
+
+    /* ── Export ─────────────────────────────────────────────────────── */
+    .export-row { display:flex; gap:.6rem; margin-top:.9rem; }
+    .btn-export {
+      display:inline-flex; align-items:center; gap:.4rem;
+      padding:.5rem .9rem; border-radius:8px; font-size:.78rem; font-weight:600;
+      cursor:pointer; border:1px solid var(--border);
+      background:var(--surface-2); color:var(--text-2);
+      transition:all .15s; font-family:inherit;
+    }
+    .btn-export:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
+    .btn-export.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+    .btn-export.primary:hover { filter:brightness(1.1); }
+
+    /* ── Toast ──────────────────────────────────────────────────────── */
+    #toast {
+      position:fixed; bottom:1.5rem; right:1.5rem;
+      background:#18181b; color:#fff; font-size:.8rem; font-weight:600;
+      padding:.6rem 1rem; border-radius:9px;
+      box-shadow:0 4px 20px rgba(0,0,0,.25);
+      display:flex; align-items:center; gap:.45rem;
+      transform:translateY(80px); opacity:0;
+      transition:all .3s cubic-bezier(.34,1.56,.64,1);
+      pointer-events:none; z-index:999;
+    }
+    #toast.show { transform:translateY(0); opacity:1; }
+
+    /* ── Rerun bar ──────────────────────────────────────────────────── */
+    .rerun-bar {
+      max-width:1160px; margin:.75rem auto 0; padding:0 1.5rem;
+      display:flex; align-items:center; gap:.6rem; flex-wrap:wrap;
+    }
+    .rerun-url {
+      flex:1; font-size:.78rem; font-family:var(--mono);
+      color:var(--text-2); background:var(--surface);
+      border:1px solid var(--border); border-radius:8px;
+      padding:.4rem .75rem; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    }
+    .btn-rerun {
+      display:inline-flex; align-items:center; gap:.35rem;
+      font-size:.78rem; font-weight:600; padding:.4rem .85rem;
+      border-radius:8px; border:1px solid var(--border);
+      background:var(--surface-2); color:var(--text-2);
+      cursor:pointer; font-family:inherit; transition:all .15s;
+    }
+    .btn-rerun:hover { border-color:var(--accent); color:var(--accent); }
+
+    @keyframes spin { to { transform:rotate(360deg); } }
+    @media (max-width:500px) {
+      .hero h1 { font-size:1.3rem; }
+      .result-wrap { padding:0 .75rem; }
+      .rerun-bar { padding:0 .75rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Topbar ─────────────────────────────────────────────────────────── -->
+<header class="topbar">
+  <div class="topbar-brand">
+    <div class="brand-icon">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    </div>
+    <span class="brand-name">Open Graph Checker</span>
+  </div>
+  <div class="topbar-right">
+    <button class="icon-btn" id="themeBtn" title="Toggle theme">
+      <svg id="ico-moon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+      <svg id="ico-sun"  width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+    </button>
+  </div>
+</header>
+
+<!-- ── Hero / Search ──────────────────────────────────────────────────── -->
+<section class="hero" id="heroSection">
+  <h1>OG Tag Checker</h1>
+  <p class="hero-sub">Instantly validate Open Graph metadata for any public URL — no login required.</p>
+  <div class="search-row">
+    <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input type="url" id="urlInput" placeholder="https://example.com" autocomplete="off" spellcheck="false" />
+    <button class="btn-analyze" id="analyzeBtn">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      Analyze
+    </button>
+  </div>
+  <div class="examples">
+    <span class="examples-label">Try:</span>
+    <button class="example-chip" data-url="https://github.com">github.com</button>
+    <button class="example-chip" data-url="https://vercel.com">vercel.com</button>
+    <button class="example-chip" data-url="https://linear.app">linear.app</button>
+  </div>
+</section>
+
+<!-- ── State area ─────────────────────────────────────────────────────── -->
+<div id="stateArea"></div>
+
+<!-- ── Rerun bar (shown after results) ───────────────────────────────── -->
+<div class="rerun-bar" id="rerunBar" style="display:none">
+  <div class="rerun-url" id="rerunUrl"></div>
+  <button class="btn-rerun" id="rerunBtn">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+    Re-check
+  </button>
+</div>
+
+<!-- ── Results ────────────────────────────────────────────────────────── -->
+<div id="results">
+  <div class="result-wrap">
+
+    <!-- LEFT col -->
+    <div id="leftCol">
+
+      <!-- Score card -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-head-ico">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          </div>
+          <span class="card-head-title">Health Score</span>
+        </div>
+        <div class="card-body">
+          <div class="score-wrap">
+            <svg class="ring-svg" viewBox="0 0 36 36">
+              <path class="ring-bg" d="M18 2.0845a15.9155 15.9155 0 0 1 0 31.831a15.9155 15.9155 0 0 1 0-31.831"/>
+              <path class="ring-fill" id="ringFill" stroke-dasharray="0,100" d="M18 2.0845a15.9155 15.9155 0 0 1 0 31.831a15.9155 15.9155 0 0 1 0-31.831"/>
+              <text x="18" y="20.5" class="ring-label" text-anchor="middle" id="ringLabel">0</text>
+            </svg>
+            <div class="score-meta">
+              <h3 id="scoreGrade">—</h3>
+              <p id="scoreMsg"></p>
+            </div>
+          </div>
+          <div class="checklist" id="checklist"></div>
+        </div>
+      </div>
+
+      <!-- Recommendations -->
+      <div class="card" id="recCard" style="display:none">
+        <div class="card-head">
+          <div class="card-head-ico">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          </div>
+          <span class="card-head-title">Recommendations</span>
+        </div>
+        <div class="card-body">
+          <div class="rec-list" id="recList"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT col -->
+    <div id="rightCol">
+
+      <!-- Previews -->
+      <div class="card">
+        <div class="ptabs">
+          <button class="ptab active" data-panel="pFB">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
+            Facebook
+          </button>
+          <button class="ptab" data-panel="pTW">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            X / Twitter
+          </button>
+          <button class="ptab" data-panel="pLI">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6zM2 9h4v12H2z"/><circle cx="4" cy="4" r="2"/></svg>
+            LinkedIn
+          </button>
+        </div>
+
+        <!-- Facebook -->
+        <div class="ppanel active" id="pFB">
+          <div class="og-card facebook">
+            <div class="og-card-img" id="fbImg"><div class="no-img"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg><span>No image</span></div></div>
+            <div class="og-card-body">
+              <div class="og-card-domain" id="fbDomain">example.com</div>
+              <div class="og-card-title"  id="fbTitle">—</div>
+              <div class="og-card-desc"   id="fbDesc">—</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Twitter -->
+        <div class="ppanel" id="pTW">
+          <div class="og-card twitter">
+            <div class="og-card-img" id="twImg"><div class="no-img"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg><span>No image</span></div></div>
+            <div class="og-card-body">
+              <div class="og-card-domain" id="twDomain">example.com</div>
+              <div class="og-card-title"  id="twTitle">—</div>
+              <div class="og-card-desc"   id="twDesc">—</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- LinkedIn -->
+        <div class="ppanel" id="pLI">
+          <div class="og-card linkedin">
+            <div class="og-card-img" id="liImg"><div class="no-img"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg><span>No image</span></div></div>
+            <div class="og-card-body">
+              <div class="og-card-title"  id="liTitle">—</div>
+              <div class="og-card-domain" id="liDomain">example.com</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Raw tags -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-head-ico">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          </div>
+          <span class="card-head-title">Extracted Tags</span>
+          <span id="tagCount" style="font-size:.7rem;color:var(--text-3);margin-left:auto"></span>
+        </div>
+        <div class="card-body" style="padding:0">
+          <div id="rawTableWrap"></div>
+        </div>
+        <div class="card-body" style="padding:.75rem 1.1rem; border-top:1px solid var(--border)">
+          <div class="export-row">
+            <button class="btn-export" id="copyReportBtn">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copy Report
+            </button>
+            <button class="btn-export primary" id="downloadBtn">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Export JSON
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div id="toast"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span id="toastMsg"></span></div>
+
+<script>
+/* ── Theme ─────────────────────────────────────────────────────────────── */
+const html = document.documentElement;
+const savedTheme = localStorage.getItem('ogc-theme') ||
+  (window.matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light');
+applyTheme(savedTheme);
+
+document.getElementById('themeBtn').addEventListener('click', () => {
+  const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  applyTheme(next); localStorage.setItem('ogc-theme', next);
+});
+
+function applyTheme(t) {
+  html.setAttribute('data-theme', t);
+  document.getElementById('ico-moon').style.display = t === 'dark' ? 'none' : '';
+  document.getElementById('ico-sun').style.display  = t === 'dark' ? ''     : 'none';
+}
+
+/* ── Tabs ──────────────────────────────────────────────────────────────── */
+document.querySelectorAll('.ptab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.ptab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.ppanel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(tab.dataset.panel).classList.add('active');
+  });
+});
+
+/* ── Example chips ─────────────────────────────────────────────────────── */
+document.querySelectorAll('.example-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.getElementById('urlInput').value = chip.dataset.url;
+    runAnalysis(chip.dataset.url);
+  });
+});
+
+/* ── Proxies (waterfall) ────────────────────────────────────────────────── */
+const PROXIES = [
+  url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+];
+
+async function fetchViaProxy(url, attempt = 0) {
+  if (attempt >= PROXIES.length) throw new Error('All proxies failed. The site might have strict anti-bot security (like Cloudflare) blocking external access.');
+  setLoaderStep(attempt);
+  try {
+    const proxyUrl = PROXIES[attempt](url);
+    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    
+    // Naya Logic: Pehle raw text lo
+    const rawText = await res.text();
+    let html = rawText;
+    
+    // Agar proxy (jaise allorigins) ne JSON bheja hai, toh usko parse karo
+    try {
+      const data = JSON.parse(rawText);
+      if (data.contents) html = data.contents;
+    } catch (e) {
+      // Agar JSON nahi hai (corsproxy/codetabs), toh as-is HTML use karo, koi error nahi.
+    }
+    
+    if (typeof html !== 'string' || html.length < 50) throw new Error('Empty response');
+    return html;
+  } catch (err) {
+    console.warn(`Proxy ${attempt + 1} failed:`, err); // Debugging ke liye
+    return fetchViaProxy(url, attempt + 1); // Agla proxy try karo
+  }
+}
+
+/* ── Extract meta tags ────────────────────────────────────────────────── */
+function resolveUrl(base, rel) {
+  if (!rel) return '';
+  try { return new URL(rel, base).href; } catch { return rel; }
+}
+
+function extractMeta(htmlStr, baseUrl) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(htmlStr, 'text/html');
+
+  const og = {}, twitter = {}, raw = [];
+
+  const add = (k, v) => { if (v && !raw.find(r => r.k === k)) raw.push({ k, v }); };
+
+  doc.querySelectorAll('meta[property^="og:"]').forEach(m => {
+    const key = m.getAttribute('property').replace('og:', '');
+    const val = m.getAttribute('content') || '';
+    if (val) { og[key] = val; add('og:' + key, val); }
+  });
+
+  doc.querySelectorAll('meta[name^="twitter:"]').forEach(m => {
+    const key = m.getAttribute('name').replace('twitter:', '');
+    const val = m.getAttribute('content') || '';
+    if (val) { twitter[key] = val; add('twitter:' + key, val); }
+  });
+
+  // Fallbacks
+  if (!og.title) {
+    const t = doc.querySelector('title');
+    if (t && t.textContent.trim()) { og.title = t.textContent.trim(); add('<title>', og.title); }
+  }
+  if (!og.description) {
+    const d = doc.querySelector('meta[name="description"]');
+    if (d) { og.description = d.getAttribute('content') || ''; add('meta[description]', og.description); }
+  }
+
+  // Resolve relative image URLs
+  if (og.image) og.image = resolveUrl(baseUrl, og.image);
+  if (twitter.image) twitter.image = resolveUrl(baseUrl, twitter.image);
+
+  return { og, twitter, raw };
+}
+
+/* ── Checks definition ─────────────────────────────────────────────────── */
+const CHECKS = [
+  { id:'title',       label:'og:title',       weight:25, test: og => !!og.title,       rec:'Add an og:title tag. Social platforms use this as the link headline.', recTitle:'Missing og:title' },
+  { id:'image',       label:'og:image',        weight:25, test: og => !!og.image,       rec:'Add og:image with a 1200×630 px image URL. This is the most visible element in link previews.', recTitle:'Missing og:image' },
+  { id:'description', label:'og:description',  weight:20, test: og => !!og.description, rec:'Add og:description (max 155 chars). Improves click-through rates on all social platforms.', recTitle:'Missing og:description' },
+  { id:'url',         label:'og:url',          weight:15, test: og => !!og.url,         rec:'Add og:url pointing to the canonical URL of the page to avoid duplicate content issues.', recTitle:'Missing og:url' },
+  { id:'type',        label:'og:type',         weight:10, test: og => !!og.type,        rec:'Set og:type (e.g. "website" or "article"). Defaults to "website" if missing but is best to set explicitly.', recTitle:'Missing og:type' },
+  { id:'site_name',   label:'og:site_name',    weight: 5, test: og => !!og.site_name,   rec:'Add og:site_name to show your brand name in Facebook and LinkedIn previews.', recTitle:'Missing og:site_name' },
+];
+
+/* ── Render results ─────────────────────────────────────────────────────── */
+function renderResults(targetUrl, og, twitter, raw) {
+  const domain = (() => { try { return new URL(targetUrl).hostname.replace(/^www\./, ''); } catch { return targetUrl; } })();
+
+  /* Score */
+  let score = 0;
+  const failed = [];
+  CHECKS.forEach(c => {
+    if (c.test(og)) score += c.weight;
+    else failed.push(c);
+  });
+
+  const ringFill  = document.getElementById('ringFill');
+  const ringLabel = document.getElementById('ringLabel');
+  ringLabel.textContent = score;
+  setTimeout(() => { ringFill.setAttribute('stroke-dasharray', `${score},100`); }, 50);
+
+  let ringColor, grade, msg;
+  if (score >= 90) { ringColor='var(--ok)';   grade='Excellent'; msg='Fully optimized for social sharing.'; }
+  else if (score >= 65) { ringColor='var(--warn)'; grade='Good';      msg='A few improvements will help.'; }
+  else if (score >= 40) { ringColor='var(--warn)'; grade='Needs Work'; msg='Missing important OG properties.'; }
+  else                  { ringColor='var(--err)';  grade='Poor';       msg='Critical OG tags are missing.'; }
+
+  ringFill.style.stroke = ringColor;
+  document.getElementById('scoreGrade').textContent = grade;
+  document.getElementById('scoreMsg').textContent   = msg;
+
+  /* Checklist */
+  const cl = document.getElementById('checklist');
+  cl.innerHTML = '';
+  CHECKS.forEach(c => {
+    const ok = c.test(og);
+    const cls = ok ? 'ok' : (c.weight >= 20 ? 'err' : 'warn');
+    const badge = ok ? 'Found' : 'Missing';
+    cl.insertAdjacentHTML('beforeend', `
+      <div class="check-row">
+        <div class="check-left">
+          <span class="dot ${cls}"></span>
+          <span class="check-key">${c.label}</span>
+        </div>
+        <span class="check-badge ${cls}">${badge}</span>
+      </div>`);
+  });
+
+  /* Recs */
+  const recCard = document.getElementById('recCard');
+  const recList = document.getElementById('recList');
+  recList.innerHTML = '';
+  if (failed.length) {
+    recCard.style.display = '';
+    failed.forEach(c => {
+      const isCrit = c.weight >= 20;
+      recList.insertAdjacentHTML('beforeend', `
+        <div class="rec-item">
+          <span class="rec-icon">
+            ${isCrit
+              ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--err)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'
+              : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--warn)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>'
+            }
+          </span>
+          <div class="rec-text"><strong>${c.recTitle}</strong>${c.rec}</div>
+        </div>`);
+    });
+  } else { recCard.style.display = 'none'; }
+
+  /* Previews */
+  const img = og.image || twitter.image || '';
+  function setImg(el, url) {
+    if (url) {
+      el.style.backgroundImage = `url('${url}')`;
+      el.innerHTML = '';
+    } else {
+      el.style.backgroundImage = '';
+      el.innerHTML = '<div class="no-img"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg><span>No og:image found</span></div>';
+    }
+  }
+
+  const title = og.title || '—';
+  const desc  = og.description || '—';
+
+  ['fb','tw','li'].forEach(p => setImg(document.getElementById(p+'Img'), img));
+  ['fbTitle','twTitle','liTitle'].forEach(id => { document.getElementById(id).textContent = title; });
+  ['fbDesc','twDesc'].forEach(id => { document.getElementById(id).textContent = desc; });
+  ['fbDomain','twDomain','liDomain'].forEach(id => { document.getElementById(id).textContent = domain; });
+
+  /* Raw table */
+  const wrap = document.getElementById('rawTableWrap');
+  document.getElementById('tagCount').textContent = raw.length ? `${raw.length} tags` : '';
+  if (raw.length === 0) {
+    wrap.innerHTML = '<div class="no-tags">No meta tags found on this page.</div>';
+  } else {
+    let rows = raw.map(r => `<tr><td class="td-key">${r.k}</td><td class="td-val">${esc(r.v)}</td></tr>`).join('');
+    wrap.innerHTML = `<table class="raw-table"><thead><tr><th>Property</th><th>Content</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
+
+  /* Store for export */
+  window._ogResult = { url: targetUrl, score, grade, og, twitter, raw, checks: CHECKS.map(c => ({ label:c.label, found:c.test(og), weight:c.weight })) };
+
+  /* Show results */
+  document.getElementById('results').classList.add('visible');
+  document.getElementById('rerunBar').style.display = '';
+  document.getElementById('rerunUrl').textContent = targetUrl;
+}
+
+/* ── Escape ─────────────────────────────────────────────────────────────── */
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ── UI helpers ─────────────────────────────────────────────────────────── */
+const stateArea = document.getElementById('stateArea');
+
+function showLoader() {
+  stateArea.innerHTML = `
+    <div class="state-loader" id="loaderEl">
+      <div class="spinner"></div>
+      <p>Fetching page metadata…</p>
+      <p class="loader-step" id="loaderStep">Connecting to proxy 1/3…</p>
+    </div>`;
+}
+function setLoaderStep(attempt) {
+  const el = document.getElementById('loaderStep');
+  if (el) el.textContent = `Trying proxy ${attempt + 1} of ${PROXIES.length}…`;
+}
+function clearState() { stateArea.innerHTML = ''; }
+function showError(msg) {
+  clearState();
+  stateArea.innerHTML = `
+    <div style="max-width:700px;margin:1.5rem auto;padding:0 1.5rem">
+      <div class="state-error">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span>${esc(msg)}</span>
+      </div>
+    </div>`;
+}
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+/* ── Main analysis ───────────────────────────────────────────────────────── */
+async function runAnalysis(rawUrl) {
+  let url = rawUrl.trim();
+  if (!url) return;
+  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+
+  const btn = document.getElementById('analyzeBtn');
+  btn.disabled = true; btn.textContent = 'Checking…';
+  document.getElementById('results').classList.remove('visible');
+  document.getElementById('rerunBar').style.display = 'none';
+  showLoader();
+
+  try {
+    const htmlStr = await fetchViaProxy(url);
+    const { og, twitter, raw } = extractMeta(htmlStr, url);
+    clearState();
+    renderResults(url, og, twitter, raw);
+  } catch (err) {
+    showError(err.message || 'Failed to fetch the page. Check the URL and try again.');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Analyze';
+  }
+}
+
+/* ── Events ──────────────────────────────────────────────────────────────── */
+document.getElementById('analyzeBtn').addEventListener('click', () => {
+  runAnalysis(document.getElementById('urlInput').value);
+});
+document.getElementById('urlInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') runAnalysis(e.target.value);
+});
+document.getElementById('rerunBtn').addEventListener('click', () => {
+  runAnalysis(document.getElementById('rerunUrl').textContent);
+});
+
+/* Copy report */
+document.getElementById('copyReportBtn').addEventListener('click', () => {
+  const r = window._ogResult;
+  if (!r) return;
+  const lines = [
+    `Open Graph Report — ${r.url}`,
+    `Score: ${r.score}/100 (${r.grade})`,
+    '',
+    '── Checks ──',
+    ...r.checks.map(c => `[${c.found ? '✓' : '✗'}] ${c.label} (weight: ${c.weight})`),
+    '',
+    '── Extracted Tags ──',
+    ...r.raw.map(t => `${t.k}: ${t.v}`),
+  ].join('\n');
+  navigator.clipboard.writeText(lines).then(() => showToast('Report copied!')).catch(() => showToast('Copy failed'));
+});
+
+/* Export JSON */
+document.getElementById('downloadBtn').addEventListener('click', () => {
+  const r = window._ogResult;
+  if (!r) return;
+  const blob = new Blob([JSON.stringify(r, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'og-report.json';
+  a.click(); URL.revokeObjectURL(a.href);
+  showToast('JSON downloaded!');
+});
+</script>
+</body>
+</html>
