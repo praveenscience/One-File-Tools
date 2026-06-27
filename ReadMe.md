@@ -41,11 +41,12 @@ Every tool in this collection is a standalone `.html` file containing all the HT
 | 12 | [Glassmorphism Generator](tools/glassmorphism-generator.html) | CSS Tools | Generate sleek, frosted-glass UI effects for your components. | [Try it](https://one-file-tools.pages.dev/tools/glassmorphism-generator) |
 | 13 | [JSON Formatter](tools/json-formatter.html) | JSON & API | Format, validate, and minify JSON locally in your browser. | [Try it](https://one-file-tools.pages.dev/tools/json-formatter) |
 | 14 | [JWT Decoder](tools/jwt-decoder.html) | JSON & API | Decode and inspect JSON Web Tokens — header, payload, claims, and expiry — entirely in your browser. | [Try it](https://one-file-tools.pages.dev/tools/jwt-decoder) |
-| 15 | [Open Graph Inspector](tools/open-graph-inspector.html) | Web & SEO | Analyze meta tags, social previews, and SEO metadata for any URL with actionable scores. | [Try it](https://one-file-tools.pages.dev/tools/open-graph-inspector) |
-| 16 | [Palette Generator](tools/palette-generator.html) | Color Tools | Generate unique, collision-free variation color schemes based on color theory metrics, offline. | [Try it](https://one-file-tools.pages.dev/tools/palette-generator) |
-| 17 | [Radii - Border Radius Generator](tools/border-radius-generator.html) | CSS Tools | Visually create CSS border-radius values with live preview, presets, and copy-ready CSS output. | [Try it](https://one-file-tools.pages.dev/tools/border-radius-generator) |
-| 18 | [Twitter / X Card Preview](tools/twitter-x-card-preview.html) | Web & SEO | Preview how Twitter/X cards appear with live updates for Summary and Summary Large Image layouts. | [Try it](https://one-file-tools.pages.dev/tools/twitter-x-card-preview) |
-| 19 | [UUID Generator](tools/uuid-generator.html) | Developer Utilities | Generate random v4 UUIDs instantly, offline. | [Try it](https://one-file-tools.pages.dev/tools/uuid-generator) |
+| 15 | [Meta Tag Generator](tools/meta-tag-generator.html) | Web & SEO | Generate essential HTML meta tags with a live preview and copy-ready code. | [Try it](https://one-file-tools.pages.dev/tools/meta-tag-generator) |
+| 16 | [Open Graph Inspector](tools/open-graph-inspector.html) | Web & SEO | Analyze meta tags, social previews, and SEO metadata for any URL with actionable scores. | [Try it](https://one-file-tools.pages.dev/tools/open-graph-inspector) |
+| 17 | [Palette Generator](tools/palette-generator.html) | Color Tools | Generate unique, collision-free variation color schemes based on color theory metrics, offline. | [Try it](https://one-file-tools.pages.dev/tools/palette-generator) |
+| 18 | [Radii - Border Radius Generator](tools/border-radius-generator.html) | CSS Tools | Visually create CSS border-radius values with live preview, presets, and copy-ready CSS output. | [Try it](https://one-file-tools.pages.dev/tools/border-radius-generator) |
+| 19 | [Twitter / X Card Preview](tools/twitter-x-card-preview.html) | Web & SEO | Preview how Twitter/X cards appear with live updates for Summary and Summary Large Image layouts. | [Try it](https://one-file-tools.pages.dev/tools/twitter-x-card-preview) |
+| 20 | [UUID Generator](tools/uuid-generator.html) | Developer Utilities | Generate random v4 UUIDs instantly, offline. | [Try it](https://one-file-tools.pages.dev/tools/uuid-generator) |
 
 > **Want to see your tool here?** Check out the [Contributing Guide](Contributing.md) and pick an idea from the [Ideas Board](#ideas-board).
 
