@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Open Graph Generator | One File Tools</title>
+  <style>
+    /* ── Tokens ───────────────────────────────────────────────────── */
+    :root {
+      --bg:          #f8f9fc;
+      --surface:     #ffffff;
+      --surface-2:   #f1f3f9;
+      --border:      #e2e6ef;
+      --border-focus:#6366f1;
+      --accent:      #6366f1;
+      --accent-2:    #4f46e5;
+      --accent-soft: #eef2ff;
+      --text:        #0f1117;
+      --text-2:      #4b5563;
+      --text-3:      #9ca3af;
+      --danger:      #ef4444;
+      --warn:        #f59e0b;
+      --ok:          #22c55e;
+      --radius:      10px;
+      --radius-lg:   16px;
+      --shadow:      0 1px 3px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.06);
+      --shadow-lg:   0 8px 32px rgba(99,102,241,.12);
+      --mono:        'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+    }
+
+    /* Dark mode */
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg:         #0c0d11;
+        --surface:    #13151c;
+        --surface-2:  #1c1f2b;
+        --border:     #272b3a;
+        --accent-soft:#1e1f3b;
+        --text:       #f0f2f8;
+        --text-2:     #9aa0b8;
+        --text-3:     #515875;
+        --shadow:     0 1px 3px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
+        --shadow-lg:  0 8px 32px rgba(99,102,241,.18);
+      }
+    }
+
+    [data-theme="dark"] {
+      --bg:         #0c0d11;
+      --surface:    #13151c;
+      --surface-2:  #1c1f2b;
+      --border:     #272b3a;
+      --accent-soft:#1e1f3b;
+      --text:       #f0f2f8;
+      --text-2:     #9aa0b8;
+      --text-3:     #515875;
+      --shadow:     0 1px 3px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
+      --shadow-lg:  0 8px 32px rgba(99,102,241,.18);
+    }
+
+    [data-theme="light"] {
+      --bg:          #f8f9fc;
+      --surface:     #ffffff;
+      --surface-2:   #f1f3f9;
+      --border:      #e2e6ef;
+      --accent-soft: #eef2ff;
+      --text:        #0f1117;
+      --text-2:      #4b5563;
+      --text-3:      #9ca3af;
+      --shadow:      0 1px 3px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.06);
+      --shadow-lg:   0 8px 32px rgba(99,102,241,.12);
+    }
+
+    /* ── Reset ────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 14px;
+      line-height: 1.6;
+      transition: background .25s, color .25s;
+    }
+
+    /* ── Top Bar ──────────────────────────────────────────────────── */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 52px;
+      backdrop-filter: blur(12px);
+    }
+
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+    }
+
+    .logo-badge {
+      width: 28px; height: 28px;
+      background: var(--accent);
+      border-radius: 7px;
+      display: grid; place-items: center;
+      flex-shrink: 0;
+    }
+
+    .logo-badge svg { color: #fff; }
+
+    .topbar h1 {
+      font-size: .9rem;
+      font-weight: 600;
+      letter-spacing: -.01em;
+    }
+
+    .topbar-right { display: flex; align-items: center; gap: .5rem; }
+
+    /* ── Theme Toggle ─────────────────────────────────────────────── */
+    .theme-btn {
+      width: 32px; height: 32px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface-2);
+      cursor: pointer;
+      display: grid; place-items: center;
+      color: var(--text-2);
+      transition: background .15s, border-color .15s;
+    }
+    .theme-btn:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+    .icon-moon, .icon-sun { transition: opacity .2s; }
+    [data-theme="dark"] .icon-moon { display: none; }
+    [data-theme="light"] .icon-sun  { display: none; }
+    /* default: system — show both and let JS handle */
+
+    /* ── Main Layout ──────────────────────────────────────────────── */
+    .page {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 1.5rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+      align-items: start;
+    }
+
+    @media (max-width: 820px) {
+      .page { grid-template-columns: 1fr; }
+    }
+
+    /* ── Card ─────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: .9rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+    }
+
+    .card-header-icon {
+      width: 22px; height: 22px;
+      background: var(--accent-soft);
+      border-radius: 6px;
+      display: grid; place-items: center;
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+
+    .card-title {
+      font-size: .8rem;
+      font-weight: 600;
+      letter-spacing: .03em;
+      text-transform: uppercase;
+      color: var(--text-2);
+    }
+
+    .card-body { padding: 1.25rem; }
+
+    /* ── Form ─────────────────────────────────────────────────────── */
+    .field { margin-bottom: 1rem; }
+    .field:last-child { margin-bottom: 0; }
+
+    .field-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: .35rem;
+    }
+
+    .field-label span {
+      font-size: .775rem;
+      font-weight: 600;
+      color: var(--text-2);
+    }
+
+    .field-counter {
+      font-size: .7rem;
+      color: var(--text-3);
+      font-variant-numeric: tabular-nums;
+      transition: color .15s;
+    }
+    .field-counter.warn  { color: var(--warn); }
+    .field-counter.over  { color: var(--danger); }
+
+    .field-input, .field-select, .field-textarea {
+      width: 100%;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-size: .875rem;
+      font-family: inherit;
+      padding: .6rem .8rem;
+      outline: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+
+    .field-input:focus, .field-select:focus, .field-textarea:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(99,102,241,.15);
+    }
+
+    .field-textarea { resize: vertical; min-height: 72px; line-height: 1.5; }
+
+    .field-select {
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right .75rem center;
+      padding-right: 2rem;
+      cursor: pointer;
+    }
+
+    .field-hint {
+      font-size: .7rem;
+      color: var(--text-3);
+      margin-top: .25rem;
+    }
+
+    /* Validation indicator */
+    .field-row { display: flex; gap: .5rem; }
+    .field-row .field { flex: 1; }
+
+    .validator-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: .3rem;
+      font-size: .7rem;
+      font-weight: 600;
+      padding: .2rem .55rem;
+      border-radius: 20px;
+      margin-top: .35rem;
+    }
+    .validator-badge.missing { background: #fef2f2; color: var(--danger); }
+    .validator-badge.ok      { background: #f0fdf4; color: var(--ok); }
+    [data-theme="dark"] .validator-badge.missing { background: #3b0a0a; }
+    [data-theme="dark"] .validator-badge.ok      { background: #052e16; }
+
+    /* ── Platform Tabs ────────────────────────────────────────────── */
+    .platform-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      padding: 0 1.25rem;
+    }
+
+    .ptab {
+      padding: .65rem .9rem;
+      font-size: .78rem;
+      font-weight: 600;
+      color: var(--text-3);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+      transition: color .15s, border-color .15s;
+      user-select: none;
+      background: none;
+      border-top: none;
+      border-left: none;
+      border-right: none;
+    }
+
+    .ptab:hover  { color: var(--text); }
+    .ptab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    /* ── Preview Cards ────────────────────────────────────────────── */
+    .preview-area { padding: 1.25rem; }
+    .preview-panel { display: none; animation: fadeSlide .2s ease; }
+    .preview-panel.active { display: block; }
+
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Facebook card */
+    .fb-card {
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+      max-width: 504px;
+      font-family: system-ui, sans-serif;
+    }
+
+    .fb-img {
+      width: 100%;
+      aspect-ratio: 1.91/1;
+      background: var(--surface-2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-3);
+      font-size: .8rem;
+      background-size: cover;
+      background-position: center;
+    }
+
+    .fb-meta { background: var(--surface-2); padding: .65rem .75rem; border-top: 1px solid var(--border); }
+    .fb-domain { font-size: .72rem; text-transform: uppercase; color: var(--text-3); margin-bottom: .15rem; }
+    .fb-title  { font-size: .9rem; font-weight: 700; color: var(--text); line-height: 1.3; margin-bottom: .2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .fb-desc   { font-size: .8rem; color: var(--text-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+    /* Twitter card */
+    .tw-card {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      max-width: 504px;
+    }
+
+    .tw-img {
+      width: 100%;
+      aspect-ratio: 1.91/1;
+      background: var(--surface-2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-3);
+      font-size: .8rem;
+      background-size: cover;
+      background-position: center;
+    }
+
+    .tw-meta { padding: .75rem 1rem; background: var(--surface); }
+    .tw-domain { font-size: .78rem; color: var(--text-3); margin-bottom: .2rem; }
+    .tw-title  { font-size: .9rem; font-weight: 700; color: var(--text); margin-bottom: .2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tw-desc   { font-size: .8rem; color: var(--text-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+    /* LinkedIn card */
+    .li-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      max-width: 504px;
+      background: var(--surface);
+    }
+
+    .li-img {
+      width: 100%;
+      aspect-ratio: 1.91/1;
+      background: var(--surface-2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-3);
+      font-size: .8rem;
+      background-size: cover;
+      background-position: center;
+    }
+
+    .li-meta { padding: .75rem 1rem; background: var(--surface-2); border-top: 1px solid var(--border); }
+    .li-title  { font-size: .875rem; font-weight: 700; color: var(--text); margin-bottom: .2rem; }
+    .li-domain { font-size: .75rem; color: var(--text-3); }
+
+    /* ── Validation Panel ─────────────────────────────────────────── */
+    .validation-list {
+      display: flex;
+      flex-direction: column;
+      gap: .5rem;
+    }
+
+    .v-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: .5rem .75rem;
+      border-radius: 8px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      transition: background .15s;
+    }
+
+    .v-row-left {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      font-size: .8rem;
+      font-weight: 600;
+      color: var(--text-2);
+    }
+
+    .v-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      transition: background .2s;
+    }
+    .v-dot.ok      { background: var(--ok); }
+    .v-dot.missing { background: var(--danger); }
+    .v-dot.warn    { background: var(--warn); }
+
+    .v-status {
+      font-size: .72rem;
+      font-weight: 700;
+      color: var(--text-3);
+    }
+    .v-status.ok      { color: var(--ok); }
+    .v-status.missing { color: var(--danger); }
+    .v-status.warn    { color: var(--warn); }
+
+    /* ── Code Output ──────────────────────────────────────────────── */
+    .code-wrap {
+      position: relative;
+    }
+
+    .code-block {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+      font-family: var(--mono);
+      font-size: .75rem;
+      line-height: 1.7;
+      overflow-x: auto;
+      white-space: pre;
+      color: var(--text-2);
+      max-height: 320px;
+      overflow-y: auto;
+    }
+
+    .code-block .ck-tag     { color: #e879f9; }
+    .code-block .ck-attr    { color: #34d399; }
+    .code-block .ck-val     { color: #fbbf24; }
+    .code-block .ck-comment { color: var(--text-3); font-style: italic; }
+
+    /* ── Buttons ──────────────────────────────────────────────────── */
+    .btn-row {
+      display: flex;
+      gap: .6rem;
+      margin-top: .9rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      padding: .55rem 1rem;
+      border-radius: 8px;
+      font-size: .8rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all .15s;
+      line-height: 1;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      flex: 1;
+      justify-content: center;
+    }
+    .btn-primary:hover { background: var(--accent-2); box-shadow: var(--shadow-lg); }
+
+    .btn-ghost {
+      background: transparent;
+      border-color: var(--border);
+      color: var(--text-2);
+    }
+    .btn-ghost:hover { background: var(--surface-2); border-color: var(--border-focus); color: var(--accent); }
+
+    .btn-danger {
+      background: transparent;
+      border-color: #fecaca;
+      color: var(--danger);
+    }
+    .btn-danger:hover { background: #fef2f2; }
+    [data-theme="dark"] .btn-danger:hover { background: #3b0a0a; }
+
+    /* ── Score badge ──────────────────────────────────────────────── */
+    .score-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: .35rem;
+      font-size: .72rem;
+      font-weight: 700;
+      padding: .2rem .6rem;
+      border-radius: 20px;
+      margin-left: auto;
+    }
+    .score-pill.high { background: #f0fdf4; color: var(--ok); }
+    .score-pill.mid  { background: #fffbeb; color: var(--warn); }
+    .score-pill.low  { background: #fef2f2; color: var(--danger); }
+    [data-theme="dark"] .score-pill.high { background: #052e16; }
+    [data-theme="dark"] .score-pill.mid  { background: #451a03; }
+    [data-theme="dark"] .score-pill.low  { background: #3b0a0a; }
+
+    /* ── Toast ────────────────────────────────────────────────────── */
+    #toast {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      background: #18181b;
+      color: #fff;
+      font-size: .8rem;
+      font-weight: 600;
+      padding: .65rem 1.1rem;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.25);
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      transform: translateY(80px);
+      opacity: 0;
+      transition: all .3s cubic-bezier(.34,1.56,.64,1);
+      pointer-events: none;
+      z-index: 999;
+    }
+    #toast.show { transform: translateY(0); opacity: 1; }
+
+    /* ── Image placeholder ────────────────────────────────────────── */
+    .img-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: .4rem;
+      color: var(--text-3);
+      font-size: .75rem;
+    }
+    .img-placeholder svg { opacity: .4; }
+
+    /* ── Responsive tweaks ────────────────────────────────────────── */
+    @media (max-width: 500px) {
+      .page { padding: 1rem .75rem; }
+      .topbar { padding: 0 .75rem; }
+      .card-body { padding: 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Top Bar ──────────────────────────────────────────────────────── -->
+<header class="topbar">
+  <div class="topbar-left">
+    <div class="logo-badge">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/>
+      </svg>
+    </div>
+    <h1>Open Graph Generator</h1>
+  </div>
+  <div class="topbar-right">
+    <button class="theme-btn" id="themeBtn" title="Toggle theme" aria-label="Toggle theme">
+      <!-- sun -->
+      <svg class="icon-sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+      </svg>
+      <!-- moon -->
+      <svg class="icon-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<!-- ── Page ─────────────────────────────────────────────────────────── -->
+<main class="page">
+
+  <!-- ── LEFT: Form ────────────────────────────────────────────────── -->
+  <div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-header-icon">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        </div>
+        <span class="card-title">Meta Details</span>
+      </div>
+
+      <div class="card-body">
+
+        <!-- Title -->
+        <div class="field">
+          <div class="field-label">
+            <span>og:title</span>
+            <span class="field-counter" id="titleCount">0 / 60</span>
+          </div>
+          <input class="field-input" type="text" id="ogTitle" placeholder="My Awesome Website" maxlength="95" />
+        </div>
+
+        <!-- Description -->
+        <div class="field">
+          <div class="field-label">
+            <span>og:description</span>
+            <span class="field-counter" id="descCount">0 / 155</span>
+          </div>
+          <textarea class="field-textarea" id="ogDesc" placeholder="Describe your page in 1–2 sentences…" maxlength="300"></textarea>
+        </div>
+
+        <!-- URL -->
+        <div class="field">
+          <div class="field-label"><span>og:url</span></div>
+          <input class="field-input" type="url" id="ogUrl" placeholder="https://example.com/page" />
+        </div>
+
+        <!-- Image URL -->
+        <div class="field">
+          <div class="field-label"><span>og:image</span></div>
+          <input class="field-input" type="url" id="ogImage" placeholder="https://example.com/og-image.jpg" />
+          <p class="field-hint">Recommended: 1200 × 630 px · JPG or PNG · &lt; 8 MB</p>
+        </div>
+
+        <!-- Type + Locale -->
+        <div class="field-row">
+          <div class="field">
+            <div class="field-label"><span>og:type</span></div>
+            <select class="field-select" id="ogType">
+              <option value="website">website</option>
+              <option value="article">article</option>
+              <option value="profile">profile</option>
+              <option value="book">book</option>
+              <option value="music.song">music.song</option>
+              <option value="video.movie">video.movie</option>
+            </select>
+          </div>
+          <div class="field">
+            <div class="field-label"><span>og:locale</span></div>
+            <input class="field-input" type="text" id="ogLocale" placeholder="en_US" value="en_US" />
+          </div>
+        </div>
+
+        <!-- Site Name -->
+        <div class="field" style="margin-bottom:0">
+          <div class="field-label"><span>og:site_name</span></div>
+          <input class="field-input" type="text" id="ogSiteName" placeholder="Brand / Site Name" />
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── Validation card ─────────────────────────────────────────── -->
+    <div class="card" style="margin-top:1.25rem">
+      <div class="card-header">
+        <div class="card-header-icon">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>
+        </div>
+        <span class="card-title">OG Validation</span>
+        <span class="score-pill" id="scorePill">—</span>
+      </div>
+      <div class="card-body">
+        <div class="validation-list" id="validationList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── RIGHT: Preview + Output ───────────────────────────────────── -->
+  <div>
+
+    <!-- Preview card -->
+    <div class="card">
+      <div class="platform-tabs">
+        <button class="ptab active" data-platform="facebook">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
+          Facebook
+        </button>
+        <button class="ptab" data-platform="twitter">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+          X / Twitter
+        </button>
+        <button class="ptab" data-platform="linkedin">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6zM2 9h4v12H2z"/><circle cx="4" cy="4" r="2"/></svg>
+          LinkedIn
+        </button>
+      </div>
+
+      <div class="preview-area">
+
+        <!-- Facebook -->
+        <div class="preview-panel active" id="panel-facebook">
+          <div class="fb-card">
+            <div class="fb-img" id="fb-img">
+              <div class="img-placeholder">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                <span>1200 × 630</span>
+              </div>
+            </div>
+            <div class="fb-meta">
+              <div class="fb-domain" id="fb-domain">example.com</div>
+              <div class="fb-title"  id="fb-title">Page Title</div>
+              <div class="fb-desc"   id="fb-desc">Page description will appear here.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Twitter -->
+        <div class="preview-panel" id="panel-twitter">
+          <div class="tw-card">
+            <div class="tw-img" id="tw-img">
+              <div class="img-placeholder">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                <span>1200 × 630</span>
+              </div>
+            </div>
+            <div class="tw-meta">
+              <div class="tw-domain" id="tw-domain">example.com</div>
+              <div class="tw-title"  id="tw-title">Page Title</div>
+              <div class="tw-desc"   id="tw-desc">Page description will appear here.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- LinkedIn -->
+        <div class="preview-panel" id="panel-linkedin">
+          <div class="li-card">
+            <div class="li-img" id="li-img">
+              <div class="img-placeholder">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                <span>1200 × 630</span>
+              </div>
+            </div>
+            <div class="li-meta">
+              <div class="li-title"  id="li-title">Page Title</div>
+              <div class="li-domain" id="li-domain">example.com</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Generated code -->
+    <div class="card" style="margin-top:1.25rem">
+      <div class="card-header">
+        <div class="card-header-icon">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        </div>
+        <span class="card-title">Generated HTML</span>
+      </div>
+      <div class="card-body">
+        <div class="code-wrap">
+          <pre class="code-block" id="codeBlock"></pre>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-danger" id="resetBtn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            Reset
+          </button>
+          <button class="btn btn-primary" id="copyBtn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copy HTML
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<div id="toast">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+  <span id="toastMsg">Copied to clipboard!</span>
+</div>
+
+<script>
+  /* ── Theme ────────────────────────────────────────────────────────── */
+  (function() {
+    const saved = localStorage.getItem('og-theme');
+    if (saved) {
+      document.documentElement.setAttribute('data-theme', saved);
+    } else {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+    }
+  })();
+
+  document.getElementById('themeBtn').addEventListener('click', () => {
+    const current = document.documentElement.getAttribute('data-theme');
+    const next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('og-theme', next);
+  });
+
+  /* ── Platform tabs ────────────────────────────────────────────────── */
+  document.querySelectorAll('.ptab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.ptab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.preview-panel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('panel-' + tab.dataset.platform).classList.add('active');
+    });
+  });
+
+  /* ── Inputs ───────────────────────────────────────────────────────── */
+  const $ = id => document.getElementById(id);
+  const inputs = {
+    title:    $('ogTitle'),
+    desc:     $('ogDesc'),
+    url:      $('ogUrl'),
+    image:    $('ogImage'),
+    type:     $('ogType'),
+    locale:   $('ogLocale'),
+    siteName: $('ogSiteName'),
+  };
+
+  /* ── Helpers ──────────────────────────────────────────────────────── */
+  function esc(str) {
+    return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function getDomain(url) {
+    try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url || 'example.com'; }
+  }
+
+  function setImgBg(el, url) {
+    if (url) {
+      el.style.backgroundImage = `url('${url}')`;
+      el.style.backgroundSize  = 'cover';
+      el.style.backgroundPosition = 'center';
+      el.innerHTML = '';
+    } else {
+      el.style.backgroundImage = '';
+      el.innerHTML = `<div class="img-placeholder">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+        <span>1200 × 630</span></div>`;
+    }
+  }
+
+  /* ── Counter update ───────────────────────────────────────────────── */
+  function updateCounter(inputEl, countEl, limit) {
+    const len = inputEl.value.length;
+    countEl.textContent = `${len} / ${limit}`;
+    countEl.className = 'field-counter' +
+      (len > limit        ? ' over' :
+       len > limit * 0.85 ? ' warn' : '');
+  }
+
+  /* ── Validation ───────────────────────────────────────────────────── */
+  const CHECKS = [
+    { key: 'title',    label: 'og:title',       test: v => v.title.length > 0,       hint: 'Required for sharing' },
+    { key: 'desc',     label: 'og:description', test: v => v.desc.length > 0,        hint: 'Recommended for previews' },
+    { key: 'image',    label: 'og:image',        test: v => v.image.length > 0,       hint: 'Highly recommended (1200×630)' },
+    { key: 'url',      label: 'og:url',          test: v => isValidURL(v.url),        hint: 'Must be a valid absolute URL' },
+    { key: 'type',     label: 'og:type',         test: v => v.type.length > 0,        hint: 'Set content type' },
+    { key: 'siteName', label: 'og:site_name',    test: v => v.siteName.length > 0,    hint: 'Optional but improves branding' },
+    { key: 'locale',   label: 'og:locale',       test: v => /^\w+_\w+$/.test(v.locale), hint: 'e.g. en_US, hi_IN' },
+  ];
+
+  function isValidURL(str) {
+    try { const u = new URL(str); return u.protocol === 'http:' || u.protocol === 'https:'; } catch { return false; }
+  }
+
+  function updateValidation(vals) {
+    const list = $('validationList');
+    const pill = $('scorePill');
+    let pass = 0;
+    list.innerHTML = '';
+    CHECKS.forEach(c => {
+      const ok = c.test(vals);
+      if (ok) pass++;
+      const row = document.createElement('div');
+      row.className = 'v-row';
+      row.innerHTML = `
+        <div class="v-row-left">
+          <span class="v-dot ${ok ? 'ok' : 'missing'}"></span>
+          <span>${c.label}</span>
+          ${!ok ? `<span style="font-size:.7rem;color:var(--text-3);font-weight:400">${c.hint}</span>` : ''}
+        </div>
+        <span class="v-status ${ok ? 'ok' : 'missing'}">${ok ? '✓ Set' : '✗ Missing'}</span>`;
+      list.appendChild(row);
+    });
+    const pct = Math.round((pass / CHECKS.length) * 100);
+    const cls = pct >= 85 ? 'high' : pct >= 57 ? 'mid' : 'low';
+    pill.className = `score-pill ${cls}`;
+    pill.textContent = `${pass}/${CHECKS.length} · ${pct}%`;
+  }
+
+  /* ── Code generation ──────────────────────────────────────────────── */
+  function generateCode(vals) {
+    const t  = esc(vals.title);
+    const d  = esc(vals.desc);
+    const u  = esc(vals.url);
+    const im = esc(vals.image);
+    const ty = esc(vals.type);
+    const sn = esc(vals.siteName);
+    const lo = esc(vals.locale);
+
+    const tag  = s => `<span class="ck-tag">${s}</span>`;
+    const attr = s => `<span class="ck-attr">${s}</span>`;
+    const val  = s => `<span class="ck-val">"${s}"</span>`;
+    const cmt  = s => `<span class="ck-comment">${s}</span>`;
+    const meta = (prop, content) => content
+      ? `${tag('&lt;meta')} ${attr('property=')}${val(prop)} ${attr('content=')}${val(content)}${tag(' /&gt;')}\n`
+      : '';
+
+    let code = '';
+    code += cmt('&lt;!-- Primary Meta Tags --&gt;') + '\n';
+    if (t) code += `${tag('&lt;title&gt;')}${t}${tag('&lt;/title&gt;')}\n`;
+    if (d) code += `${tag('&lt;meta')} ${attr('name=')}${val('description')} ${attr('content=')}${val(d)}${tag(' /&gt;')}\n`;
+
+    code += '\n' + cmt('&lt;!-- Open Graph / Facebook --&gt;') + '\n';
+    code += meta('og:type',        ty);
+    code += meta('og:url',         u);
+    code += meta('og:title',       t);
+    code += meta('og:description', d);
+    code += meta('og:image',       im);
+    if (sn) code += meta('og:site_name', sn);
+    if (lo) code += meta('og:locale',    lo);
+
+    code += '\n' + cmt('&lt;!-- Twitter / X Card --&gt;') + '\n';
+    code += `${tag('&lt;meta')} ${attr('name=')}${val('twitter:card')} ${attr('content=')}${val('summary_large_image')}${tag(' /&gt;')}\n`;
+    if (u)  code += `${tag('&lt;meta')} ${attr('name=')}${val('twitter:url')} ${attr('content=')}${val(u)}${tag(' /&gt;')}\n`;
+    if (t)  code += `${tag('&lt;meta')} ${attr('name=')}${val('twitter:title')} ${attr('content=')}${val(t)}${tag(' /&gt;')}\n`;
+    if (d)  code += `${tag('&lt;meta')} ${attr('name=')}${val('twitter:description')} ${attr('content=')}${val(d)}${tag(' /&gt;')}\n`;
+    if (im) code += `${tag('&lt;meta')} ${attr('name=')}${val('twitter:image')} ${attr('content=')}${val(im)}${tag(' /&gt;')}\n`;
+
+    $('codeBlock').innerHTML = code;
+  }
+
+  /* ── Raw text for clipboard ───────────────────────────────────────── */
+  function getRawCode(vals) {
+    const t  = vals.title;
+    const d  = vals.desc;
+    const u  = vals.url;
+    const im = vals.image;
+    const ty = vals.type;
+    const sn = vals.siteName;
+    const lo = vals.locale;
+    const meta = (p, c) => c ? `<meta property="${p}" content="${c}" />\n` : '';
+
+    let code = '<!-- Primary Meta Tags -->\n';
+    if (t) code += `<title>${t}</title>\n`;
+    if (d) code += `<meta name="description" content="${d}" />\n`;
+    code += '\n<!-- Open Graph / Facebook -->\n';
+    code += meta('og:type', ty);
+    code += meta('og:url', u);
+    code += meta('og:title', t);
+    code += meta('og:description', d);
+    code += meta('og:image', im);
+    if (sn) code += meta('og:site_name', sn);
+    if (lo) code += meta('og:locale', lo);
+    code += '\n<!-- Twitter / X Card -->\n';
+    code += `<meta name="twitter:card" content="summary_large_image" />\n`;
+    if (u)  code += `<meta name="twitter:url" content="${u}" />\n`;
+    if (t)  code += `<meta name="twitter:title" content="${t}" />\n`;
+    if (d)  code += `<meta name="twitter:description" content="${d}" />\n`;
+    if (im) code += `<meta name="twitter:image" content="${im}" />\n`;
+    return code;
+  }
+
+  /* ── Main update ──────────────────────────────────────────────────── */
+  function update() {
+    const vals = {
+      title:    inputs.title.value.trim(),
+      desc:     inputs.desc.value.trim(),
+      url:      inputs.url.value.trim(),
+      image:    inputs.image.value.trim(),
+      type:     inputs.type.value,
+      locale:   inputs.locale.value.trim(),
+      siteName: inputs.siteName.value.trim(),
+    };
+    const domain = getDomain(vals.url);
+
+    // Counters
+    updateCounter(inputs.title, $('titleCount'), 60);
+    updateCounter(inputs.desc,  $('descCount'),  155);
+
+    // Facebook preview
+    $('fb-domain').textContent = domain;
+    $('fb-title').textContent  = vals.title || 'Page Title';
+    $('fb-desc').textContent   = vals.desc  || 'Page description will appear here.';
+    setImgBg($('fb-img'), vals.image);
+
+    // Twitter preview
+    $('tw-domain').textContent = domain;
+    $('tw-title').textContent  = vals.title || 'Page Title';
+    $('tw-desc').textContent   = vals.desc  || 'Page description will appear here.';
+    setImgBg($('tw-img'), vals.image);
+
+    // LinkedIn preview
+    $('li-domain').textContent = domain;
+    $('li-title').textContent  = vals.title || 'Page Title';
+    setImgBg($('li-img'), vals.image);
+
+    // Validation + code
+    updateValidation(vals);
+    generateCode(vals);
+  }
+
+  /* ── Events ───────────────────────────────────────────────────────── */
+  Object.values(inputs).forEach(el => el.addEventListener('input', update));
+
+  $('resetBtn').addEventListener('click', () => {
+    Object.values(inputs).forEach(el => {
+      if (el.tagName === 'SELECT') el.selectedIndex = 0;
+      else el.value = el.id === 'ogLocale' ? 'en_US' : '';
+    });
+    update();
+  });
+
+  $('copyBtn').addEventListener('click', () => {
+    const vals = {
+      title:    inputs.title.value.trim(),
+      desc:     inputs.desc.value.trim(),
+      url:      inputs.url.value.trim(),
+      image:    inputs.image.value.trim(),
+      type:     inputs.type.value,
+      locale:   inputs.locale.value.trim(),
+      siteName: inputs.siteName.value.trim(),
+    };
+    const raw = getRawCode(vals);
+    navigator.clipboard.writeText(raw).then(() => showToast('HTML copied to clipboard!')).catch(() => {
+      // fallback
+      const ta = document.createElement('textarea');
+      ta.value = raw; document.body.appendChild(ta);
+      ta.select(); document.execCommand('copy');
+      document.body.removeChild(ta);
+      showToast('HTML copied!');
+    });
+  });
+
+  function showToast(msg) {
+    const toast = $('toast');
+    $('toastMsg').textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2800);
+  }
+
+  /* ── Init ─────────────────────────────────────────────────────────── */
+  update();
+</script>
+</body>
+</html>
