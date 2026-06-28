@@ -161,7 +161,7 @@ Below is a curated list of tool ideas waiting to be built. Each idea is a potent
 | ~~UUID Generator~~ — ✅ [Built](tools/uuid-generator.html)    | Easy       |
 | ~~Command Step Loader~~ — ✅ [Built](tools/command-step-loader.html) | Easy |
 | QR Code Generator — create QR codes from text or URLs        | Easy       |
-| Git Ignore Generator — generate .gitignore files for selected technologies | Easy |
+| ~~Git Ignore Generator~~ — ✅ [Built](tools/git-ignore-generator.html) | Easy |
 | Commit Message Generator — create conventional commit messages | Easy     |
 | Chmod Calculator — toggle permission bits, see numeric and symbolic notation | Easy |
 | Crontab Explainer — paste a cron expression, see next 5 run times in plain English | Easy |
