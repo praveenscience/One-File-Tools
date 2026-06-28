@@ -206,14 +206,14 @@ function buildPillarCards() {
     {
       id: "resume",
       title: "One File Resume",
-      count: "3 themes",
+      count: "1 theme",
       desc: "ATS-friendly resume themes from a single JSON file. Zero JS, A4 print-ready.",
       icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></svg>'
     },
     {
       id: "portfolio",
       title: "One File Portfolio",
-      count: "3 themes",
+      count: "1 theme",
       desc: "Developer portfolio themes from a single JSON file. Dark/light, responsive.",
       icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M7 6.5h.01M10 6.5h.01"/></svg>'
     },
@@ -313,15 +313,10 @@ function buildPortfolioCards() {
 
 // Resume & portfolio theme data for the template
 const resumeThemes = [
-  { id: "classic", name: "Classic", description: "Clean single-column layout. ATS-compliant, zero JavaScript, A4 print-ready. System fonts only.", file: "resume/themes/classic.html" },
-  { id: "modern", name: "Modern", description: "Contemporary two-column sidebar layout. Features clean visual separation and minimal blue color accents.", file: "resume/themes/modern.html" },
-  { id: "compact", name: "Compact", description: "Maximum information density. Single-column, tight spacing, highly optimized for 1 page.", file: "resume/themes/compact.html" }
+  { id: "classic", name: "Classic", description: "Clean single-column layout. ATS-compliant, zero JavaScript, A4 print-ready. System fonts only.", file: "resume/themes/classic.html" }
 ];
-
 const portfolioThemes = [
-  { id: "developer", name: "Developer", description: "Terminal/IDE aesthetic with JetBrains Mono, dark/light mode toggle, IntersectionObserver animations.", file: "portfolio/themes/developer.html" },
-  { id: "minimal", name: "Minimal", description: "Ultra-clean single-page layout. Fast-loading, typography-driven, and content-focused.", file: "portfolio/themes/minimal.html" },
-  { id: "designer", name: "Designer", description: "Visual-first, image-heavy approach. Features large project thumbnails and elegant typography.", file: "portfolio/themes/designer.html" }
+  { id: "developer", name: "Developer", description: "Terminal/IDE aesthetic with JetBrains Mono, dark/light mode toggle, IntersectionObserver animations, 20+ inline SVG icons.", file: "portfolio/themes/developer.html" }
 ];
 
 // Build JSON data for the script block (used by modal + search)
@@ -1091,288 +1086,7 @@ ${has(talks) || has(publications) ? `<section id="talks-publications"><div class
 </body>
 </html>`;
   }
-function buildPortfolioMinimal(profile) {
-    const p = profile.personal || {};
-    const contact = p.contact || {};
-    const social = p.social || {};
-    const skills = profile.skills || [];
-    const projects = profile.projects || [];
-    const experience = profile.experience || [];
-    const summary = profile.summary || "";
-    
-    const e = escapeHtml;
-    const displayName = p.displayName || [p.firstName, p.lastName].filter(Boolean).join(" ") || "Portfolio";
-    const title = p.title || "";
-    const bio = p.bio || summary || "";
 
-    // Generate Projects HTML
-    const projectsHtml = projects.map(proj => `
-      <div class="project-item">
-        <h3>${has(proj.liveUrl) ? `<a href="${e(proj.liveUrl)}" target="_blank">${e(proj.name)}</a>` : e(proj.name)}</h3>
-        ${has(proj.tagline) ? `<p class="tagline">${e(proj.tagline)}</p>` : ""}
-        ${has(proj.description) ? `<p class="desc">${e(proj.description)}</p>` : ""}
-        ${has(proj.techStack) ? `<div class="tags">${proj.techStack.map(t => `<span>${e(t)}</span>`).join("")}</div>` : ""}
-      </div>
-    `).join("");
-
-    // Generate Experience HTML
-    const experienceHtml = experience.map(exp => `
-      <div class="exp-item">
-        <div class="exp-header">
-          <h3>${e(exp.role)}</h3>
-          <span class="dates">${fmtDate(exp.startDate)} — ${exp.current ? "Present" : fmtDate(exp.endDate)}</span>
-        </div>
-        <div class="company">${has(exp.url) ? `<a href="${e(exp.url)}" target="_blank">${e(exp.company)}</a>` : e(exp.company)}</div>
-        ${has(exp.description) ? `<p class="desc">${e(exp.description)}</p>` : ""}
-      </div>
-    `).join("");
-
-    // Generate Skills HTML
-    const skillsHtml = skills.filter(g => has(g.items)).map(group => `
-      <div class="skill-group">
-        <h4>${e(group.category)}</h4>
-        <p>${group.items.map(i => e(i.name)).join(", ")}</p>
-      </div>
-    `).join("");
-
-    return `<!DOCTYPE html>
-<html lang="en" data-theme="light">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${e(displayName)} — ${e(title)}</title>
-<style>
-  :root {
-    --bg: #ffffff;
-    --text: #1a1a1a;
-    --text-muted: #666666;
-    --border: #eaeaea;
-    --accent: #000000;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #111111;
-      --text: #eeeeee;
-      --text-muted: #999999;
-      --border: #333333;
-      --accent: #ffffff;
-    }
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: var(--text); background: var(--bg); max-width: 760px; margin: 0 auto; padding: 4rem 2rem; }
-  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--border); transition: border-color 0.2s; }
-  a:hover { border-bottom-color: var(--accent); }
-  h1 { font-size: 2.5rem; font-weight: 700; margin-bottom: 0.5rem; letter-spacing: -0.02em; }
-  h2 { font-size: 1.25rem; font-weight: 600; margin: 3rem 0 1.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
-  h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem; }
-  p { margin-bottom: 1rem; color: var(--text-muted); }
-  
-  .hero { margin-bottom: 4rem; }
-  .hero .title { font-size: 1.25rem; color: var(--text-muted); margin-bottom: 1.5rem; }
-  .hero .bio { font-size: 1.1rem; max-width: 600px; color: var(--text); }
-  .social-links { display: flex; gap: 1rem; margin-top: 1.5rem; flex-wrap: wrap; }
-  .social-links a { font-weight: 500; font-size: 0.95rem; }
-
-  .project-item, .exp-item { margin-bottom: 2rem; }
-  .project-item .tagline { font-size: 0.95rem; color: var(--text); margin-bottom: 0.5rem; }
-  .tags { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.75rem; }
-  .tags span { font-size: 0.75rem; padding: 0.2rem 0.6rem; border: 1px solid var(--border); border-radius: 4px; color: var(--text-muted); }
-
-  .exp-header { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; }
-  .exp-header .dates { font-size: 0.85rem; color: var(--text-muted); }
-  .company { font-weight: 500; margin-bottom: 0.5rem; }
-
-  .skill-group { margin-bottom: 1.25rem; }
-  .skill-group h4 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.25rem; color: var(--text); }
-  .skill-group p { font-size: 0.95rem; }
-
-  footer { margin-top: 5rem; padding-top: 2rem; border-top: 1px solid var(--border); font-size: 0.85rem; color: var(--text-muted); display: flex; justify-content: space-between; }
-</style>
-</head>
-<body>
-  <header class="hero">
-    <h1>${e(displayName)}</h1>
-    <div class="title">${e(title)}</div>
-    ${has(bio) ? `<p class="bio">${e(bio)}</p>` : ""}
-    <div class="social-links">
-      ${has(contact.email) ? `<a href="mailto:${e(contact.email)}">Email</a>` : ""}
-      ${has(social.github) ? `<a href="${e(social.github)}" target="_blank">GitHub</a>` : ""}
-      ${has(social.linkedin) ? `<a href="${e(social.linkedin)}" target="_blank">LinkedIn</a>` : ""}
-      ${has(contact.website) ? `<a href="${e(contact.website)}" target="_blank">Website</a>` : ""}
-    </div>
-  </header>
-
-  ${has(projects) ? `
-  <section id="projects">
-    <h2>Selected Work</h2>
-    <div class="projects-list">${projectsHtml}</div>
-  </section>` : ""}
-
-  ${has(experience) ? `
-  <section id="experience">
-    <h2>Experience</h2>
-    <div class="experience-list">${experienceHtml}</div>
-  </section>` : ""}
-
-  ${has(skills) ? `
-  <section id="skills">
-    <h2>Capabilities</h2>
-    <div class="skills-list">${skillsHtml}</div>
-  </section>` : ""}
-
-  <footer>
-    <span>&copy; ${new Date().getFullYear()} ${e(displayName)}</span>
-    <span>Built with <a href="https://github.com/praveenscience/One-File-Tools" target="_blank">One File Tools</a></span>
-  </footer>
-</body>
-</html>`;
-  }
-
-  function buildPortfolioDesigner(profile) {
-    const p = profile.personal || {};
-    const contact = p.contact || {};
-    const social = p.social || {};
-    const skills = profile.skills || [];
-    const projects = profile.projects || [];
-    const experience = profile.experience || [];
-    const summary = profile.summary || "";
-    
-    const e = escapeHtml;
-    const displayName = p.displayName || [p.firstName, p.lastName].filter(Boolean).join(" ") || "Portfolio";
-    const title = p.title || "";
-    const bio = p.bio || summary || "";
-
-    // Generate Projects HTML (Image-Heavy)
-    const projectsHtml = projects.map(proj => `
-      <article class="project-card">
-        <div class="project-image">
-          ${has(proj.thumbnail) 
-            ? `<img src="${e(proj.thumbnail)}" alt="${e(proj.name)}" loading="lazy" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'100%\\' height=\\'100%\\'><rect width=\\'100%\\' height=\\'100%\\' fill=\\'%23e5e7eb\\'/><text x=\\'50%\\' y=\\'50%\\' font-family=\\'sans-serif\\' font-size=\\'24\\' fill=\\'%239ca3af\\' text-anchor=\\'middle\\' dy=\\'.3em\\'>Image Placeholder</text></svg>'">` 
-            : `<div class="image-placeholder">No Image Available</div>`
-          }
-        </div>
-        <div class="project-info">
-          <h3>${has(proj.liveUrl) ? `<a href="${e(proj.liveUrl)}" target="_blank">${e(proj.name)}</a>` : e(proj.name)}</h3>
-          ${has(proj.tagline) ? `<span class="tagline">${e(proj.tagline)}</span>` : ""}
-          ${has(proj.description) ? `<p>${e(proj.description)}</p>` : ""}
-        </div>
-      </article>
-    `).join("");
-
-    // Generate Experience HTML (Clean, spaced out)
-    const experienceHtml = experience.map(exp => `
-      <div class="exp-row">
-        <div class="exp-meta">
-          <span class="dates">${fmtDate(exp.startDate)} — ${exp.current ? "Present" : fmtDate(exp.endDate)}</span>
-          <span class="company">${has(exp.url) ? `<a href="${e(exp.url)}" target="_blank">${e(exp.company)}</a>` : e(exp.company)}</span>
-        </div>
-        <div class="exp-details">
-          <h4>${e(exp.role)}</h4>
-          ${has(exp.description) ? `<p>${e(exp.description)}</p>` : ""}
-        </div>
-      </div>
-    `).join("");
-
-    return `<!DOCTYPE html>
-<html lang="en" data-theme="light">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${e(displayName)} — ${e(title)}</title>
-<style>
-  :root {
-    --bg: #f9f9f9;
-    --surface: #ffffff;
-    --text-main: #111111;
-    --text-muted: #777777;
-    --border: #e2e2e2;
-    --font-sans: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
-    --font-serif: "Playfair Display", "Georgia", serif;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #0f0f0f;
-      --surface: #1a1a1a;
-      --text-main: #f4f4f4;
-      --text-muted: #a0a0a0;
-      --border: #333333;
-    }
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: var(--font-sans); color: var(--text-main); background: var(--bg); line-height: 1.6; }
-  a { color: inherit; text-decoration: none; position: relative; }
-  a::after { content: ''; position: absolute; width: 100%; transform: scaleX(0); height: 1px; bottom: 0; left: 0; background-color: currentColor; transform-origin: bottom right; transition: transform 0.4s cubic-bezier(0.86, 0, 0.07, 1); }
-  a:hover::after { transform: scaleX(1); transform-origin: bottom left; }
-  
-  .container { max-width: 1400px; margin: 0 auto; padding: 0 4vw; }
-  
-  /* Hero Section */
-  header { min-height: 90vh; display: flex; flex-direction: column; justify-content: center; padding: 10vh 0; }
-  .greeting { font-size: 1rem; text-transform: uppercase; letter-spacing: 0.2em; color: var(--text-muted); margin-bottom: 2rem; display: block; }
-  h1 { font-family: var(--font-serif); font-size: clamp(3rem, 8vw, 7rem); font-weight: 400; line-height: 1.1; margin-bottom: 1.5rem; letter-spacing: -0.02em; }
-  .hero-bio { font-size: clamp(1.2rem, 2vw, 1.8rem); color: var(--text-muted); max-width: 800px; font-weight: 300; }
-  
-  /* Sections */
-  section { padding: 8rem 0; border-top: 1px solid var(--border); }
-  .section-header { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-muted); margin-bottom: 4rem; }
-  
-  /* Projects Grid */
-  .projects-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 4rem; }
-  .project-card { display: flex; flex-direction: column; gap: 1.5rem; }
-  .project-image { width: 100%; aspect-ratio: 4/3; overflow: hidden; background: var(--surface); border-radius: 4px; }
-  .project-image img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s ease; }
-  .project-card:hover .project-image img { transform: scale(1.05); }
-  .image-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--text-muted); background: var(--border); }
-  .project-info h3 { font-family: var(--font-serif); font-size: 2rem; font-weight: 400; margin-bottom: 0.5rem; }
-  .tagline { display: block; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 1rem; }
-  
-  /* Experience Row */
-  .exp-row { display: grid; grid-template-columns: 1fr 2fr; gap: 2rem; margin-bottom: 4rem; }
-  .exp-meta { display: flex; flex-direction: column; gap: 0.5rem; color: var(--text-muted); }
-  .exp-details h4 { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 400; margin-bottom: 1rem; }
-  
-  /* Footer */
-  footer { padding: 4rem 0; text-align: center; border-top: 1px solid var(--border); }
-  .socials { display: flex; justify-content: center; gap: 2rem; margin-bottom: 2rem; font-size: 1.2rem; }
-  
-  @media (max-width: 768px) {
-    .exp-row { grid-template-columns: 1fr; gap: 1rem; margin-bottom: 3rem; }
-    .projects-grid { grid-template-columns: 1fr; }
-  }
-</style>
-</head>
-<body>
-  <div class="container">
-    <header>
-      <span class="greeting">${e(title)}</span>
-      <h1>${e(displayName)}.</h1>
-      ${has(bio) ? `<p class="hero-bio">${e(bio)}</p>` : ""}
-    </header>
-
-    ${has(projects) ? `
-    <section id="work">
-      <h2 class="section-header">Selected Works</h2>
-      <div class="projects-grid">${projectsHtml}</div>
-    </section>` : ""}
-
-    ${has(experience) ? `
-    <section id="experience">
-      <h2 class="section-header">Experience</h2>
-      <div class="experience-list">${experienceHtml}</div>
-    </section>` : ""}
-
-    <footer>
-      <div class="socials">
-        ${has(contact.email) ? `<a href="mailto:${e(contact.email)}">Email</a>` : ""}
-        ${has(social.github) ? `<a href="${e(social.github)}" target="_blank">GitHub</a>` : ""}
-        ${has(social.linkedin) ? `<a href="${e(social.linkedin)}" target="_blank">LinkedIn</a>` : ""}
-      </div>
-      <p style="color: var(--text-muted); font-size: 0.9rem;">&copy; ${new Date().getFullYear()} ${e(displayName)}. Built with One File Tools.</p>
-    </footer>
-  </div>
-</body>
-</html>`;
-  }
   // ── Showcase page: Resume ──
 
   function buildResumeShowcase() {
@@ -1455,7 +1169,7 @@ function buildPortfolioMinimal(profile) {
 
   // ── Showcase page: Portfolio ──
 
-function buildPortfolioShowcase() {
+  function buildPortfolioShowcase() {
     return `<!DOCTYPE html>
 <html lang="en">
   <head>
@@ -1513,7 +1227,6 @@ function buildPortfolioShowcase() {
       <h1>Portfolio Themes</h1>
       <p class="subtitle">Developer portfolios generated from profile.json. Responsive, dark/light mode, self-contained HTML files.</p>
       <div class="theme-grid">
-        
         <div class="theme-card">
           <div class="theme-thumb">&#128187;</div>
           <div class="theme-info">
@@ -1524,29 +1237,6 @@ function buildPortfolioShowcase() {
             </div>
           </div>
         </div>
-
-        <div class="theme-card">
-          <div class="theme-thumb">&#10024;</div>
-          <div class="theme-info">
-            <h3>Minimal</h3>
-            <p>Ultra-clean single-page layout. Fast-loading, typography-driven, and content-focused with zero distracting animations.</p>
-            <div class="theme-links">
-              <a href="themes/minimal.html" class="btn-primary">Preview</a>
-            </div>
-          </div>
-        </div>
-
-        <div class="theme-card">
-          <div class="theme-thumb">&#127912;</div>
-          <div class="theme-info">
-            <h3>Designer</h3>
-            <p>Visual-first, image-heavy approach. Features large project thumbnails, abundant whitespace, and elegant typography.</p>
-            <div class="theme-links">
-              <a href="themes/designer.html" class="btn-primary">Preview</a>
-            </div>
-          </div>
-        </div>
-
       </div>
     </div>
     <footer>
@@ -1570,14 +1260,6 @@ function buildPortfolioShowcase() {
   // Portfolio themes
   fs.writeFileSync(path.join(portfolioDir, "developer.html"), buildPortfolioDeveloper(profile), "utf-8");
   console.log("Built portfolio/themes/developer.html");
-
-  // Build and write the Minimal portfolio theme
-  fs.writeFileSync(path.join(portfolioDir, "minimal.html"), buildPortfolioMinimal(profile), "utf-8");
-  console.log("Built portfolio/themes/minimal.html");
-
-  // Build and write the Designer portfolio theme
-  fs.writeFileSync(path.join(portfolioDir, "designer.html"), buildPortfolioDesigner(profile), "utf-8");
-  console.log("Built portfolio/themes/designer.html");
 
   // Showcase pages
   fs.writeFileSync(path.join(__dirname, "resume", "index.html"), buildResumeShowcase(), "utf-8");
