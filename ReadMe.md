@@ -45,19 +45,22 @@ Every tool in this collection is a standalone `.html` file containing all the HT
 | 16 | [Glassmorphism Generator](tools/glassmorphism-generator.html) | CSS Tools | Generate sleek, frosted-glass UI effects for your components. | [Try it](https://one-file-tools.pages.dev/tools/glassmorphism-generator) |
 | 17 | [JSON Diff Viewer](tools/json-diff-viewer.html) | JSON & API | Compare two JSON objects semantically with added, removed, and modified value highlighting. | [Try it](https://one-file-tools.pages.dev/tools/json-diff-viewer) |
 | 18 | [JSON Formatter](tools/json-formatter.html) | JSON & API | Format, validate, and minify JSON locally in your browser. | [Try it](https://one-file-tools.pages.dev/tools/json-formatter) |
-| 19 | [JWT Decoder](tools/jwt-decoder.html) | JSON & API | Decode and inspect JSON Web Tokens — header, payload, claims, and expiry — entirely in your browser. | [Try it](https://one-file-tools.pages.dev/tools/jwt-decoder) |
-| 20 | [Meta Tag Generator](tools/meta-tag-generator.html) | Web & SEO | Generate essential HTML meta tags with a live preview and copy-ready code. | [Try it](https://one-file-tools.pages.dev/tools/meta-tag-generator) |
-| 21 | [Neumorphism Generator](tools/neumorphism-generator.html) | CSS Tools | Create soft, extruded UI elements with customizable neumorphic shadows. | [Try it](https://one-file-tools.pages.dev/tools/neumorphism-generator) |
-| 22 | [Open Graph Checker](tools/open-graph-checker.html) | Web & SEO | Validate Open Graph tags from any public URL with social previews, health score, and JSON export. | [Try it](https://one-file-tools.pages.dev/tools/open-graph-checker) |
-| 23 | [Open Graph Generator](tools/open-graph-generator.html) | Web & SEO | Generate Open Graph meta tags with a live tri-platform preview (Facebook, Twitter, LinkedIn) and copy-ready HTML. | [Try it](https://one-file-tools.pages.dev/tools/open-graph-generator) |
-| 24 | [Open Graph Inspector](tools/open-graph-inspector.html) | Web & SEO | Analyze meta tags, social previews, and SEO metadata for any URL with actionable scores. | [Try it](https://one-file-tools.pages.dev/tools/open-graph-inspector) |
-| 25 | [Palette Generator](tools/palette-generator.html) | Color Tools | Generate unique, collision-free variation color schemes based on color theory metrics, offline. | [Try it](https://one-file-tools.pages.dev/tools/palette-generator) |
-| 26 | [Password Generator](tools/password-generator.html) | Developer Utilities | Generate highly secure, cryptographic random passwords instantly. 100% offline, privacy guaranteed. | [Try it](https://one-file-tools.pages.dev/tools/password-generator) |
-| 27 | [Radii - Border Radius Generator](tools/border-radius-generator.html) | CSS Tools | Visually create CSS border-radius values with live preview, presets, and copy-ready CSS output. | [Try it](https://one-file-tools.pages.dev/tools/border-radius-generator) |
-| 28 | [Responsive Breakpoint Tester](tools/responsive-breakpoint-tester.html) | Web & SEO | Test responsive layouts instantly via URL or raw HTML sandbox with intelligent scaling. | [Try it](https://one-file-tools.pages.dev/tools/responsive-breakpoint-tester) |
-| 29 | [Robots.txt Generator](tools/robots-txt-generator.html) | Web & SEO | Visually build, manage, and export standard-compliant robots.txt files with live syntax highlighting. | [Try it](https://one-file-tools.pages.dev/tools/robots-txt-generator) |
-| 30 | [Twitter / X Card Preview](tools/twitter-x-card-preview.html) | Web & SEO | Preview how Twitter/X cards appear with live updates for Summary and Summary Large Image layouts. | [Try it](https://one-file-tools.pages.dev/tools/twitter-x-card-preview) |
-| 31 | [UUID Generator](tools/uuid-generator.html) | Developer Utilities | Generate random v4 UUIDs instantly, offline. | [Try it](https://one-file-tools.pages.dev/tools/uuid-generator) |
+| 19 | [JSON-LD / Schema.org Generator](tools/jsonld-schema-generator.html) | Web & SEO | Generate Schema.org JSON-LD structured data with live preview, copy, and download support. | [Try it](https://one-file-tools.pages.dev/tools/jsonld-schema-generator) |
+| 20 | [JWT Decoder](tools/jwt-decoder.html) | JSON & API | Decode and inspect JSON Web Tokens — header, payload, claims, and expiry — entirely in your browser. | [Try it](https://one-file-tools.pages.dev/tools/jwt-decoder) |
+| 21 | [Lorem Ipsum Generator](tools/lorem-ipsum-generator.html) | Text & Content | Generate placeholder lorem ipsum text for designs and mockups. | [Try it](https://one-file-tools.pages.dev/tools/lorem-ipsum-generator) |
+| 22 | [Meta Tag Generator](tools/meta-tag-generator.html) | Web & SEO | Generate essential HTML meta tags with a live preview and copy-ready code. | [Try it](https://one-file-tools.pages.dev/tools/meta-tag-generator) |
+| 23 | [Neumorphism Generator](tools/neumorphism-generator.html) | CSS Tools | Create soft, extruded UI elements with customizable neumorphic shadows. | [Try it](https://one-file-tools.pages.dev/tools/neumorphism-generator) |
+| 24 | [Open Graph Checker](tools/open-graph-checker.html) | Web & SEO | Validate Open Graph tags from any public URL with social previews, health score, and JSON export. | [Try it](https://one-file-tools.pages.dev/tools/open-graph-checker) |
+| 25 | [Open Graph Generator](tools/open-graph-generator.html) | Web & SEO | Generate Open Graph meta tags with a live tri-platform preview (Facebook, Twitter, LinkedIn) and copy-ready HTML. | [Try it](https://one-file-tools.pages.dev/tools/open-graph-generator) |
+| 26 | [Open Graph Inspector](tools/open-graph-inspector.html) | Web & SEO | Analyze meta tags, social previews, and SEO metadata for any URL with actionable scores. | [Try it](https://one-file-tools.pages.dev/tools/open-graph-inspector) |
+| 27 | [Palette Generator](tools/palette-generator.html) | Color Tools | Generate unique, collision-free variation color schemes based on color theory metrics, offline. | [Try it](https://one-file-tools.pages.dev/tools/palette-generator) |
+| 28 | [Password Generator](tools/password-generator.html) | Developer Utilities | Generate highly secure, cryptographic random passwords instantly. 100% offline, privacy guaranteed. | [Try it](https://one-file-tools.pages.dev/tools/password-generator) |
+| 29 | [Radii - Border Radius Generator](tools/border-radius-generator.html) | CSS Tools | Visually create CSS border-radius values with live preview, presets, and copy-ready CSS output. | [Try it](https://one-file-tools.pages.dev/tools/border-radius-generator) |
+| 30 | [Responsive Breakpoint Tester](tools/responsive-breakpoint-tester.html) | Web & SEO | Test responsive layouts instantly via URL or raw HTML sandbox with intelligent scaling. | [Try it](https://one-file-tools.pages.dev/tools/responsive-breakpoint-tester) |
+| 31 | [Robots.txt Generator](tools/robots-txt-generator.html) | Web & SEO | Visually build, manage, and export standard-compliant robots.txt files with live syntax highlighting. | [Try it](https://one-file-tools.pages.dev/tools/robots-txt-generator) |
+| 32 | [Sitemap Generator](tools/sitemap-generator.html) | Web & SEO | A standalone Sitemap Generator that helps users create valid XML sitemaps for websites entirely offline. | [Try it](https://one-file-tools.pages.dev/tools/sitemap-generator) |
+| 33 | [Twitter / X Card Preview](tools/twitter-x-card-preview.html) | Web & SEO | Preview how Twitter/X cards appear with live updates for Summary and Summary Large Image layouts. | [Try it](https://one-file-tools.pages.dev/tools/twitter-x-card-preview) |
+| 34 | [UUID Generator](tools/uuid-generator.html) | Developer Utilities | Generate random v4 UUIDs instantly, offline. | [Try it](https://one-file-tools.pages.dev/tools/uuid-generator) |
 
 > **Want to see your tool here?** Check out the [Contributing Guide](Contributing.md) and pick an idea from the [Ideas Board](#ideas-board).
 
@@ -160,8 +163,8 @@ Below is a curated list of tool ideas waiting to be built. Each idea is a potent
 | ~~Password Generator~~ — ✅ [Built](tools/password-generator.html)        | Easy       |
 | ~~UUID Generator~~ — ✅ [Built](tools/uuid-generator.html)    | Easy       |
 | ~~Command Step Loader~~ — ✅ [Built](tools/command-step-loader.html) | Easy |
-| QR Code Generator — create QR codes from text or URLs        | Easy       |
 | ~~Git Ignore Generator~~ — ✅ [Built](tools/git-ignore-generator.html) | Easy |
+| ~~QR Code Generator~~ — ✅ [Built](tools/qr-code-generator.html)        | Easy       |
 | Commit Message Generator — create conventional commit messages | Easy     |
 | Chmod Calculator — toggle permission bits, see numeric and symbolic notation | Easy |
 | Crontab Explainer — paste a cron expression, see next 5 run times in plain English | Easy |
