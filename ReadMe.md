@@ -27,31 +27,37 @@ Every tool in this collection is a standalone `.html` file containing all the HT
 
 | # | Tool | Category | Description | Live |
 |---|------|----------|-------------|------|
-| 1 | [Aspect Ratio Calculator](tools/aspect-ratio-calculator.html) | Image Tools | Calculate and simplify aspect ratios instantly. Supports common presets and outputs decimal ratio and CSS padding-bottom values. | [Try it](https://one-file-tools.pages.dev/tools/aspect-ratio-calculator) |
-| 2 | [Box Shadow Generator](tools/box-shadow-generator.html) | CSS Tools | Design CSS box shadows visually with live preview, presets, and copy-ready output. | [Try it](https://one-file-tools.pages.dev/tools/box-shadow-generator) |
-| 3 | [Clip Path Generator](tools/clip-path-generator.html) | CSS Tools | Visually create complex CSS clip-path shapes and instantly copy the generated code. | [Try it](https://one-file-tools.pages.dev/tools/clip-path-generator) |
-| 4 | [Color Palette Extractor](tools/color-palette-extractor.html) | Image Tools | Extract dominant colors and generate beautiful palettes directly from images in your browser. | [Try it](https://one-file-tools.pages.dev/tools/color-palette-extractor) |
-| 5 | [Command Step Loader](tools/command-step-loader.html) | Developer Utilities | Load multiple commands and copy them one at a time with a terminal-style interface. | [Try it](https://one-file-tools.pages.dev/tools/command-step-loader) |
-| 6 | [Cron Expression Builder](tools/cron-expression-builder.html) | Developer Utilities | Build and customize cron schedules with presets, validation, explanations, and upcoming run previews. | [Try it](https://one-file-tools.pages.dev/tools/cron-expression-builder) |
-| 7 | [CSS Color Converter](tools/css-color-converter.html) | Color Tools | Convert between Hex, RGB, HSL, HSLA, and OKLCH color formats instantly with a visual picker. | [Try it](https://one-file-tools.pages.dev/tools/css-color-converter) |
-| 8 | [CSS Grid Generator](tools/css-grid-generator.html) | CSS Tools | Build CSS Grid layouts visually with configurable columns, rows, gap, and sizing options. | [Try it](https://one-file-tools.pages.dev/tools/css-grid-generator) |
-| 9 | [Favicon Generator](tools/favicon-generator.html) | Developer Utilities | Generate a complete favicon pack and integration tags from any image, offline. | [Try it](https://one-file-tools.pages.dev/tools/favicon-generator) |
-| 10 | [Flexbox Playground](tools/flexbox-playground.html) | CSS Tools | Experiment with Flexbox properties visually and copy the generated CSS. | [Try it](https://one-file-tools.pages.dev/tools/flexbox-playground) |
-| 11 | [GitHub Token Validator (Terminal)](tools/github-token-validator-terminal.html) | Developer Utilities | Validate GitHub Personal Access Tokens with a terminal-style UI that displays user identity and scopes. | [Try it](https://one-file-tools.pages.dev/tools/github-token-validator-terminal) |
-| 12 | [GitHub Token Validator Plain](tools/github-token-validator-plain.html) | Developer Utilities | Validate GitHub Personal Access Tokens with a clean, straightforward interface. | [Try it](https://one-file-tools.pages.dev/tools/github-token-validator-plain) |
-| 13 | [GitHub Token Validator Retro](tools/github-token-validator-retro.html) | Developer Utilities | Validate GitHub Personal Access Tokens with a retro terminal themed interface. | [Try it](https://one-file-tools.pages.dev/tools/github-token-validator-retro) |
-| 14 | [Glassmorphism Generator](tools/glassmorphism-generator.html) | CSS Tools | Generate sleek, frosted-glass UI effects for your components. | [Try it](https://one-file-tools.pages.dev/tools/glassmorphism-generator) |
-| 15 | [JSON Diff Viewer](tools/json-diff-viewer.html) | JSON & API | Compare two JSON objects semantically with added, removed, and modified value highlighting. | [Try it](https://one-file-tools.pages.dev/tools/json-diff-viewer) |
-| 16 | [JSON Formatter](tools/json-formatter.html) | JSON & API | Format, validate, and minify JSON locally in your browser. | [Try it](https://one-file-tools.pages.dev/tools/json-formatter) |
-| 17 | [JWT Decoder](tools/jwt-decoder.html) | JSON & API | Decode and inspect JSON Web Tokens — header, payload, claims, and expiry — entirely in your browser. | [Try it](https://one-file-tools.pages.dev/tools/jwt-decoder) |
-| 18 | [Meta Tag Generator](tools/meta-tag-generator.html) | Web & SEO | Generate essential HTML meta tags with a live preview and copy-ready code. | [Try it](https://one-file-tools.pages.dev/tools/meta-tag-generator) |
-| 19 | [Neumorphism Generator](tools/neumorphism-generator.html) | CSS Tools | Create soft, extruded UI elements with customizable neumorphic shadows. | [Try it](https://one-file-tools.pages.dev/tools/neumorphism-generator) |
-| 20 | [Open Graph Generator](tools/open-graph-generator.html) | Web & SEO | Generate Open Graph meta tags with a live tri-platform preview (Facebook, Twitter, LinkedIn) and copy-ready HTML. | [Try it](https://one-file-tools.pages.dev/tools/open-graph-generator) |
-| 21 | [Open Graph Inspector](tools/open-graph-inspector.html) | Web & SEO | Analyze meta tags, social previews, and SEO metadata for any URL with actionable scores. | [Try it](https://one-file-tools.pages.dev/tools/open-graph-inspector) |
-| 22 | [Palette Generator](tools/palette-generator.html) | Color Tools | Generate unique, collision-free variation color schemes based on color theory metrics, offline. | [Try it](https://one-file-tools.pages.dev/tools/palette-generator) |
-| 23 | [Password Generator](tools/password-generator.html) | Developer Utilities | Generate highly secure, cryptographic random passwords instantly. 100% offline, privacy guaranteed. | [Try it](https://one-file-tools.pages.dev/tools/password-generator) |
-| 24 | [Radii - Border Radius Generator](tools/border-radius-generator.html) | CSS Tools | Visually create CSS border-radius values with live preview, presets, and copy-ready CSS output. | [Try it](https://one-file-tools.pages.dev/tools/border-radius-generator) |
-| 25 | [Twitter / X Card Preview](tools/twitter-x-card-preview.html) | Web & SEO | Preview how Twitter/X cards appear with live updates for Summary and Summary Large Image layouts. | [Try it](https://one-file-tools.pages.dev/tools/twitter-x-card-preview) |
+| 1 | [Animation Cubic-Bezier Editor](tools/animation-cubic-bezier-editor.html) | CSS Tools | Visually create and customize CSS cubic-bezier() easing functions with a live animation preview. | [Try it](https://one-file-tools.pages.dev/tools/animation-cubic-bezier-editor) |
+| 2 | [Aspect Ratio Calculator](tools/aspect-ratio-calculator.html) | Image Tools | Calculate and simplify aspect ratios instantly. Supports common presets and outputs decimal ratio and CSS padding-bottom values. | [Try it](https://one-file-tools.pages.dev/tools/aspect-ratio-calculator) |
+| 3 | [Box Shadow Generator](tools/box-shadow-generator.html) | CSS Tools | Design CSS box shadows visually with live preview, presets, and copy-ready output. | [Try it](https://one-file-tools.pages.dev/tools/box-shadow-generator) |
+| 4 | [Clip Path Generator](tools/clip-path-generator.html) | CSS Tools | Visually create complex CSS clip-path shapes and instantly copy the generated code. | [Try it](https://one-file-tools.pages.dev/tools/clip-path-generator) |
+| 5 | [Color Palette Extractor](tools/color-palette-extractor.html) | Image Tools | Extract dominant colors and generate beautiful palettes directly from images in your browser. | [Try it](https://one-file-tools.pages.dev/tools/color-palette-extractor) |
+| 6 | [Command Step Loader](tools/command-step-loader.html) | Developer Utilities | Load multiple commands and copy them one at a time with a terminal-style interface. | [Try it](https://one-file-tools.pages.dev/tools/command-step-loader) |
+| 7 | [Cron Expression Builder](tools/cron-expression-builder.html) | Developer Utilities | Build and customize cron schedules with presets, validation, explanations, and upcoming run previews. | [Try it](https://one-file-tools.pages.dev/tools/cron-expression-builder) |
+| 8 | [CSS Color Converter](tools/css-color-converter.html) | Color Tools | Convert between Hex, RGB, HSL, HSLA, and OKLCH color formats instantly with a visual picker. | [Try it](https://one-file-tools.pages.dev/tools/css-color-converter) |
+| 9 | [CSS Grid Generator](tools/css-grid-generator.html) | CSS Tools | Build CSS Grid layouts visually with configurable columns, rows, gap, and sizing options. | [Try it](https://one-file-tools.pages.dev/tools/css-grid-generator) |
+| 10 | [CSS Unit Converter](tools/css-unit-converter.html) | CSS Tools | Instantly convert between px, rem, em, vw, vh, and percentages. | [Try it](https://one-file-tools.pages.dev/tools/css-unit-converter) |
+| 11 | [Favicon Generator](tools/favicon-generator.html) | Developer Utilities | Generate a complete favicon pack and integration tags from any image, offline. | [Try it](https://one-file-tools.pages.dev/tools/favicon-generator) |
+| 12 | [Flexbox Playground](tools/flexbox-playground.html) | CSS Tools | Experiment with Flexbox properties visually and copy the generated CSS. | [Try it](https://one-file-tools.pages.dev/tools/flexbox-playground) |
+| 13 | [GitHub Token Validator (Terminal)](tools/github-token-validator-terminal.html) | Developer Utilities | Validate GitHub Personal Access Tokens with a terminal-style UI that displays user identity and scopes. | [Try it](https://one-file-tools.pages.dev/tools/github-token-validator-terminal) |
+| 14 | [GitHub Token Validator Plain](tools/github-token-validator-plain.html) | Developer Utilities | Validate GitHub Personal Access Tokens with a clean, straightforward interface. | [Try it](https://one-file-tools.pages.dev/tools/github-token-validator-plain) |
+| 15 | [GitHub Token Validator Retro](tools/github-token-validator-retro.html) | Developer Utilities | Validate GitHub Personal Access Tokens with a retro terminal themed interface. | [Try it](https://one-file-tools.pages.dev/tools/github-token-validator-retro) |
+| 16 | [Glassmorphism Generator](tools/glassmorphism-generator.html) | CSS Tools | Generate sleek, frosted-glass UI effects for your components. | [Try it](https://one-file-tools.pages.dev/tools/glassmorphism-generator) |
+| 17 | [JSON Diff Viewer](tools/json-diff-viewer.html) | JSON & API | Compare two JSON objects semantically with added, removed, and modified value highlighting. | [Try it](https://one-file-tools.pages.dev/tools/json-diff-viewer) |
+| 18 | [JSON Formatter](tools/json-formatter.html) | JSON & API | Format, validate, and minify JSON locally in your browser. | [Try it](https://one-file-tools.pages.dev/tools/json-formatter) |
+| 19 | [JWT Decoder](tools/jwt-decoder.html) | JSON & API | Decode and inspect JSON Web Tokens — header, payload, claims, and expiry — entirely in your browser. | [Try it](https://one-file-tools.pages.dev/tools/jwt-decoder) |
+| 20 | [Meta Tag Generator](tools/meta-tag-generator.html) | Web & SEO | Generate essential HTML meta tags with a live preview and copy-ready code. | [Try it](https://one-file-tools.pages.dev/tools/meta-tag-generator) |
+| 21 | [Neumorphism Generator](tools/neumorphism-generator.html) | CSS Tools | Create soft, extruded UI elements with customizable neumorphic shadows. | [Try it](https://one-file-tools.pages.dev/tools/neumorphism-generator) |
+| 22 | [Open Graph Checker](tools/open-graph-checker.html) | Web & SEO | Validate Open Graph tags from any public URL with social previews, health score, and JSON export. | [Try it](https://one-file-tools.pages.dev/tools/open-graph-checker) |
+| 23 | [Open Graph Generator](tools/open-graph-generator.html) | Web & SEO | Generate Open Graph meta tags with a live tri-platform preview (Facebook, Twitter, LinkedIn) and copy-ready HTML. | [Try it](https://one-file-tools.pages.dev/tools/open-graph-generator) |
+| 24 | [Open Graph Inspector](tools/open-graph-inspector.html) | Web & SEO | Analyze meta tags, social previews, and SEO metadata for any URL with actionable scores. | [Try it](https://one-file-tools.pages.dev/tools/open-graph-inspector) |
+| 25 | [Palette Generator](tools/palette-generator.html) | Color Tools | Generate unique, collision-free variation color schemes based on color theory metrics, offline. | [Try it](https://one-file-tools.pages.dev/tools/palette-generator) |
+| 26 | [Password Generator](tools/password-generator.html) | Developer Utilities | Generate highly secure, cryptographic random passwords instantly. 100% offline, privacy guaranteed. | [Try it](https://one-file-tools.pages.dev/tools/password-generator) |
+| 27 | [Radii - Border Radius Generator](tools/border-radius-generator.html) | CSS Tools | Visually create CSS border-radius values with live preview, presets, and copy-ready CSS output. | [Try it](https://one-file-tools.pages.dev/tools/border-radius-generator) |
+| 28 | [Responsive Breakpoint Tester](tools/responsive-breakpoint-tester.html) | Web & SEO | Test responsive layouts instantly via URL or raw HTML sandbox with intelligent scaling. | [Try it](https://one-file-tools.pages.dev/tools/responsive-breakpoint-tester) |
+| 29 | [Robots.txt Generator](tools/robots-txt-generator.html) | Web & SEO | Visually build, manage, and export standard-compliant robots.txt files with live syntax highlighting. | [Try it](https://one-file-tools.pages.dev/tools/robots-txt-generator) |
+| 30 | [Twitter / X Card Preview](tools/twitter-x-card-preview.html) | Web & SEO | Preview how Twitter/X cards appear with live updates for Summary and Summary Large Image layouts. | [Try it](https://one-file-tools.pages.dev/tools/twitter-x-card-preview) |
+| 31 | [UUID Generator](tools/uuid-generator.html) | Developer Utilities | Generate random v4 UUIDs instantly, offline. | [Try it](https://one-file-tools.pages.dev/tools/uuid-generator) |
 
 > **Want to see your tool here?** Check out the [Contributing Guide](Contributing.md) and pick an idea from the [Ideas Board](#ideas-board).
 
@@ -63,16 +69,16 @@ Below is a curated list of tool ideas waiting to be built. Each idea is a potent
 
 | Idea                                                           | Difficulty |
 | -------------------------------------------------------------- | ---------- |
-| Open Graph Generator — generate OG meta tags and preview cards | Easy       |
-| Open Graph Checker — validate existing OG tags from a URL      | Medium     |
-| Meta Tag Generator — create standard HTML meta tags            | Easy       |
+| ~~Open Graph Generator~~ — ✅ [Built](tools/open-graph-generator.html) | Easy       |
+| ~~Open Graph Checker~~ — ✅ [Built](tools/open-graph-checker.html) | Medium     |
+| ~~Meta Tag Generator~~ — ✅ [Built](tools/meta-tag-generator.html) | Easy       |
 | ~~Twitter / X Card Preview~~ — ✅ [Built](tools/twitter-x-card-preview.html) | Easy       |
-| Robots.txt Generator — build a `robots.txt` file visually      | Easy       |
+| ~~Robots.txt Generator~~ — ✅ [Built](tools/robots-txt-generator.html) | Easy       |
 | Sitemap Generator — create XML sitemaps                        | Medium     |
 | Canonical URL Checker — verify canonical tag setup             | Medium     |
 | JSON-LD / Schema.org Generator — build structured data         | Medium     |
 | Hreflang Tag Generator — generate multi-language link tags     | Easy       |
-| Responsive Breakpoint Tester — preview pages at common device widths | Medium |
+| ~~Responsive Breakpoint Tester~~ — ✅ [Built](tools/responsive-breakpoint-tester.html) | Medium |
 | Privacy Policy Generator — fill a form, get a basic privacy policy   | Easy   |
 
 ### Image Tools
@@ -96,7 +102,7 @@ Below is a curated list of tool ideas waiting to be built. Each idea is a potent
 | Contrast Checker — verify WCAG contrast ratios             | Easy       |
 | ~~Palette Generator~~ — ✅ [Built](tools/palette-generator.html) | Medium     |
 | Gradient Builder — create CSS gradients visually           | Easy       |
-| CSS Color Converter — convert between HEX, RGB, HSL, OKLCH | Easy      |
+| ~~CSS Color Converter~~ — ✅ [Built](tools/css-color-converter.html) | Easy      |
 | Tailwind Color Finder — find the closest Tailwind color    | Easy       |
 
 ### CSS Tools
@@ -107,11 +113,11 @@ Below is a curated list of tool ideas waiting to be built. Each idea is a potent
 | ~~Border Radius Generator~~ — ✅ [Built](tools/border-radius-generator.html) | Easy |
 | ~~Clip Path Generator~~ — ✅ [Built](tools/clip-path-generator.html) | Medium |
 | ~~Glassmorphism Generator~~ — ✅ [Built](tools/glassmorphism-generator.html) | Easy |
-| Neumorphism Generator — create soft UI / neumorphic styles  | Easy       |
+| ~~Neumorphism Generator~~ — ✅ [Built](tools/neumorphism-generator.html) | Easy       |
 | ~~CSS Grid Generator~~ — ✅ [Built](tools/css-grid-generator.html) | Medium     |
-| Flexbox Playground — experiment with Flexbox properties     | Medium     |
-| CSS Unit Converter — convert between px, rem, em, vw, vh    | Easy       |
-| Animation Cubic-Bezier Editor — design easing curves        | Medium     |
+| ~~Flexbox Playground~~ — ✅ [Built](tools/flexbox-playground.html) | Medium     |
+| ~~CSS Unit Converter~~ — ✅ [Built](tools/css-unit-converter.html) | Easy       |
+| ~~Animation Cubic-Bezier Editor~~ — ✅ [Built](tools/animation-cubic-bezier-editor.html) | Medium     |
 | CSS Easing Visualizer — draw cubic-bezier curves with animated preview | Medium |
 | Tailwind → Vanilla CSS Converter — paste Tailwind classes, get equivalent CSS | Medium |
 
@@ -133,6 +139,7 @@ Below is a curated list of tool ideas waiting to be built. Each idea is a potent
 
 | Idea                                                     | Difficulty |
 | -------------------------------------------------------- | ---------- |
+| ~~JSON Formatter~~ — ✅ [Built](tools/json-formatter.html) | Easy       |
 | ~~JSON Diff Viewer~~ — ✅ [Built](tools/json-diff-viewer.html) | Medium |
 | ~~JWT Decoder~~ — ✅ [Built](tools/jwt-decoder.html)     | Easy       |
 | URL Encoder / Decoder — encode and decode URL strings    | Easy       |
@@ -151,6 +158,8 @@ Below is a curated list of tool ideas waiting to be built. Each idea is a potent
 | ~~Cron Expression Builder~~ — ✅ [Built](tools/cron-expression-builder.html) | Medium |
 | Hash Generator — generate MD5, SHA-1, SHA-256 hashes         | Easy       |
 | ~~Password Generator~~ — ✅ [Built](tools/password-generator.html)        | Easy       |
+| ~~UUID Generator~~ — ✅ [Built](tools/uuid-generator.html)    | Easy       |
+| ~~Command Step Loader~~ — ✅ [Built](tools/command-step-loader.html) | Easy |
 | QR Code Generator — create QR codes from text or URLs        | Easy       |
 | Git Ignore Generator — generate .gitignore files for selected technologies | Easy |
 | Commit Message Generator — create conventional commit messages | Easy     |
@@ -235,11 +244,12 @@ One-File-Tools/
 │   └── index.html        # Portfolio theme showcase
 ├── profile.json          # Master data file for resume & portfolio generation
 ├── tools.json            # Tool registry
+├── index-template.txt    # Landing page template (used by build.js)
 ├── build.js              # Generates index.html + resume/portfolio themes
 ├── sort-norm.js          # Sorts and normalizes tools.json
 ├── sync-readme.js        # Auto-syncs the Available Tools table in ReadMe.md
 ├── Contributing.md       # Contribution guide
-├── index.html            # Generated: hub page with Tools/Portfolio/Resume nav
+├── index.html            # Generated: landing page with Tools/Resume/Portfolio pillars
 ├── ReadMe.md             # This file
 ├── LICENSE               # Unlicense (Public Domain)
 └── .gitignore
