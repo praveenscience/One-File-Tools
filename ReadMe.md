@@ -216,6 +216,7 @@ touch tools/your-tool-name.html
 # Run the build scripts.
 node sort-norm.js tools.json   # Sort and normalize tools.json
 node build.js                  # Regenerate the landing page
+node theme-gen.js              # Regenerate resume/portfolio themes (optional)
 
 # Commit and push, make a PR.
 git add tools/your-tool-name.html tools/your-tool-name.png tools.json
@@ -232,20 +233,20 @@ One-File-Tools/
 │   ├── json-formatter.html
 │   ├── json-formatter.png
 │   └── ...
-├── resume/               # Pillar 2: Resume themes (generated from profile.json)
-│   ├── themes/
-│   │   └── classic.html
-│   ├── screenshots/
-│   └── index.html        # Resume theme showcase
-├── portfolio/            # Pillar 3: Portfolio themes (generated from profile.json)
-│   ├── themes/
-│   │   └── developer.html
-│   ├── screenshots/
-│   └── index.html        # Portfolio theme showcase
-├── profile.json          # Master data file for resume & portfolio generation
-├── tools.json            # Tool registry
+├── resume/               # Pillar 2: Resume themes
+│   └── themes/
+│       ├── classic.hbs   # Handlebars template (contributor-created)
+│       └── classic.html  # Generated output
+├── portfolio/            # Pillar 3: Portfolio themes
+│   └── themes/
+│       ├── developer.hbs # Handlebars template (contributor-created)
+│       └── developer.html# Generated output
+├── profile.json          # Sample data file for resume & portfolio generation
+├── tools.json            # Tool registry (tools metadata for landing page)
+├── themes.json           # Theme registry (resume/portfolio metadata for landing page)
 ├── index-template.txt    # Landing page template (used by build.js)
-├── build.js              # Generates index.html + resume/portfolio themes
+├── build.js              # Generates index.html (landing page only)
+├── theme-gen.js          # Generates resume/portfolio HTML from .hbs templates + profile.json
 ├── sort-norm.js          # Sorts and normalizes tools.json
 ├── sync-readme.js        # Auto-syncs the Available Tools table in ReadMe.md
 ├── Contributing.md       # Contribution guide

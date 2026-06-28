@@ -13,6 +13,7 @@ This guide will walk you through everything you need to know.
 - [Before You Start](#before-you-start)
 - [Building a New Tool](#building-a-new-tool)
 - [Enhancing an Existing Tool](#enhancing-an-existing-tool)
+- [Contributing a Resume or Portfolio Theme](#contributing-a-resume-or-portfolio-theme)
 - [Tool Requirements](#tool-requirements)
 - [File Naming Convention](#file-naming-convention)
 - [Code Style](#code-style)
@@ -267,6 +268,129 @@ Enhancements are valuable contributions! Some examples:
 git checkout -b feat/tool-name-what-you-changed
 # Example: feat/json-formatter-dark-mode
 ```
+
+---
+
+## Contributing a Resume or Portfolio Theme
+
+Beyond tools, you can contribute **resume** and **portfolio** themes. Each theme is a single [Handlebars](https://handlebarsjs.com/) template (`.hbs`) that gets compiled against `profile.json` to produce a standalone HTML file.
+
+### How it works
+
+1. `profile.json` contains sample profile data (personal info, experience, skills, projects, etc.)
+2. `theme-gen.js` discovers all `.hbs` files in `resume/themes/` and `portfolio/themes/`
+3. Each template is compiled with Handlebars, producing a matching `.html` file
+
+### Creating a theme
+
+```bash
+git checkout -b add/resume-theme-minimal
+```
+
+Create your template file (e.g., `resume/themes/minimal.hbs` or `portfolio/themes/creative.hbs`). Look at the existing templates for reference:
+
+- `resume/themes/classic.hbs` — clean, print-ready A4 resume
+- `portfolio/themes/developer.hbs` — dark, developer-focused portfolio
+
+### Available template data
+
+Your template receives these top-level fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `displayName` | string | Full name |
+| `title` | string | Job title |
+| `headline` | string | One-line headline |
+| `bio` | string | Short bio paragraph |
+| `photo` | string | Photo URL |
+| `email`, `phone`, `website` | string | Contact info |
+| `locationStr` | string | Formatted location (e.g., "San Francisco, CA (Remote)") |
+| `socialLinks` | array | `[{ key, url, label }]` |
+| `summary` | string | Professional summary |
+| `skills` | array | `[{ category, items: [{ name, level }] }]` |
+| `experience` | array | `[{ company, role, startDate, endDate, description, highlights, location }]` |
+| `education` | array | `[{ institution, degree, field, startDate, endDate, gpa, honors }]` |
+| `projects` | array | `[{ name, tagline, description, techStack, highlights, liveUrl, repoUrl, year }]` |
+| `certifications` | array | `[{ name, issuer, date }]` |
+| `publications` | array | `[{ title, publisher, date, url }]` |
+| `talks` | array | `[{ title, event, date, location, slidesUrl, videoUrl }]` |
+| `awards` | array | `[{ title, issuer, date, description }]` |
+| `testimonials` | array | `[{ quote, author, role, company }]` |
+| `languages` | array | `[{ language, proficiency }]` |
+| `volunteer` | array | `[{ organization, role, startDate, endDate, description }]` |
+| `interests` | array | Array of strings |
+
+### Available Handlebars helpers
+
+| Helper | Usage | Output |
+|--------|-------|--------|
+| `fmtDate` | `{{fmtDate startDate}}` | `"2022-03"` → `"Mar 2022"`, `null` → `"Present"` |
+| `year` | `{{year}}` | Current year (e.g., `2026`) |
+| `eq` | `{{#if (eq level "expert")}}` | Equality check |
+| `join` | `{{join interests ", "}}` | Join array of strings |
+| `joinField` | `{{joinField items "name" ", "}}` | Join array of objects by field |
+| `lowercase` | `{{lowercase level}}` | Lowercase a string |
+| `levelPercent` | `{{levelPercent level}}` | `"expert"` → `95`, `"advanced"` → `80` |
+| `has` | `{{#has experience}}...{{/has}}` | Truthy check for arrays, strings, objects |
+| `stripProtocol` | `{{stripProtocol website}}` | Remove `https://` prefix |
+
+### Important patterns
+
+Use `{{#has array}}` to conditionally show sections, and `{{#array}}` to iterate:
+
+```handlebars
+{{#has experience}}
+<section>
+  <h2>Experience</h2>
+  {{#experience}}
+  <div>
+    <h3>{{role}}</h3>
+    <span>{{fmtDate startDate}} — {{fmtDate endDate}}</span>
+    <p>{{company}}</p>
+  </div>
+  {{/experience}}
+</section>
+{{/has}}
+```
+
+For string arrays like `interests`, use `{{.}}` for the current item:
+
+```handlebars
+{{#interests}}<span>{{.}}</span>{{/interests}}
+```
+
+### Register your theme
+
+Add an entry for your theme in `themes.json` under the `"resume"` or `"portfolio"` array:
+
+```json
+{
+  "id": "minimal",
+  "name": "Minimal",
+  "description": "A brief description of your theme's style and features.",
+  "file": "resume/themes/minimal.hbs",
+  "author": "Your Name"
+}
+```
+
+This is how your theme appears on the landing page — similar to how `tools.json` works for tools.
+
+### Build and test
+
+```bash
+npm install                    # Install Handlebars (first time only)
+node theme-gen.js              # Generate HTML from all .hbs templates
+open resume/themes/minimal.html
+```
+
+### Submit
+
+```bash
+git add resume/themes/minimal.hbs themes.json
+git commit -m "Add: resume theme — minimal"
+```
+
+> **Note:** Don't commit the generated `.html` files — they are rebuilt by `theme-gen.js`.
 
 ---
 
