@@ -1,271 +1,470 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Animation Cubic-Bezier Editor | One File Tools</title>
     <style>
-        /* Design Tokens */
-        :root {
-            --bg-base: #fafafa;
-            --bg-surface: #ffffff;
-            --border: #e4e4e7;
-            --border-focus: #3b82f6;
-            --text-main: #18181b;
-            --text-muted: #71717a;
-            --accent: #2563eb;
-            --accent-hover: #1d4ed8;
-            --handle-1: #ec4899;
-            --handle-2: #06b6d4;
-            --radius: 12px;
-            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            --font-sans: 'Inter', system-ui, sans-serif;
-            --font-mono: 'JetBrains Mono', monospace;
-            --graph-size: 300px;
+      /* Design Tokens */
+      :root {
+        --bg-base: #fafafa;
+        --bg-surface: #ffffff;
+        --border: #e4e4e7;
+        --border-focus: #3b82f6;
+        --text-main: #18181b;
+        --text-muted: #71717a;
+        --accent: #2563eb;
+        --accent-hover: #1d4ed8;
+        --handle-1: #ec4899;
+        --handle-2: #06b6d4;
+        --radius: 12px;
+        --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        --font-sans: "Inter", system-ui, sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+        --graph-size: 300px;
+      }
+
+      [data-theme="dark"] {
+        --bg-base: #09090b;
+        --bg-surface: #18181b;
+        --border: #27272a;
+        --text-main: #f4f4f5;
+        --text-muted: #a1a1aa;
+        --accent: #3b82f6;
+        --accent-hover: #60a5fa;
+        --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: var(--font-sans);
+        background: var(--bg-base);
+        color: var(--text-main);
+        min-height: 100vh;
+        transition: 0.2s;
+      }
+
+      /* Layout Structure */
+      .header {
+        display: flex;
+        justify-content: space-between;
+        padding: 1rem 1.5rem;
+        background: var(--bg-surface);
+        border-bottom: 1px solid var(--border);
+      }
+      .brand {
+        font-weight: 600;
+        font-size: 1.125rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .workspace {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 2rem;
+        max-width: 1000px;
+        margin: 2rem auto;
+        padding: 0 1.5rem;
+      }
+      @media (max-width: 800px) {
+        .workspace {
+          grid-template-columns: 1fr;
         }
+      }
 
-        [data-theme="dark"] {
-            --bg-base: #09090b;
-            --bg-surface: #18181b;
-            --border: #27272a;
-            --text-main: #f4f4f5;
-            --text-muted: #a1a1aa;
-            --accent: #3b82f6;
-            --accent-hover: #60a5fa;
-            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
-        }
+      /* Graph Editor */
+      .editor-card {
+        background: var(--bg-surface);
+        padding: 1.5rem;
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow);
+        display: inline-block;
+      }
+      .graph-container {
+        position: relative;
+        width: var(--graph-size);
+        height: var(--graph-size);
+        margin: 1rem 0;
+        background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px);
+        background-size: 10% 10%;
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+      }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: var(--font-sans); background: var(--bg-base); color: var(--text-main); min-height: 100vh; transition: 0.2s; }
+      svg {
+        width: 100%;
+        height: 100%;
+        overflow: visible;
+      }
+      .curve {
+        fill: none;
+        stroke: var(--text-main);
+        stroke-width: 4;
+        stroke-linecap: round;
+      }
+      .handle-line {
+        fill: none;
+        stroke-width: 2;
+        stroke-dasharray: 4;
+      }
+      .line-1 {
+        stroke: var(--handle-1);
+      }
+      .line-2 {
+        stroke: var(--handle-2);
+      }
 
-        /* Layout Structure */
-        .header { display: flex; justify-content: space-between; padding: 1rem 1.5rem; background: var(--bg-surface); border-bottom: 1px solid var(--border); }
-        .brand { font-weight: 600; font-size: 1.125rem; display: flex; align-items: center; gap: 8px; }
-        .workspace { display: grid; grid-template-columns: auto 1fr; gap: 2rem; max-width: 1000px; margin: 2rem auto; padding: 0 1.5rem; }
-        @media (max-width: 800px) { .workspace { grid-template-columns: 1fr; } }
+      .control-point {
+        position: absolute;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+        cursor: grab;
+        border: 3px solid var(--bg-surface);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        z-index: 10;
+      }
+      .control-point:active {
+        cursor: grabbing;
+        transform: translate(-50%, -50%) scale(1.2);
+      }
+      .point-1 {
+        background: var(--handle-1);
+      }
+      .point-2 {
+        background: var(--handle-2);
+      }
 
-        /* Graph Editor */
-        .editor-card { background: var(--bg-surface); padding: 1.5rem; border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow); display: inline-block; }
-        .graph-container { position: relative; width: var(--graph-size); height: var(--graph-size); margin: 1rem 0; background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 10% 10%; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-        
-        svg { width: 100%; height: 100%; overflow: visible; }
-        .curve { fill: none; stroke: var(--text-main); stroke-width: 4; stroke-linecap: round; }
-        .handle-line { fill: none; stroke-width: 2; stroke-dasharray: 4; }
-        .line-1 { stroke: var(--handle-1); }
-        .line-2 { stroke: var(--handle-2); }
-        
-        .control-point { position: absolute; width: 16px; height: 16px; border-radius: 50%; transform: translate(-50%, -50%); cursor: grab; border: 3px solid var(--bg-surface); box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 10; }
-        .control-point:active { cursor: grabbing; transform: translate(-50%, -50%) scale(1.2); }
-        .point-1 { background: var(--handle-1); }
-        .point-2 { background: var(--handle-2); }
+      /* Controls & Preview */
+      .controls-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
 
-        /* Controls & Preview */
-        .controls-panel { display: flex; flex-direction: column; gap: 1.5rem; }
-        
-        .preview-card { background: var(--bg-surface); padding: 1.5rem; border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow); }
-        .track { width: 100%; height: 60px; background: var(--bg-base); border-radius: 30px; position: relative; border: 1px solid var(--border); margin: 1rem 0; }
-        .box { width: 60px; height: 60px; background: var(--accent); border-radius: 50%; position: absolute; left: 0; display: flex; align-items: center; justify-content: center; color: white; box-shadow: var(--shadow); }
-        .animate-btn { padding: 0.75rem 1.5rem; background: var(--accent); color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.2s; width: 100%; }
-        .animate-btn:hover { background: var(--accent-hover); }
+      .preview-card {
+        background: var(--bg-surface);
+        padding: 1.5rem;
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow);
+      }
+      .track {
+        width: 100%;
+        height: 60px;
+        background: var(--bg-base);
+        border-radius: 30px;
+        position: relative;
+        border: 1px solid var(--border);
+        margin: 1rem 0;
+      }
+      .box {
+        width: 60px;
+        height: 60px;
+        background: var(--accent);
+        border-radius: 50%;
+        position: absolute;
+        left: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        box-shadow: var(--shadow);
+      }
+      .animate-btn {
+        padding: 0.75rem 1.5rem;
+        background: var(--accent);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: 0.2s;
+        width: 100%;
+      }
+      .animate-btn:hover {
+        background: var(--accent-hover);
+      }
 
-        /* Output & Presets */
-        .section-title { font-size: 0.875rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.75rem; }
-        
-        .code-output { display: flex; align-items: center; background: var(--bg-base); border: 1px solid var(--border); border-radius: 6px; padding: 0.75rem; font-family: var(--font-mono); font-size: 1rem; color: var(--accent); font-weight: 600; justify-content: space-between; }
-        .copy-btn { background: transparent; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; }
-        .copy-btn:hover { color: var(--text-main); }
+      /* Output & Presets */
+      .section-title {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        margin-bottom: 0.75rem;
+      }
 
-        .presets { display: flex; flex-wrap: wrap; gap: 8px; }
-        .preset-btn { padding: 0.5rem 1rem; background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-main); border-radius: 20px; font-size: 0.875rem; cursor: pointer; transition: 0.2s; }
-        .preset-btn:hover { border-color: var(--border-focus); background: var(--bg-base); }
+      .code-output {
+        display: flex;
+        align-items: center;
+        background: var(--bg-base);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 0.75rem;
+        font-family: var(--font-mono);
+        font-size: 1rem;
+        color: var(--accent);
+        font-weight: 600;
+        justify-content: space-between;
+      }
+      .copy-btn {
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+      }
+      .copy-btn:hover {
+        color: var(--text-main);
+      }
 
-        /* Utilities */
-        .theme-btn { background: transparent; border: 1px solid var(--border); color: var(--text-main); padding: 0.5rem; border-radius: 6px; cursor: pointer; }
-        #toast { position: fixed; bottom: 20px; right: 20px; background: var(--bg-surface); border: 1px solid var(--border); padding: 12px 20px; border-radius: 6px; box-shadow: var(--shadow); font-weight: 500; transform: translateY(100px); opacity: 0; transition: 0.3s; z-index: 100; }
-        #toast.show { transform: translateY(0); opacity: 1; }
+      .presets {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .preset-btn {
+        padding: 0.5rem 1rem;
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        color: var(--text-main);
+        border-radius: 20px;
+        font-size: 0.875rem;
+        cursor: pointer;
+        transition: 0.2s;
+      }
+      .preset-btn:hover {
+        border-color: var(--border-focus);
+        background: var(--bg-base);
+      }
+
+      /* Utilities */
+      .theme-btn {
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--text-main);
+        padding: 0.5rem;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      #toast {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        padding: 12px 20px;
+        border-radius: 6px;
+        box-shadow: var(--shadow);
+        font-weight: 500;
+        transform: translateY(100px);
+        opacity: 0;
+        transition: 0.3s;
+        z-index: 100;
+      }
+      #toast.show {
+        transform: translateY(0);
+        opacity: 1;
+      }
     </style>
-</head>
-<body>
-
+  </head>
+  <body>
     <header class="header">
-        <div class="brand">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0z"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>
-            Cubic-Bezier Editor
-        </div>
-        <button class="theme-btn" id="themeToggle" aria-label="Toggle Theme">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-        </button>
+      <div class="brand">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0z" />
+          <path d="M12 8v8" />
+          <path d="M8 12h8" />
+        </svg>
+        Cubic-Bezier Editor
+      </div>
+      <button class="theme-btn" id="themeToggle" aria-label="Toggle Theme">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+      </button>
     </header>
 
     <main class="workspace">
-        
-        <section class="editor-card">
-            <div class="section-title">Curve Editor</div>
-            <div class="graph-container" id="graph">
-                <svg>
-                    <line class="handle-line line-1" id="line1" x1="0" y1="300" x2="0" y2="0" />
-                    <line class="handle-line line-2" id="line2" x1="300" y1="0" x2="300" y2="300" />
-                    <path class="curve" id="bezierCurve" d="M 0,300 C 0,0 300,300 300,0" />
-                </svg>
-                <div class="control-point point-1" id="p1"></div>
-                <div class="control-point point-2" id="p2"></div>
-            </div>
-        </section>
+      <section class="editor-card">
+        <div class="section-title">Curve Editor</div>
+        <div class="graph-container" id="graph">
+          <svg>
+            <line class="handle-line line-1" id="line1" x1="0" y1="300" x2="0" y2="0" />
+            <line class="handle-line line-2" id="line2" x1="300" y1="0" x2="300" y2="300" />
+            <path class="curve" id="bezierCurve" d="M 0,300 C 0,0 300,300 300,0" />
+          </svg>
+          <div class="control-point point-1" id="p1"></div>
+          <div class="control-point point-2" id="p2"></div>
+        </div>
+      </section>
 
-        <section class="controls-panel">
-            
-            <div class="preview-card">
-                <div class="section-title">Live Preview</div>
-                <div class="track">
-                    <div class="box" id="demoBox">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-                    </div>
-                </div>
-                <button class="animate-btn" id="goBtn">Test Animation</button>
+      <section class="controls-panel">
+        <div class="preview-card">
+          <div class="section-title">Live Preview</div>
+          <div class="track">
+            <div class="box" id="demoBox">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 16v-4" />
+                <path d="M12 8h.01" />
+              </svg>
             </div>
+          </div>
+          <button class="animate-btn" id="goBtn">Test Animation</button>
+        </div>
 
-            <div class="preview-card">
-                <div class="section-title">CSS Output</div>
-                <div class="code-output">
-                    <span id="cssOutput">cubic-bezier(0, 1, 1, 0)</span>
-                    <button class="copy-btn" id="copyBtn" aria-label="Copy to clipboard">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                    </button>
-                </div>
-            </div>
+        <div class="preview-card">
+          <div class="section-title">CSS Output</div>
+          <div class="code-output">
+            <span id="cssOutput">cubic-bezier(0, 1, 1, 0)</span>
+            <button class="copy-btn" id="copyBtn" aria-label="Copy to clipboard">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+            </button>
+          </div>
+        </div>
 
-            <div class="preview-card">
-                <div class="section-title">Presets</div>
-                <div class="presets">
-                    <button class="preset-btn" data-bezier="0.25, 0.1, 0.25, 1">ease</button>
-                    <button class="preset-btn" data-bezier="0.4, 0, 1, 1">ease-in</button>
-                    <button class="preset-btn" data-bezier="0, 0, 0.2, 1">ease-out</button>
-                    <button class="preset-btn" data-bezier="0.4, 0, 0.2, 1">ease-in-out</button>
-                    <button class="preset-btn" data-bezier="0, 0, 1, 1">linear</button>
-                    <button class="preset-btn" data-bezier="0.68, -0.55, 0.27, 1.55" style="border-color: var(--accent);">bouncy</button>
-                </div>
-            </div>
-
-        </section>
+        <div class="preview-card">
+          <div class="section-title">Presets</div>
+          <div class="presets">
+            <button class="preset-btn" data-bezier="0.25, 0.1, 0.25, 1">ease</button>
+            <button class="preset-btn" data-bezier="0.4, 0, 1, 1">ease-in</button>
+            <button class="preset-btn" data-bezier="0, 0, 0.2, 1">ease-out</button>
+            <button class="preset-btn" data-bezier="0.4, 0, 0.2, 1">ease-in-out</button>
+            <button class="preset-btn" data-bezier="0, 0, 1, 1">linear</button>
+            <button class="preset-btn" data-bezier="0.68, -0.55, 0.27, 1.55" style="border-color: var(--accent)">bouncy</button>
+          </div>
+        </div>
+      </section>
     </main>
 
     <div id="toast">Copied to clipboard!</div>
 
     <script>
-        /**
-         * State Architecture for SVG DOM plotting
-         */
-        const size = 300;
-        let p1 = { x: 0.25, y: 0.1 };
-        let p2 = { x: 0.25, y: 1.0 };
-        
-        let activePoint = null;
+      /**
+       * State Architecture for SVG DOM plotting
+       */
+      const size = 300;
+      let p1 = { x: 0.25, y: 0.1 };
+      let p2 = { x: 0.25, y: 1.0 };
 
-        // DOM Elements
-        const els = {
-            graph: document.getElementById('graph'),
-            p1Btn: document.getElementById('p1'),
-            p2Btn: document.getElementById('p2'),
-            line1: document.getElementById('line1'),
-            line2: document.getElementById('line2'),
-            curve: document.getElementById('bezierCurve'),
-            output: document.getElementById('cssOutput'),
-            demoBox: document.getElementById('demoBox'),
-            goBtn: document.getElementById('goBtn'),
-            toast: document.getElementById('toast'),
-            themeBtn: document.getElementById('themeToggle')
-        };
+      let activePoint = null;
 
-        // Theme Setup
-        const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        if(isDark) document.documentElement.setAttribute('data-theme', 'dark');
-        
-        els.themeBtn.addEventListener('click', () => {
-            const current = document.documentElement.getAttribute('data-theme');
-            document.documentElement.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark');
-        });
+      // DOM Elements
+      const els = {
+        graph: document.getElementById("graph"),
+        p1Btn: document.getElementById("p1"),
+        p2Btn: document.getElementById("p2"),
+        line1: document.getElementById("line1"),
+        line2: document.getElementById("line2"),
+        curve: document.getElementById("bezierCurve"),
+        output: document.getElementById("cssOutput"),
+        demoBox: document.getElementById("demoBox"),
+        goBtn: document.getElementById("goBtn"),
+        toast: document.getElementById("toast"),
+        themeBtn: document.getElementById("themeToggle")
+      };
 
-        // Math Logic: Convert [0,1] domain to pixel space for SVG rendering
-        function updateUI() {
-            // P1 Math (Bottom-Left origin)
-            const p1Px = { x: p1.x * size, y: (1 - p1.y) * size };
-            els.p1Btn.style.left = `${p1Px.x}px`;
-            els.p1Btn.style.top = `${p1Px.y}px`;
-            els.line1.setAttribute('x2', p1Px.x);
-            els.line1.setAttribute('y2', p1Px.y);
+      // Theme Setup
+      const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      if (isDark) document.documentElement.setAttribute("data-theme", "dark");
 
-            // P2 Math (Top-Right origin)
-            const p2Px = { x: p2.x * size, y: (1 - p2.y) * size };
-            els.p2Btn.style.left = `${p2Px.x}px`;
-            els.p2Btn.style.top = `${p2Px.y}px`;
-            els.line2.setAttribute('x1', p2Px.x);
-            els.line2.setAttribute('y1', p2Px.y);
+      els.themeBtn.addEventListener("click", () => {
+        const current = document.documentElement.getAttribute("data-theme");
+        document.documentElement.setAttribute("data-theme", current === "dark" ? "light" : "dark");
+      });
 
-            // Draw Curve (M: Move to start, C: Cubic Bezier parameters)
-            els.curve.setAttribute('d', `M 0,${size} C ${p1Px.x},${p1Px.y} ${p2Px.x},${p2Px.y} ${size},0`);
+      // Math Logic: Convert [0,1] domain to pixel space for SVG rendering
+      function updateUI() {
+        // P1 Math (Bottom-Left origin)
+        const p1Px = { x: p1.x * size, y: (1 - p1.y) * size };
+        els.p1Btn.style.left = `${p1Px.x}px`;
+        els.p1Btn.style.top = `${p1Px.y}px`;
+        els.line1.setAttribute("x2", p1Px.x);
+        els.line1.setAttribute("y2", p1Px.y);
 
-            // Update Text & Box
-            const val = `${p1.x.toFixed(2)}, ${p1.y.toFixed(2)}, ${p2.x.toFixed(2)}, ${p2.y.toFixed(2)}`;
-            const cssString = `cubic-bezier(${val})`;
-            els.output.textContent = cssString;
-            els.demoBox.style.transition = `transform 1s ${cssString}`;
+        // P2 Math (Top-Right origin)
+        const p2Px = { x: p2.x * size, y: (1 - p2.y) * size };
+        els.p2Btn.style.left = `${p2Px.x}px`;
+        els.p2Btn.style.top = `${p2Px.y}px`;
+        els.line2.setAttribute("x1", p2Px.x);
+        els.line2.setAttribute("y1", p2Px.y);
+
+        // Draw Curve (M: Move to start, C: Cubic Bezier parameters)
+        els.curve.setAttribute("d", `M 0,${size} C ${p1Px.x},${p1Px.y} ${p2Px.x},${p2Px.y} ${size},0`);
+
+        // Update Text & Box
+        const val = `${p1.x.toFixed(2)}, ${p1.y.toFixed(2)}, ${p2.x.toFixed(2)}, ${p2.y.toFixed(2)}`;
+        const cssString = `cubic-bezier(${val})`;
+        els.output.textContent = cssString;
+        els.demoBox.style.transition = `transform 1s ${cssString}`;
+      }
+
+      // Drag Logic
+      function handleDrag(e) {
+        if (!activePoint) return;
+        e.preventDefault();
+
+        const rect = els.graph.getBoundingClientRect();
+        // Calculate relative coordinates
+        let x = (e.clientX - rect.left) / size;
+        let y = 1 - (e.clientY - rect.top) / size;
+
+        // Constrain X bounds (0 to 1 as per CSS spec)
+        x = Math.max(0, Math.min(1, x));
+
+        // Note: Y bounds are intentionally unconstrained to allow bouncy/overflow easings
+
+        if (activePoint === els.p1Btn) {
+          p1 = { x, y };
+        } else {
+          p2 = { x, y };
         }
-
-        // Drag Logic
-        function handleDrag(e) {
-            if (!activePoint) return;
-            e.preventDefault();
-            
-            const rect = els.graph.getBoundingClientRect();
-            // Calculate relative coordinates
-            let x = (e.clientX - rect.left) / size;
-            let y = 1 - ((e.clientY - rect.top) / size);
-            
-            // Constrain X bounds (0 to 1 as per CSS spec)
-            x = Math.max(0, Math.min(1, x));
-            
-            // Note: Y bounds are intentionally unconstrained to allow bouncy/overflow easings
-
-            if (activePoint === els.p1Btn) {
-                p1 = { x, y };
-            } else {
-                p2 = { x, y };
-            }
-            updateUI();
-        }
-
-        els.p1Btn.addEventListener('mousedown', () => activePoint = els.p1Btn);
-        els.p2Btn.addEventListener('mousedown', () => activePoint = els.p2Btn);
-        window.addEventListener('mousemove', handleDrag);
-        window.addEventListener('mouseup', () => activePoint = null);
-
-        // Preview Animation Logic
-        let toggle = false;
-        els.goBtn.addEventListener('click', () => {
-            toggle = !toggle;
-            els.demoBox.style.transform = toggle ? 'translateX(calc(1000% - 60px))' : 'translateX(0)';
-        });
-
-        // Presets Logic
-        document.querySelectorAll('.preset-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const vals = e.target.dataset.bezier.split(',').map(Number);
-                p1 = { x: vals[0], y: vals[1] };
-                p2 = { x: vals[2], y: vals[3] };
-                updateUI();
-            });
-        });
-
-        // Copy Logic
-        document.getElementById('copyBtn').addEventListener('click', () => {
-            navigator.clipboard.writeText(els.output.textContent).then(() => {
-                els.toast.classList.add('show');
-                setTimeout(() => els.toast.classList.remove('show'), 2000);
-            });
-        });
-
-        // Init
         updateUI();
+      }
+
+      els.p1Btn.addEventListener("mousedown", () => (activePoint = els.p1Btn));
+      els.p2Btn.addEventListener("mousedown", () => (activePoint = els.p2Btn));
+      window.addEventListener("mousemove", handleDrag);
+      window.addEventListener("mouseup", () => (activePoint = null));
+
+      // Preview Animation Logic
+      let toggle = false;
+      els.goBtn.addEventListener("click", () => {
+        toggle = !toggle;
+        els.demoBox.style.transform = toggle ? "translateX(calc(1000% - 60px))" : "translateX(0)";
+      });
+
+      // Presets Logic
+      document.querySelectorAll(".preset-btn").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          const vals = e.target.dataset.bezier.split(",").map(Number);
+          p1 = { x: vals[0], y: vals[1] };
+          p2 = { x: vals[2], y: vals[3] };
+          updateUI();
+        });
+      });
+
+      // Copy Logic
+      document.getElementById("copyBtn").addEventListener("click", () => {
+        navigator.clipboard.writeText(els.output.textContent).then(() => {
+          els.toast.classList.add("show");
+          setTimeout(() => els.toast.classList.remove("show"), 2000);
+        });
+      });
+
+      // Init
+      updateUI();
     </script>
-</body>
+  </body>
 </html>
