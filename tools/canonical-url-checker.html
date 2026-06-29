@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Canonical URL Checker — One File Tools</title>
+    <style>
+      /* ========================================
+       Reset & Base
+       ======================================== */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        line-height: 1.6;
+        padding: 2rem;
+        max-width: 960px;
+        margin: 0 auto;
+        background: #fafafa;
+        color: #1a1a1a;
+      }
+
+      /* ========================================
+       Dark Mode
+       ======================================== */
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: #0a0a0a;
+          color: #e5e5e5;
+        }
+      }
+
+      header {
+        text-align: center;
+        margin-bottom: 2rem;
+      }
+
+      header p {
+        color: #666;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        header p {
+          color: #aaa;
+        }
+      }
+
+      .container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+      }
+
+      .panel {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 12px;
+        padding: 1.5rem;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .panel {
+          background: #161616;
+          border-color: #333;
+        }
+      }
+
+      label {
+        display: block;
+        margin-top: 1rem;
+        margin-bottom: 0.35rem;
+        font-weight: 600;
+      }
+
+      textarea,
+      input {
+        width: 100%;
+        padding: 0.75rem;
+        border-radius: 8px;
+        border: 1px solid #bbb;
+        font-size: 15px;
+      }
+
+      textarea {
+        resize: vertical;
+      }
+
+      input:focus,
+      textarea:focus {
+        outline: 2px solid #1d9bf0;
+        outline-offset: 2px;
+      }
+
+      .buttons {
+        display: flex;
+        gap: 0.75rem;
+        margin-top: 1rem;
+        flex-wrap: wrap;
+      }
+
+      button {
+        padding: 0.8rem 1.2rem;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        background: #1d9bf0;
+        color: white;
+      }
+
+      button:hover {
+        opacity: 0.9;
+      }
+
+      #resetBtn {
+        background: #666;
+      }
+
+      .status {
+        padding: 1rem;
+        border-radius: 10px;
+        text-align: center;
+        font-weight: 600;
+        margin-bottom: 1.5rem;
+      }
+
+      .status.neutral {
+        background: #f3f4f6;
+      }
+
+      .status.success {
+        background: #dcfce7;
+        color: #166534;
+      }
+
+      .status.warning {
+        background: #fee2e2;
+        color: #991b1b;
+      }
+
+      .result textarea {
+        height: 120px;
+      }
+
+      footer {
+        margin-top: 2rem;
+        text-align: center;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .status.neutral {
+          background: #2a2a2a;
+          color: white;
+        }
+
+        .status.success {
+          background: #14532d;
+          color: #dcfce7;
+        }
+
+        .status.warning {
+          background: #7f1d1d;
+          color: #fee2e2;
+        }
+      }
+
+      @media (max-width: 768px) {
+        .container {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Canonical URL Checker</h1>
+      <p>Analyze HTML to verify canonical tag implementation and identify SEO issues.</p>
+    </header>
+
+    <main>
+      <div class="container">
+        <!-- Left Panel -->
+        <section class="panel">
+          <h2>HTML Input</h2>
+
+          <label for="htmlInput">Paste HTML Source</label>
+
+          <textarea id="htmlInput" rows="18" placeholder="Paste your HTML source or <head> section here..."></textarea>
+
+          <div class="buttons">
+            <button id="exampleBtn">Load Example</button>
+            <button id="analyzeBtn">Analyze</button>
+            <button id="resetBtn">Reset</button>
+          </div>
+        </section>
+
+        <!-- Right Panel -->
+        <section class="panel">
+          <h2>Analysis Result</h2>
+
+          <div id="statusCard" class="status neutral">Waiting for analysis...</div>
+
+          <div class="result">
+            <label>Canonical URL</label>
+            <input id="canonicalUrl" readonly placeholder="No canonical URL found" />
+
+            <label>Status</label>
+            <input id="statusText" readonly placeholder="Waiting..." />
+
+            <label>Recommendations</label>
+            <textarea id="recommendation" rows="7" readonly></textarea>
+          </div>
+
+          <div class="buttons">
+            <button id="copyBtn">Copy Report</button>
+            <button id="downloadBtn">Download Report</button>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <footer>
+      <p>Part of <a href="https://github.com/praveenscience/One-File-Tools">One File Tools</a></p>
+    </footer>
+
+    <script>
+      const htmlInput = document.getElementById("htmlInput");
+
+      const analyzeBtn = document.getElementById("analyzeBtn");
+      const exampleBtn = document.getElementById("exampleBtn");
+      const resetBtn = document.getElementById("resetBtn");
+
+      const copyBtn = document.getElementById("copyBtn");
+      const downloadBtn = document.getElementById("downloadBtn");
+
+      const canonicalUrl = document.getElementById("canonicalUrl");
+      const statusText = document.getElementById("statusText");
+      const recommendation = document.getElementById("recommendation");
+
+      const statusCard = document.getElementById("statusCard");
+      function analyzeHTML() {
+        const html = htmlInput.value.trim();
+        if (!html) {
+          statusCard.className = "status warning";
+          statusCard.textContent = "Please paste HTML source.";
+
+          canonicalUrl.value = "";
+          statusText.value = "No HTML Provided";
+          recommendation.value = "Paste a webpage's HTML source to analyze its canonical tag.";
+          copyBtn.disabled = true;
+          downloadBtn.disabled = true;
+          return;
+        }
+        copyBtn.disabled = false;
+        downloadBtn.disabled = false;
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, "text/html");
+
+        const canonicalTags = doc.querySelectorAll('link[rel="canonical"]');
+        const headCanonical = doc.head.querySelectorAll('link[rel="canonical"]');
+
+        if (canonicalTags.length && headCanonical.length === 0) {
+          statusCard.className = "status warning";
+          statusCard.textContent = "Canonical Tag Outside <head>";
+
+          canonicalUrl.value = canonicalTags[0].getAttribute("href") || "";
+
+          statusText.value = "Incorrect Placement";
+
+          recommendation.value = "Move the canonical tag inside the <head> section.";
+
+          return;
+        }
+
+        // Missing canonical
+        if (canonicalTags.length === 0) {
+          statusCard.className = "status warning";
+          statusCard.textContent = "No Canonical Tag Found";
+
+          canonicalUrl.value = "";
+          statusText.value = "Missing";
+          recommendation.value = 'Add a <link rel="canonical"> tag inside the <head> section.';
+
+          return;
+        }
+
+        // Multiple canonicals
+        if (canonicalTags.length > 1) {
+          statusCard.className = "status warning";
+          statusCard.textContent = "Multiple Canonical Tags";
+
+          canonicalUrl.value = "";
+          statusText.value = "Conflict";
+          recommendation.value = "Only one canonical tag should exist on a webpage.";
+
+          return;
+        }
+
+        const href = canonicalTags[0].getAttribute("href");
+        // Empty href
+        if (!href || href.trim() === "") {
+          statusCard.className = "status warning";
+          statusCard.textContent = "Empty Canonical URL";
+
+          canonicalUrl.value = "";
+          statusText.value = "Invalid";
+          recommendation.value = "The canonical tag exists but its href attribute is empty.";
+
+          return;
+        }
+
+        let validURL = true;
+
+        // Relative URL
+        if (!/^https?:\/\//i.test(href)) {
+          statusCard.className = "status warning";
+          statusCard.textContent = "Relative Canonical URL";
+
+          canonicalUrl.value = href;
+          statusText.value = "Relative URL";
+          recommendation.value = "Use an absolute URL instead of a relative canonical URL.";
+
+          return;
+        }
+
+        try {
+          new URL(href);
+        } catch {
+          validURL = false;
+        }
+
+        if (!validURL) {
+          statusCard.className = "status warning";
+          statusCard.textContent = "Invalid Canonical URL";
+
+          canonicalUrl.value = href;
+          statusText.value = "Invalid URL";
+
+          recommendation.value = "The canonical URL is not a valid absolute URL.";
+
+          return;
+        }
+
+        // Valid
+        statusCard.className = "status success";
+        statusCard.textContent = "Valid Canonical URL";
+
+        canonicalUrl.value = href;
+        statusText.value = "Valid";
+        recommendation.value = `✔ Canonical tag found.
+
+✔ Uses an absolute URL.
+
+✔ Only one canonical tag exists.
+
+✔ Appears correctly implemented for SEO.`;
+      }
+      analyzeBtn.addEventListener("click", analyzeHTML);
+      copyBtn.disabled = true;
+      downloadBtn.disabled = true;
+      resetBtn.addEventListener("click", () => {
+        htmlInput.value = "";
+
+        canonicalUrl.value = "";
+
+        statusText.value = "Waiting...";
+
+        recommendation.value = "Paste HTML and click Analyze to check the canonical tag.";
+
+        statusCard.className = "status neutral";
+
+        statusCard.textContent = "Waiting for analysis...";
+        copyBtn.disabled = true;
+        downloadBtn.disabled = true;
+      });
+      copyBtn.addEventListener("click", async () => {
+        const report = `Canonical URL Checker Report
+
+Status: ${statusText.value}
+
+Canonical URL:
+${canonicalUrl.value || "Not Found"}
+
+Recommendations:
+${recommendation.value}
+`;
+
+        try {
+          await navigator.clipboard.writeText(report);
+
+          const originalText = copyBtn.textContent;
+          const originalColor = copyBtn.style.backgroundColor;
+
+          copyBtn.textContent = "Copied!";
+          copyBtn.style.backgroundColor = "#16a34a";
+
+          setTimeout(() => {
+            copyBtn.textContent = originalText;
+            copyBtn.style.backgroundColor = originalColor || "#1d9bf0";
+          }, 2000);
+        } catch {
+          alert("Failed to copy report.");
+        }
+      });
+      downloadBtn.addEventListener("click", () => {
+        const report = `Canonical URL Checker Report
+
+Status: ${statusText.value}
+
+Canonical URL:
+${canonicalUrl.value || "Not Found"}
+
+Recommendations:
+${recommendation.value}
+`;
+
+        const blob = new Blob([report], {
+          type: "text/plain"
+        });
+
+        const link = document.createElement("a");
+
+        link.href = URL.createObjectURL(blob);
+
+        link.download = "canonical-url-report.txt";
+
+        link.click();
+
+        URL.revokeObjectURL(link.href);
+      });
+      exampleBtn.addEventListener("click", () => {
+        htmlInput.value = `<!DOCTYPE html>
+<html>
+<head>
+
+<title>Example</title>
+
+<link rel="canonical" href="https://example.com/page">
+
+</head>
+
+<body>
+
+<h1>Hello World</h1>
+
+</body>
+</html>`;
+
+        analyzeHTML();
+      });
+    </script>
+  </body>
+</html>
