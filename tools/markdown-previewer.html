@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Markdown Preview</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" id="hljs-light">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hljs-dark" disabled>
+<style>
+  :root {
+    --bg: #fff8f3;
+    --surface: #ffffff;
+    --border: #f0ddd0;
+    --text: #2a1a0e;
+    --text-muted: #a07858;
+    --accent: #e8600a;
+    --accent-soft: #fff1e8;
+    --accent-hover: #c94e00;
+    --editor-bg: #1c1410;
+    --editor-text: #f5e6d8;
+    --editor-line: #2e1f14;
+    --divider: #f0ddd0;
+    --toolbar-bg: #ffffff;
+    --toolbar-border: #f0ddd0;
+    --mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+    --sans: 'Inter', system-ui, -apple-system, sans-serif;
+    --serif: 'Georgia', 'Cambria', serif;
+  }
+  [data-theme="dark"] {
+    --bg: #1a1008;
+    --surface: #231508;
+    --border: #3d2510;
+    --text: #f5e6d8;
+    --text-muted: #a07858;
+    --accent: #ff8c42;
+    --accent-soft: #2e1a08;
+    --accent-hover: #ffab70;
+    --editor-bg: #130d05;
+    --editor-text: #f5e6d8;
+    --editor-line: #231508;
+    --divider: #3d2510;
+    --toolbar-bg: #231508;
+    --toolbar-border: #3d2510;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; font-family: var(--sans); background: var(--bg); color: var(--text); transition: background .2s, color .2s; }
+
+  /* ── toolbar ── */
+  .toolbar {
+    height: 48px;
+    background: var(--toolbar-bg);
+    border-bottom: 2px solid var(--accent);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 8px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .toolbar-brand {
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: -.4px;
+    color: var(--text);
+    margin-right: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .toolbar-brand svg { color: var(--accent); }
+  .tb-btn {
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text-muted);
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: var(--sans);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: background .15s, color .15s, border-color .15s;
+    white-space: nowrap;
+  }
+  .tb-btn:hover { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+  .tb-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .tb-btn.active:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+  .tb-sep { width: 1px; height: 20px; background: var(--divider); margin: 0 4px; }
+
+  /* ── layout ── */
+  .workspace {
+    display: flex;
+    height: calc(100vh - 48px);
+    overflow: hidden;
+  }
+  .pane {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .pane-label {
+    height: 34px;
+    padding: 0 16px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .6px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .char-count { font-weight: 400; letter-spacing: 0; }
+
+  /* ── resizer ── */
+  .resizer {
+    width: 5px;
+    background: var(--border);
+    cursor: col-resize;
+    transition: background .15s;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .resizer:hover, .resizer.dragging { background: var(--accent); }
+
+  /* ── editor ── */
+  #editor {
+    flex: 1;
+    width: 100%;
+    background: var(--editor-bg);
+    color: var(--editor-text);
+    border: none;
+    outline: none;
+    resize: none;
+    padding: 24px;
+    font-family: var(--mono);
+    font-size: 13.5px;
+    line-height: 1.75;
+    tab-size: 2;
+    overflow-y: auto;
+    caret-color: var(--accent);
+  }
+  #editor::selection { background: rgba(137,180,250,.25); }
+  #editor::-webkit-scrollbar { width: 6px; }
+  #editor::-webkit-scrollbar-track { background: transparent; }
+  #editor::-webkit-scrollbar-thumb { background: #3d2510; border-radius: 99px; }
+
+  /* ── preview ── */
+  #preview {
+    flex: 1;
+    padding: 32px 40px;
+    overflow-y: auto;
+    background: var(--surface);
+    font-family: var(--serif);
+    font-size: 16px;
+    line-height: 1.8;
+    color: var(--text);
+  }
+  #preview::-webkit-scrollbar { width: 6px; }
+  #preview::-webkit-scrollbar-track { background: transparent; }
+  #preview::-webkit-scrollbar-thumb { background: var(--divider); border-radius: 99px; }
+
+  /* ── preview typography ── */
+  #preview h1,#preview h2,#preview h3,#preview h4,#preview h5,#preview h6 {
+    font-family: var(--sans);
+    font-weight: 700;
+    line-height: 1.25;
+    margin: 1.6em 0 .5em;
+    color: var(--text);
+    letter-spacing: -.3px;
+  }
+  #preview h1 { font-size: 2em; border-bottom: 2px solid var(--accent); padding-bottom: .3em; }
+  #preview h2 { font-size: 1.45em; border-bottom: 1px solid var(--border); padding-bottom: .2em; }
+  #preview h3 { font-size: 1.2em; }
+  #preview h4 { font-size: 1em; }
+  #preview p { margin: .85em 0; }
+  #preview ul, #preview ol { padding-left: 1.5em; margin: .75em 0; }
+  #preview li { margin: .3em 0; }
+  #preview a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+  #preview blockquote {
+    border-left: 3px solid var(--accent);
+    margin: 1.2em 0;
+    padding: .5em 1.2em;
+    background: var(--accent-soft);
+    border-radius: 0 6px 6px 0;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  #preview code {
+    font-family: var(--mono);
+    font-size: .85em;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: .15em .4em;
+  }
+  #preview pre {
+    background: var(--editor-bg);
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 1.2em 0;
+    padding: 0;
+  }
+  #preview pre code {
+    background: transparent;
+    border: none;
+    padding: 18px 20px;
+    display: block;
+    font-size: .82em;
+    line-height: 1.6;
+    color: var(--editor-text);
+  }
+  #preview table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1.2em 0;
+    font-family: var(--sans);
+    font-size: .92em;
+  }
+  #preview th {
+    background: var(--bg);
+    font-weight: 600;
+    text-align: left;
+    padding: 8px 14px;
+    border: 1px solid var(--border);
+  }
+  #preview td { padding: 7px 14px; border: 1px solid var(--border); }
+  #preview tr:nth-child(even) td { background: var(--bg); }
+  #preview img { max-width: 100%; border-radius: 6px; }
+  #preview hr { border: none; border-top: 2px solid var(--border); margin: 2em 0; }
+  #preview input[type="checkbox"] { margin-right: 6px; accent-color: var(--accent); }
+
+  /* ── single-pane modes ── */
+  .workspace.editor-only .pane:last-child,
+  .workspace.editor-only .resizer { display: none; }
+  .workspace.preview-only .pane:first-child,
+  .workspace.preview-only .resizer { display: none; }
+
+  /* ── copy feedback ── */
+  @keyframes fadeout { from { opacity:1 } to { opacity:0 } }
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--text);
+    color: var(--surface);
+    padding: 8px 18px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-family: var(--sans);
+    animation: fadeout .4s ease 1.6s forwards;
+    pointer-events: none;
+    z-index: 100;
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="toolbar-brand">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+    Markdown Preview
+  </div>
+
+  <button class="tb-btn" id="btn-both" onclick="setView('both')">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="8" height="18" rx="1"/><rect x="13" y="3" width="8" height="18" rx="1"/></svg>
+    Split
+  </button>
+  <button class="tb-btn" id="btn-editor" onclick="setView('editor')">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+    Editor
+  </button>
+  <button class="tb-btn" id="btn-preview" onclick="setView('preview')">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+    Preview
+  </button>
+
+  <div class="tb-sep"></div>
+
+  <button class="tb-btn" id="btn-theme" onclick="toggleTheme()" title="Toggle dark mode">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" id="theme-icon"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+  </button>
+  <button class="tb-btn" onclick="copyMarkdown()">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+    Copy MD
+  </button>
+  <button class="tb-btn" onclick="copyHTML()">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+    Copy HTML
+  </button>
+</div>
+
+<div class="workspace" id="workspace">
+  <div class="pane">
+    <div class="pane-label">
+      Editor
+      <span class="char-count" id="char-count">0 chars · 0 words</span>
+    </div>
+    <textarea id="editor" spellcheck="false" placeholder="Type your Markdown here…"></textarea>
+  </div>
+
+  <div class="resizer" id="resizer"></div>
+
+  <div class="pane">
+    <div class="pane-label">Preview</div>
+    <div id="preview"></div>
+  </div>
+</div>
+
+<script>
+// ── default content ──
+const DEFAULT = `# Welcome to Markdown Preview
+
+A **live** editor with side-by-side preview. Start typing on the left!
+
+---
+
+## Features
+
+- **Bold**, *italic*, and \`inline code\`
+- [Links](https://example.com) and images
+- Tables, blockquotes, and task lists
+- Syntax-highlighted code blocks
+- Dark / light theme toggle
+- Split, editor-only, or preview-only views
+
+---
+
+## Code Example
+
+\`\`\`javascript
+function greet(name) {
+  return \`Hello, \${name}!\`;
+}
+
+console.log(greet("World"));
+\`\`\`
+
+---
+
+## Table
+
+| Feature       | Supported |
+|---------------|-----------|
+| Headers       | ✅        |
+| Bold / Italic | ✅        |
+| Tables        | ✅        |
+| Code blocks   | ✅        |
+| Task lists    | ✅        |
+
+---
+
+## Blockquote
+
+> "The best tools get out of your way so you can focus on what you're making."
+
+---
+
+## Task List
+
+- [x] Create Markdown editor
+- [x] Add live preview
+- [ ] Export to PDF
+- [ ] Share via link
+`;
+
+// ── marked config ──
+marked.setOptions({
+  breaks: true,
+  gfm: true,
+  highlight: function(code, lang) {
+    if (lang && hljs.getLanguage(lang)) {
+      return hljs.highlight(code, { language: lang }).value;
+    }
+    return hljs.highlightAuto(code).value;
+  }
+});
+
+const editor = document.getElementById('editor');
+const preview = document.getElementById('preview');
+const workspace = document.getElementById('workspace');
+
+function render() {
+  const md = editor.value;
+  preview.innerHTML = marked.parse(md);
+  // re-highlight any code blocks
+  preview.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
+  // char / word count
+  const chars = md.length;
+  const words = md.trim() ? md.trim().split(/\s+/).length : 0;
+  document.getElementById('char-count').textContent = `${chars.toLocaleString()} chars · ${words.toLocaleString()} words`;
+}
+
+editor.value = DEFAULT;
+render();
+editor.addEventListener('input', render);
+
+// ── view modes ──
+let currentView = 'both';
+function setView(mode) {
+  currentView = mode;
+  workspace.className = 'workspace' + (mode === 'editor' ? ' editor-only' : mode === 'preview' ? ' preview-only' : '');
+  document.getElementById('btn-both').classList.toggle('active', mode === 'both');
+  document.getElementById('btn-editor').classList.toggle('active', mode === 'editor');
+  document.getElementById('btn-preview').classList.toggle('active', mode === 'preview');
+}
+setView('both');
+
+// ── resizer ──
+const resizer = document.getElementById('resizer');
+let isResizing = false;
+resizer.addEventListener('mousedown', e => {
+  isResizing = true;
+  resizer.classList.add('dragging');
+  document.body.style.cursor = 'col-resize';
+  document.body.style.userSelect = 'none';
+});
+window.addEventListener('mousemove', e => {
+  if (!isResizing) return;
+  const ws = workspace.getBoundingClientRect();
+  const offset = e.clientX - ws.left;
+  const total = ws.width - resizer.offsetWidth;
+  const pct = Math.min(80, Math.max(20, (offset / total) * 100));
+  const panes = workspace.querySelectorAll('.pane');
+  panes[0].style.flex = 'none';
+  panes[0].style.width = pct + '%';
+  panes[1].style.flex = '1';
+});
+window.addEventListener('mouseup', () => {
+  if (isResizing) {
+    isResizing = false;
+    resizer.classList.remove('dragging');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  }
+});
+
+// ── theme ──
+let dark = false;
+function toggleTheme() {
+  dark = !dark;
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : '');
+  document.getElementById('hljs-light').disabled = dark;
+  document.getElementById('hljs-dark').disabled = !dark;
+  const icon = document.getElementById('theme-icon');
+  if (dark) {
+    icon.innerHTML = '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
+  } else {
+    icon.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+  }
+}
+
+// ── copy ──
+function toast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2100);
+}
+function copyMarkdown() {
+  navigator.clipboard.writeText(editor.value).then(() => toast('Markdown copied!'));
+}
+function copyHTML() {
+  navigator.clipboard.writeText(preview.innerHTML).then(() => toast('HTML copied!'));
+}
+
+// ── tab key in editor ──
+editor.addEventListener('keydown', e => {
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const s = editor.selectionStart, end = editor.selectionEnd;
+    editor.value = editor.value.substring(0, s) + '  ' + editor.value.substring(end);
+    editor.selectionStart = editor.selectionEnd = s + 2;
+    render();
+  }
+});
+</script>
+</body>
+</html>
