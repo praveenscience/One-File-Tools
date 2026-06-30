@@ -1,0 +1,438 @@
+<!--
+Base64 Encoder / Decoder
+Single-file offline tool for encoding and decoding Base64 strings.
+Built for One File Tools.
+-->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Base64 Encoder / Decoder - One File Tools</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Inter:wght@400;500;600&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet" />
+    
+    <!-- Feather Icons (No CDN) - We will use the inline SVGs or fetch them. Actually, since we need to avoid external CDN for core functionality, I'll inline the needed icons or use feather-icons via unpkg if we strictly don't care about CDN for icons. The README says "No external JS/CSS frameworks or CDN imports (Google Fonts are okay)". The easiest offline way is to use SVG directly. -->
+    
+    <style>
+      :root {
+        --bg: #030712;
+        --grid-line: #111827;
+        --bg-panel: rgba(17, 24, 39, 0.7);
+        --panel-border: #1f2937;
+        --accent: #f59e0b;
+        --accent-glow: rgba(245, 158, 11, 0.15);
+        --accent-hover: #d97706;
+        --error: #ef4444;
+        --error-bg: rgba(239, 68, 68, 0.1);
+        --text: #f9fafb;
+        --text-muted: #9ca3af;
+        --text-dim: #4b5563;
+        --input-bg: rgba(3, 7, 18, 0.6);
+        
+        --font-sans: "Inter", system-ui, sans-serif;
+        --font-display: "Space Grotesk", sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg);
+        background-image: radial-gradient(circle at 15% 50%, rgba(245, 158, 11, 0.05), transparent 25%), radial-gradient(circle at 85% 30%, rgba(236, 72, 153, 0.05), transparent 25%), linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+        background-size:
+          100% 100%,
+          100% 100%,
+          32px 32px,
+          32px 32px;
+        color: var(--text);
+        padding: 48px 20px 80px;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+      }
+
+      .container {
+        width: 100%;
+        max-width: 1200px;
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+      }
+
+      header {
+        text-align: center;
+        margin-bottom: 1rem;
+      }
+
+      h1 {
+        font-family: var(--font-display);
+        font-size: 2.5rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #fff 0%, #cbd5e1 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0.5rem;
+        text-shadow: 0 0 40px rgba(255,255,255,0.1);
+      }
+
+      p.subtitle {
+        color: var(--text-muted);
+        font-size: 1.1rem;
+      }
+
+      .panels {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+        flex: 1;
+      }
+
+      @media (max-width: 768px) {
+        .panels {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .panel {
+        background: var(--bg-panel);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid var(--panel-border);
+        border-radius: 16px;
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+      }
+
+      .panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+      }
+
+      .panel-title {
+        font-family: var(--font-display);
+        font-size: 1.2rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .panel-actions {
+        display: flex;
+        gap: 0.5rem;
+      }
+
+      .btn {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--panel-border);
+        color: var(--text);
+        padding: 0.5rem 0.75rem;
+        border-radius: 8px;
+        font-family: var(--font-sans);
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        transition: all 0.2s ease;
+      }
+
+      .btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.2);
+      }
+      
+      .btn-primary {
+        background: var(--accent);
+        border-color: var(--accent);
+      }
+      
+      .btn-primary:hover {
+        background: var(--accent-hover);
+        border-color: var(--accent-hover);
+      }
+
+      textarea {
+        flex: 1;
+        width: 100%;
+        background: var(--input-bg);
+        border: 1px solid var(--panel-border);
+        border-radius: 12px;
+        padding: 1rem;
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 0.95rem;
+        line-height: 1.5;
+        resize: none;
+        outline: none;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        min-height: 300px;
+      }
+
+      textarea:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-glow);
+      }
+      
+      textarea.error {
+        border-color: var(--error);
+        background: var(--error-bg);
+      }
+      
+      textarea.error:focus {
+        box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+      }
+
+      .file-input-wrapper {
+        position: relative;
+        overflow: hidden;
+        display: inline-block;
+      }
+
+      .file-input-wrapper input[type=file] {
+        font-size: 100px;
+        position: absolute;
+        left: 0;
+        top: 0;
+        opacity: 0;
+        cursor: pointer;
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 2rem;
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background: var(--accent);
+        color: white;
+        padding: 0.75rem 1.5rem;
+        border-radius: 99px;
+        font-weight: 500;
+        opacity: 0;
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        box-shadow: 0 10px 25px var(--accent-glow);
+        z-index: 1000;
+      }
+
+      .toast.show {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+      }
+      
+      .status-text {
+        font-size: 0.85rem;
+        color: var(--error);
+        min-height: 1.2rem;
+        margin-top: 0.5rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>Base64 Encoder / Decoder</h1>
+        <p class="subtitle">Instantly convert text or files to Base64 and back. Works offline.</p>
+      </header>
+
+      <div class="panels">
+        
+        <!-- Text Panel -->
+        <div class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+              Raw Text
+            </h2>
+            <div class="panel-actions">
+              <div class="file-input-wrapper btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                Upload File
+                <input type="file" id="fileInput" />
+              </div>
+              <button class="btn" id="btnEncode">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                Encode
+              </button>
+              <button class="btn btn-primary" id="btnCopyText">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                Copy
+              </button>
+            </div>
+          </div>
+          <textarea id="textInput" placeholder="Type or paste plain text here to encode..."></textarea>
+          <div class="status-text" id="textStatus"></div>
+        </div>
+
+        <!-- Base64 Panel -->
+        <div class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+              Base64
+            </h2>
+            <div class="panel-actions">
+              <button class="btn" id="btnDecode">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                Decode
+              </button>
+              <button class="btn btn-primary" id="btnCopyBase64">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                Copy
+              </button>
+            </div>
+          </div>
+          <textarea id="base64Input" placeholder="Type or paste Base64 here to decode..."></textarea>
+          <div class="status-text" id="base64Status"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="toast" id="toast">Copied to clipboard!</div>
+
+    <script>
+      // DOM Elements
+      const textInput = document.getElementById('textInput');
+      const base64Input = document.getElementById('base64Input');
+      const textStatus = document.getElementById('textStatus');
+      const base64Status = document.getElementById('base64Status');
+      const btnCopyText = document.getElementById('btnCopyText');
+      const btnCopyBase64 = document.getElementById('btnCopyBase64');
+      const fileInput = document.getElementById('fileInput');
+      const toast = document.getElementById('toast');
+
+      // State to prevent recursive loops
+      let isUpdatingText = false;
+      let isUpdatingBase64 = false;
+
+      const btnEncode = document.getElementById('btnEncode');
+      const btnDecode = document.getElementById('btnDecode');
+
+      // Unicode-safe encode
+      function utf8ToBase64(str) {
+        return btoa(unescape(encodeURIComponent(str)));
+      }
+
+      // Unicode-safe decode
+      function base64ToUtf8(str) {
+        return decodeURIComponent(escape(atob(str)));
+      }
+
+      // Handle Text -> Base64
+      btnEncode.addEventListener('click', () => {
+        if (isUpdatingBase64) return;
+        
+        isUpdatingText = true;
+        try {
+          const val = textInput.value;
+          base64Input.value = val === "" ? "" : utf8ToBase64(val);
+          base64Input.classList.remove('error');
+          base64Status.textContent = "";
+        } catch (e) {
+          // Generally utf8ToBase64 shouldn't fail, but just in case
+          console.error(e);
+        }
+        isUpdatingText = false;
+      });
+
+      // Handle Base64 -> Text
+      btnDecode.addEventListener('click', () => {
+        if (isUpdatingText) return;
+        
+        isUpdatingBase64 = true;
+        try {
+          const val = base64Input.value.trim();
+          
+          if (val === "") {
+            textInput.value = "";
+            base64Input.classList.remove('error');
+            base64Status.textContent = "";
+          } else {
+            // Attempt to decode
+            // Some base64 contains whitespace or newlines, we can strip them
+            const cleanVal = val.replace(/\s/g, '');
+            textInput.value = base64ToUtf8(cleanVal);
+            
+            base64Input.classList.remove('error');
+            base64Status.textContent = "";
+          }
+        } catch (e) {
+          // Invalid Base64
+          base64Input.classList.add('error');
+          base64Status.textContent = "Invalid Base64 string.";
+        }
+        isUpdatingBase64 = false;
+      });
+
+      // File Upload functionality
+      fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        
+        reader.onload = function(event) {
+          // event.target.result looks like: data:image/png;base64,iVBORw0KGgo...
+          // We can just output the whole thing, or just the base64 part.
+          // For maximum utility, keeping the data URI is often helpful.
+          const result = event.target.result;
+          
+          isUpdatingBase64 = true;
+          base64Input.value = result;
+          base64Input.classList.remove('error');
+          base64Status.textContent = "";
+          isUpdatingBase64 = false;
+          
+          isUpdatingText = true;
+          textInput.value = `[File: ${file.name}]\nFile has been encoded to Base64 (Data URI format).`;
+          isUpdatingText = false;
+        };
+        
+        reader.onerror = function() {
+          textStatus.textContent = "Error reading file.";
+        };
+        
+        reader.readAsDataURL(file);
+        
+        // Reset input
+        fileInput.value = "";
+      });
+
+      // Copy Functionality
+      function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 2500);
+      }
+
+      btnCopyText.addEventListener('click', () => {
+        if (!textInput.value) return;
+        navigator.clipboard.writeText(textInput.value).then(() => {
+          showToast('Raw text copied!');
+        });
+      });
+
+      btnCopyBase64.addEventListener('click', () => {
+        if (!base64Input.value) return;
+        navigator.clipboard.writeText(base64Input.value).then(() => {
+          showToast('Base64 copied!');
+        });
+      });
+    </script>
+  </body>
+</html>
