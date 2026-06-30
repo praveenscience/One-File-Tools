@@ -100,7 +100,7 @@ Below is a curated list of tool ideas waiting to be built. Each idea is a potent
 | SVG Previewer — paste and preview SVG code instantly                 | Easy       |
 | Base64 Image Converter — convert images to/from Base64               | Easy       |
 | ~~Favicon Generator~~ — ✅ [Built](tools/favicon-generator.html)     | Medium     |
-| Image Metadata Viewer — read EXIF and other metadata                 | Medium     |
+| ~~Image Metadata Viewer~~ — ✅ [Built](tools/image-metadata-viewer.html) | Medium     |
 | ~~Color Palette Extractor~~ — ✅ [Built](tools/color-palette-extractor.html)      | Medium     |
 
 ### Color Tools
