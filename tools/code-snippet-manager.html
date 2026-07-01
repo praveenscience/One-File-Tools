@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Code Snippet Manager — One File Tools</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+    <style>
+      /* ========================================
+       Reset & Base
+       ======================================== */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --bg-base: #f4f6fa;
+        --bg-surface: #ffffff;
+        --bg-surface-2: #f9fafb;
+        --border-color: #dce3ec;
+        --text-primary: #111827;
+        --text-secondary: #4b5e7e;
+        --text-tertiary: #9ca3af;
+        --accent: #4f46e5;
+        --accent-hover: #4338ca;
+        --accent-soft: #eef2ff;
+        --danger: #ef4444;
+        --radius: 8px;
+        --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        line-height: 1.6;
+        background: var(--bg-base);
+        color: var(--text-primary);
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        overflow: hidden; /* Prevent the body from scrolling */
+      }
+
+      /* ========================================
+       Dark Mode
+       ======================================== */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg-base: #0d1117;
+          --bg-surface: #161b22;
+          --bg-surface-2: #0d1117;
+          --border-color: #30363d;
+          --text-primary: #c9d1d9;
+          --text-secondary: #8b949e;
+          --text-tertiary: #586069;
+          --accent: #818cf8;
+          --accent-hover: #6366f1;
+          --accent-soft: #312e81;
+          --danger: #f85149;
+        }
+
+        .sidebar {
+          background-color: #1e192b; /* Dark Purple */
+        }
+      }
+
+      /* ========================================
+       Layout
+       ======================================== */
+      .app-container {
+        display: grid;
+        grid-template-columns: var(--sidebar-width, 325px) 5px 1fr;
+        flex-grow: 1;
+        min-height: 0; /* Crucial for allowing grid children to scroll within a flex parent */
+      }
+
+      header {
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid var(--border-color);
+        background: var(--bg-surface);
+        flex-shrink: 0;
+      }
+
+      header h1 {
+        font-size: 1.375rem; /* 22px */
+        margin: 0;
+        color: var(--accent);
+      }
+      header p {
+        font-size: 1rem; /* 16px */
+        color: var(--text-secondary);
+        margin: 0.25rem 0 0;
+      }
+
+      /* Snippet List (Left Panel) */
+      .sidebar {
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-surface);
+        border-right: 1px solid var(--border-color);
+        overflow: hidden; /* This will contain the flex children and allow the list to scroll independently */
+      }
+
+      .sidebar-resizer {
+        cursor: col-resize;
+        background: var(--border-color);
+        transition: background 0.2s ease;
+        z-index: 50;
+      }
+      .sidebar-resizer:hover,
+      .sidebar-resizer.is-resizing {
+        background: var(--accent);
+      }
+
+      .sidebar-header {
+        padding: 1rem;
+        border-bottom: 1px solid var(--border-color);
+        flex-shrink: 0;
+      }
+
+      #searchInput {
+        width: 100%;
+        padding: 0.75rem;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+        background: var(--bg-base);
+        color: var(--text-primary);
+        font-size: 0.9rem;
+      }
+
+      #snippetList {
+        list-style: none;
+        flex-grow: 1;
+        overflow-y: auto;
+        min-height: 0;
+      }
+
+      .snippet-item {
+        padding: 1rem;
+        border-bottom: 1px solid var(--border-color);
+        cursor: pointer;
+        position: relative;
+      }
+      .snippet-item:hover {
+        background: var(--accent-soft);
+      }
+      .snippet-item.active {
+        background: var(--accent);
+        color: white;
+      }
+      .snippet-item.active .snippet-title {
+        color: white;
+      }
+      .snippet-item.active .snippet-lang {
+        color: rgba(255, 255, 255, 0.8);
+      }
+
+      .snippet-title {
+        font-weight: 600;
+        font-size: 0.95rem;
+        color: var(--accent);
+        margin-bottom: 0.25rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .snippet-lang {
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        font-family: var(--font-mono);
+      }
+
+      .sidebar-footer {
+        padding: 1rem;
+        border-top: 1px solid var(--border-color);
+        display: flex;
+        gap: 0.5rem;
+        flex-shrink: 0;
+      }
+
+      .sidebar-footer .btn {
+        font-size: 1.0625rem; /* 17px */
+      }
+
+      .btn {
+        padding: 0.6rem 1rem;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+        background: var(--bg-surface-2);
+        color: var(--text-primary);
+        font-weight: 500;
+        cursor: pointer;
+        flex-grow: 1;
+        text-align: center;
+      }
+      .btn:hover {
+        background: var(--border-color);
+      }
+      .btn-primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: white;
+      }
+      .btn-primary:hover {
+        background: var(--accent-hover);
+      }
+
+      /* Main Content (Right Panel) */
+      .main-content {
+        display: flex;
+        flex-direction: column;
+        padding: 1.5rem;
+        min-height: 0; /* Prevents grid item from overflowing its container */
+      }
+
+      .viewer-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+      }
+      .viewer-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+      }
+      .viewer-actions .btn {
+        flex-grow: 0;
+      }
+      .btn-danger {
+        border-color: var(--danger);
+        color: var(--danger);
+      }
+      .btn-danger:hover {
+        background: var(--danger);
+        color: white;
+      }
+
+      .tag-list {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+      }
+      .tag {
+        font-size: 0.75rem;
+        font-family: var(--font-mono);
+        padding: 0.2rem 0.6rem;
+        background: var(--accent-soft);
+        color: var(--accent);
+        border-radius: 99px;
+      }
+
+      .code-container {
+        flex-grow: 1;
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+        overflow: hidden;
+        position: relative;
+        min-height: 0; /* Prevents flex item from overflowing its container */
+      }
+
+      .code-container pre {
+        height: 100%;
+        margin: 0;
+      }
+      .code-container code {
+        display: block;
+        padding: 1rem;
+        height: 100%;
+        overflow: auto;
+        font-family: var(--font-mono);
+        font-size: 0.9rem;
+      }
+
+      .copy-code-btn {
+        position: absolute;
+        top: 0.75rem;
+        right: 0.75rem;
+        background: var(--bg-surface-2);
+        opacity: 0.5;
+      }
+      .copy-code-btn:hover {
+        opacity: 1;
+      }
+
+      .filter-tags-container {
+        padding-bottom: 1rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+
+      .filter-tag {
+        font-size: 0.75rem;
+        font-family: var(--font-mono);
+        padding: 0.2rem 0.6rem;
+        background: var(--bg-surface-2);
+        color: var(--text-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 99px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .filter-tag:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .filter-tag.active {
+        background: var(--accent-soft);
+        color: var(--accent);
+        border-color: var(--accent);
+        font-weight: 600;
+      }
+
+      /* Modal for Add/Edit */
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+        display: none; /* Hidden by default */
+      }
+      .modal {
+        background: var(--bg-surface);
+        padding: 1.5rem;
+        border-radius: var(--radius);
+        width: 90%;
+        max-width: 700px;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+      .modal h2 {
+        margin: 0;
+      }
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      .form-group label {
+        font-weight: 500;
+        font-size: 0.9rem;
+      }
+      .form-group input,
+      .form-group textarea {
+        width: 100%;
+        padding: 0.75rem;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+        background: var(--bg-base);
+        color: var(--text-primary);
+        font-size: 0.9rem;
+      }
+      .form-group textarea {
+        min-height: 200px;
+        font-family: var(--font-mono);
+        resize: vertical;
+      }
+      .modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.75rem;
+      }
+
+      /* Responsive */
+      @media (max-width: 768px) {
+        .app-container {
+          grid-template-columns: 1fr;
+          height: auto;
+        }
+        .sidebar {
+          height: 40vh;
+        }
+        .main-content {
+          height: 60vh;
+        }
+      }
+
+      footer {
+        display: none; /* Hide for this app-like UI */
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Code Snippet Manager</h1>
+      <p>Store, categorize, and retrieve code snippets with syntax highlighting, entirely offline.</p>
+    </header>
+
+    <div class="app-container" id="appContainer">
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <div id="filterTagsContainer" class="filter-tags-container"></div>
+          <input type="search" id="searchInput" placeholder="Search snippets..." />
+        </div>
+        <ul id="snippetList">
+          <!-- Snippet items will be injected here -->
+        </ul>
+        <div class="sidebar-footer">
+          <button class="btn" id="importBtn">Import</button>
+          <button class="btn" id="exportBtn">Export JSON</button>
+          <button class="btn btn-primary" id="addSnippetBtn">Add New</button>
+        </div>
+      </aside>
+
+      <div class="sidebar-resizer" id="sidebarResizer"></div>
+
+      <main class="main-content" id="mainContent">
+        <!-- Viewer will be injected here -->
+        <div id="emptyState" style="text-align: center; margin: auto; color: var(--text-secondary); display: flex; flex-direction: column; gap: 1rem;">
+          <div style="font-size: 4rem; line-height: 1; opacity: 0.5;">&lt; / &gt;</div>
+          <p style="font-size: 1.125rem;">Select a snippet to view it, or add a new one.</p>
+        </div>
+      </main>
+    </div>
+
+    <!-- Add/Edit Modal -->
+    <div class="modal-overlay" id="snippetModal">
+      <div class="modal">
+        <h2 id="modalTitle">Add New Snippet</h2>
+        <form id="snippetForm">
+          <input type="hidden" id="snippetId" />
+          <div class="form-group">
+            <label for="snippetTitle">Title</label>
+            <input type="text" id="snippetTitle" required />
+          </div>
+          <div class="form-group">
+            <label for="snippetLang">Language</label>
+            <input type="text" id="snippetLang" placeholder="e.g., javascript, python, css" />
+          </div>
+          <div class="form-group">
+            <label for="snippetTags">Tags (comma-separated)</label>
+            <input type="text" id="snippetTags" />
+          </div>
+          <div class="form-group">
+            <label for="snippetCode">Code</label>
+            <textarea id="snippetCode" required></textarea>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn" id="cancelBtn">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save Snippet</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        // --- DOM Elements ---
+        const appContainer = document.getElementById("appContainer");
+        const searchInput = document.getElementById("searchInput");
+        const snippetList = document.getElementById("snippetList");
+        const mainContent = document.getElementById("mainContent");
+        const addSnippetBtn = document.getElementById("addSnippetBtn");
+        const importBtn = document.getElementById("importBtn");
+        const exportBtn = document.getElementById("exportBtn");
+        const snippetModal = document.getElementById("snippetModal");
+        const modalTitle = document.getElementById("modalTitle");
+        const snippetForm = document.getElementById("snippetForm");
+        const cancelBtn = document.getElementById("cancelBtn");
+        const snippetIdInput = document.getElementById("snippetId");
+        const snippetTitleInput = document.getElementById("snippetTitle");
+        const snippetLangInput = document.getElementById("snippetLang");
+        const snippetTagsInput = document.getElementById("snippetTags");
+        const snippetCodeInput = document.getElementById("snippetCode");
+        const sidebarResizer = document.getElementById("sidebarResizer");
+        const filterTagsContainer = document.getElementById("filterTagsContainer");
+
+        // --- State ---
+        let snippets = [];
+        let activeSnippetId = null;
+        const STORAGE_KEY = "one-file-tools-code-snippets";
+        let allTags = [];
+        let activeFilterTags = new Set();
+
+        // --- Data Persistence ---
+        const loadSnippets = () => {
+          try {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            snippets = stored ? JSON.parse(stored) : [];
+          } catch (e) {
+            console.error("Failed to load snippets from localStorage", e);
+            snippets = [];
+          }
+        };
+
+        const saveSnippets = () => {
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(snippets));
+          } catch (e) {
+            console.error("Failed to save snippets to localStorage", e);
+          }
+        };
+
+        // --- Rendering ---
+        const renderFilterTags = () => {
+          filterTagsContainer.innerHTML = "";
+          allTags.forEach((tag) => {
+            const tagEl = document.createElement("div");
+            tagEl.className = "filter-tag";
+            tagEl.textContent = tag;
+            if (activeFilterTags.has(tag)) {
+              tagEl.classList.add("active");
+            }
+            tagEl.addEventListener("click", () => {
+              if (activeFilterTags.has(tag)) {
+                activeFilterTags.delete(tag);
+              } else {
+                activeFilterTags.add(tag);
+              }
+              renderFilterTags();
+              renderSnippetList();
+            });
+            filterTagsContainer.appendChild(tagEl);
+          });
+        };
+
+        const updateAllTags = () => {
+          allTags = [...new Set(snippets.flatMap((s) => s.tags))].sort((a, b) => a.localeCompare(b));
+          activeFilterTags.forEach((tag) => {
+            if (!allTags.includes(tag)) {
+              activeFilterTags.delete(tag);
+            }
+          });
+          renderFilterTags();
+        };
+
+        const renderSnippetList = () => {
+          const filter = searchInput.value.toLowerCase();
+          snippetList.innerHTML = "";
+
+          let filteredSnippets = snippets;
+
+          if (activeFilterTags.size > 0) {
+            const filterTagsArray = [...activeFilterTags];
+            filteredSnippets = filteredSnippets.filter((s) => filterTagsArray.every((tag) => s.tags.includes(tag)));
+          }
+
+          if (filter) {
+            filteredSnippets = filteredSnippets.filter((s) => s.title.toLowerCase().includes(filter) || s.language.toLowerCase().includes(filter) || s.tags.some((t) => t.toLowerCase().includes(filter)));
+          }
+
+          filteredSnippets.forEach((snippet) => {
+            const li = document.createElement("li");
+            li.className = `snippet-item ${snippet.id === activeSnippetId ? "active" : ""}`;
+            li.dataset.id = snippet.id;
+            li.innerHTML = `
+              <div class="snippet-title">${snippet.title}</div>
+              <div class="snippet-lang">${snippet.language || "plaintext"}</div>
+            `;
+            li.addEventListener("click", () => {
+              activeSnippetId = snippet.id;
+              renderSnippetList();
+              renderSnippetViewer();
+            });
+            snippetList.appendChild(li);
+          });
+        };
+
+        const renderSnippetViewer = () => {
+          const snippet = snippets.find((s) => s.id === activeSnippetId);
+          if (!snippet) {
+            mainContent.innerHTML = `<div id="emptyState" style="text-align: center; margin: auto; color: var(--text-secondary); display: flex; flex-direction: column; gap: 1rem;"><div style="font-size: 4rem; line-height: 1; opacity: 0.5;">&lt; / &gt;</div><p style="font-size: 1.125rem;">Select a snippet to view it, or add a new one.</p></div>`;
+            return;
+          }
+
+          const tagsHtml = snippet.tags.map((tag) => `<span class="tag">${tag}</span>`).join("");
+
+          mainContent.innerHTML = `
+            <div class="viewer-header">
+              <h2 class="viewer-title">${snippet.title}</h2>
+              <div class="viewer-actions">
+                <button class="btn" id="editSnippetBtn">Edit</button>
+                <button class="btn btn-danger" id="deleteSnippetBtn">Delete</button>
+              </div>
+            </div>
+            <div class="tag-list">${tagsHtml}</div>
+            <div class="code-container">
+              <pre><code class="language-${snippet.language || "plaintext"}">${snippet.code}</code></pre>
+              <button class="btn copy-code-btn" id="copyCodeBtn">Copy</button>
+            </div>
+          `;
+
+          // Syntax Highlighting
+          const codeBlock = mainContent.querySelector("code");
+          hljs.highlightElement(codeBlock);
+
+          // Add event listeners for viewer buttons
+          document.getElementById("editSnippetBtn").addEventListener("click", () => openModal(snippet.id));
+          document.getElementById("deleteSnippetBtn").addEventListener("click", () => deleteSnippet(snippet.id));
+          document.getElementById("copyCodeBtn").addEventListener("click", (e) => {
+            const btn = e.currentTarget;
+            if (btn.disabled) return;
+
+            navigator.clipboard.writeText(snippet.code).then(() => {
+              const originalText = btn.textContent;
+              btn.textContent = `[✓] Copied to clipboard!`;
+              btn.disabled = true;
+              setTimeout(() => {
+                btn.textContent = originalText;
+                btn.disabled = false;
+              }, 2000);
+            }).catch(err => console.error("Failed to copy snippet:", err));
+          });
+        };
+
+        // --- Modal & Form Logic ---
+        const openModal = (id = null) => {
+          snippetForm.reset();
+          if (id) {
+            const snippet = snippets.find((s) => s.id === id);
+            modalTitle.textContent = "Edit Snippet";
+            snippetIdInput.value = snippet.id;
+            snippetTitleInput.value = snippet.title;
+            snippetLangInput.value = snippet.language;
+            snippetTagsInput.value = snippet.tags.join(", ");
+            snippetCodeInput.value = snippet.code;
+          } else {
+            modalTitle.textContent = "Add New Snippet";
+            snippetIdInput.value = "";
+          }
+          snippetModal.style.display = "flex";
+        };
+
+        const closeModal = () => {
+          snippetModal.style.display = "none";
+        };
+
+        const handleFormSubmit = (e) => {
+          e.preventDefault();
+          const id = snippetIdInput.value;
+          const snippetData = {
+            title: snippetTitleInput.value,
+            language: snippetLangInput.value.toLowerCase(),
+            tags: snippetTagsInput.value.split(",").map((t) => t.trim()).filter(Boolean),
+            code: snippetCodeInput.value,
+          };
+
+          if (id) {
+            // Update existing
+            const index = snippets.findIndex((s) => s.id === id);
+            snippets[index] = { ...snippets[index], ...snippetData };
+          } else {
+            // Create new
+            snippets.push({ id: `snip_${Date.now()}`, ...snippetData });
+            activeSnippetId = snippets[snippets.length - 1].id;
+          }
+
+          saveSnippets();
+          updateAllTags();
+          renderSnippetList();
+          renderSnippetViewer();
+          closeModal();
+        };
+
+        const deleteSnippet = (id) => {
+          if (confirm("Are you sure you want to delete this snippet?")) {
+            snippets = snippets.filter((s) => s.id !== id);
+            if (activeSnippetId === id) {
+              activeSnippetId = null;
+            }
+            saveSnippets();
+            updateAllTags();
+            renderSnippetList();
+            renderSnippetViewer();
+          }
+        };
+
+        // --- Import / Export ---
+        const handleExport = () => {
+          if (snippets.length === 0) {
+            alert("No snippets to export.");
+            return;
+          }
+          const dataStr = JSON.stringify(snippets, null, 2);
+          const blob = new Blob([dataStr], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.download = `one-file-tools-snippets-${Date.now()}.json`;
+          link.href = url;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        };
+
+        const handleImport = () => {
+          const input = document.createElement("input");
+          input.type = "file";
+          input.accept = ".json,application/json";
+          input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              try {
+                const importedSnippets = JSON.parse(event.target.result);
+                if (!Array.isArray(importedSnippets) || (importedSnippets.length > 0 && (importedSnippets[0].title === undefined || importedSnippets[0].code === undefined))) {
+                  throw new Error("File does not appear to be a valid snippet export.");
+                }
+                if (confirm(`This will overwrite all ${snippets.length} existing snippets with ${importedSnippets.length} new one(s). Are you sure?`)) {
+                  snippets = importedSnippets;
+                  activeSnippetId = snippets.length > 0 ? snippets[0].id : null;
+                  saveSnippets();
+                  updateAllTags();
+                  renderSnippetList();
+                  renderSnippetViewer();
+                  alert("Snippets imported successfully!");
+                }
+              } catch (err) {
+                alert("Failed to import snippets: " + err.message);
+              }
+            };
+            reader.readAsText(file);
+          };
+          input.click();
+        };
+
+        // --- Event Listeners ---
+        addSnippetBtn.addEventListener("click", () => openModal());
+        cancelBtn.addEventListener("click", closeModal);
+        snippetForm.addEventListener("submit", handleFormSubmit);
+        searchInput.addEventListener("input", renderSnippetList);
+        importBtn.addEventListener("click", handleImport);
+        exportBtn.addEventListener("click", handleExport);
+
+        // --- Resizer Logic ---
+        sidebarResizer.addEventListener("mousedown", (e) => {
+          e.preventDefault();
+          document.body.style.cursor = "col-resize";
+          document.body.style.userSelect = "none";
+          sidebarResizer.classList.add("is-resizing");
+
+          const mouseMoveHandler = (e) => {
+            const newWidth = e.clientX;
+            if (newWidth > 200 && newWidth < 600) {
+              appContainer.style.setProperty("--sidebar-width", `${newWidth}px`);
+            }
+          };
+
+          const mouseUpHandler = () => {
+            document.body.style.cursor = "default";
+            document.body.style.userSelect = "auto";
+            sidebarResizer.classList.remove("is-resizing");
+            document.removeEventListener("mousemove", mouseMoveHandler);
+            document.removeEventListener("mouseup", mouseUpHandler);
+          };
+
+          document.addEventListener("mousemove", mouseMoveHandler);
+          document.addEventListener("mouseup", mouseUpHandler);
+        });
+
+        // --- Init ---
+        const init = () => {
+          loadSnippets();
+          updateAllTags();
+          renderSnippetList();
+          renderSnippetViewer();
+        };
+
+        init();
+      });
+    </script>
+  </body>
+</html>
