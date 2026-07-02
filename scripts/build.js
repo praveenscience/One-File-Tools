@@ -7,20 +7,22 @@
  * Zero npm dependencies - runs with plain Node.js.
  *
  * Usage:
- *   node build.js
+ *   node scripts/build.js
  *
  * Cloudflare Pages build command:
- *   node build.js
+ *   node scripts/build.js
  */
 
 const fs = require("fs");
 const path = require("path");
 
+const rootDir = path.join(__dirname, "..");
+
 // ──────────────────────────────────────────────
 // Load data
 // ──────────────────────────────────────────────
 
-const data = JSON.parse(fs.readFileSync(path.join(__dirname, "tools.json"), "utf-8"));
+const data = JSON.parse(fs.readFileSync(path.join(rootDir, "data", "tools.json"), "utf-8"));
 const { site, categories, tools } = data;
 
 // ──────────────────────────────────────────────
@@ -133,7 +135,7 @@ function inlineMarkdown(text) {
 }
 
 function thumbnailExists(toolId) {
-  return fs.existsSync(path.join(__dirname, "tools", toolId + ".png"));
+  return fs.existsSync(path.join(rootDir, "tools", toolId + ".png"));
 }
 
 // ──────────────────────────────────────────────
@@ -313,7 +315,7 @@ function buildPortfolioCards() {
 
 // Resume & portfolio theme data from themes.json
 // Convention: [pillar]/themes/[id].hbs is the template, [id].png is the screenshot, [id].html is the output
-const themesData = JSON.parse(fs.readFileSync(path.join(__dirname, "themes.json"), "utf-8"));
+const themesData = JSON.parse(fs.readFileSync(path.join(rootDir, "data", "themes.json"), "utf-8"));
 function mapTheme(pillar) {
   return function (t) {
     var base = pillar + "/" + t.id;
@@ -321,7 +323,7 @@ function mapTheme(pillar) {
       ...t,
       file: base + ".html",
       screenshot: base + ".png",
-      hasScreenshot: fs.existsSync(path.join(__dirname, base + ".png"))
+      hasScreenshot: fs.existsSync(path.join(rootDir, base + ".png"))
     };
   };
 }
@@ -363,7 +365,7 @@ let html = template
 // Write output
 // ──────────────────────────────────────────────
 
-const outPath = path.join(__dirname, "index.html");
+const outPath = path.join(rootDir, "index.html");
 fs.writeFileSync(outPath, html, "utf-8");
 
 console.log("Built index.html successfully.");

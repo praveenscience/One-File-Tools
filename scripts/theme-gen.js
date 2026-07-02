@@ -7,10 +7,10 @@
  * in resume/themes/ and portfolio/themes/, outputting .html files.
  *
  * Usage:
- *   node theme-gen.js                      # uses ./profile.json
- *   node theme-gen.js path/to/profile.json  # custom profile path
+ *   node scripts/theme-gen.js                      # uses data/profile.json
+ *   node scripts/theme-gen.js path/to/profile.json  # custom profile path
  *
- * Contributors: create a .hbs file in resume/themes/ or portfolio/themes/.
+ * Contributors: create a .hbs file in resume/ or portfolio/.
  * See existing templates for examples. Available helpers are listed below.
  */
 
@@ -18,11 +18,13 @@ const fs = require("fs");
 const path = require("path");
 const Handlebars = require("handlebars");
 
+const rootDir = path.join(__dirname, "..");
+
 // ──────────────────────────────────────────────
 // Load profile data
 // ──────────────────────────────────────────────
 
-const profilePath = process.argv[2] || path.join(__dirname, "profile.json");
+const profilePath = process.argv[2] || path.join(rootDir, "data", "profile.json");
 let profile;
 try {
   profile = JSON.parse(fs.readFileSync(profilePath, "utf-8"));
@@ -48,6 +50,29 @@ Handlebars.registerHelper("fmtDate", function (d) {
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   return months[parseInt(parts[1], 10) - 1] + " " + parts[0];
 });
+Handlebars.registerHelper("dotDate", (s) => (s ? String(s).replace(/-/g, ".") : ""));
+Handlebars.registerHelper("lower", (s) => String(s || "").toLowerCase());
+Handlebars.registerHelper("tel", (s) => String(s || "").replace(/[^+\d]/g, ""));
+Handlebars.registerHelper("year", () => new Date().getFullYear());
+Handlebars.registerHelper("initials", (name) =>
+  String(name || "")
+    .split(/\s+/)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2)
+);
+Handlebars.registerHelper("cycle", (index, ...args) => {
+  const values = args.slice(0, -1); // drop Handlebars options object
+  return values[index % values.length];
+});
+Handlebars.registerHelper(
+  "json",
+  (ctx) =>
+    new Handlebars.SafeString(
+      JSON.stringify(ctx, null, 2).replace(/<\//g, "<\\/") // </script> safety
+    )
+);
 
 // {{year}} — current year
 Handlebars.registerHelper("year", function () {
@@ -68,7 +93,12 @@ Handlebars.registerHelper("join", function (arr, sep) {
 // {{joinField array "name" ", "}} — join array of objects by field
 Handlebars.registerHelper("joinField", function (arr, field, sep) {
   if (!Array.isArray(arr)) return "";
-  return arr.map(function (item) { return item[field] || ""; }).filter(Boolean).join(typeof sep === "string" ? sep : ", ");
+  return arr
+    .map(function (item) {
+      return item[field] || "";
+    })
+    .filter(Boolean)
+    .join(typeof sep === "string" ? sep : ", ");
 });
 
 // {{lowercase value}} — lowercase a string
@@ -119,13 +149,23 @@ function buildContext(profile) {
   else if (location.remote) locationStr = "Remote";
 
   var socialLinks = Object.entries(social)
-    .filter(function (entry) { return entry[1] && String(entry[1]).trim(); })
+    .filter(function (entry) {
+      return entry[1] && String(entry[1]).trim();
+    })
     .map(function (entry) {
-      var key = entry[0], url = entry[1];
+      var key = entry[0],
+        url = entry[1];
       var labels = {
-        github: "GitHub", linkedin: "LinkedIn", twitter: "Twitter / X",
-        youtube: "YouTube", blog: "Blog", stackoverflow: "Stack Overflow",
-        dribbble: "Dribbble", behance: "Behance", medium: "Medium", devto: "DEV.to"
+        github: "GitHub",
+        linkedin: "LinkedIn",
+        twitter: "Twitter / X",
+        youtube: "YouTube",
+        blog: "Blog",
+        stackoverflow: "Stack Overflow",
+        dribbble: "Dribbble",
+        behance: "Behance",
+        medium: "Medium",
+        devto: "DEV.to"
       };
       return { key: key, url: url, label: labels[key] || key };
     });
@@ -170,10 +210,7 @@ function buildContext(profile) {
 // Discover and process templates
 // ──────────────────────────────────────────────
 
-var themeDirs = [
-  path.join(__dirname, "resume"),
-  path.join(__dirname, "portfolio")
-];
+var themeDirs = [path.join(rootDir, "resume"), path.join(rootDir, "portfolio")];
 
 var ctx = buildContext(profile);
 var count = 0;
@@ -184,7 +221,9 @@ themeDirs.forEach(function (dir) {
     return;
   }
 
-  var files = fs.readdirSync(dir).filter(function (f) { return f.endsWith(".hbs"); });
+  var files = fs.readdirSync(dir).filter(function (f) {
+    return f.endsWith(".hbs");
+  });
 
   files.forEach(function (file) {
     var templatePath = path.join(dir, file);
@@ -194,7 +233,7 @@ themeDirs.forEach(function (dir) {
     var outName = file.replace(/\.hbs$/, ".html");
     var outPath = path.join(dir, outName);
     fs.writeFileSync(outPath, html, "utf-8");
-    console.log("  Built " + path.relative(__dirname, outPath));
+    console.log("  Built " + path.relative(rootDir, outPath));
     count++;
   });
 });

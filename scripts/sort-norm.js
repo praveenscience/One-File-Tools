@@ -60,6 +60,13 @@ if (Array.isArray(data.tools)) {
   }
 }
 
+// Sort theme arrays (themes.json: { resume: [...], portfolio: [...] })
+for (const pillar of ["resume", "portfolio"]) {
+  if (Array.isArray(data[pillar])) {
+    data[pillar].sort((a, b) => a.name.localeCompare(b.name));
+  }
+}
+
 fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n", "utf8");
 
 console.log(`✓ Normalized and sorted: ${file}`);

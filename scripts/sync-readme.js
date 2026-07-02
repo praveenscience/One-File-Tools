@@ -16,8 +16,9 @@
 const fs = require("fs");
 const path = require("path");
 
-const toolsPath = path.join(__dirname, "tools.json");
-const readmePath = path.join(__dirname, "ReadMe.md");
+const rootDir = path.join(__dirname, "..");
+const toolsPath = path.join(rootDir, "data", "tools.json");
+const readmePath = path.join(rootDir, "ReadMe.md");
 
 const data = JSON.parse(fs.readFileSync(toolsPath, "utf-8"));
 const { site, categories, tools } = data;

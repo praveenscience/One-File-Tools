@@ -30,12 +30,12 @@ Closes #
 
 - [ ] The tool is a single self-contained `.html` file in the `tools/` folder
 - [ ] The filename is kebab-case (e.g. `json-formatter.html`)
-- [ ] I added an entry to `tools.json` with all required fields
+- [ ] I added an entry to `data/tools.json` with all required fields
 - [ ] I added a screenshot as `tools/<tool-name>.png` next to the HTML file
-- [ ] The tool works offline (no external API calls required for core functionality)
-- [ ] No external JS/CSS frameworks or CDN imports (Google Fonts are okay)
-- [ ] I ran `node sort-norm.js tools.json` to sort and normalize the tools registry
-- [ ] I ran `node build.js` and verified the landing page renders correctly
+- [ ] No JS frameworks (React, Vue, Angular, etc.) or heavy UI libraries (Bootstrap JS, jQuery, etc.)
+- [ ] CDN links for lightweight libraries and fonts are fine — no copy-pasting library source code inline
+- [ ] I ran `node scripts/sort-norm.js data/tools.json` to sort and normalize the tools registry
+- [ ] I ran `node scripts/build.js` and verified the landing page renders correctly
 
 ### For enhancements / bug fixes:
 
