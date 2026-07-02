@@ -70,8 +70,9 @@ Every tool in this collection is a standalone `.html` file containing all the HT
 | 41 | [Responsive Breakpoint Tester](tools/responsive-breakpoint-tester.html) | Web & SEO | Test responsive layouts instantly via URL or raw HTML sandbox with intelligent scaling. | [Try it](https://one-file-tools.pages.dev/tools/responsive-breakpoint-tester) |
 | 42 | [Robots.txt Generator](tools/robots-txt-generator.html) | Web & SEO | Visually build, manage, and export standard-compliant robots.txt files with live syntax highlighting. | [Try it](https://one-file-tools.pages.dev/tools/robots-txt-generator) |
 | 43 | [Sitemap Generator](tools/sitemap-generator.html) | undefined | A standalone Sitemap Generator that helps users create valid XML sitemaps for websites entirely offline. | [Try it](https://one-file-tools.pages.dev/tools/sitemap-generator) |
-| 44 | [Twitter / X Card Preview](tools/twitter-x-card-preview.html) | Web & SEO | Preview how Twitter/X cards appear with live updates for Summary and Summary Large Image layouts. | [Try it](https://one-file-tools.pages.dev/tools/twitter-x-card-preview) |
-| 45 | [UUID Generator](tools/uuid-generator.html) | Developer Utilities | Generate random v4 UUIDs instantly, offline. | [Try it](https://one-file-tools.pages.dev/tools/uuid-generator) |
+| 44 | [Text Diff Viewer](tools/text-diff-viewer.html) | Text & Content | Compare two blocks of text and see line-level and word-level differences, side-by-side or unified. | [Try it](https://one-file-tools.pages.dev/tools/text-diff-viewer) |
+| 45 | [Twitter / X Card Preview](tools/twitter-x-card-preview.html) | Web & SEO | Preview how Twitter/X cards appear with live updates for Summary and Summary Large Image layouts. | [Try it](https://one-file-tools.pages.dev/tools/twitter-x-card-preview) |
+| 46 | [UUID Generator](tools/uuid-generator.html) | Developer Utilities | Generate random v4 UUIDs instantly, offline. | [Try it](https://one-file-tools.pages.dev/tools/uuid-generator) |
 
 > **Want to see your tool here?** Check out the [Contributing Guide](Contributing.md) and pick an idea from the [Ideas Board](#ideas-board).
 
@@ -147,7 +148,6 @@ Below is a curated list of tool ideas waiting to be built. Each idea is a potent
 | Text Diff Viewer — compare two blocks of text side by side    | Medium     |
 | Unicode Inspector — inspect Unicode characters and codepoints | Easy       |
 | HTML Entity Converter — encode/decode HTML entities and Unicode escapes | Easy |
-| Diff Viewer — paste two text blocks, see highlighted line-by-line diff  | Medium |
 
 ### JSON & API
 
