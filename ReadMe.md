@@ -147,7 +147,6 @@ Below is a curated list of tool ideas waiting to be built. Each idea is a potent
 | Text Diff Viewer — compare two blocks of text side by side    | Medium     |
 | Unicode Inspector — inspect Unicode characters and codepoints | Easy       |
 | HTML Entity Converter — encode/decode HTML entities and Unicode escapes | Easy |
-| Diff Viewer — paste two text blocks, see highlighted line-by-line diff  | Medium |
 
 ### JSON & API
 
