@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bash Sandbox — One File Tools</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Overpass+Mono:wght@700&display=swap" rel="stylesheet" />
+    <style>
+      /* ========================================
+       Reset & Base
+       ======================================== */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        line-height: 1.6;
+        background: #1e1e1e;
+        color: #d4d4d4;
+        overflow: hidden;
+        height: 100vh;
+        font-size: 15px;
+      }
+
+      .container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        height: 100vh;
+      }
+
+      h1 {
+        font-family: "Overpass Mono", monospace;
+        color: #be95ff;
+        font-size: 2rem;
+        padding: 1rem 1rem 0;
+        text-align: left;
+      }
+
+      /* ========================================
+       Terminal Styles
+       ======================================== */
+      .terminal-container {
+        display: flex;
+        flex-direction: column;
+        padding: 0 1rem 1rem;
+        overflow: hidden; /* Ensure this container doesn't overflow, allowing child to scroll */
+      }
+
+      #help-panel {
+        padding: 0.5rem;
+        border: 1px solid #333;
+        background: #121212;
+        border-bottom: 1px solid #fff;
+      }
+
+      #terminal {
+        width: 100%;
+        flex-grow: 1;
+        overflow-y: auto;
+        padding: 0.5rem;
+        border: 1px solid #333;
+        border-top: none;
+        background: #121212;
+        margin-top: 1rem;
+        margin-top: 0;
+      }
+
+      .line {
+        display: flex;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+
+      .prompt {
+        color: #569cd6;
+        margin-right: 0.5rem;
+        flex-shrink: 0;
+      }
+
+      .prompt .user {
+        color: #9cdcfe;
+      }
+
+      .prompt .path {
+        color: #ce9178;
+      }
+
+      .input-container {
+        display: flex;
+        flex-grow: 1;
+      }
+
+      .input {
+        background: transparent;
+        border: none;
+        color: #d4d4d4;
+        font-family: inherit;
+        font-size: inherit;
+        width: 100%;
+        outline: none;
+      }
+
+      .output {
+        color: #d4d4d4;
+      }
+
+      .output .directory {
+        color: #4ec9b0;
+        font-weight: bold;
+      }
+
+      .output .error {
+        color: #f44747;
+      }
+
+      .output .help-command {
+        color: #c586c0;
+        font-weight: bold;
+        display: inline-block;
+        width: 80px;
+      }
+
+      .output .help-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 0.5rem;
+      }
+      .output .help-table td {
+        padding: 4px 8px;
+        vertical-align: top;
+      }
+      .output .help-table td:first-child {
+        color: #c586c0;
+        font-weight: bold;
+        width: 100px;
+        white-space: nowrap;
+      }
+
+      /* ========================================
+       Desktop Styles
+       ======================================== */
+      .desktop-container {
+        position: relative;
+        background: #0a0f29;
+        border-left: 1px solid #333;
+        padding: 2rem;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .desktop-header {
+        font-family: "Overpass Mono", monospace;
+        color: #fff;
+        font-size: 1.5rem;
+        text-align: right;
+        margin-bottom: 1rem;
+      }
+
+      .desktop-bg {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        z-index: 0;
+      }
+
+      .scanline {
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+        background-size: 100% 3px;
+        animation: scan 10s linear infinite;
+      }
+
+      @keyframes scan {
+        from {
+          background-position-y: 0;
+        }
+        to {
+          background-position-y: 100vh;
+        }
+      }
+
+      #desktop-icons {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        align-content: flex-start;
+      }
+
+      .icon {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 96px;
+        text-align: center;
+      }
+
+      .icon svg {
+        width: 52px;
+        height: 52px;
+        color: #7aa5ff;
+      }
+
+      .icon-label {
+        font-size: 0.9rem;
+        color: #d4d4d4;
+        word-break: break-all;
+        margin-top: 0.25rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="terminal-container">
+        <h1>>_ Bash Sandbox</h1>
+        <div id="help-panel"></div>
+        <div id="terminal"></div>
+      </div>
+      <div class="desktop-container">
+        <div class="desktop-bg"><div class="scanline"></div></div>
+        <header class="desktop-header">My Desktop</header>
+        <div id="desktop-icons"></div>
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const terminal = document.getElementById("terminal");
+        const helpPanel = document.getElementById("help-panel");
+        const desktopIcons = document.getElementById("desktop-icons");
+        let currentPath = "/home/user";
+        let commandHistory = [];
+        let historyIndex = -1;
+        const MAX_FS_ITEMS = 20;
+
+        // --- Virtual File System ---
+        const fs = {
+          "/": {
+            type: "directory",
+            children: {
+              home: {
+                type: "directory",
+                children: {
+                  user: {
+                    type: "directory",
+                    children: {
+                      "welcome.txt": {
+                        type: "file",
+                        content: "Welcome to the Bash Sandbox!\n\nType 'help' to see a list of available commands.\n",
+                      },
+                    },
+                  },
+                },
+              },
+              etc: { type: "directory", children: {} },
+              var: { type: "directory", children: {} },
+            },
+          },
+        };
+
+        const getPathNode = (path) => {
+          const parts = path.split("/").filter(Boolean);
+          let node = fs["/"];
+          for (const part of parts) {
+            if (node.type !== "directory" || !node.children[part]) {
+              return null;
+            }
+            node = node.children[part];
+          }
+          return node;
+        };
+
+        const resolvePath = (path) => {
+          if (path.startsWith("/")) return path;
+          const newPath = new URL(path, `file://${currentPath}/`).pathname;
+          return newPath.endsWith("/") && newPath.length > 1 ? newPath.slice(0, -1) : newPath;
+        };
+
+        // --- Command Implementations ---
+        const commands = {
+          help: () => {
+            const helpData = [
+              { cmd: "ls", desc: "List directory contents." },
+              { cmd: "cd &lt;dir&gt;", desc: "Change directory." },
+              { cmd: "cd", desc: "Navigate back to My Desktop." },
+              { cmd: "pwd", desc: "Print current directory." },
+              { cmd: "mkdir &lt;dir&gt;", desc: "Create a directory." },
+              { cmd: "touch &lt;file&gt;", desc: "Create an empty file." },
+              { cmd: "cat &lt;file&gt;", desc: "View file contents." },
+              { cmd: "cat file1 file2 > file3", desc: "Concatenate files." },
+              { cmd: "echo text", desc: "Display text." },
+              { cmd: "echo text >> &lt;file&gt;", desc: "Append text to a file." },
+              { cmd: "rm -rf &lt;file/directory&gt;", desc: "Remove/Delete a file or directory." },
+              { cmd: "clear", desc: "Clear the terminal screen." },
+              { cmd: "help", desc: "Display list of available commands." },
+            ];
+            let tableHtml = '<table class="help-table">';
+            helpData.forEach((item) => {
+              tableHtml += `<tr><td>${item.cmd}</td><td>${item.desc}</td></tr>`;
+            });
+            tableHtml += "</table>";
+            return tableHtml;
+          },
+          ls: (args) => {
+            const path = args[0] ? resolvePath(args[0]) : currentPath;
+            const node = getPathNode(path);
+            if (!node || node.type !== "directory") {
+              return `<span class="error">ls: cannot access '${args[0] || "."}': No such file or directory</span>`;
+            }
+            return Object.keys(node.children)
+              .map((name) => {
+                return node.children[name].type === "directory" ? `<span class="directory">${name}</span>` : name;
+              })
+              .join("  ");
+          },
+          cd: (args) => {
+            if (!args[0]) {
+              currentPath = "/home/user";
+              renderDesktopIcons();
+              return "";
+            }
+            const newPath = resolvePath(args[0]);
+            const node = getPathNode(newPath);
+            if (!node || node.type !== "directory") {
+              return `<span class="error">cd: ${args[0]}: No such file or directory</span>`;
+            }
+            currentPath = newPath;
+            renderDesktopIcons();
+            return "";
+          },
+          pwd: () => currentPath,
+          cat: (args) => {
+            const cmdStr = args.join(" ");
+            const redirectMatch = cmdStr.match(/(.*)>\s*(\S+)/);
+            if (redirectMatch) {
+              const sourceFiles = redirectMatch[1].trim().split(/\s+/).filter(Boolean);
+              const destFile = redirectMatch[2];
+              if (sourceFiles.length === 0) return `<span class="error">cat: missing source file for redirection</span>`;
+              if (!destFile) return `<span class="error">cat: missing destination file for redirection</span>`;
+
+              let combinedContent = "";
+              for (const file of sourceFiles) {
+                const path = resolvePath(file);
+                const node = getPathNode(path);
+                if (!node) return `<span class="error">cat: ${file}: No such file or directory</span>`;
+                if (node.type === "directory") return `<span class="error">cat: ${file}: Is a directory</span>`;
+                combinedContent += node.content + "\n";
+              }
+
+              const destPath = resolvePath(destFile);
+              const destParts = destPath.split("/").filter(Boolean);
+              const destName = destParts.pop();
+              const parentPath = "/" + destParts.join("/");
+              const parentNode = getPathNode(parentPath);
+              if (!parentNode) return `<span class="error">cat: cannot create file '${destFile}': No such file or directory</span>`;
+
+              // Check limit only if file is new
+              if (!parentNode.children[destName] && Object.keys(parentNode.children).length >= MAX_FS_ITEMS) {
+                return `<span class="error">cat: cannot create file '${destFile}': Maximum number of items (${MAX_FS_ITEMS}) reached in this directory.</span>`;
+              }
+              parentNode.children[destName] = { type: "file", content: combinedContent.trim() };
+              renderDesktopIcons();
+              return "";
+            } else {
+              if (!args[0]) return "";
+              const path = resolvePath(args[0]);
+              const node = getPathNode(path);
+              if (!node) return `<span class="error">cat: ${args[0]}: No such file or directory</span>`;
+              if (node.type === "directory") return `<span class="error">cat: ${args[0]}: Is a directory</span>`;
+              return node.content;
+            }
+          },
+          echo: (args) => {
+            const cmdStr = args.join(" ");
+            const appendMatch = cmdStr.match(/(.*)>>\s*(\S+)/);
+            if (appendMatch) {
+              const text = appendMatch[1].trim().replace(/^"|"$/g, "");
+              const fileName = appendMatch[2];
+              if (!fileName) return `<span class="error">echo: missing filename for redirection</span>`;
+
+              const path = resolvePath(fileName);
+              let node = getPathNode(path);
+
+              if (node && node.type === "directory") {
+                return `<span class="error">echo: cannot write to '${fileName}': It is a directory</span>`;
+              }
+              if (!node) {
+                const touchResult = commands.touch([fileName]);
+                if (touchResult) {
+                  return touchResult; // Propagate error from touch
+                }
+                node = getPathNode(path);
+              }
+              node.content += (node.content ? "\n" : "") + text;
+              return "";
+            }
+            return cmdStr;
+          },
+          mkdir: (args) => {
+            if (!args[0]) return `<span class="error">mkdir: missing operand</span>`;
+            const path = resolvePath(args[0]);
+            const parts = path.split("/").filter(Boolean);
+            const newDirName = parts.pop();
+            const parentPath = "/" + parts.join("/");
+            const parentNode = getPathNode(parentPath);
+
+            if (!parentNode || parentNode.type !== "directory") {
+              return `<span class="error">mkdir: cannot create directory '${args[0]}': No such file or directory</span>`;
+            }
+            if (parentNode.children[newDirName]) {
+              return `<span class="error">mkdir: cannot create directory '${args[0]}': File exists</span>`;
+            }
+            if (Object.keys(parentNode.children).length >= MAX_FS_ITEMS) {
+              return `<span class="error">mkdir: cannot create directory '${args[0]}': Maximum number of items (${MAX_FS_ITEMS}) reached in this directory.</span>`;
+            }
+            parentNode.children[newDirName] = { type: "directory", children: {} };
+            renderDesktopIcons();
+            return "";
+          },
+          touch: (args) => {
+            if (!args[0]) return `<span class="error">touch: missing file operand</span>`;
+            const path = resolvePath(args[0]);
+            const parts = path.split("/").filter(Boolean);
+            const newFileName = parts.pop();
+            const parentPath = "/" + parts.join("/");
+            const parentNode = getPathNode(parentPath);
+
+            if (!parentNode || parentNode.type !== "directory") {
+              return `<span class="error">touch: cannot touch '${args[0]}': No such file or directory</span>`;
+            }
+            if (!parentNode.children[newFileName]) {
+              if (Object.keys(parentNode.children).length >= MAX_FS_ITEMS) {
+                return `<span class="error">touch: cannot create file '${args[0]}': Maximum number of items (${MAX_FS_ITEMS}) reached in this directory.</span>`;
+              }
+              parentNode.children[newFileName] = { type: "file", content: "" };
+              renderDesktopIcons();
+            }
+            return "";
+          },
+          rm: (args) => {
+            if (!args[0] || args[0] !== "-rf" || !args[1]) {
+              return `<span class="error">rm: usage: rm -rf &lt;file/directory&gt;</span>`;
+            }
+            const targetName = args[1];
+            const targetPath = resolvePath(targetName);
+            const parts = targetPath.split("/").filter(Boolean);
+            const name = parts.pop();
+            const parentPath = "/" + parts.join("/");
+            const parentNode = getPathNode(parentPath);
+
+            if (!parentNode || !parentNode.children[name]) {
+              return `<span class="error">rm: cannot remove '${targetName}': No such file or directory</span>`;
+            }
+
+            delete parentNode.children[name];
+            renderDesktopIcons();
+            return "";
+          },
+          clear: () => {
+            terminal.innerHTML = "";
+            // The new prompt is added by the calling function, so we just need to clear the interactive area.
+            return "";
+          },
+        };
+
+        // --- Terminal UI & Input Handling ---
+
+        const createPrompt = () => {
+          const line = document.createElement("div");
+          line.className = "line";
+
+          const prompt = document.createElement("span");
+          prompt.className = "prompt";
+          prompt.innerHTML = `<span class="user">user@one-file-tools</span>:<span class="path">${currentPath.replace(
+            fs["/"].children.home.children.user,
+            "~"
+          )}</span>$`;
+
+          const inputContainer = document.createElement("div");
+          inputContainer.className = "input-container";
+          const input = document.createElement("input");
+          input.className = "input";
+          input.type = "text";
+          input.autofocus = true;
+
+          inputContainer.appendChild(input);
+          line.appendChild(prompt);
+          line.appendChild(inputContainer);
+          terminal.appendChild(line);
+
+          input.focus();
+          return input;
+        };
+
+        const writeOutput = (output) => {
+          if (!output) return;
+          const line = document.createElement("div");
+          line.className = "line output";
+          line.innerHTML = output;
+          terminal.appendChild(line);
+        };
+
+        const writeToHelpPanel = (output) => {
+          if (!output) return;
+          const line = document.createElement("div");
+          line.className = "line output";
+          line.innerHTML = output;
+          helpPanel.appendChild(line);
+        };
+
+        const executeCommand = (cmdStr) => {
+          const [command, ...args] = cmdStr.trim().split(/\s+/);
+          if (!command) return;
+
+          if (commands[command]) {
+            const output = commands[command](args);
+            writeOutput(output);
+          } else {
+            writeOutput(`<span class="error">${command}: command not found</span>`);
+          }
+        };
+
+        const handleTerminalInput = (e) => {
+          if (e.key === "Enter") {
+            const input = e.target;
+            const cmdStr = input.value;
+
+            // Disable current input
+            input.disabled = true;
+            input.parentElement.parentElement.classList.remove("input-container");
+
+            if (cmdStr) {
+              commandHistory.unshift(cmdStr);
+              historyIndex = -1;
+            }
+
+            try {
+              executeCommand(cmdStr);
+            } catch (err) {
+              console.error("Command execution error:", err);
+              writeOutput(`<span class="error">An unexpected error occurred.</span>`);
+            } finally {
+              createPromptAndScroll();
+            }
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            if (historyIndex < commandHistory.length - 1) {
+              historyIndex++;
+              e.target.value = commandHistory[historyIndex];
+            }
+          } else if (e.key === "ArrowDown") {
+            e.preventDefault();
+            if (historyIndex > 0) {
+              historyIndex--;
+              e.target.value = commandHistory[historyIndex];
+            } else {
+              historyIndex = -1;
+              e.target.value = "";
+            }
+          } else if (e.key === "Tab") {
+            e.preventDefault();
+            handleTabCompletion(e.target);
+          }
+        };
+
+        const handleTabCompletion = (input) => {
+            const value = input.value;
+            const parts = value.split(" ");
+            const partialPath = parts.pop();
+            if (!partialPath) return;
+
+            const parentPath = partialPath.includes('/') ? resolvePath(partialPath.substring(0, partialPath.lastIndexOf('/') + 1)) : currentPath;
+            const partialName = partialPath.substring(partialPath.lastIndexOf('/') + 1);
+
+            const parentNode = getPathNode(parentPath);
+            if (!parentNode || parentNode.type !== 'directory') return;
+
+            const matches = Object.keys(parentNode.children).filter(name => name.startsWith(partialName));
+
+            if (matches.length === 1) {
+                const completion = matches[0];
+                const newPath = partialPath.substring(0, partialPath.lastIndexOf('/') + 1) + completion;
+                input.value = parts.join(" ") + (parts.length > 0 ? " " : "") + newPath;
+                if (parentNode.children[completion].type === 'directory') {
+                    input.value += '/';
+                }
+            } else if (matches.length > 1) {
+                writeOutput(`<span class="prompt">${input.previousElementSibling.innerHTML}</span> ${value}`);
+                writeOutput(matches.join('\n'));
+                createPromptAndScroll(value);
+            }
+        };
+
+        const createPromptAndScroll = (currentValue = "") => {
+          const newPromptInput = createPrompt();
+          newPromptInput.value = currentValue;
+          terminal.scrollTop = terminal.scrollHeight;
+        };
+
+        const renderDesktopIcons = () => {
+          desktopIcons.innerHTML = "";
+          const currentNode = getPathNode(currentPath);
+          if (!currentNode || currentNode.type !== "directory") return;
+
+          const FOLDER_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`;
+          const FILE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>`;
+
+          for (const name in currentNode.children) {
+            const item = currentNode.children[name];
+            const iconEl = document.createElement("div");
+            iconEl.className = "icon";
+
+            let iconSvg = item.type === "directory" ? FOLDER_ICON : FILE_ICON;
+            iconEl.innerHTML = `${iconSvg}<span class="icon-label">${name}</span>`;
+            desktopIcons.appendChild(iconEl);
+          }
+        };
+
+        // --- Init ---
+        const init = () => {
+          writeToHelpPanel("<br><b>Available commands:</b>");
+          writeToHelpPanel(commands.help());
+          writeToHelpPanel("<br>");
+          writeToHelpPanel("Try typing <i>cat welcome.txt</i> and hit enter!");
+
+          createPromptAndScroll();
+          renderDesktopIcons();
+
+          terminal.addEventListener("keydown", handleTerminalInput);
+          terminal.addEventListener("click", () => {
+            const currentInput = terminal.querySelector(".input:not([disabled])");
+            if (currentInput) currentInput.focus();
+          });
+        };
+
+        init();
+      });
+    </script>
+  </body>
+</html>
