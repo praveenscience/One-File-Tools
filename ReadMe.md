@@ -4,7 +4,7 @@ A growing collection of useful developer tools, each built as a **single, self-c
 
 No build step. No frameworks. No npm. Just open the file in your browser and it works.
 
-![Thumbnail](./thumb.png)
+![Thumbnail](./assets/thumb.png)
 
 ## Why?
 
