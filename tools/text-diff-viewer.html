@@ -1,0 +1,673 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Text Diff Viewer - One File Tools</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --c-950: #051f20;
+        --c-900: #0b2b26;
+        --c-800: #163832;
+        --c-700: #235347;
+        --c-400: #8eb69b;
+        --c-100: #daf1de;
+
+        --bg: var(--c-950);
+        --surface: var(--c-900);
+        --surface-2: var(--c-800);
+        --border: var(--c-700);
+        --text: var(--c-100);
+        --muted: var(--c-400);
+        --accent: var(--c-400);
+        --accent-text: var(--c-950);
+
+        --add: #5fd38d;
+        --add-bg: rgba(95, 211, 141, 0.18);
+        --add-bg-strong: rgba(95, 211, 141, 0.45);
+        --rem: #ff8a75;
+        --rem-bg: rgba(255, 138, 117, 0.16);
+        --rem-bg-strong: rgba(255, 138, 117, 0.5);
+
+        --font-display: "Fraunces", serif;
+        --font-sans: "Inter", system-ui, sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+        --radius: 10px;
+      }
+
+      [data-theme="light"] {
+        --bg: var(--c-100);
+        --surface: #ffffff;
+        --surface-2: #eef8f1;
+        --border: var(--c-400);
+        --text: var(--c-950);
+        --muted: var(--c-700);
+        --accent: var(--c-700);
+        --accent-text: #ffffff;
+
+        --add: #1e5f45;
+        --add-bg: rgba(30, 95, 69, 0.1);
+        --add-bg-strong: rgba(30, 95, 69, 0.28);
+        --rem: #9a3b2e;
+        --rem-bg: rgba(154, 59, 46, 0.1);
+        --rem-bg-strong: rgba(154, 59, 46, 0.28);
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font-sans);
+        min-height: 100vh;
+        transition:
+          background 0.2s,
+          color 0.2s;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 20px 28px;
+        border-bottom: 1px solid var(--border);
+        flex-wrap: wrap;
+      }
+
+      .logo {
+        color: var(--accent);
+        flex-shrink: 0;
+      }
+
+      .brand {
+        display: flex;
+        flex-direction: column;
+        margin-right: auto;
+      }
+      .brand .eyebrow {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .brand h1 {
+        font-family: var(--font-display);
+        font-size: 22px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+
+      .btn {
+        font-family: var(--font-sans);
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text);
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: 100px;
+        padding: 7px 14px;
+        cursor: pointer;
+        transition:
+          border-color 0.15s,
+          background 0.15s;
+      }
+      .btn:hover {
+        border-color: var(--muted);
+      }
+      .btn:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+      .btn.active {
+        background: var(--accent);
+        color: var(--accent-text);
+        border-color: var(--accent);
+      }
+
+      .segment {
+        display: flex;
+        border: 1px solid var(--border);
+        border-radius: 100px;
+        overflow: hidden;
+      }
+      .segment button {
+        font-family: var(--font-sans);
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--muted);
+        background: transparent;
+        border: none;
+        padding: 7px 14px;
+        cursor: pointer;
+      }
+      .segment button.active {
+        background: var(--accent);
+        color: var(--accent-text);
+      }
+
+      .inputs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        border-bottom: 1px solid var(--border);
+      }
+      .pane {
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+      }
+      .pane:last-child {
+        border-right: none;
+      }
+      .pane-label {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--muted);
+        padding: 8px 16px;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        display: block;
+      }
+      textarea {
+        height: 200px;
+        background: var(--surface);
+        color: var(--text);
+        border: none;
+        resize: vertical;
+        outline: none;
+        font-family: var(--font-mono);
+        font-size: 13px;
+        line-height: 1.6;
+        padding: 14px 16px;
+        width: 100%;
+      }
+      textarea::placeholder {
+        color: var(--muted);
+        opacity: 0.6;
+      }
+
+      .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 28px;
+        border-bottom: 1px solid var(--border);
+        flex-wrap: wrap;
+      }
+      .stats {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-right: auto;
+      }
+      .pill {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        font-weight: 600;
+        padding: 3px 10px;
+        border-radius: 100px;
+        border: 1px solid;
+      }
+      .pill.add {
+        color: var(--add);
+        background: var(--add-bg);
+        border-color: var(--add-bg-strong);
+      }
+      .pill.rem {
+        color: var(--rem);
+        background: var(--rem-bg);
+        border-color: var(--rem-bg-strong);
+      }
+      .pill.mod {
+        color: var(--text);
+        background: var(--surface-2);
+        border-color: var(--border);
+      }
+      .pill.eq {
+        color: var(--muted);
+        background: transparent;
+        border-color: var(--border);
+      }
+
+      .output {
+        padding: 16px 28px 40px;
+        overflow-x: auto;
+      }
+      .empty {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 80px 20px;
+        color: var(--muted);
+        font-size: 14px;
+        text-align: center;
+      }
+
+      .diff {
+        font-family: var(--font-mono);
+        font-size: 12.5px;
+        line-height: 1.7;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+      }
+
+      .row {
+        display: flex;
+      }
+      .gutter {
+        flex-shrink: 0;
+        width: 44px;
+        text-align: right;
+        padding-right: 10px;
+        color: var(--muted);
+        user-select: none;
+        border-right: 1px solid var(--border);
+      }
+      .marker {
+        flex-shrink: 0;
+        width: 20px;
+        text-align: center;
+        user-select: none;
+      }
+      .content {
+        flex: 1;
+        white-space: pre-wrap;
+        word-break: break-word;
+        padding-right: 12px;
+      }
+
+      .row.add {
+        background: var(--add-bg);
+      }
+      .row.add .marker,
+      .row.add .content {
+        color: var(--add);
+      }
+      .row.rem {
+        background: var(--rem-bg);
+      }
+      .row.rem .marker,
+      .row.rem .content {
+        color: var(--rem);
+      }
+
+      mark.w-add {
+        background: var(--add);
+        color: var(--bg);
+        border-radius: 3px;
+        padding: 0 2px;
+        font-weight: 600;
+      }
+      mark.w-rem {
+        background: var(--rem);
+        color: var(--bg);
+        border-radius: 3px;
+        padding: 0 2px;
+        text-decoration: line-through;
+        text-decoration-thickness: 1.5px;
+      }
+
+      .hide-eq .row.eq {
+        display: none;
+      }
+
+      .split {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+      }
+      .split .side:first-child {
+        border-right: 1px solid var(--border);
+      }
+      .split .row.blank {
+        background: repeating-linear-gradient(135deg, transparent, transparent 6px, var(--surface-2) 6px, var(--surface-2) 7px);
+      }
+
+      @media (max-width: 720px) {
+        .inputs {
+          grid-template-columns: 1fr;
+        }
+        .pane {
+          border-right: none;
+          border-bottom: 1px solid var(--border);
+        }
+        header,
+        .toolbar,
+        .output {
+          padding-left: 16px;
+          padding-right: 16px;
+        }
+        .split {
+          grid-template-columns: 1fr;
+        }
+        .split .side:first-child {
+          border-right: none;
+          border-bottom: 1px solid var(--border);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <svg class="logo" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M5 2v16M5 2 3 4M5 2l2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+        <path d="M15 18V2M15 18l-2-2M15 18l2-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+      <div class="brand">
+        <span class="eyebrow">Text &amp; Content</span>
+        <h1>Text Diff Viewer</h1>
+      </div>
+      <div class="segment" role="group" aria-label="View mode">
+        <button id="modeUnified" class="active" aria-pressed="true">Unified</button>
+        <button id="modeSplit" aria-pressed="false">Split</button>
+      </div>
+      <button class="btn" id="themeToggle" aria-label="Toggle theme">Light mode</button>
+    </header>
+
+    <div class="inputs">
+      <div class="pane">
+        <label class="pane-label" for="inputA">Original</label>
+        <textarea id="inputA" spellcheck="false" placeholder="Paste original text…"></textarea>
+      </div>
+      <div class="pane">
+        <label class="pane-label" for="inputB">Modified</label>
+        <textarea id="inputB" spellcheck="false" placeholder="Paste modified text…"></textarea>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <div class="stats" id="stats" aria-live="polite"></div>
+      <button class="btn" id="hideEqBtn" aria-pressed="false">Hide unchanged</button>
+      <button class="btn" id="copyBtn">Copy diff</button>
+      <button class="btn" id="clearBtn">Clear</button>
+    </div>
+
+    <div class="output" id="output">
+      <div class="empty">Paste text into both panels to see the difference.</div>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const inputA = $("inputA"),
+        inputB = $("inputB"),
+        output = $("output"),
+        stats = $("stats");
+      const modeUnified = $("modeUnified"),
+        modeSplit = $("modeSplit");
+      const hideEqBtn = $("hideEqBtn"),
+        copyBtn = $("copyBtn"),
+        clearBtn = $("clearBtn"),
+        themeToggle = $("themeToggle");
+
+      let mode = "unified";
+      let hideEq = false;
+      let lastGrouped = null;
+
+      const escapeHtml = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const tokenize = (line) => line.match(/\s+|[^\s]+/g) || [];
+
+      function lcs(a, b) {
+        const n = a.length,
+          m = b.length;
+        const dp = Array.from({ length: n + 1 }, () => new Int32Array(m + 1));
+        for (let i = n - 1; i >= 0; i--) {
+          for (let j = m - 1; j >= 0; j--) {
+            dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+          }
+        }
+        const ops = [];
+        let i = 0,
+          j = 0;
+        while (i < n && j < m) {
+          if (a[i] === b[j]) {
+            ops.push({ type: "eq", a: a[i], b: b[j] });
+            i++;
+            j++;
+          } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+            ops.push({ type: "rem", a: a[i] });
+            i++;
+          } else {
+            ops.push({ type: "add", b: b[j] });
+            j++;
+          }
+        }
+        while (i < n) {
+          ops.push({ type: "rem", a: a[i] });
+          i++;
+        }
+        while (j < m) {
+          ops.push({ type: "add", b: b[j] });
+          j++;
+        }
+        return ops;
+      }
+
+      function group(ops) {
+        const out = [];
+        let i = 0;
+        while (i < ops.length) {
+          if (ops[i].type === "eq") {
+            out.push(ops[i]);
+            i++;
+            continue;
+          }
+          const rem = [],
+            add = [];
+          while (i < ops.length && ops[i].type === "rem") {
+            rem.push(ops[i].a);
+            i++;
+          }
+          while (i < ops.length && ops[i].type === "add") {
+            add.push(ops[i].b);
+            i++;
+          }
+          const paired = Math.min(rem.length, add.length);
+          for (let k = 0; k < paired; k++) out.push({ type: "mod", a: rem[k], b: add[k] });
+          for (let k = paired; k < rem.length; k++) out.push({ type: "rem", a: rem[k] });
+          for (let k = paired; k < add.length; k++) out.push({ type: "add", b: add[k] });
+        }
+        return out;
+      }
+
+      function wordDiff(a, b) {
+        const ops = lcs(tokenize(a), tokenize(b));
+        let delHtml = "",
+          insHtml = "";
+        for (const op of ops) {
+          if (op.type === "eq") {
+            const t = escapeHtml(op.a);
+            delHtml += t;
+            insHtml += t;
+          } else if (op.type === "rem") delHtml += `<mark class="w-rem">${escapeHtml(op.a)}</mark>`;
+          else insHtml += `<mark class="w-add">${escapeHtml(op.b)}</mark>`;
+        }
+        return { delHtml, insHtml };
+      }
+
+      const diffText = (a, b) => group(lcs(a.split("\n"), b.split("\n")));
+
+      function countStats(grouped) {
+        const c = { add: 0, rem: 0, mod: 0, eq: 0 };
+        for (const g of grouped) c[g.type]++;
+        return c;
+      }
+
+      function renderStats(c) {
+        const pills = [];
+        if (c.add) pills.push(`<span class="pill add">+${c.add} added</span>`);
+        if (c.rem) pills.push(`<span class="pill rem">−${c.rem} removed</span>`);
+        if (c.mod) pills.push(`<span class="pill mod">~${c.mod} modified</span>`);
+        pills.push(`<span class="pill eq">${c.eq} unchanged</span>`);
+        stats.innerHTML = pills.join("");
+      }
+
+      function renderUnified(grouped) {
+        let aNum = 1,
+          bNum = 1;
+        const rows = [];
+        for (const g of grouped) {
+          if (g.type === "eq") {
+            rows.push(`<div class="row eq"><span class="gutter">${aNum}</span><span class="marker"> </span><span class="content">${escapeHtml(g.a)}</span></div>`);
+            aNum++;
+            bNum++;
+          } else if (g.type === "rem") {
+            rows.push(`<div class="row rem"><span class="gutter">${aNum}</span><span class="marker">−</span><span class="content">${escapeHtml(g.a)}</span></div>`);
+            aNum++;
+          } else if (g.type === "add") {
+            rows.push(`<div class="row add"><span class="gutter">${bNum}</span><span class="marker">+</span><span class="content">${escapeHtml(g.b)}</span></div>`);
+            bNum++;
+          } else {
+            const { delHtml, insHtml } = wordDiff(g.a, g.b);
+            rows.push(`<div class="row rem"><span class="gutter">${aNum}</span><span class="marker">−</span><span class="content">${delHtml}</span></div>`);
+            rows.push(`<div class="row add"><span class="gutter">${bNum}</span><span class="marker">+</span><span class="content">${insHtml}</span></div>`);
+            aNum++;
+            bNum++;
+          }
+        }
+        return `<div class="diff">${rows.join("")}</div>`;
+      }
+
+      function renderSplit(grouped) {
+        let aNum = 1,
+          bNum = 1;
+        const left = [],
+          right = [];
+        const blank = `<div class="row blank"><span class="gutter"></span><span class="content"></span></div>`;
+        for (const g of grouped) {
+          if (g.type === "eq") {
+            left.push(`<div class="row eq"><span class="gutter">${aNum}</span><span class="content">${escapeHtml(g.a)}</span></div>`);
+            right.push(`<div class="row eq"><span class="gutter">${bNum}</span><span class="content">${escapeHtml(g.b)}</span></div>`);
+            aNum++;
+            bNum++;
+          } else if (g.type === "rem") {
+            left.push(`<div class="row rem"><span class="gutter">${aNum}</span><span class="content">${escapeHtml(g.a)}</span></div>`);
+            right.push(blank);
+            aNum++;
+          } else if (g.type === "add") {
+            left.push(blank);
+            right.push(`<div class="row add"><span class="gutter">${bNum}</span><span class="content">${escapeHtml(g.b)}</span></div>`);
+            bNum++;
+          } else {
+            const { delHtml, insHtml } = wordDiff(g.a, g.b);
+            left.push(`<div class="row rem"><span class="gutter">${aNum}</span><span class="content">${delHtml}</span></div>`);
+            right.push(`<div class="row add"><span class="gutter">${bNum}</span><span class="content">${insHtml}</span></div>`);
+            aNum++;
+            bNum++;
+          }
+        }
+        return `<div class="diff split"><div class="side">${left.join("")}</div><div class="side">${right.join("")}</div></div>`;
+      }
+
+      function render() {
+        const a = inputA.value,
+          b = inputB.value;
+        if (!a && !b) {
+          output.innerHTML = '<div class="empty">Paste text into both panels to see the difference.</div>';
+          stats.innerHTML = "";
+          lastGrouped = null;
+          return;
+        }
+        const grouped = diffText(a, b);
+        lastGrouped = grouped;
+        const c = countStats(grouped);
+        renderStats(c);
+
+        if (!c.add && !c.rem && !c.mod) {
+          output.innerHTML = '<div class="empty">No differences found — both texts are identical.</div>';
+          return;
+        }
+
+        output.innerHTML = mode === "unified" ? renderUnified(grouped) : renderSplit(grouped);
+        output.querySelector(".diff")?.classList.toggle("hide-eq", hideEq);
+      }
+
+      let timer;
+      const scheduleRender = () => {
+        clearTimeout(timer);
+        timer = setTimeout(render, 200);
+      };
+
+      inputA.addEventListener("input", scheduleRender);
+      inputB.addEventListener("input", scheduleRender);
+
+      modeUnified.addEventListener("click", () => {
+        mode = "unified";
+        modeUnified.classList.add("active");
+        modeUnified.setAttribute("aria-pressed", "true");
+        modeSplit.classList.remove("active");
+        modeSplit.setAttribute("aria-pressed", "false");
+        render();
+      });
+      modeSplit.addEventListener("click", () => {
+        mode = "split";
+        modeSplit.classList.add("active");
+        modeSplit.setAttribute("aria-pressed", "true");
+        modeUnified.classList.remove("active");
+        modeUnified.setAttribute("aria-pressed", "false");
+        render();
+      });
+
+      hideEqBtn.addEventListener("click", () => {
+        hideEq = !hideEq;
+        hideEqBtn.classList.toggle("active", hideEq);
+        hideEqBtn.setAttribute("aria-pressed", String(hideEq));
+        output.querySelector(".diff")?.classList.toggle("hide-eq", hideEq);
+      });
+
+      clearBtn.addEventListener("click", () => {
+        inputA.value = "";
+        inputB.value = "";
+        render();
+        inputA.focus();
+      });
+
+      copyBtn.addEventListener("click", async () => {
+        if (!lastGrouped) return;
+        const lines = [];
+        for (const g of lastGrouped) {
+          if (g.type === "eq") lines.push("  " + g.a);
+          else if (g.type === "rem") lines.push("- " + g.a);
+          else if (g.type === "add") lines.push("+ " + g.b);
+          else {
+            lines.push("- " + g.a);
+            lines.push("+ " + g.b);
+          }
+        }
+        await navigator.clipboard.writeText(lines.join("\n"));
+        const original = copyBtn.textContent;
+        copyBtn.textContent = "Copied!";
+        setTimeout(() => (copyBtn.textContent = original), 1500);
+      });
+
+      themeToggle.addEventListener("click", () => {
+        const isLight = document.documentElement.getAttribute("data-theme") === "light";
+        setTheme(isLight ? "dark" : "light");
+      });
+
+      function setTheme(theme) {
+        document.documentElement.setAttribute("data-theme", theme);
+        themeToggle.textContent = theme === "light" ? "Dark mode" : "Light mode";
+        localStorage.setItem("tdv-theme", theme);
+      }
+
+      const savedTheme = localStorage.getItem("tdv-theme");
+      const prefersLight = window.matchMedia("(prefers-color-scheme: light)").matches;
+      setTheme(savedTheme || (prefersLight ? "light" : "dark"));
+
+      inputA.value = "The quick brown fox jumps over the lazy dog.\nThis line stays the same.\nOld line to be removed.\nAnother unchanged line here.";
+      inputB.value = "The quick brown fox leaps over the lazy dog.\nThis line stays the same.\nAnother unchanged line here.\nA brand new line was added.";
+      render();
+    </script>
+  </body>
+</html>
