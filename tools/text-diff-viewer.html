@@ -414,6 +414,10 @@
       let hideEq = false;
       let lastGrouped = null;
 
+      // Storage Keys (same architecture as Regex Playground)
+      const STORAGE_KEY = "oft-text-diff-viewer-state";
+      const THEME_KEY = "oft-text-diff-viewer-theme";
+
       const escapeHtml = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
       const tokenize = (line) => line.match(/\s+|[^\s]+/g) || [];
 
@@ -592,14 +596,44 @@
         output.querySelector(".diff")?.classList.toggle("hide-eq", hideEq);
       }
 
+      // Autosave
+      function saveState() {
+        localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({
+            a: inputA.value,
+            b: inputB.value,
+            mode,
+            hideEq
+          })
+        );
+      }
+
       let timer;
       const scheduleRender = () => {
         clearTimeout(timer);
         timer = setTimeout(render, 200);
       };
 
-      inputA.addEventListener("input", scheduleRender);
-      inputB.addEventListener("input", scheduleRender);
+      // Restore saved input on load
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        if (saved) {
+          if (saved.a !== undefined) inputA.value = saved.a;
+          if (saved.b !== undefined) inputB.value = saved.b;
+          if (saved.mode) mode = saved.mode;
+          if (typeof saved.hideEq === "boolean") hideEq = saved.hideEq;
+        }
+      } catch (e) {}
+
+      inputA.addEventListener("input", () => {
+        scheduleRender();
+        saveState();
+      });
+      inputB.addEventListener("input", () => {
+        scheduleRender();
+        saveState();
+      });
 
       modeUnified.addEventListener("click", () => {
         mode = "unified";
@@ -607,6 +641,7 @@
         modeUnified.setAttribute("aria-pressed", "true");
         modeSplit.classList.remove("active");
         modeSplit.setAttribute("aria-pressed", "false");
+        saveState();
         render();
       });
       modeSplit.addEventListener("click", () => {
@@ -615,6 +650,7 @@
         modeSplit.setAttribute("aria-pressed", "true");
         modeUnified.classList.remove("active");
         modeUnified.setAttribute("aria-pressed", "false");
+        saveState();
         render();
       });
 
@@ -622,12 +658,14 @@
         hideEq = !hideEq;
         hideEqBtn.classList.toggle("active", hideEq);
         hideEqBtn.setAttribute("aria-pressed", String(hideEq));
-        output.querySelector(".diff")?.classList.toggle("hide-eq", hideEq);
+        saveState();
+        render();
       });
 
       clearBtn.addEventListener("click", () => {
         inputA.value = "";
         inputB.value = "";
+        saveState();
         render();
         inputA.focus();
       });
@@ -658,10 +696,10 @@
       function setTheme(theme) {
         document.documentElement.setAttribute("data-theme", theme);
         themeToggle.textContent = theme === "light" ? "Dark mode" : "Light mode";
-        localStorage.setItem("tdv-theme", theme);
+        localStorage.setItem(THEME_KEY, theme);
       }
 
-      const savedTheme = localStorage.getItem("tdv-theme");
+      const savedTheme = localStorage.getItem(THEME_KEY);
       const prefersLight = window.matchMedia("(prefers-color-scheme: light)").matches;
       setTheme(savedTheme || (prefersLight ? "light" : "dark"));
 
