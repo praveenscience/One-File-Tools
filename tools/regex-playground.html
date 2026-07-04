@@ -409,6 +409,11 @@
     </main>
 
     <script>
+      // Storage Keys (for consistency across One File Tools)
+      const STORAGE_KEY = "oft-regex-playground-input";
+      const THEME_KEY = "oft-regex-playground-theme";
+      const TUTORIAL_KEY = "oft-regex-playground-has-seen-tutorial";
+
       // Modal Logic
       const modal = document.getElementById('tutorial-modal');
       const closeIcon = document.getElementById('close-modal-icon');
@@ -422,14 +427,14 @@
           videoPlayer.pause();
         }
         // Remember that user dismissed it
-        localStorage.setItem('hasSeenTutorial', 'true');
+        localStorage.setItem(TUTORIAL_KEY, 'true');
       }
 
       closeIcon.addEventListener('click', closeModal);
       skipBtn.addEventListener('click', closeModal);
 
       // Auto-open modal on first visit
-      if (!localStorage.getItem('hasSeenTutorial')) {
+      if (!localStorage.getItem(TUTORIAL_KEY)) {
         setTimeout(() => {
           modal.classList.add('active');
         }, 500); // Slight delay for better UX
@@ -438,7 +443,7 @@
       // Theme Logic
       const themeToggleBtn = document.getElementById('theme-toggle');
       const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-      let currentTheme = localStorage.getItem('theme');
+      let currentTheme = localStorage.getItem(THEME_KEY);
       
       if (!currentTheme) {
         currentTheme = prefersDark ? 'dark' : 'light';
@@ -447,7 +452,7 @@
       function setTheme(theme) {
         document.body.setAttribute('data-theme', theme);
         themeToggleBtn.textContent = theme === 'dark' ? '☀️' : '🌙';
-        localStorage.setItem('theme', theme);
+        localStorage.setItem(THEME_KEY, theme);
         currentTheme = theme;
       }
       
@@ -469,6 +474,19 @@
       const replaceInput = document.getElementById('replace-str');
       const replaceResult = document.getElementById('replace-result');
       const copyBtn = document.getElementById('copy-btn');
+
+      // Autosave
+      function saveInput() {
+        localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({
+            pattern: patternInput.value,
+            flags: flagsInput.value,
+            text: testStringTextarea.value,
+            replacement: replaceInput.value
+          })
+        );
+      }
 
       // Scroll syncing for highlighting
       testStringTextarea.addEventListener('scroll', () => {
@@ -511,7 +529,7 @@
           } else {
             matchCount = re.test(text) ? 1 : 0;
           }
-          matchInfo.textContent = `${matchCount} match${matchCount !== 1 ? 'es' : ''} found.`;
+          matchInfo.textContent = `\( {matchCount} match \){matchCount !== 1 ? 'es' : ''} found.`;
 
           // Generate highlighted HTML
           const globalFlags = flags.includes('g') ? flags : flags + 'g';
@@ -539,9 +557,26 @@
         }
       }
 
+      // Restore saved input on load
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        if (saved) {
+          if (saved.pattern !== undefined) patternInput.value = saved.pattern;
+          if (saved.flags !== undefined) flagsInput.value = saved.flags;
+          if (saved.text !== undefined) testStringTextarea.value = saved.text;
+          if (saved.replacement !== undefined) replaceInput.value = saved.replacement;
+        }
+      } catch (e) {
+        // Ignore corrupted data
+        console.warn("Failed to restore regex playground data");
+      }
+
       // Event listeners
-      [patternInput, flagsInput, testStringTextarea, replaceInput].forEach(el => {
-        el.addEventListener('input', updateRegex);
+      [patternInput, flagsInput, testStringTextarea, replaceInput].forEach((el) => {
+        el.addEventListener("input", () => {
+          saveInput();
+          updateRegex();
+        });
       });
 
       new ResizeObserver(() => {
@@ -550,7 +585,7 @@
       }).observe(testStringTextarea);
 
       copyBtn.addEventListener('click', () => {
-         const reStr = `/${patternInput.value}/${flagsInput.value}`;
+         const reStr = `/\( {patternInput.value}/ \){flagsInput.value}`;
          navigator.clipboard.writeText(reStr).then(() => {
              const orig = copyBtn.textContent;
              copyBtn.textContent = 'Copied!';
