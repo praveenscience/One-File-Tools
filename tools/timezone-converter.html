@@ -100,43 +100,111 @@ Built for One File Tools.
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
       }
 
-      .select-wrapper {
+      /* Custom Select */
+      .custom-select {
         flex: 1;
         min-width: 250px;
         position: relative;
+        font-family: var(--font-sans);
       }
 
-      select {
-        width: 100%;
-        appearance: none;
+      .select-header {
         background: var(--input-bg);
         border: 1px solid var(--panel-border);
         color: var(--text);
         padding: 0.75rem 1rem;
         border-radius: 8px;
-        font-family: var(--font-sans);
         font-size: 0.95rem;
-        outline: none;
         cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
         transition: border-color 0.2s;
       }
 
-      select:focus {
+      .select-header:hover {
         border-color: var(--accent);
       }
-      
-      select option {
+
+      .select-dropdown {
+        position: absolute;
+        top: calc(100% + 8px);
+        left: 0;
+        right: 0;
         background: var(--bg);
-        color: var(--text);
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        z-index: 100;
+        display: none;
+        flex-direction: column;
       }
 
-      .select-icon {
-        position: absolute;
-        right: 1rem;
-        top: 50%;
-        transform: translateY(-50%);
-        pointer-events: none;
-        color: var(--text-muted);
+      .custom-select.open .select-dropdown {
+        display: flex;
+      }
+
+      .select-search {
+        padding: 0.75rem;
+        border-bottom: 1px solid var(--panel-border);
+      }
+
+      .select-search input {
+        width: 100%;
+        background: var(--input-bg);
+        border: 1px solid var(--panel-border);
+        color: var(--text);
+        padding: 0.5rem 0.75rem;
+        border-radius: 6px;
+        outline: none;
+      }
+
+      .select-search input:focus {
+        border-color: var(--accent);
+      }
+
+      .select-options {
+        max-height: 250px;
+        overflow-y: auto;
+        padding: 0.5rem 0;
+      }
+
+      .select-option {
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        transition: background 0.2s;
+      }
+
+      .select-option:hover {
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      .select-option.selected {
+        color: var(--accent);
+      }
+
+      .checkbox {
+        width: 16px;
+        height: 16px;
+        border: 1px solid var(--panel-border);
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .select-option.selected .checkbox {
+        background: var(--accent);
+        border-color: var(--accent);
+      }
+      .select-option.selected .checkbox::after {
+        content: "✓";
+        color: #000;
+        font-size: 10px;
+        font-weight: bold;
       }
 
       .btn {
@@ -375,11 +443,17 @@ Built for One File Tools.
       </header>
 
       <div class="controls-bar">
-        <div class="select-wrapper">
-          <select id="tzSelect">
-            <option value="" disabled selected>Select a timezone to add...</option>
-          </select>
-          <i data-feather="chevron-down" class="select-icon" width="16" height="16"></i>
+        <div class="custom-select" id="customSelect">
+          <div class="select-header" id="selectHeader">
+            <span id="selectPlaceholder">Select timezones to add...</span>
+            <i data-feather="chevron-down" width="16" height="16"></i>
+          </div>
+          <div class="select-dropdown" id="selectDropdown">
+            <div class="select-search">
+              <input type="text" id="tzSearch" placeholder="Search city or timezone..." autocomplete="off">
+            </div>
+            <div class="select-options" id="selectOptions"></div>
+          </div>
         </div>
         <button class="btn btn-primary" id="btnAddTz">
           <i data-feather="plus" width="16" height="16"></i>
@@ -428,7 +502,11 @@ Built for One File Tools.
       }
 
       // DOM Elements
-      const tzSelect = document.getElementById('tzSelect');
+      const customSelect = document.getElementById('customSelect');
+      const selectHeader = document.getElementById('selectHeader');
+      const tzSearch = document.getElementById('tzSearch');
+      const selectOptions = document.getElementById('selectOptions');
+      const selectPlaceholder = document.getElementById('selectPlaceholder');
       const btnAddTz = document.getElementById('btnAddTz');
       const btnNow = document.getElementById('btnNow');
       const timeScrubber = document.getElementById('timeScrubber');
@@ -469,6 +547,9 @@ Built for One File Tools.
         baseDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
       }
 
+      let allTimezones = [];
+      let pendingZones = new Set();
+
       function populateTimezones() {
         const fallbacks = ['UTC', 'America/New_York', 'America/Los_Angeles', 'Europe/London', 'Europe/Paris', 'Asia/Tokyo', 'Asia/Kolkata', 'Australia/Sydney'];
         let timezones = [];
@@ -485,12 +566,46 @@ Built for One File Tools.
           timezones = fallbacks;
         }
 
-        timezones.forEach(tz => {
-          const opt = document.createElement('option');
-          opt.value = tz;
-          opt.textContent = tz.replace(/_/g, ' ');
-          tzSelect.appendChild(opt);
+        allTimezones = timezones;
+        renderDropdownOptions();
+      }
+
+      function renderDropdownOptions(filter = '') {
+        selectOptions.innerHTML = '';
+        const lowerFilter = filter.toLowerCase();
+        
+        allTimezones.forEach(tz => {
+          const label = tz.replace(/_/g, ' ');
+          if (filter && !label.toLowerCase().includes(lowerFilter)) return;
+          
+          const opt = document.createElement('div');
+          opt.className = 'select-option';
+          if (pendingZones.has(tz)) opt.classList.add('selected');
+          
+          opt.innerHTML = `<div class="checkbox"></div><span>${label}</span>`;
+          
+          opt.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (pendingZones.has(tz)) {
+              pendingZones.delete(tz);
+              opt.classList.remove('selected');
+            } else {
+              pendingZones.add(tz);
+              opt.classList.add('selected');
+            }
+            updatePlaceholder();
+          });
+          
+          selectOptions.appendChild(opt);
         });
+      }
+
+      function updatePlaceholder() {
+        if (pendingZones.size === 0) {
+          selectPlaceholder.textContent = 'Select timezones to add...';
+        } else {
+          selectPlaceholder.textContent = `${pendingZones.size} timezone${pendingZones.size > 1 ? 's' : ''} selected`;
+        }
       }
 
       function setScrubberToNow() {
@@ -621,28 +736,51 @@ Built for One File Tools.
         updateTimes(getScrubbedDate());
       });
 
-      btnAddTz.addEventListener('click', () => {
-        const tz = tzSelect.value;
-        if (!tz) {
-          showToast('Please select a timezone first.');
-          return;
+      // Dropdown Interactions
+      selectHeader.addEventListener('click', (e) => {
+        e.stopPropagation();
+        customSelect.classList.toggle('open');
+        if (customSelect.classList.contains('open')) {
+          tzSearch.focus();
         }
-        if (selectedZones.includes(tz)) {
-          showToast('Timezone already added.');
-          tzSelect.value = '';
-          return;
-        }
-        selectedZones.push(tz);
-        renderCards();
-        tzSelect.value = '';
-        showToast('Timezone added!');
       });
 
-      // Auto-add on selection for better UX
-      tzSelect.addEventListener('change', () => {
-        if (tzSelect.value) {
-          btnAddTz.click();
+      document.addEventListener('click', (e) => {
+        if (!customSelect.contains(e.target)) {
+          customSelect.classList.remove('open');
         }
+      });
+
+      tzSearch.addEventListener('input', (e) => {
+        renderDropdownOptions(e.target.value);
+      });
+
+      btnAddTz.addEventListener('click', () => {
+        if (pendingZones.size === 0) {
+          showToast('Please select at least one timezone.');
+          return;
+        }
+        
+        let addedCount = 0;
+        pendingZones.forEach(tz => {
+          if (!selectedZones.includes(tz)) {
+            selectedZones.push(tz);
+            addedCount++;
+          }
+        });
+        
+        if (addedCount > 0) {
+          renderCards();
+          showToast(`${addedCount} timezone${addedCount > 1 ? 's' : ''} added!`);
+        } else {
+          showToast('Selected timezones are already added.');
+        }
+        
+        pendingZones.clear();
+        customSelect.classList.remove('open');
+        tzSearch.value = '';
+        renderDropdownOptions();
+        updatePlaceholder();
       });
 
       function showToast(message) {
