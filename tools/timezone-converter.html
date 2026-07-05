@@ -1,0 +1,821 @@
+<!--
+Chrono / Timezone Converter
+Single-file offline tool for visualizing and converting times across multiple timezones.
+Built for One File Tools.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chrono / Timezone Converter - One File Tools</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+    <style>
+      :root {
+        --bg: #030712;
+        --grid-line: #111827;
+        --bg-panel: rgba(17, 24, 39, 0.7);
+        --panel-border: #1f2937;
+        --accent: #f59e0b;
+        --accent-glow: rgba(245, 158, 11, 0.15);
+        --accent-hover: #d97706;
+        --error: #ef4444;
+        --text: #f9fafb;
+        --text-muted: #9ca3af;
+        --text-dim: #4b5563;
+        --input-bg: rgba(3, 7, 18, 0.6);
+
+        --font-sans: "Inter", system-ui, sans-serif;
+        --font-display: "Space Grotesk", sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg);
+        background-image: radial-gradient(circle at 15% 50%, rgba(245, 158, 11, 0.05), transparent 25%), radial-gradient(circle at 85% 30%, rgba(236, 72, 153, 0.05), transparent 25%), linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+        background-size:
+          100% 100%,
+          100% 100%,
+          32px 32px,
+          32px 32px;
+        color: var(--text);
+        padding: 48px 20px 80px;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+      }
+
+      .container {
+        width: 100%;
+        max-width: 900px;
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+      }
+
+      header {
+        text-align: center;
+        margin-bottom: 1rem;
+      }
+
+      h1 {
+        font-family: var(--font-display);
+        font-size: 2.5rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #fff 0%, #cbd5e1 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0.5rem;
+        text-shadow: 0 0 40px rgba(255, 255, 255, 0.1);
+      }
+
+      p.subtitle {
+        color: var(--text-muted);
+        font-size: 1.1rem;
+      }
+
+      .controls-bar {
+        display: flex;
+        gap: 1rem;
+        background: var(--bg-panel);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid var(--panel-border);
+        padding: 1rem 1.5rem;
+        border-radius: 16px;
+        align-items: center;
+        flex-wrap: wrap;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        position: relative;
+        z-index: 10;
+      }
+
+      /* Custom Select */
+      .custom-select {
+        flex: 1;
+        min-width: 250px;
+        position: relative;
+        font-family: var(--font-sans);
+      }
+
+      .select-header {
+        background: var(--input-bg);
+        border: 1px solid var(--panel-border);
+        color: var(--text);
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+        font-size: 0.95rem;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: border-color 0.2s;
+      }
+
+      .select-header:hover {
+        border-color: var(--accent);
+      }
+
+      .select-dropdown {
+        position: absolute;
+        top: calc(100% + 8px);
+        left: 0;
+        right: 0;
+        background: var(--bg);
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        z-index: 100;
+        display: none;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .custom-select.open .select-dropdown {
+        display: flex;
+      }
+
+      .select-search {
+        padding: 0.75rem;
+        border-bottom: 1px solid var(--panel-border);
+      }
+
+      .select-search input {
+        width: 100%;
+        background: var(--input-bg);
+        border: 1px solid var(--panel-border);
+        color: var(--text);
+        padding: 0.5rem 0.75rem;
+        border-radius: 6px;
+        outline: none;
+      }
+
+      .select-search input:focus {
+        border-color: var(--accent);
+      }
+
+      .select-options {
+        max-height: 250px;
+        overflow-y: auto;
+        padding: 0.5rem 0;
+      }
+
+      .select-options::-webkit-scrollbar {
+        width: 6px;
+      }
+      .select-options::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .select-options::-webkit-scrollbar-thumb {
+        background: var(--panel-border);
+        border-radius: 4px;
+      }
+      .select-options::-webkit-scrollbar-thumb:hover {
+        background: var(--text-dim);
+      }
+
+      .select-option {
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        transition: background 0.2s;
+      }
+
+      .select-option:hover {
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      .select-option.selected {
+        color: var(--accent);
+      }
+
+      .checkbox {
+        width: 16px;
+        height: 16px;
+        border: 1px solid var(--panel-border);
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .select-option.selected .checkbox {
+        background: var(--accent);
+        border-color: var(--accent);
+      }
+      .select-option.selected .checkbox::after {
+        content: "✓";
+        color: #000;
+        font-size: 10px;
+        font-weight: bold;
+      }
+
+      .btn {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--panel-border);
+        color: var(--text);
+        padding: 0.75rem 1.25rem;
+        border-radius: 8px;
+        font-family: var(--font-sans);
+        font-size: 0.95rem;
+        font-weight: 500;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all 0.2s ease;
+      }
+
+      .btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.2);
+      }
+
+      .btn-primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #000;
+      }
+
+      .btn-primary:hover {
+        background: var(--accent-hover);
+        border-color: var(--accent-hover);
+      }
+
+      /* Scrubber */
+      .scrubber-panel {
+        background: var(--bg-panel);
+        backdrop-filter: blur(12px);
+        border: 1px solid var(--panel-border);
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+
+      .scrubber-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .scrubber-title {
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: 1.2rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .range-container {
+        position: relative;
+        padding: 1rem 0;
+      }
+
+      input[type="range"] {
+        -webkit-appearance: none;
+        width: 100%;
+        background: transparent;
+      }
+
+      input[type="range"]:focus {
+        outline: none;
+      }
+
+      input[type="range"]::-webkit-slider-runnable-track {
+        width: 100%;
+        height: 6px;
+        cursor: pointer;
+        background: var(--panel-border);
+        border-radius: 99px;
+      }
+
+      input[type="range"]::-webkit-slider-thumb {
+        height: 24px;
+        width: 24px;
+        border-radius: 50%;
+        background: var(--accent);
+        cursor: pointer;
+        -webkit-appearance: none;
+        margin-top: -9px;
+        box-shadow: 0 0 15px var(--accent-glow);
+        border: 2px solid #000;
+        transition: transform 0.1s;
+      }
+
+      input[type="range"]::-webkit-slider-thumb:hover {
+        transform: scale(1.15);
+      }
+
+      .ticks {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 0.5rem;
+        color: var(--text-dim);
+        font-size: 0.75rem;
+        font-family: var(--font-mono);
+      }
+
+      /* Timezone Grid */
+      .tz-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 1rem;
+      }
+
+      .tz-card {
+        background: var(--input-bg);
+        border: 1px solid var(--panel-border);
+        border-radius: 12px;
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        position: relative;
+        transition:
+          border-color 0.2s,
+          background 0.2s;
+      }
+
+      .tz-card.working-hours {
+        border-color: rgba(16, 185, 129, 0.4);
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, transparent 100%);
+      }
+
+      .tz-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+      }
+
+      .tz-name {
+        font-weight: 600;
+        font-size: 1.1rem;
+        word-break: break-all;
+      }
+
+      .tz-region {
+        color: var(--text-muted);
+        font-size: 0.8rem;
+        margin-top: 0.25rem;
+      }
+
+      .tz-time {
+        font-family: var(--font-mono);
+        font-size: 2rem;
+        font-weight: 700;
+        margin-top: 0.5rem;
+        color: var(--accent);
+      }
+
+      .tz-date {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+      }
+
+      .tz-offset {
+        display: inline-block;
+        background: rgba(255, 255, 255, 0.1);
+        padding: 0.1rem 0.4rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-family: var(--font-mono);
+        margin-top: 0.5rem;
+        width: fit-content;
+      }
+
+      .btn-remove {
+        background: transparent;
+        border: none;
+        color: var(--text-dim);
+        cursor: pointer;
+        padding: 0.25rem;
+        border-radius: 4px;
+        transition:
+          color 0.2s,
+          background 0.2s;
+      }
+
+      .btn-remove:hover {
+        color: var(--error);
+        background: var(--error-bg);
+      }
+
+      .indicator {
+        font-size: 0.75rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: 99px;
+        background: rgba(16, 185, 129, 0.1);
+        color: #10b981;
+        width: fit-content;
+        display: none;
+        align-items: center;
+        gap: 0.3rem;
+      }
+
+      .tz-card.working-hours .indicator {
+        display: flex;
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 2rem;
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background: var(--accent);
+        color: #000;
+        padding: 0.75rem 1.5rem;
+        border-radius: 99px;
+        font-weight: 600;
+        opacity: 0;
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        box-shadow: 0 10px 25px var(--accent-glow);
+        z-index: 1000;
+      }
+
+      .toast.show {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>Chrono / Timezone Converter</h1>
+        <p class="subtitle">Scrub the timeline to synchronize meetings across global timezones.</p>
+      </header>
+
+      <div class="controls-bar">
+        <div class="custom-select" id="customSelect">
+          <div class="select-header" id="selectHeader">
+            <span id="selectPlaceholder">Select timezones to add...</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </div>
+          <div class="select-dropdown" id="selectDropdown">
+            <div class="select-search">
+              <input type="text" id="tzSearch" placeholder="Search city or timezone..." autocomplete="off" spellcheck="false" />
+            </div>
+            <div class="select-options" id="selectOptions"></div>
+          </div>
+        </div>
+        <button class="btn btn-primary" id="btnAddTz">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          Add Timezone
+        </button>
+      </div>
+
+      <div class="scrubber-panel">
+        <div class="scrubber-header">
+          <div class="scrubber-title">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            Timeline
+          </div>
+          <button class="btn" id="btnNow">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <circle cx="12" cy="12" r="6"></circle>
+              <circle cx="12" cy="12" r="2"></circle>
+            </svg>
+            Reset to Now
+          </button>
+        </div>
+
+        <div class="range-container">
+          <!-- Range represents minutes in a day: 0 to 1439 -->
+          <input type="range" id="timeScrubber" min="0" max="1439" value="0" />
+          <div class="ticks">
+            <span>12 AM</span>
+            <span>6 AM</span>
+            <span>12 PM</span>
+            <span>6 PM</span>
+            <span>11:59 PM</span>
+          </div>
+        </div>
+
+        <div class="tz-grid" id="tzGrid">
+          <!-- Cards injected via JS -->
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+      // DOM Elements
+      const customSelect = document.getElementById("customSelect");
+      const selectHeader = document.getElementById("selectHeader");
+      const tzSearch = document.getElementById("tzSearch");
+      const selectOptions = document.getElementById("selectOptions");
+      const selectPlaceholder = document.getElementById("selectPlaceholder");
+      const btnAddTz = document.getElementById("btnAddTz");
+      const btnNow = document.getElementById("btnNow");
+      const timeScrubber = document.getElementById("timeScrubber");
+      const tzGrid = document.getElementById("tzGrid");
+      const toast = document.getElementById("toast");
+
+      // State
+      let selectedZones = [];
+      let baseDate = new Date(); // Midnight of the current local day
+      let currentScrubMinutes = 0;
+
+      // Initialize
+      function init() {
+        populateTimezones();
+
+        // Setup initial zones (Local time + a couple of popular ones)
+        let localTz = "UTC";
+        try {
+          localTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+        } catch (e) {
+          console.error("Could not resolve local timezone, defaulting to UTC.");
+        }
+
+        selectedZones = [localTz, "UTC", "America/New_York", "Asia/Tokyo"].filter(Boolean);
+
+        // Remove duplicates if localTz is one of the defaults
+        selectedZones = [...new Set(selectedZones)];
+
+        setupBaseDate();
+        setScrubberToNow();
+
+        renderCards();
+      }
+
+      function setupBaseDate() {
+        const now = new Date();
+        // Create a date at midnight local time today
+        baseDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+      }
+
+      let allTimezones = [];
+      let pendingZones = new Set();
+
+      function populateTimezones() {
+        const fallbacks = ["UTC", "America/New_York", "America/Los_Angeles", "Europe/London", "Europe/Paris", "Asia/Tokyo", "Asia/Kolkata", "Australia/Sydney"];
+        let timezones = [];
+
+        try {
+          if (typeof Intl !== "undefined" && typeof Intl.supportedValuesOf === "function") {
+            timezones = Intl.supportedValuesOf("timeZone");
+          }
+        } catch (e) {
+          console.warn("Intl.supportedValuesOf('timeZone') is not supported, using fallbacks.", e);
+        }
+
+        if (!timezones || timezones.length === 0) {
+          timezones = fallbacks;
+        }
+
+        allTimezones = timezones;
+        renderDropdownOptions();
+      }
+
+      function renderDropdownOptions(filter = "") {
+        selectOptions.innerHTML = "";
+        const lowerFilter = filter.toLowerCase();
+
+        allTimezones.forEach((tz) => {
+          const label = tz.replace(/_/g, " ");
+          if (filter && !label.toLowerCase().includes(lowerFilter)) return;
+
+          const opt = document.createElement("div");
+          opt.className = "select-option";
+          if (pendingZones.has(tz)) opt.classList.add("selected");
+
+          opt.innerHTML = `<div class="checkbox"></div><span>${label}</span>`;
+
+          opt.addEventListener("click", (e) => {
+            e.stopPropagation();
+            if (pendingZones.has(tz)) {
+              pendingZones.delete(tz);
+              opt.classList.remove("selected");
+            } else {
+              pendingZones.add(tz);
+              opt.classList.add("selected");
+            }
+            updatePlaceholder();
+          });
+
+          selectOptions.appendChild(opt);
+        });
+      }
+
+      function updatePlaceholder() {
+        if (pendingZones.size === 0) {
+          selectPlaceholder.textContent = "Select timezones to add...";
+        } else {
+          selectPlaceholder.textContent = `${pendingZones.size} timezone${pendingZones.size > 1 ? "s" : ""} selected`;
+        }
+      }
+
+      function setScrubberToNow() {
+        const now = new Date();
+        const minutesSinceMidnight = now.getHours() * 60 + now.getMinutes();
+        timeScrubber.value = minutesSinceMidnight;
+        currentScrubMinutes = minutesSinceMidnight;
+      }
+
+      function getScrubbedDate() {
+        return new Date(baseDate.getTime() + currentScrubMinutes * 60000);
+      }
+
+      function isWorkingHours(date, tz) {
+        // Format the hour in 24h format for the specific timezone
+        const hourStr = new Intl.DateTimeFormat("en-US", {
+          timeZone: tz,
+          hour: "numeric",
+          hour12: false
+        }).format(date);
+
+        const hour = parseInt(hourStr, 10);
+        // Working hours: 9 AM (9) to 5 PM (17)
+        return hour >= 9 && hour < 17;
+      }
+
+      function renderCards() {
+        tzGrid.innerHTML = "";
+        const targetDate = getScrubbedDate();
+
+        selectedZones.forEach((tz, index) => {
+          const card = document.createElement("div");
+          card.className = "tz-card";
+          card.dataset.tz = tz;
+
+          const isPrimary = index === 0;
+
+          // Split timezone into region and city
+          const parts = tz.split("/");
+          const city = parts.pop().replace(/_/g, " ");
+          const region = parts.join("/").replace(/_/g, " ") || "Global";
+
+          card.innerHTML = `
+            <div class="tz-header">
+              <div>
+                <div class="tz-name">${city} ${isPrimary ? "(Local)" : ""}</div>
+                <div class="tz-region">${region}</div>
+              </div>
+              ${!isPrimary ? `<button class="btn-remove" data-index="${index}" title="Remove"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>` : "<div></div>"}
+            </div>
+            <div class="indicator"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg> Working Hours</div>
+            <div class="tz-time" id="time-${index}">--:--</div>
+            <div class="tz-date" id="date-${index}">---</div>
+            <div class="tz-offset" id="offset-${index}">UTC Offset</div>
+          `;
+          tzGrid.appendChild(card);
+        });
+
+        // Add listeners to remove buttons
+        document.querySelectorAll(".btn-remove").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            const idx = parseInt(e.currentTarget.dataset.index, 10);
+            selectedZones.splice(idx, 1);
+            renderCards();
+          });
+        });
+
+        updateTimes(targetDate);
+      }
+
+      function updateTimes(date) {
+        selectedZones.forEach((tz, index) => {
+          const card = tzGrid.querySelector(`.tz-card[data-tz="${tz}"]`);
+          if (!card) return;
+
+          // Format Time
+          const timeStr = new Intl.DateTimeFormat("en-US", {
+            timeZone: tz,
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true
+          }).format(date);
+
+          // Format Date
+          const dateStr = new Intl.DateTimeFormat("en-US", {
+            timeZone: tz,
+            weekday: "short",
+            month: "short",
+            day: "numeric"
+          }).format(date);
+
+          // Format Offset (approximated by formatting GMT offset string if possible, or using parts)
+          let offsetStr = "";
+          try {
+            const parts = new Intl.DateTimeFormat("en-US", {
+              timeZone: tz,
+              timeZoneName: "shortOffset"
+            }).formatToParts(date);
+            const tzNamePart = parts.find((p) => p.type === "timeZoneName");
+            offsetStr = tzNamePart ? tzNamePart.value : tz;
+          } catch (e) {
+            offsetStr = tz;
+          }
+
+          document.getElementById(`time-${index}`).textContent = timeStr;
+          document.getElementById(`date-${index}`).textContent = dateStr;
+          document.getElementById(`offset-${index}`).textContent = offsetStr;
+
+          if (isWorkingHours(date, tz)) {
+            card.classList.add("working-hours");
+          } else {
+            card.classList.remove("working-hours");
+          }
+        });
+      }
+
+      // Event Listeners
+      timeScrubber.addEventListener("input", (e) => {
+        currentScrubMinutes = parseInt(e.target.value, 10);
+        updateTimes(getScrubbedDate());
+      });
+
+      btnNow.addEventListener("click", () => {
+        setupBaseDate();
+        setScrubberToNow();
+        updateTimes(getScrubbedDate());
+      });
+
+      // Dropdown Interactions
+      selectHeader.addEventListener("click", (e) => {
+        e.stopPropagation();
+        customSelect.classList.toggle("open");
+        if (customSelect.classList.contains("open")) {
+          tzSearch.value = "";
+          renderDropdownOptions();
+          tzSearch.focus();
+        }
+      });
+
+      document.addEventListener("click", (e) => {
+        if (!customSelect.contains(e.target)) {
+          customSelect.classList.remove("open");
+        }
+      });
+
+      tzSearch.addEventListener("input", (e) => {
+        renderDropdownOptions(e.target.value);
+      });
+
+      btnAddTz.addEventListener("click", () => {
+        if (pendingZones.size === 0) {
+          showToast("Please select at least one timezone.");
+          return;
+        }
+
+        let addedCount = 0;
+        pendingZones.forEach((tz) => {
+          if (!selectedZones.includes(tz)) {
+            selectedZones.push(tz);
+            addedCount++;
+          }
+        });
+
+        if (addedCount > 0) {
+          renderCards();
+          showToast(`${addedCount} timezone${addedCount > 1 ? "s" : ""} added!`);
+        } else {
+          showToast("Selected timezones are already added.");
+        }
+
+        pendingZones.clear();
+        customSelect.classList.remove("open");
+        tzSearch.value = "";
+        renderDropdownOptions();
+        updatePlaceholder();
+      });
+
+      function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add("show");
+        setTimeout(() => toast.classList.remove("show"), 2500);
+      }
+
+      // Boot
+      init();
+    </script>
+  </body>
+</html>
