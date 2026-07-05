@@ -60,6 +60,21 @@ if (Array.isArray(data.tools)) {
   }
 }
 
+// Normalize and sort quests
+if (Array.isArray(data.quests)) {
+  data.quests.sort((a, b) => a.name.localeCompare(b.name));
+
+  for (const quest of data.quests) {
+    if (Array.isArray(quest.tags)) {
+      quest.tags = [...new Set(quest.tags.map(normalizeTag))].sort((a, b) => a.localeCompare(b));
+    }
+
+    if (Array.isArray(quest.techStack)) {
+      quest.techStack.sort((a, b) => a.localeCompare(b));
+    }
+  }
+}
+
 // Sort theme arrays (themes.json: { resume: [...], portfolio: [...] })
 for (const pillar of ["resume", "portfolio"]) {
   if (Array.isArray(data[pillar])) {

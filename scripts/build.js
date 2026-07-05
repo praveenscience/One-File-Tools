@@ -25,6 +25,12 @@ const rootDir = path.join(__dirname, "..");
 const data = JSON.parse(fs.readFileSync(path.join(rootDir, "data", "tools.json"), "utf-8"));
 const { site, categories, tools } = data;
 
+// Quests registry is optional — build should not fail if it doesn't exist yet.
+const questsPath = path.join(rootDir, "data", "quests.json");
+const questsDataRaw = fs.existsSync(questsPath) ? JSON.parse(fs.readFileSync(questsPath, "utf-8")) : { categories: [], quests: [] };
+const questCategories = questsDataRaw.categories || [];
+const quests = questsDataRaw.quests || [];
+
 // ──────────────────────────────────────────────
 // Helpers
 // ──────────────────────────────────────────────
@@ -138,6 +144,10 @@ function thumbnailExists(toolId) {
   return fs.existsSync(path.join(rootDir, "tools", toolId + ".png"));
 }
 
+function questThumbnailExists(questId) {
+  return fs.existsSync(path.join(rootDir, "quests", questId + ".png"));
+}
+
 // ──────────────────────────────────────────────
 // Build tool data
 // ──────────────────────────────────────────────
@@ -179,6 +189,40 @@ const totalCount = tools.length;
 const allTags = [...new Set(tools.flatMap((t) => t.tags || []))].sort();
 
 // ──────────────────────────────────────────────
+// Build quest data
+// ──────────────────────────────────────────────
+
+const questCategoryMap = {};
+questCategories.forEach((c) => {
+  questCategoryMap[c.id] = c;
+});
+
+const questsDataBuilt = quests.map((q) => ({
+  id: q.id,
+  name: q.name,
+  shortDescription: q.shortDescription,
+  longDescriptionHtml: markdownToHtml(q.longDescription),
+  category: q.category,
+  categoryName: questCategoryMap[q.category]?.name || q.category,
+  categoryIcon: questCategoryMap[q.category]?.icon || "",
+  tags: q.tags || [],
+  techStack: q.techStack || [],
+  difficulty: q.difficulty || "Easy",
+  status: q.status || "idea",
+  hasThumbnail: questThumbnailExists(q.id),
+  file: `quests/${q.id}.html`,
+  thumbnail: `quests/${q.id}.png`,
+  github: `${site.github}/blob/main/quests/${q.id}.html`,
+  live: `${site.url}/quests/${q.id}`
+}));
+
+const totalQuestCount = questsDataBuilt.length;
+
+const questCountByCategory = {};
+questCategories.forEach((c) => { questCountByCategory[c.id] = 0; });
+questsDataBuilt.forEach((q) => { if (questCountByCategory[q.category] !== undefined) questCountByCategory[q.category]++; });
+
+// ──────────────────────────────────────────────
 // Template-based index.html generation
 // ──────────────────────────────────────────────
 
@@ -218,6 +262,13 @@ function buildPillarCards() {
       count: portfolioThemes.length + " theme" + (portfolioThemes.length === 1 ? "" : "s"),
       desc: "Developer portfolio themes from a single JSON file. Dark/light, responsive.",
       icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M7 6.5h.01M10 6.5h.01"/></svg>'
+    },
+    {
+      id: "quests",
+      title: "One File Quests",
+      count: totalQuestCount + " quest" + (totalQuestCount === 1 ? "" : "s"),
+      desc: "Interactive, gamified lessons to learn Git, CSS, and JS by doing.",
+      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z"/></svg>'
     },
     {
       id: "soon",
@@ -287,6 +338,47 @@ function buildToolCards() {
   }).join("\n");
 }
 
+// ── Build quest filter pills (static HTML) ──
+
+function buildQuestFilterPills() {
+  const pills = ['              <button class="pill" type="button" data-cat="all" aria-pressed="true"><span class="pi" aria-hidden="true">\u25A6</span> All <span class="pill-count">(' + totalQuestCount + ')</span></button>'];
+  questCategories.forEach((c) => {
+    const count = questCountByCategory[c.id] || 0;
+    if (count === 0) return;
+    pills.push('              <button class="pill" type="button" data-cat="' + escapeAttr(c.id) + '" aria-pressed="false"><span class="pi" aria-hidden="true">' + c.icon + '</span> ' + escapeHtml(c.name) + ' <span class="pill-count">(' + count + ')</span></button>');
+  });
+  return pills.join("\n");
+}
+
+// ── Build quest cards (static HTML) ──
+
+function buildQuestCards() {
+  return questsDataBuilt.map((q) => {
+    const cat = questCategoryMap[q.category];
+    const diff = q.difficulty.toLowerCase();
+    const searchData = (q.name + " " + q.shortDescription + " " + q.tags.join(" ")).toLowerCase();
+    const liveUrl = site.url + "/quests/" + q.id;
+
+    const thumbHtml = q.hasThumbnail
+      ? '<img class="card-thumb" src="quests/' + escapeAttr(q.id) + '.png" alt="' + escapeAttr(q.name) + '" loading="lazy" />'
+      : '<div class="card-thumb-placeholder">' + (cat ? cat.icon : '') + '</div>';
+
+    return '            <article class="card" data-id="' + escapeAttr(q.id) + '" data-category="' + escapeAttr(q.category) + '" data-search="' + escapeAttr(searchData) + '" tabindex="0" role="button" aria-label="View details for ' + escapeAttr(q.name) + '">' +
+      thumbHtml +
+      '<div class="card-body">' +
+      '<div class="card-top"><h4>' + escapeHtml(q.name) + '</h4>' +
+      '<span class="badge-cat"><span aria-hidden="true">' + (cat ? cat.icon : '') + '</span> ' + escapeHtml(q.categoryName) + '</span></div>' +
+      '<p class="desc">' + escapeHtml(q.shortDescription) + '</p>' +
+      '<div class="path mono">quests/' + escapeHtml(q.id) + '.html</div>' +
+      '<div class="card-foot">' +
+      '<span class="badge-diff ' + diff + '">' + escapeHtml(q.difficulty) + '</span>' +
+      '<span class="card-links">' +
+      '<a class="link-btn" href="quests/' + escapeAttr(q.id) + '.html" data-nomodal>Preview</a>' +
+      '<a class="link-btn primary" href="' + escapeAttr(liveUrl) + '" target="_blank" rel="noopener noreferrer" data-nomodal>Start Quest <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg></a>' +
+      '</span></div></div></article>';
+  }).join("\n");
+}
+
 // ── Build resume/portfolio showcase cards (static HTML) ──
 
 function buildThemeCard(t, glyph) {
@@ -339,6 +431,11 @@ const toolsJson = JSON.stringify(toolsData.map((t) => ({
 })));
 const resumeThemesJson = JSON.stringify(resumeThemes);
 const portfolioThemesJson = JSON.stringify(portfolioThemes);
+const questsJson = JSON.stringify(questsDataBuilt.map((q) => ({
+  id: q.id, name: q.name, shortDescription: q.shortDescription, longDescription: quests.find((x) => x.id === q.id)?.longDescription || "",
+  category: q.category, tags: q.tags, techStack: q.techStack, difficulty: q.difficulty
+})));
+const questCategoriesJson = JSON.stringify(questCategories.map((c) => ({ id: c.id, name: c.name, icon: c.icon })));
 
 // ── Inject into template ──
 
@@ -350,16 +447,21 @@ let html = template
   .replace(/\{\{SSOC_URL\}\}/g, escapeAttr(site.ssoc.url))
   .replace(/\{\{YEAR\}\}/g, new Date().getFullYear().toString())
   .replace(/\{\{TOOL_COUNT\}\}/g, String(totalCount))
+  .replace(/\{\{QUEST_COUNT\}\}/g, String(totalQuestCount))
   .replace("{{PILLAR_CARDS}}", buildPillarCards())
   .replace("{{FILTER_PILLS}}", buildFilterPills())
   .replace("{{TOOL_CARDS}}", buildToolCards())
   .replace("{{RESUME_CARDS}}", buildResumeCards())
   .replace("{{PORTFOLIO_CARDS}}", buildPortfolioCards())
+  .replace("{{QUEST_FILTER_PILLS}}", buildQuestFilterPills())
+  .replace("{{QUEST_CARDS}}", buildQuestCards())
   .replace("{{SITE_JSON}}", siteJson)
   .replace("{{CATEGORIES_JSON}}", categoriesJson)
   .replace("{{TOOLS_JSON}}", toolsJson)
   .replace("{{RESUME_THEMES_JSON}}", resumeThemesJson)
-  .replace("{{PORTFOLIO_THEMES_JSON}}", portfolioThemesJson);
+  .replace("{{PORTFOLIO_THEMES_JSON}}", portfolioThemesJson)
+  .replace("{{QUESTS_JSON}}", questsJson)
+  .replace("{{QUEST_CATEGORIES_JSON}}", questCategoriesJson);
 
 // ──────────────────────────────────────────────
 // Write output
@@ -370,6 +472,7 @@ fs.writeFileSync(outPath, html, "utf-8");
 
 console.log("Built index.html successfully.");
 console.log("  " + totalCount + " tools across " + categories.length + " categories (" + liveCount + " live, " + (totalCount - liveCount) + " ideas)");
+console.log("  " + totalQuestCount + " quests across " + questCategories.length + " categories");
 console.log("  Template: " + templatePath);
 console.log("  Output: " + outPath);
 

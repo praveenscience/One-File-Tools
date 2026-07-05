@@ -1312,6 +1312,38 @@
             <span>All portfolio themes are generated from <code>profile.json</code> — edit your data once, get every theme.</span>
           </div>
         </section>
+
+        <!-- ===================== QUESTS SECTION ===================== -->
+        <section class="section" id="section-quests" aria-labelledby="quests-heading">
+          <div class="section-head">
+            <div class="kicker">~/quests</div>
+            <h2 id="quests-heading">One File Quests</h2>
+            <p>Interactive, gamified lessons for learning Git, CSS, and JavaScript by doing — each one a single HTML file with progress saved locally in your browser.</p>
+          </div>
+
+          <div class="toolbar">
+            <div class="search">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+              <input type="search" id="questSearch" placeholder="Search quests…" aria-label="Search quests" autocomplete="off" />
+            </div>
+            <div class="filters" id="questFilters" role="group" aria-label="Filter quests by category">
+{{QUEST_FILTER_PILLS}}
+            </div>
+          </div>
+
+          <p class="count-row" id="questCountRow" aria-live="polite"><b>{{QUEST_COUNT}}</b> quests</p>
+          <div class="grid" id="questGrid">
+{{QUEST_CARDS}}
+          </div>
+
+          <div class="contribute-cta">
+            <p><strong>Want to add a quest?</strong> Check the quests contributing guide and submit a PR.</p>
+            <a class="link-btn primary" href="{{GITHUB_URL}}/blob/main/quests/Contributing.md" target="_blank" rel="noopener noreferrer">Contributing Guide <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg></a>
+          </div>
+        </section>
       </div>
     </main>
 
@@ -1370,6 +1402,8 @@
       const TOOLS = {{TOOLS_JSON}};
       const RESUME_THEMES = {{RESUME_THEMES_JSON}};
       const PORTFOLIO_THEMES = {{PORTFOLIO_THEMES_JSON}};
+      const QUESTS = {{QUESTS_JSON}};
+      const QUEST_CATEGORIES = {{QUEST_CATEGORIES_JSON}};
 
       /* =================================================================
    UTILITIES
@@ -1377,6 +1411,7 @@
       const $ = (sel, ctx = document) => ctx.querySelector(sel);
       const $$ = (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
       const catById = (id) => CATEGORIES.find((c) => c.id === id);
+      const questCatById = (id) => QUEST_CATEGORIES.find((c) => c.id === id);
 
       function escapeHtml(str) {
         return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
@@ -1428,7 +1463,7 @@
       /* =================================================================
    PILLARS
    ================================================================= */
-      const VALID_PILLARS = ["tools", "resume", "portfolio"];
+      const VALID_PILLARS = ["tools", "resume", "portfolio", "quests"];
       let currentPillar = "tools";
 
       $$(".pillar[data-pillar]").forEach((btn) => {
@@ -1496,6 +1531,49 @@
       }
 
       /* =================================================================
+   QUESTS: search + filter (same pattern as tools)
+   ================================================================= */
+      let questActiveCategory = "all";
+      let questSearchTerm = "";
+
+      $$("#questFilters .pill").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          questActiveCategory = btn.dataset.cat;
+          $$("#questFilters .pill").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+          filterAndUpdateQuests();
+        });
+      });
+
+      function filterAndUpdateQuests() {
+        const q = questSearchTerm.trim().toLowerCase();
+        const cards = $$("#questGrid .card");
+        let visible = 0;
+
+        cards.forEach((card) => {
+          const cat = card.dataset.category;
+          const hay = card.dataset.search;
+          const catMatch = questActiveCategory === "all" || cat === questActiveCategory;
+          const searchMatch = !q || hay.includes(q);
+          const show = catMatch && searchMatch;
+          card.style.display = show ? "" : "none";
+          if (show) visible++;
+        });
+
+        const catName = questActiveCategory !== "all" ? (questCatById(questActiveCategory) || {}).name || questActiveCategory : "";
+        const countEl = $("#questCountRow");
+        countEl.innerHTML = "<b>" + visible + "</b> " + (visible === 1 ? "quest" : "quests") +
+          (catName ? " in " + escapeHtml(catName) : "") +
+          (q ? " matching \u201C" + escapeHtml(questSearchTerm.trim()) + "\u201D" : "");
+      }
+
+      $("#questSearch").addEventListener("input", (e) => {
+        questSearchTerm = e.target.value;
+        filterAndUpdateQuests();
+      });
+
+      filterAndUpdateQuests();
+
+      /* =================================================================
    Cmd/Ctrl+K to focus search
    ================================================================= */
       document.addEventListener("keydown", (e) => {
@@ -1514,18 +1592,26 @@
       const modal = $("#modal");
       let lastFocused = null;
 
-      function showModal(toolId, pushHash) {
-        const t = TOOLS.find((x) => x.id === toolId);
+      function showModal(itemId, pushHash, kind) {
+        kind = kind || "tools";
+        const isQuest = kind === "quests";
+        const collection = isQuest ? QUESTS : TOOLS;
+        const catLookup = isQuest ? questCatById : catById;
+        const folder = isQuest ? "quests" : "tools";
+        const openLabel = isQuest ? "Preview file" : "Open file";
+        const liveLabel = isQuest ? "Start quest " : "Try live ";
+
+        const t = collection.find((x) => x.id === itemId);
         if (!t) return;
-        const cat = catById(t.category);
+        const cat = catLookup(t.category);
         const diff = t.difficulty.toLowerCase();
-        const live = SITE.url + "/tools/" + t.id;
+        const live = SITE.url + "/" + folder + "/" + t.id;
 
         $("#modalTitle").textContent = t.name;
         $("#modalMeta").innerHTML =
           '<span class="badge-cat"><span aria-hidden="true">' + (cat ? cat.icon : "") + "</span> " + escapeHtml(cat ? cat.name : t.category) + "</span>" +
           '<span class="badge-diff ' + diff + '">' + escapeHtml(t.difficulty) + "</span>" +
-          '<span class="path mono" style="margin-left:auto">tools/' + escapeHtml(t.id) + ".html</span>";
+          '<span class="path mono" style="margin-left:auto">' + folder + "/" + escapeHtml(t.id) + ".html</span>";
 
         $("#modalBody").innerHTML = parseMarkdown(t.longDescription) +
           '<div class="modal-tags">' +
@@ -1533,13 +1619,13 @@
           '<div class="lbl">// tags</div><div class="tag-row">' + t.tags.map((s) => '<span class="tag">' + escapeHtml(s) + "</span>").join("") + "</div></div>";
 
         $("#modalFoot").innerHTML =
-          '<a class="link-btn" href="tools/' + escapeHtml(t.id) + '.html">Open file</a>' +
-          '<a class="link-btn primary" href="' + escapeHtml(live) + '" target="_blank" rel="noopener noreferrer">Try live ' +
+          '<a class="link-btn" href="' + folder + "/" + escapeHtml(t.id) + '.html">' + openLabel + '</a>' +
+          '<a class="link-btn primary" href="' + escapeHtml(live) + '" target="_blank" rel="noopener noreferrer">' + liveLabel +
           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg></a>';
 
         lastFocused = document.activeElement;
         if (!modal.open) modal.showModal();
-        if (pushHash) history.replaceState(null, "", "#tools/" + t.id);
+        if (pushHash) history.replaceState(null, "", "#" + kind + "/" + t.id);
         $("#modalClose").focus();
       }
 
@@ -1547,6 +1633,8 @@
         if (modal.open) modal.close();
         if (restoreHash && location.hash.startsWith("#tools/")) {
           history.replaceState(null, "", "#tools");
+        } else if (restoreHash && location.hash.startsWith("#quests/")) {
+          history.replaceState(null, "", "#quests");
         }
       }
 
@@ -1555,20 +1643,24 @@
       modal.addEventListener("cancel", () => closeModal(true));
       modal.addEventListener("close", () => { if (lastFocused && typeof lastFocused.focus === "function") lastFocused.focus(); });
 
-      /* Card click → modal */
-      $$("#toolGrid .card").forEach((card) => {
-        const openModal = () => showModal(card.dataset.id, true);
-        card.addEventListener("click", (e) => {
-          if (e.target.closest("[data-nomodal]")) return;
-          openModal();
-        });
-        card.addEventListener("keydown", (e) => {
-          if ((e.key === "Enter" || e.key === " ") && !e.target.closest("[data-nomodal]")) {
-            e.preventDefault();
+      /* Card click → modal (shared by tools and quests grids) */
+      function wireCardModals(gridId, kind) {
+        $$("#" + gridId + " .card").forEach((card) => {
+          const openModal = () => showModal(card.dataset.id, true, kind);
+          card.addEventListener("click", (e) => {
+            if (e.target.closest("[data-nomodal]")) return;
             openModal();
-          }
+          });
+          card.addEventListener("keydown", (e) => {
+            if ((e.key === "Enter" || e.key === " ") && !e.target.closest("[data-nomodal]")) {
+              e.preventDefault();
+              openModal();
+            }
+          });
         });
-      });
+      }
+      wireCardModals("toolGrid", "tools");
+      wireCardModals("questGrid", "quests");
 
       /* =================================================================
    HASH ROUTING
@@ -1577,11 +1669,16 @@
         const hash = location.hash.replace(/^#/, "");
         if (!hash) { selectPillar("tools", { scroll: false }); return; }
 
-        const [pillar, toolId] = hash.split("/");
+        const [pillar, itemId] = hash.split("/");
 
-        if (pillar === "tools" && toolId) {
+        if (pillar === "tools" && itemId) {
           selectPillar("tools", { scroll: false });
-          if (TOOLS.some((t) => t.id === toolId)) { showModal(toolId, false); return; }
+          if (TOOLS.some((t) => t.id === itemId)) { showModal(itemId, false, "tools"); return; }
+        }
+
+        if (pillar === "quests" && itemId) {
+          selectPillar("quests", { scroll: false });
+          if (QUESTS.some((q) => q.id === itemId)) { showModal(itemId, false, "quests"); return; }
         }
 
         if (VALID_PILLARS.includes(pillar)) {
