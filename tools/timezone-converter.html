@@ -445,8 +445,14 @@ Built for One File Tools.
         populateTimezones();
         
         // Setup initial zones (Local time + a couple of popular ones)
-        const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        selectedZones = [localTz, 'UTC', 'America/New_York', 'Asia/Tokyo'];
+        let localTz = 'UTC';
+        try {
+          localTz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+        } catch (e) {
+          console.error("Could not resolve local timezone, defaulting to UTC.");
+        }
+        
+        selectedZones = [localTz, 'UTC', 'America/New_York', 'Asia/Tokyo'].filter(Boolean);
         
         // Remove duplicates if localTz is one of the defaults
         selectedZones = [...new Set(selectedZones)];
@@ -464,20 +470,21 @@ Built for One File Tools.
       }
 
       function populateTimezones() {
-        if (!Intl || !Intl.supportedValuesOf) {
-          console.error("Intl.supportedValuesOf is not supported in this browser.");
-          // Add some manual fallbacks if API is missing
-          const fallbacks = ['UTC', 'America/New_York', 'America/Los_Angeles', 'Europe/London', 'Europe/Paris', 'Asia/Tokyo', 'Asia/Kolkata', 'Australia/Sydney'];
-          fallbacks.forEach(tz => {
-            const opt = document.createElement('option');
-            opt.value = tz;
-            opt.textContent = tz;
-            tzSelect.appendChild(opt);
-          });
-          return;
+        const fallbacks = ['UTC', 'America/New_York', 'America/Los_Angeles', 'Europe/London', 'Europe/Paris', 'Asia/Tokyo', 'Asia/Kolkata', 'Australia/Sydney'];
+        let timezones = [];
+        
+        try {
+          if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
+            timezones = Intl.supportedValuesOf('timeZone');
+          }
+        } catch (e) {
+          console.warn("Intl.supportedValuesOf('timeZone') is not supported, using fallbacks.", e);
         }
 
-        const timezones = Intl.supportedValuesOf('timeZone');
+        if (!timezones || timezones.length === 0) {
+          timezones = fallbacks;
+        }
+
         timezones.forEach(tz => {
           const opt = document.createElement('option');
           opt.value = tz;
@@ -558,7 +565,7 @@ Built for One File Tools.
 
       function updateTimes(date) {
         selectedZones.forEach((tz, index) => {
-          const card = tzGrid.querySelector(\`.tz-card[data-tz="\${tz}"]\`);
+          const card = tzGrid.querySelector(`.tz-card[data-tz="${tz}"]`);
           if (!card) return;
 
           // Format Time
@@ -590,9 +597,9 @@ Built for One File Tools.
             offsetStr = tz;
           }
 
-          document.getElementById(\`time-\${index}\`).textContent = timeStr;
-          document.getElementById(\`date-\${index}\`).textContent = dateStr;
-          document.getElementById(\`offset-\${index}\`).textContent = offsetStr;
+          document.getElementById(`time-${index}`).textContent = timeStr;
+          document.getElementById(`date-${index}`).textContent = dateStr;
+          document.getElementById(`offset-${index}`).textContent = offsetStr;
 
           if (isWorkingHours(date, tz)) {
             card.classList.add('working-hours');
@@ -622,11 +629,20 @@ Built for One File Tools.
         }
         if (selectedZones.includes(tz)) {
           showToast('Timezone already added.');
+          tzSelect.value = '';
           return;
         }
         selectedZones.push(tz);
         renderCards();
         tzSelect.value = '';
+        showToast('Timezone added!');
+      });
+
+      // Auto-add on selection for better UX
+      tzSelect.addEventListener('change', () => {
+        if (tzSelect.value) {
+          btnAddTz.click();
+        }
       });
 
       function showToast(message) {
