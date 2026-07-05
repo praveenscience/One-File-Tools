@@ -102,7 +102,7 @@
         flex-direction: column;
         background: var(--bg-surface);
         border-right: 1px solid var(--border-color);
-        overflow: hidden; /* This will contain the flex children and allow the list to scroll independently */
+        overflow: hidden; /* contain the flex children and allow the list to scroll independently */
       }
 
       .sidebar-resizer {
@@ -294,6 +294,45 @@
         gap: 0.5rem;
       }
 
+      .filter-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+      }
+
+      .filter-section {
+        margin-bottom: 1rem;
+      }
+
+      .filter-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        display: block;
+      }
+
+      .btn-clear-filter {
+        background: none;
+        border: none;
+        color: var(--text-secondary);
+        font-size: 0.75rem;
+        font-weight: 500;
+        cursor: pointer;
+        padding: 2px 4px;
+        border-radius: 4px;
+        display: none; /* Hidden by default */
+      }
+      .btn-clear-filter:hover {
+        color: var(--accent);
+        background: var(--accent-soft);
+      }
+      .btn-clear-filter.visible {
+        display: block;
+      }
+
       .filter-tag {
         font-size: 0.75rem;
         font-family: var(--font-mono);
@@ -372,6 +411,35 @@
         gap: 0.75rem;
       }
 
+      .lang-suggestions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+      }
+      .suggestion-tag {
+        font-size: 0.75rem;
+        font-family: var(--font-mono);
+        padding: 0.2rem 0.6rem;
+        background: var(--bg-surface-2);
+        color: var(--text-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 99px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .suggestion-tag:hover,
+      .suggestion-tag.active {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .error-message {
+        color: var(--danger);
+        font-size: 0.8rem;
+        margin-top: 0.5rem;
+        min-height: 1rem;
+      }
+
       /* Responsive */
       @media (max-width: 768px) {
         .app-container {
@@ -400,7 +468,20 @@
     <div class="app-container" id="appContainer">
       <aside class="sidebar">
         <div class="sidebar-header">
-          <div id="filterTagsContainer" class="filter-tags-container"></div>
+          <div class="filter-section">
+            <div class="filter-header">
+              <label class="filter-label">Filter by Language</label>
+              <button class="btn-clear-filter" id="clearLangFilters">Clear</button>
+            </div>
+            <div id="filterLangsContainer" class="filter-tags-container"></div>
+          </div>
+          <div class="filter-section">
+            <div class="filter-header">
+              <label class="filter-label">Filter by Tag</label>
+              <button class="btn-clear-filter" id="clearTagFilters">Clear</button>
+            </div>
+            <div id="filterTagsContainer" class="filter-tags-container"></div>
+          </div>
           <input type="search" id="searchInput" placeholder="Search snippets..." />
         </div>
         <ul id="snippetList">
@@ -434,18 +515,24 @@
             <label for="snippetTitle">Title</label>
             <input type="text" id="snippetTitle" required />
           </div>
+          <br />
           <div class="form-group">
             <label for="snippetLang">Language</label>
             <input type="text" id="snippetLang" placeholder="e.g., javascript, python, css" />
+            <div id="langSuggestions" class="lang-suggestions"></div>
+            <div id="langError" class="error-message"></div>
           </div>
+          <br />
           <div class="form-group">
             <label for="snippetTags">Tags (comma-separated)</label>
             <input type="text" id="snippetTags" />
           </div>
+          <br />
           <div class="form-group">
             <label for="snippetCode">Code</label>
             <textarea id="snippetCode" required></textarea>
           </div>
+          <br />
           <div class="modal-actions">
             <button type="button" class="btn" id="cancelBtn">Cancel</button>
             <button type="submit" class="btn btn-primary">Save Snippet</button>
@@ -475,12 +562,20 @@
         const snippetTagsInput = document.getElementById("snippetTags");
         const snippetCodeInput = document.getElementById("snippetCode");
         const sidebarResizer = document.getElementById("sidebarResizer");
+        const langSuggestions = document.getElementById("langSuggestions");
+        const langError = document.getElementById("langError");
+        const clearLangFilters = document.getElementById("clearLangFilters");
+        const clearTagFilters = document.getElementById("clearTagFilters");
+        const filterLangsContainer = document.getElementById("filterLangsContainer");
         const filterTagsContainer = document.getElementById("filterTagsContainer");
 
         // --- State ---
         let snippets = [];
         let activeSnippetId = null;
         const STORAGE_KEY = "one-file-tools-code-snippets";
+        let allLangs = [];
+        const commonLangs = ["bash", "c", "c#", "c++", "css", "go", "html", "java", "javascript", "json", "kotlin", "markdown", "php", "python", "ruby", "rust", "sql", "swift", "typescript"];
+        let activeFilterLangs = new Set();
         let allTags = [];
         let activeFilterTags = new Set();
 
@@ -494,7 +589,6 @@
             snippets = [];
           }
         };
-
         const saveSnippets = () => {
           try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(snippets));
@@ -504,8 +598,32 @@
         };
 
         // --- Rendering ---
+        const renderFilterLangs = () => {
+          filterLangsContainer.innerHTML = "";
+          clearLangFilters.classList.toggle("visible", activeFilterLangs.size > 0);
+          allLangs.forEach((lang) => {
+            const tagEl = document.createElement("div");
+            tagEl.className = "filter-tag";
+            tagEl.textContent = lang;
+            if (activeFilterLangs.has(lang)) {
+              tagEl.classList.add("active");
+            }
+            tagEl.addEventListener("click", () => {
+              if (activeFilterLangs.has(lang)) {
+                activeFilterLangs.delete(lang);
+              } else {
+                activeFilterLangs.add(lang);
+              }
+              renderFilterLangs();
+              renderSnippetList();
+            });
+            filterLangsContainer.appendChild(tagEl);
+          });
+        };
+
         const renderFilterTags = () => {
           filterTagsContainer.innerHTML = "";
+          clearTagFilters.classList.toggle("visible", activeFilterTags.size > 0);
           allTags.forEach((tag) => {
             const tagEl = document.createElement("div");
             tagEl.className = "filter-tag";
@@ -526,6 +644,16 @@
           });
         };
 
+        const updateAllLangs = () => {
+          allLangs = [...new Set(snippets.map((s) => s.language).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+          activeFilterLangs.forEach((lang) => {
+            if (!allLangs.includes(lang)) {
+              activeFilterLangs.delete(lang);
+            }
+          });
+          renderFilterLangs();
+        };
+
         const updateAllTags = () => {
           allTags = [...new Set(snippets.flatMap((s) => s.tags))].sort((a, b) => a.localeCompare(b));
           activeFilterTags.forEach((tag) => {
@@ -542,9 +670,14 @@
 
           let filteredSnippets = snippets;
 
+          if (activeFilterLangs.size > 0) {
+            const filterLangsArray = [...activeFilterLangs];
+            filteredSnippets = filteredSnippets.filter((s) => filterLangsArray.includes(s.language));
+          }
+
           if (activeFilterTags.size > 0) {
             const filterTagsArray = [...activeFilterTags];
-            filteredSnippets = filteredSnippets.filter((s) => filterTagsArray.every((tag) => s.tags.includes(tag)));
+            filteredSnippets = filteredSnippets.filter((s) => filterTagsArray.some((tag) => s.tags.includes(tag)));
           }
 
           if (filter) {
@@ -621,6 +754,7 @@
         // --- Modal & Form Logic ---
         const openModal = (id = null) => {
           snippetForm.reset();
+          langError.textContent = "";
           if (id) {
             const snippet = snippets.find((s) => s.id === id);
             modalTitle.textContent = "Edit Snippet";
@@ -634,6 +768,30 @@
             snippetIdInput.value = "";
           }
           snippetModal.style.display = "flex";
+          updateLangTagSelection();
+        };
+
+        const updateLangTagSelection = () => {
+          const currentValue = snippetLangInput.value.toLowerCase();
+          document.querySelectorAll(".suggestion-tag").forEach((tag) => {
+            tag.classList.toggle("active", tag.textContent.toLowerCase() === currentValue);
+          });
+        };
+
+        const populateLangSuggestions = () => {
+          commonLangs.forEach((lang) => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "suggestion-tag";
+            btn.textContent = lang;
+            btn.addEventListener("click", () => {
+              snippetLangInput.value = lang;
+              snippetLangInput.focus();
+              updateLangTagSelection();
+              langError.textContent = "";
+            });
+            langSuggestions.appendChild(btn);
+          });
         };
 
         const closeModal = () => {
@@ -642,6 +800,14 @@
 
         const handleFormSubmit = (e) => {
           e.preventDefault();
+          const langValue = snippetLangInput.value.trim().toLowerCase();
+          langError.textContent = "";
+
+          if (langValue && !commonLangs.includes(langValue)) {
+            langError.textContent = "Please enter one of the supported languages from the list.";
+            return;
+          }
+
           const id = snippetIdInput.value;
           const snippetData = {
             title: snippetTitleInput.value,
@@ -664,6 +830,7 @@
           }
 
           saveSnippets();
+          updateAllLangs();
           updateAllTags();
           renderSnippetList();
           renderSnippetViewer();
@@ -677,6 +844,7 @@
               activeSnippetId = null;
             }
             saveSnippets();
+            updateAllLangs();
             updateAllTags();
             renderSnippetList();
             renderSnippetViewer();
@@ -720,6 +888,7 @@
                   snippets = importedSnippets;
                   activeSnippetId = snippets.length > 0 ? snippets[0].id : null;
                   saveSnippets();
+                  updateAllLangs();
                   updateAllTags();
                   renderSnippetList();
                   renderSnippetViewer();
@@ -739,6 +908,20 @@
         cancelBtn.addEventListener("click", closeModal);
         snippetForm.addEventListener("submit", handleFormSubmit);
         searchInput.addEventListener("input", renderSnippetList);
+        snippetLangInput.addEventListener("input", () => {
+          updateLangTagSelection();
+          langError.textContent = "";
+        });
+        clearLangFilters.addEventListener("click", () => {
+          activeFilterLangs.clear();
+          renderFilterLangs();
+          renderSnippetList();
+        });
+        clearTagFilters.addEventListener("click", () => {
+          activeFilterTags.clear();
+          renderFilterTags();
+          renderSnippetList();
+        });
         importBtn.addEventListener("click", handleImport);
         exportBtn.addEventListener("click", handleExport);
 
@@ -771,8 +954,10 @@
         // --- Init ---
         const init = () => {
           loadSnippets();
+          updateAllLangs();
           updateAllTags();
           renderSnippetList();
+          populateLangSuggestions();
           renderSnippetViewer();
         };
 

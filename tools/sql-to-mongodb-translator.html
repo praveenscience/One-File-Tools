@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SQL to MongoDB Aggregation Translator — One File Tools</title>
+    <style>
+      /* ========================================
+         Reset & Base
+         ======================================== */
+      :root {
+        --app-bg: #fafafa;
+        --app-text: #1a1a1a;
+        --app-primary: #2563eb;
+        --app-primary-hover: #1d4ed8;
+        --app-secondary: #e5e7eb;
+        --app-secondary-text: #374151;
+        --app-accent: #10b981;
+        --app-panel-bg: #ffffff;
+        --app-border: #eaeaea;
+        --code-bg: #f3f4f6;
+        --code-text: #111827;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --app-bg: #0a0a0a;
+          --app-text: #e5e5e5;
+          --app-primary: #3b82f6;
+          --app-primary-hover: #60a5fa;
+          --app-secondary: #374151;
+          --app-secondary-text: #e5e7eb;
+          --app-panel-bg: #171717;
+          --app-border: #333333;
+          --code-bg: #1f2937;
+          --code-text: #f9fafb;
+        }
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        line-height: 1.6;
+        padding: 2rem;
+        max-width: 1400px;
+        margin: 0 auto;
+        background: var(--app-bg);
+        color: var(--app-text);
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+      }
+
+      header {
+        margin-bottom: 2rem;
+        text-align: center;
+      }
+
+      main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+      }
+
+      @media (min-width: 992px) {
+        main {
+          flex-direction: row;
+          height: 65vh;
+        }
+      }
+
+      /* ========================================
+         Editor Panels
+         ======================================== */
+      .panel {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background: var(--app-panel-bg);
+        border: 1px solid var(--app-border);
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+      }
+
+      .panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 1.5rem;
+        background: var(--app-secondary);
+        border-bottom: 1px solid var(--app-border);
+        font-weight: 600;
+        color: var(--app-secondary-text);
+      }
+
+      .editor-area {
+        flex: 1;
+        width: 100%;
+        padding: 1.5rem;
+        border: none;
+        resize: none;
+        background: var(--code-bg);
+        color: var(--code-text);
+        font-family: "Courier New", Courier, monospace;
+        font-size: 1rem;
+        line-height: 1.5;
+        outline: none;
+      }
+
+      pre.editor-area {
+        margin: 0;
+        overflow-y: auto;
+        white-space: pre-wrap;
+      }
+
+      /* ========================================
+         Buttons
+         ======================================== */
+      .toolbar {
+        display: flex;
+        justify-content: center;
+        gap: 1rem;
+        padding: 1rem 0;
+      }
+
+      button.btn {
+        padding: 0.75rem 1.5rem;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 1rem;
+        font-weight: 600;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .btn-primary {
+        background: var(--app-primary);
+        color: #fff;
+      }
+      .btn-primary:hover {
+        background: var(--app-primary-hover);
+        transform: translateY(-2px);
+      }
+
+      .btn-secondary {
+        background: var(--app-secondary);
+        color: var(--app-secondary-text);
+      }
+      .btn-secondary:hover {
+        filter: brightness(0.9);
+      }
+
+      .btn-small {
+        padding: 0.4rem 0.8rem;
+        font-size: 0.875rem;
+        border-radius: 6px;
+      }
+
+      /* ========================================
+         Toast
+         ======================================== */
+      .toast {
+        position: fixed;
+        bottom: 2rem;
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background: var(--app-accent);
+        color: white;
+        padding: 1rem 2rem;
+        border-radius: 9999px;
+        font-weight: 600;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        opacity: 0;
+        transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        z-index: 1000;
+      }
+      .toast.show {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+      }
+      .toast.error {
+        background: #ef4444;
+      }
+
+      footer {
+        margin-top: 3rem;
+        text-align: center;
+      }
+      a {
+        color: var(--app-primary);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>SQL to MongoDB Aggregation Translator</h1>
+      <p>Translate standard SQL queries instantly into MongoDB Aggregation Pipeline JSON arrays.</p>
+    </header>
+
+    <main>
+      <!-- SQL Input Panel -->
+      <div class="panel">
+        <div class="panel-header">
+          <span>SQL Query</span>
+          <button class="btn btn-secondary btn-small" id="btn-format-sql">Format SQL</button>
+        </div>
+        <textarea class="editor-area" id="sql-input" placeholder="SELECT id, status, COUNT(*) as total&#10;FROM orders&#10;WHERE status = 'active' AND price > 100&#10;GROUP BY id, status&#10;ORDER BY total DESC&#10;LIMIT 10"></textarea>
+      </div>
+
+      <!-- MongoDB Output Panel -->
+      <div class="panel">
+        <div class="panel-header">
+          <span>MongoDB Pipeline</span>
+          <button class="btn btn-secondary btn-small" id="btn-copy-json">Copy JSON</button>
+        </div>
+        <pre class="editor-area" id="mongo-output">[\n  // Your translated aggregation pipeline will appear here\n]</pre>
+      </div>
+    </main>
+
+    <div class="toolbar">
+      <button class="btn btn-primary" id="btn-translate">🚀 Translate to MongoDB</button>
+      <button class="btn btn-secondary" id="btn-clear">🗑️ Clear</button>
+    </div>
+
+    <div class="toast" id="toast">Copied to clipboard!</div>
+
+    <footer>
+      <p>
+        Part of
+        <a href="https://github.com/praveenscience/One-File-Tools">One File Tools</a>
+      </p>
+    </footer>
+
+    <script>
+      // ==========================================
+      // DOM Elements
+      // ==========================================
+      const sqlInput = document.getElementById("sql-input");
+      const mongoOutput = document.getElementById("mongo-output");
+      const btnTranslate = document.getElementById("btn-translate");
+      const btnClear = document.getElementById("btn-clear");
+      const btnCopyJson = document.getElementById("btn-copy-json");
+      const btnFormatSql = document.getElementById("btn-format-sql");
+      const toast = document.getElementById("toast");
+
+      // ==========================================
+      // Utility Functions
+      // ==========================================
+      function showToast(message, isError = false) {
+        toast.textContent = message;
+        if (isError) {
+          toast.classList.add("error");
+        } else {
+          toast.classList.remove("error");
+        }
+        toast.classList.add("show");
+        setTimeout(() => toast.classList.remove("show"), 2500);
+      }
+
+      function copyToClipboard(text) {
+        navigator.clipboard.writeText(text).then(() => showToast("JSON Copied to clipboard!"));
+      }
+
+      // ==========================================
+      // SQL to MongoDB Parser Engine (Lightweight)
+      // ==========================================
+      class SQLParser {
+        constructor(query) {
+          this.query = query.replace(/\s+/g, " ").trim().replace(/;$/, "");
+          this.pipeline = [];
+        }
+
+        parse() {
+          try {
+            const selectRegex = /SELECT\s+(.+?)\s+FROM/i;
+            const fromRegex = /FROM\s+([^\s]+)/i;
+            const whereRegex = /WHERE\s+(.+?)(?=\s+GROUP BY|\s+ORDER BY|\s+LIMIT|$)/i;
+            const groupByRegex = /GROUP BY\s+(.+?)(?=\s+ORDER BY|\s+LIMIT|$)/i;
+            const orderByRegex = /ORDER BY\s+(.+?)(?=\s+LIMIT|$)/i;
+            const limitRegex = /LIMIT\s+(\d+)/i;
+
+            const selectMatch = this.query.match(selectRegex);
+            const fromMatch = this.query.match(fromRegex);
+            const whereMatch = this.query.match(whereRegex);
+            const groupByMatch = this.query.match(groupByRegex);
+            const orderByMatch = this.query.match(orderByRegex);
+            const limitMatch = this.query.match(limitRegex);
+
+            if (!fromMatch) throw new Error("Missing FROM clause.");
+
+            // 1. $match (WHERE)
+            if (whereMatch) {
+              const condition = this.parseWhereCondition(whereMatch[1]);
+              if (Object.keys(condition).length > 0) {
+                this.pipeline.push({ $match: condition });
+              }
+            }
+
+            // 2. $group (GROUP BY)
+            let groupFields = [];
+            if (groupByMatch) {
+              groupFields = groupByMatch[1].split(",").map((f) => f.trim());
+              const groupStage = { _id: {} };
+              groupFields.forEach((f) => {
+                groupStage._id[f] = `$${f}`;
+              });
+
+              // Handle aggregations in SELECT
+              if (selectMatch) {
+                const selectParts = selectMatch[1].split(",").map((s) => s.trim());
+                selectParts.forEach((part) => {
+                  if (part.toLowerCase().includes("count(")) {
+                    const aliasMatch = part.match(/AS\s+([^\s]+)/i);
+                    const alias = aliasMatch ? aliasMatch[1] : "count";
+                    groupStage[alias] = { $sum: 1 };
+                  } else if (part.toLowerCase().includes("sum(")) {
+                    const fieldMatch = part.match(/SUM\((.*?)\)/i);
+                    const aliasMatch = part.match(/AS\s+([^\s]+)/i);
+                    if (fieldMatch) {
+                      const alias = aliasMatch ? aliasMatch[1] : `total_${fieldMatch[1]}`;
+                      groupStage[alias] = { $sum: `$${fieldMatch[1]}` };
+                    }
+                  } else if (part.toLowerCase().includes("avg(")) {
+                    const fieldMatch = part.match(/AVG\((.*?)\)/i);
+                    const aliasMatch = part.match(/AS\s+([^\s]+)/i);
+                    if (fieldMatch) {
+                      const alias = aliasMatch ? aliasMatch[1] : `avg_${fieldMatch[1]}`;
+                      groupStage[alias] = { $avg: `$${fieldMatch[1]}` };
+                    }
+                  }
+                });
+              }
+              this.pipeline.push({ $group: groupStage });
+            }
+
+            // 3. $project (SELECT - if not grouped)
+            if (selectMatch && !groupByMatch) {
+              if (selectMatch[1].trim() !== "*") {
+                const projectStage = {};
+                const fields = selectMatch[1].split(",").map((f) => f.trim());
+                fields.forEach((f) => {
+                  const aliasMatch = f.match(/(.+?)\s+AS\s+(.+)/i);
+                  if (aliasMatch) {
+                    projectStage[aliasMatch[2].trim()] = `$${aliasMatch[1].trim()}`;
+                  } else {
+                    projectStage[f] = 1;
+                  }
+                });
+                projectStage._id = 0; // default exclude _id unless specified
+                this.pipeline.push({ $project: projectStage });
+              }
+            }
+
+            // 4. $sort (ORDER BY)
+            if (orderByMatch) {
+              const sortStage = {};
+              const sorts = orderByMatch[1].split(",").map((s) => s.trim());
+              sorts.forEach((s) => {
+                const parts = s.split(/\s+/);
+                const field = parts[0];
+                const order = parts[1] && parts[1].toUpperCase() === "DESC" ? -1 : 1;
+                sortStage[field] = order;
+              });
+              this.pipeline.push({ $sort: sortStage });
+            }
+
+            // 5. $limit (LIMIT)
+            if (limitMatch) {
+              this.pipeline.push({ $limit: parseInt(limitMatch[1], 10) });
+            }
+
+            return this.pipeline;
+          } catch (error) {
+            throw new Error(`Parse Error: ${error.message}`);
+          }
+        }
+
+        parseWhereCondition(whereStr) {
+          const condition = {};
+
+          // Very basic AND splitting (nested/OR conditions require full AST)
+          const andParts = whereStr.split(/\s+AND\s+/i);
+
+          andParts.forEach((part) => {
+            part = part.trim();
+            // operators: =, !=, <>, >, <, >=, <=
+            let match;
+
+            if ((match = part.match(/(.+?)\s*(>=|<=|!=|<>|>|<|=)\s*(.+)/))) {
+              const field = match[1].trim();
+              const op = match[2].trim();
+              let val = match[3].trim();
+
+              // Remove quotes from strings
+              if ((val.startsWith("'") && val.endsWith("'")) || (val.startsWith('"') && val.endsWith('"'))) {
+                val = val.substring(1, val.length - 1);
+              } else if (!isNaN(val)) {
+                val = Number(val); // parse numbers
+              }
+
+              switch (op) {
+                case "=":
+                  condition[field] = val;
+                  break;
+                case "!=":
+                case "<>":
+                  condition[field] = { $ne: val };
+                  break;
+                case ">":
+                  condition[field] = { $gt: val };
+                  break;
+                case ">=":
+                  condition[field] = { $gte: val };
+                  break;
+                case "<":
+                  condition[field] = { $lt: val };
+                  break;
+                case "<=":
+                  condition[field] = { $lte: val };
+                  break;
+              }
+            }
+          });
+
+          return condition;
+        }
+      }
+
+      // ==========================================
+      // Event Listeners
+      // ==========================================
+      btnTranslate.addEventListener("click", () => {
+        const sql = sqlInput.value.trim();
+        if (!sql) {
+          showToast("Please enter a SQL query first.", true);
+          return;
+        }
+
+        try {
+          const parser = new SQLParser(sql);
+          const pipeline = parser.parse();
+          mongoOutput.textContent = JSON.stringify(pipeline, null, 2);
+        } catch (error) {
+          mongoOutput.textContent = `// Error parsing SQL\n${error.message}`;
+          showToast("Failed to parse SQL", true);
+        }
+      });
+
+      btnCopyJson.addEventListener("click", () => {
+        const text = mongoOutput.textContent;
+        if (text && text !== "[\n  // Your translated aggregation pipeline will appear here\n]") {
+          copyToClipboard(text);
+        }
+      });
+
+      btnClear.addEventListener("click", () => {
+        sqlInput.value = "";
+        mongoOutput.textContent = "[\n  // Your translated aggregation pipeline will appear here\n]";
+      });
+
+      btnFormatSql.addEventListener("click", () => {
+        // Very basic SQL formatting (uppercasing keywords and breaking lines)
+        let sql = sqlInput.value;
+        if (!sql) return;
+
+        const keywords = ["SELECT", "FROM", "WHERE", "GROUP BY", "ORDER BY", "LIMIT", "AND", "OR", "AS", "COUNT", "SUM", "AVG"];
+        let formatted = sql;
+
+        keywords.forEach((kw) => {
+          const regex = new RegExp(`\\b${kw}\\b`, "gi");
+          formatted = formatted.replace(regex, kw);
+        });
+
+        formatted = formatted
+          .replace(/\s+FROM/g, "\nFROM")
+          .replace(/\s+WHERE/g, "\nWHERE")
+          .replace(/\s+GROUP BY/g, "\nGROUP BY")
+          .replace(/\s+ORDER BY/g, "\nORDER BY")
+          .replace(/\s+LIMIT/g, "\nLIMIT");
+
+        sqlInput.value = formatted;
+      });
+    </script>
+  </body>
+</html>

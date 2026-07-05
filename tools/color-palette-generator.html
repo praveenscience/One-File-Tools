@@ -1,0 +1,605 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Color Palette Generator — One File Tools</title>
+    <style>
+      /* ========================================
+         Reset & Base
+         ======================================== */
+      :root {
+        --app-bg: #fafafa;
+        --app-text: #1a1a1a;
+        --app-primary: #2563eb;
+        --app-secondary: #e5e7eb;
+        --app-secondary-text: #374151;
+        --app-accent: #10b981;
+        --app-panel-bg: #ffffff;
+        --app-border: #eaeaea;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --app-bg: #0a0a0a;
+          --app-text: #e5e5e5;
+          --app-primary: #3b82f6;
+          --app-secondary: #374151;
+          --app-secondary-text: #e5e7eb;
+          --app-accent: #10b981;
+          --app-panel-bg: #171717;
+          --app-border: #333333;
+        }
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        line-height: 1.6;
+        padding: 2rem;
+        max-width: 1200px;
+        margin: 0 auto;
+        background: var(--app-bg);
+        color: var(--app-text);
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+        transition:
+          background 0.3s,
+          color 0.3s;
+      }
+
+      /* ========================================
+         Main App Styles
+         ======================================== */
+      header {
+        margin-bottom: 2rem;
+        text-align: center;
+        position: relative;
+      }
+
+      main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+      }
+
+      /* Palette Container */
+      .palette {
+        display: flex;
+        flex-direction: column;
+        height: 60vh;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+      }
+
+      @media (min-width: 768px) {
+        .palette {
+          flex-direction: row;
+        }
+      }
+
+      /* Color Swatch */
+      .color-block {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        align-items: center;
+        padding: 2rem 1rem;
+        position: relative;
+        transition: flex 0.3s ease;
+        cursor: pointer;
+      }
+
+      .color-block:hover {
+        flex: 1.1;
+      }
+
+      .color-info {
+        background: rgba(255, 255, 255, 0.85);
+        padding: 1rem;
+        border-radius: 8px;
+        text-align: center;
+        backdrop-filter: blur(4px);
+        width: 100%;
+        max-width: 150px;
+        color: #1a1a1a;
+        transition:
+          transform 0.2s,
+          background 0.2s;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .color-info {
+          background: rgba(20, 20, 20, 0.7);
+          color: #e5e5e5;
+        }
+      }
+
+      .hex-code {
+        font-family: monospace;
+        font-size: 1.2rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+      }
+
+      .lock-btn {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        padding: 0.5rem;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s;
+        color: inherit;
+      }
+
+      /* Toolbar */
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        justify-content: center;
+        align-items: center;
+        background: var(--app-panel-bg);
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        border: 1px solid var(--app-border);
+        transition:
+          background 0.3s,
+          border-color 0.3s;
+      }
+
+      button.btn {
+        padding: 0.75rem 1.5rem;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 1rem;
+        font-weight: 600;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .btn-primary {
+        background: var(--app-primary);
+        color: #fff;
+      }
+      .btn-primary:hover {
+        filter: brightness(0.9);
+        transform: translateY(-2px);
+      }
+
+      .btn-secondary {
+        background: var(--app-secondary);
+        color: var(--app-secondary-text);
+      }
+      .btn-secondary:hover {
+        filter: brightness(0.9);
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 2rem;
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background: var(--app-accent);
+        color: white;
+        padding: 1rem 2rem;
+        border-radius: 9999px;
+        font-weight: 600;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        opacity: 0;
+        transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        z-index: 1000;
+      }
+
+      .toast.show {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+      }
+
+      /* ========================================
+         Theme Drawer Styles
+         ======================================== */
+      .theme-toggle-btn {
+        position: absolute;
+        top: 0;
+        right: 0;
+        background: var(--app-panel-bg);
+        border: 1px solid var(--app-border);
+        color: var(--app-text);
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all 0.2s;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      }
+      .theme-toggle-btn:hover {
+        background: var(--app-secondary);
+      }
+
+      .theme-drawer {
+        position: fixed;
+        top: 0;
+        right: -350px;
+        width: 350px;
+        height: 100vh;
+        background: var(--app-panel-bg);
+        border-left: 1px solid var(--app-border);
+        box-shadow: -5px 0 25px rgba(0, 0, 0, 0.1);
+        padding: 2rem;
+        transition: right 0.3s ease;
+        z-index: 2000;
+        display: flex;
+        flex-direction: column;
+        color: var(--app-text);
+      }
+
+      .theme-drawer.open {
+        right: 0;
+      }
+
+      .drawer-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        border-bottom: 1px solid var(--app-border);
+        padding-bottom: 1rem;
+      }
+
+      .drawer-header h2 {
+        font-size: 1.25rem;
+      }
+
+      .close-drawer-btn {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        color: var(--app-text);
+        cursor: pointer;
+      }
+
+      .color-setting {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+      }
+
+      .color-setting label {
+        font-weight: 600;
+        font-size: 0.9rem;
+      }
+
+      .color-setting input[type="color"] {
+        -webkit-appearance: none;
+        border: none;
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        cursor: pointer;
+        padding: 0;
+        background: none;
+      }
+      .color-setting input[type="color"]::-webkit-color-swatch-wrapper {
+        padding: 0;
+      }
+      .color-setting input[type="color"]::-webkit-color-swatch {
+        border: 2px solid var(--app-border);
+        border-radius: 8px;
+      }
+
+      .drawer-actions {
+        margin-top: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      footer {
+        margin-top: 3rem;
+        text-align: center;
+      }
+
+      a {
+        color: var(--app-primary);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Color Palette Generator</h1>
+      <p>Press <kbd>Spacebar</kbd> to generate new colors. Click a color to copy its HEX value.</p>
+      <button class="theme-toggle-btn" id="theme-toggle-btn">🎨 Theme Settings</button>
+    </header>
+
+    <main>
+      <div class="palette" id="palette-container">
+        <!-- Color blocks will be generated by JS -->
+      </div>
+
+      <div class="toolbar">
+        <button class="btn btn-primary" id="generate-btn">✨ Generate (Space)</button>
+        <button class="btn btn-secondary" id="export-css-btn">📋 Export CSS</button>
+        <button class="btn btn-secondary" id="export-json-btn">📄 Export JSON</button>
+      </div>
+    </main>
+
+    <div class="toast" id="toast">Copied to clipboard!</div>
+
+    <!-- Theme Drawer -->
+    <div class="theme-drawer" id="theme-drawer">
+      <div class="drawer-header">
+        <h2>App Theme</h2>
+        <button class="close-drawer-btn" id="close-drawer-btn">×</button>
+      </div>
+
+      <div class="color-setting">
+        <label for="theme-bg">Background Color</label>
+        <input type="color" id="theme-bg" data-var="--app-bg" />
+      </div>
+      <div class="color-setting">
+        <label for="theme-text">Text Color</label>
+        <input type="color" id="theme-text" data-var="--app-text" />
+      </div>
+      <div class="color-setting">
+        <label for="theme-primary">Primary Color</label>
+        <input type="color" id="theme-primary" data-var="--app-primary" />
+      </div>
+      <div class="color-setting">
+        <label for="theme-secondary">Secondary Panel Color</label>
+        <input type="color" id="theme-panel-bg" data-var="--app-panel-bg" />
+      </div>
+      <div class="color-setting">
+        <label for="theme-accent">Accent Color (Toast)</label>
+        <input type="color" id="theme-accent" data-var="--app-accent" />
+      </div>
+
+      <div class="drawer-actions">
+        <button class="btn btn-primary" style="justify-content: center" id="save-theme-btn">Save Theme</button>
+        <button class="btn btn-secondary" style="justify-content: center" id="reset-theme-btn">Reset Defaults</button>
+      </div>
+    </div>
+
+    <footer>
+      <p>
+        Part of
+        <a href="https://github.com/praveenscience/One-File-Tools">One File Tools</a>
+      </p>
+    </footer>
+
+    <script>
+      // ==========================================
+      // Palette Logic
+      // ==========================================
+      const PALETTE_SIZE = 5;
+      let colors = Array(PALETTE_SIZE)
+        .fill()
+        .map(() => ({
+          hex: "",
+          isLocked: false
+        }));
+
+      const paletteContainer = document.getElementById("palette-container");
+      const generateBtn = document.getElementById("generate-btn");
+      const exportCssBtn = document.getElementById("export-css-btn");
+      const exportJsonBtn = document.getElementById("export-json-btn");
+      const toast = document.getElementById("toast");
+
+      function randomHex() {
+        return (
+          "#" +
+          Math.floor(Math.random() * 16777215)
+            .toString(16)
+            .padStart(6, "0")
+            .toUpperCase()
+        );
+      }
+
+      function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add("show");
+        setTimeout(() => toast.classList.remove("show"), 2500);
+      }
+
+      function copyToClipboard(text, successMsg = "Copied to clipboard!") {
+        navigator.clipboard.writeText(text).then(() => showToast(successMsg));
+      }
+
+      function renderPalette() {
+        paletteContainer.innerHTML = "";
+
+        colors.forEach((color, index) => {
+          const block = document.createElement("div");
+          block.className = "color-block";
+          block.style.backgroundColor = color.hex;
+
+          block.addEventListener("click", (e) => {
+            if (e.target === block) {
+              copyToClipboard(color.hex, `Copied ${color.hex}!`);
+            }
+          });
+
+          const info = document.createElement("div");
+          info.className = "color-info";
+
+          const hexText = document.createElement("div");
+          hexText.className = "hex-code";
+          hexText.textContent = color.hex;
+          hexText.title = "Click to copy";
+          hexText.style.cursor = "pointer";
+          hexText.addEventListener("click", () => copyToClipboard(color.hex, `Copied ${color.hex}!`));
+
+          const lockBtn = document.createElement("button");
+          lockBtn.className = "lock-btn";
+          lockBtn.innerHTML = color.isLocked ? "🔒" : "🔓";
+          lockBtn.title = color.isLocked ? "Unlock color" : "Lock color";
+
+          lockBtn.addEventListener("click", () => {
+            colors[index].isLocked = !colors[index].isLocked;
+            renderPalette();
+          });
+
+          info.appendChild(hexText);
+          info.appendChild(lockBtn);
+          block.appendChild(info);
+          paletteContainer.appendChild(block);
+        });
+      }
+
+      function generatePalette() {
+        colors = colors.map((color) => {
+          if (color.isLocked) return color;
+          return { ...color, hex: randomHex() };
+        });
+        renderPalette();
+      }
+
+      function exportCSS() {
+        let cssStr = `:root {\n`;
+        colors.forEach((c, i) => {
+          cssStr += `  --color-${i + 1}: ${c.hex};\n`;
+        });
+        cssStr += `}`;
+        copyToClipboard(cssStr, "CSS variables copied!");
+      }
+
+      function exportJSON() {
+        const hexArray = colors.map((c) => c.hex);
+        const jsonStr = JSON.stringify({ palette: hexArray }, null, 2);
+
+        const blob = new Blob([jsonStr], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "palette.json";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        showToast("JSON Downloaded!");
+      }
+
+      generateBtn.addEventListener("click", generatePalette);
+      exportCssBtn.addEventListener("click", exportCSS);
+      exportJsonBtn.addEventListener("click", exportJSON);
+
+      document.addEventListener("keydown", (e) => {
+        if (e.code === "Space") {
+          if (document.activeElement.tagName !== "BUTTON" && document.activeElement.tagName !== "INPUT") {
+            e.preventDefault();
+            generatePalette();
+          }
+        }
+      });
+
+      generatePalette();
+
+      // ==========================================
+      // Theme App Customization Logic
+      // ==========================================
+      const themeToggleBtn = document.getElementById("theme-toggle-btn");
+      const themeDrawer = document.getElementById("theme-drawer");
+      const closeDrawerBtn = document.getElementById("close-drawer-btn");
+      const themeInputs = document.querySelectorAll('.color-setting input[type="color"]');
+      const saveThemeBtn = document.getElementById("save-theme-btn");
+      const resetThemeBtn = document.getElementById("reset-theme-btn");
+
+      // Helper to convert rgb to hex for input[type="color"] compatibility
+      function rgbToHex(rgb) {
+        if (rgb.startsWith("#")) return rgb;
+        const result = rgb.match(/\d+/g);
+        if (!result) return "#000000";
+        return "#" + result.map((x) => parseInt(x).toString(16).padStart(2, "0")).join("");
+      }
+
+      // Initialize inputs with current CSS variable values
+      function initThemeInputs() {
+        const rootStyles = getComputedStyle(document.documentElement);
+        themeInputs.forEach((input) => {
+          const cssVar = input.getAttribute("data-var");
+          const val = String(rootStyles.getPropertyValue(cssVar)).trim();
+          if (val) input.value = rgbToHex(val);
+        });
+      }
+
+      // Live update CSS variable when input changes
+      themeInputs.forEach((input) => {
+        input.addEventListener("input", (e) => {
+          const cssVar = e.target.getAttribute("data-var");
+          document.documentElement.style.setProperty(cssVar, e.target.value);
+        });
+      });
+
+      // Toggle drawer
+      themeToggleBtn.addEventListener("click", () => {
+        themeDrawer.classList.add("open");
+        initThemeInputs(); // Set inputs to current values when opened
+      });
+      closeDrawerBtn.addEventListener("click", () => {
+        themeDrawer.classList.remove("open");
+      });
+
+      // Save Theme
+      saveThemeBtn.addEventListener("click", () => {
+        const theme = {};
+        themeInputs.forEach((input) => {
+          const cssVar = input.getAttribute("data-var");
+          theme[cssVar] = input.value;
+        });
+        localStorage.setItem("custom-app-theme", JSON.stringify(theme));
+        showToast("Theme saved!");
+        themeDrawer.classList.remove("open");
+      });
+
+      // Reset Theme
+      resetThemeBtn.addEventListener("click", () => {
+        localStorage.removeItem("custom-app-theme");
+        themeInputs.forEach((input) => {
+          const cssVar = input.getAttribute("data-var");
+          document.documentElement.style.removeProperty(cssVar);
+        });
+        showToast("Theme reset to defaults!");
+        initThemeInputs();
+        themeDrawer.classList.remove("open");
+      });
+
+      // Load Theme on start
+      const savedTheme = localStorage.getItem("custom-app-theme");
+      if (savedTheme) {
+        try {
+          const theme = JSON.parse(savedTheme);
+          Object.keys(theme).forEach((cssVar) => {
+            document.documentElement.style.setProperty(cssVar, theme[cssVar]);
+          });
+        } catch (e) {
+          console.error("Failed to parse saved theme");
+        }
+      }
+    </script>
+  </body>
+</html>
