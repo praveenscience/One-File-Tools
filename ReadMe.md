@@ -98,7 +98,7 @@ Every tool in this collection is a standalone `.html` file containing all the HT
 | 69 | [URL Encoder / Decoder](tools/url-encoder-decoder.html) | JSON & API | Encode and decode URLs or percent-encoded strings instantly using native browser APIs. | [Try it](https://one-file-tools.pages.dev/tools/url-encoder-decoder) |
 | 70 | [User Agent Parser](tools/user-agent-parser.html) | Browser & Network | Parse any User-Agent string into a readable breakdown of browser, engine, OS, device, and CPU architecture. | [Try it](https://one-file-tools.pages.dev/tools/user-agent-parser) |
 | 71 | [UUID Generator](tools/uuid-generator.html) | Developer Utilities | Generate random v4 UUIDs instantly, offline. | [Try it](https://one-file-tools.pages.dev/tools/uuid-generator) |
-| 72 | [Case-Converter](tools/case-converter.html) | Text & Content | Convert a sentence into any case | 
+| 72 | [Case-Converter](tools/case-converter.html) | Text & Content | Convert a sentence into any case | [Try it](https://one-file-tools.pages.dev/tools/case-converter) |
 
 > **Want to see your tool here?** Check out the [Contributing Guide](Contributing.md) and pick an idea from the [Ideas Board](#ideas-board).
 
