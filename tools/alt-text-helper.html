@@ -1,0 +1,648 @@
+<!--
+Alt Text Helper
+Single-file client-side tool that helps users write clear, accessible alt text
+for images: preview locally, draft a description, and get quality feedback.
+Built for One File Tools.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Alt Text Helper - One File Tools</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <style>
+      :root {
+        --bg: #030712;
+        --grid-line: #111827;
+        --panel: rgba(17, 24, 39, 0.7);
+        --panel-border: #1f2937;
+        --accent: #34d399;
+        --accent-hover: #10b981;
+        --accent-glow: rgba(52, 211, 153, 0.15);
+        --text: #f9fafb;
+        --text-muted: #9ca3af;
+        --text-dim: #4b5563;
+        --radius-sm: 12px;
+        --radius-md: 20px;
+        --font-sans: "Inter", system-ui, sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+        --font-display: "Space Grotesk", sans-serif;
+        --color-weak: #ef4444;
+        --color-fair: #f59e0b;
+        --color-strong: #10b981;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg);
+        background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+        background-size: 32px 32px;
+        color: var(--text);
+        padding: 48px 20px 80px;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+      }
+
+      .app {
+        width: 100%;
+        max-width: 820px;
+      }
+
+      .hero {
+        text-align: center;
+        margin-bottom: 32px;
+      }
+
+      .eyebrow {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        letter-spacing: 0.2em;
+        color: var(--accent);
+        text-transform: uppercase;
+        margin-bottom: 12px;
+        font-weight: 500;
+      }
+
+      .wordmark {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: clamp(26px, 5vw, 38px);
+        letter-spacing: -0.02em;
+        margin-bottom: 12px;
+      }
+
+      .tagline {
+        color: var(--text-muted);
+        font-size: 15px;
+        line-height: 1.5;
+        max-width: 580px;
+        margin: 0 auto;
+      }
+
+      .studio {
+        background: var(--panel);
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-md);
+        padding: 28px;
+        box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.5);
+        margin-bottom: 24px;
+      }
+
+      .section-label {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        display: block;
+        margin-bottom: 14px;
+      }
+
+      /* Drop zone / image preview */
+      .dropzone {
+        border: 2px dashed var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 28px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        background: rgba(3, 7, 18, 0.4);
+      }
+
+      .dropzone:hover,
+      .dropzone.dragover {
+        border-color: var(--accent);
+        background: rgba(52, 211, 153, 0.05);
+      }
+
+      .dropzone p {
+        color: var(--text-muted);
+        font-size: 14px;
+      }
+
+      .dropzone .hint {
+        color: var(--text-dim);
+        font-size: 12px;
+        margin-top: 6px;
+      }
+
+      .preview-wrap {
+        margin-top: 16px;
+        display: none;
+        text-align: center;
+      }
+
+      .preview-wrap.visible {
+        display: block;
+      }
+
+      .preview-wrap img {
+        max-width: 100%;
+        max-height: 320px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--panel-border);
+      }
+
+      .image-meta {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--text-dim);
+        margin-top: 10px;
+      }
+
+      textarea {
+        width: 100%;
+        background: rgba(17, 24, 39, 0.8);
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: var(--font-sans);
+        font-size: 15px;
+        padding: 12px 14px;
+        resize: vertical;
+        min-height: 90px;
+        line-height: 1.5;
+      }
+
+      textarea:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-glow);
+      }
+
+      .counter {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--text-dim);
+        margin-top: 8px;
+        text-align: right;
+      }
+
+      .actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 14px;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        background: var(--accent);
+        color: #030712;
+        border: none;
+        border-radius: 8px;
+        padding: 11px 18px;
+        font-family: var(--font-sans);
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+
+      .btn:hover {
+        background: var(--accent-hover);
+      }
+
+      .btn:focus-visible,
+      .btn-ghost:focus-visible,
+      .dropzone:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      .btn-ghost {
+        background: rgba(31, 41, 55, 0.6);
+        border: 1px solid var(--panel-border);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 11px 16px;
+        font-family: var(--font-sans);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+
+      .btn-ghost:hover {
+        background: rgba(55, 65, 81, 0.8);
+      }
+
+      /* Feedback list */
+      .feedback-list {
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .feedback-item {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        padding: 12px 14px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--panel-border);
+        font-size: 14px;
+        line-height: 1.5;
+        background: rgba(3, 7, 18, 0.5);
+      }
+
+      .feedback-item .icon {
+        flex-shrink: 0;
+        font-size: 15px;
+        line-height: 1.4;
+      }
+
+      .feedback-item.pass {
+        border-color: rgba(16, 185, 129, 0.35);
+        color: var(--text);
+      }
+
+      .feedback-item.warn {
+        border-color: rgba(245, 158, 11, 0.35);
+        color: var(--text);
+      }
+
+      .feedback-item.fail {
+        border-color: rgba(239, 68, 68, 0.35);
+        color: var(--text);
+      }
+
+      .tips {
+        margin-top: 6px;
+        font-size: 13px;
+        color: var(--text-muted);
+        line-height: 1.7;
+      }
+
+      .tips ul {
+        margin: 8px 0 0 18px;
+      }
+
+      .note {
+        margin-top: 16px;
+        font-size: 13px;
+        color: var(--text-muted);
+        line-height: 1.6;
+        background: rgba(52, 211, 153, 0.06);
+        border: 1px solid rgba(52, 211, 153, 0.25);
+        border-radius: var(--radius-sm);
+        padding: 12px 14px;
+      }
+
+      .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+      }
+
+      .footer-note {
+        text-align: center;
+        color: var(--text-dim);
+        font-size: 13px;
+        margin-top: 8px;
+      }
+
+      .footer-note a {
+        color: var(--text-muted);
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background: var(--text);
+        color: var(--bg);
+        padding: 12px 22px;
+        border-radius: 99px;
+        font-family: var(--font-sans);
+        font-weight: 600;
+        font-size: 14px;
+        opacity: 0;
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        z-index: 100;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      }
+
+      .toast.show {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+      }
+
+      @media (max-width: 640px) {
+        .studio {
+          padding: 20px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="hero">
+        <div class="eyebrow">Accessibility</div>
+        <h1 class="wordmark">Alt Text Helper</h1>
+        <p class="tagline">Preview an image, draft its alt text, and get instant feedback on whether it's clear, concise, and accessible — with a scaffold to help you get started.</p>
+      </header>
+
+      <main class="studio">
+        <span class="section-label">Image (optional)</span>
+        <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Upload an image, or press Enter to browse files">
+          <p>Click, press Enter, or drag an image here</p>
+          <p class="hint">Stays on your device — never uploaded</p>
+        </div>
+        <input type="file" id="fileInput" accept="image/*" class="visually-hidden" />
+
+        <div class="preview-wrap" id="previewWrap">
+          <img id="previewImage" alt="Preview of the image you selected" />
+          <div class="image-meta" id="imageMeta"></div>
+        </div>
+      </main>
+
+      <main class="studio">
+        <label class="section-label" for="altInput">Your alt text draft</label>
+        <textarea id="altInput" spellcheck="true" placeholder="Describe what the image shows and why it matters in context…"></textarea>
+        <div class="counter" id="counter">0 characters</div>
+        <div class="actions">
+          <button class="btn" id="btnCheck" type="button">Check alt text</button>
+          <button class="btn-ghost" id="btnScaffold" type="button">Insert scaffold</button>
+          <button class="btn-ghost" id="btnCopy" type="button">Copy alt text</button>
+          <button class="btn-ghost" id="btnClear" type="button">Clear</button>
+        </div>
+        <div class="note">This tool runs fully offline and can't "see" the image contents — you write the description, and it checks the wording for common accessibility issues. Use the scaffold as a starting prompt, then replace the placeholders with what you actually see.</div>
+      </main>
+
+      <main class="studio">
+        <span class="section-label">Feedback</span>
+        <ul class="feedback-list" id="feedbackList">
+          <li class="feedback-item" style="border-style: dashed">
+            <span class="icon">💡</span>
+            <span>Enter a draft above and click <strong>Check alt text</strong> to see feedback.</span>
+          </li>
+        </ul>
+
+        <div class="tips">
+          <strong>Tips for effective alt text:</strong>
+          <ul>
+            <li>Describe the content and function, not just "image of…".</li>
+            <li>Keep it concise — aim for roughly 5–15 words (under ~125 characters).</li>
+            <li>Don't start with "picture of" or "image of" — screen readers already announce it's an image.</li>
+            <li>Convey context: why is this image here, what does it communicate?</li>
+            <li>Use empty <code>alt=""</code> for purely decorative images.</li>
+          </ul>
+        </div>
+      </main>
+
+      <p class="footer-note">Part of <a href="https://github.com/praveenscience/One-File-Tools">One File Tools</a>. Images and text never leave your browser.</p>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script>
+      /* ==========================================================
+         Alt Text Helper
+         Vanilla JS, no dependencies. Analyzes the wording of a
+         user-written alt text draft — it does not analyze image
+         pixels (impossible offline without an ML model).
+         ========================================================== */
+
+      const dropzone = document.getElementById("dropzone");
+      const fileInput = document.getElementById("fileInput");
+      const previewWrap = document.getElementById("previewWrap");
+      const previewImage = document.getElementById("previewImage");
+      const imageMeta = document.getElementById("imageMeta");
+      const altInput = document.getElementById("altInput");
+      const counter = document.getElementById("counter");
+      const btnCheck = document.getElementById("btnCheck");
+      const btnScaffold = document.getElementById("btnScaffold");
+      const btnCopy = document.getElementById("btnCopy");
+      const btnClear = document.getElementById("btnClear");
+      const feedbackList = document.getElementById("feedbackList");
+      const toast = document.getElementById("toast");
+
+      // Keeps the current object URL so we can revoke it and avoid leaks.
+      let currentObjectUrl = null;
+      let currentFileName = "";
+
+      const IDEAL_MAX = 125; // Common screen-reader-friendly upper bound.
+      const HARD_MAX = 250;
+
+      // Phrases that add no value because assistive tech already says "image".
+      const REDUNDANT_PREFIXES = ["image of", "picture of", "photo of", "photograph of", "graphic of", "pic of", "an image of", "a picture of", "a photo of"];
+
+      // Vague, low-information words that rarely help a screen-reader user.
+      const VAGUE_WORDS = ["image", "picture", "photo", "graphic", "thing", "stuff", "item", "content", "logo", "icon", "banner"];
+
+      /** Shows a brief toast message. */
+      function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add("show");
+        setTimeout(() => toast.classList.remove("show"), 2000);
+      }
+
+      /** Loads a selected file into the preview and records its metadata. */
+      function loadFile(file) {
+        if (!file || !file.type.startsWith("image/")) {
+          showToast("Please choose an image file");
+          return;
+        }
+        if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
+        currentObjectUrl = URL.createObjectURL(file);
+        currentFileName = file.name;
+
+        previewImage.src = currentObjectUrl;
+        previewImage.onload = () => {
+          const kb = Math.round(file.size / 1024);
+          imageMeta.textContent = file.name + " · " + previewImage.naturalWidth + "×" + previewImage.naturalHeight + " · " + kb + " KB";
+        };
+        previewWrap.classList.add("visible");
+      }
+
+      /** Builds a fill-in-the-blank scaffold to prompt a good description. */
+      function buildScaffold() {
+        const subject = "[main subject]";
+        const action = "[what it's doing or showing]";
+        const context = "[why it matters here]";
+        return subject + " " + action + ", " + context;
+      }
+
+      /** Renders a list of feedback items. */
+      function renderFeedback(items) {
+        feedbackList.innerHTML = "";
+        items.forEach((item) => {
+          const li = document.createElement("li");
+          li.className = "feedback-item " + item.level;
+          const icon = document.createElement("span");
+          icon.className = "icon";
+          icon.textContent = item.level === "pass" ? "✅" : item.level === "warn" ? "⚠️" : "❌";
+          const text = document.createElement("span");
+          text.innerHTML = item.message;
+          li.appendChild(icon);
+          li.appendChild(text);
+          feedbackList.appendChild(li);
+        });
+      }
+
+      /** Analyzes the alt text draft and returns a list of feedback items. */
+      function analyze(text) {
+        const trimmed = text.trim();
+        const items = [];
+
+        if (trimmed === "") {
+          items.push({
+            level: "warn",
+            message: 'Alt text is empty. That\'s correct only for <strong>purely decorative</strong> images (use <code>alt=""</code>). For meaningful images, describe them.'
+          });
+          return items;
+        }
+
+        const lower = trimmed.toLowerCase();
+        const length = trimmed.length;
+        const words = trimmed.split(/\s+/).filter(Boolean);
+
+        // Length checks.
+        if (length > HARD_MAX) {
+          items.push({ level: "fail", message: "Too long (" + length + " chars). Alt text over ~" + HARD_MAX + " characters is hard to consume via a screen reader — trim to the essentials." });
+        } else if (length > IDEAL_MAX) {
+          items.push({ level: "warn", message: "A bit long (" + length + " chars). Aim for under ~" + IDEAL_MAX + " characters where possible." });
+        } else if (words.length < 2) {
+          items.push({ level: "warn", message: "Very short — one word rarely conveys enough. Add what the subject is doing or why it's shown." });
+        } else {
+          items.push({ level: "pass", message: "Length looks good (" + length + " chars)." });
+        }
+
+        // Redundant prefix.
+        const badPrefix = REDUNDANT_PREFIXES.find((p) => lower.startsWith(p));
+        if (badPrefix) {
+          items.push({ level: "fail", message: 'Starts with "<strong>' + badPrefix + "</strong>\". Screen readers already announce it's an image — drop that opener." });
+        } else {
+          items.push({ level: "pass", message: 'No redundant "image of / picture of" opener.' });
+        }
+
+        // Vague-only content.
+        const meaningfulWords = words.filter((w) => !VAGUE_WORDS.includes(w.toLowerCase().replace(/[^a-z]/gi, "")));
+        if (meaningfulWords.length === 0) {
+          items.push({ level: "fail", message: 'Only vague words detected. Describe the actual subject and its purpose, not just "image" or "logo".' });
+        } else if (meaningfulWords.length < words.length / 2) {
+          items.push({ level: "warn", message: "Fairly vague — a lot of the words are generic. Add concrete, specific detail." });
+        }
+
+        // Repetition of a single word.
+        const wordCounts = {};
+        words.forEach((w) => {
+          const key = w.toLowerCase().replace(/[^a-z]/gi, "");
+          if (key) wordCounts[key] = (wordCounts[key] || 0) + 1;
+        });
+        const repeated = Object.entries(wordCounts).filter(([w, count]) => count >= 3 && w.length > 2);
+        if (repeated.length > 0) {
+          items.push({ level: "warn", message: 'Repetitive — "<strong>' + repeated[0][0] + '</strong>" appears ' + repeated[0][1] + " times. Vary the wording." });
+        }
+
+        // Unfilled scaffold placeholders.
+        if (/\[.*?\]/.test(trimmed)) {
+          items.push({ level: "fail", message: "Contains unfilled placeholders like <code>[main subject]</code>. Replace them with real detail." });
+        }
+
+        // Trailing filename-looking content.
+        if (/\.(jpg|jpeg|png|gif|webp|svg)\b/i.test(trimmed)) {
+          items.push({ level: "warn", message: "Looks like it contains a filename. Describe the image, don't name the file." });
+        }
+
+        // Ends without being a fragment sentence is fine; encourage punctuation for longer text.
+        if (words.length >= 8 && !/[.!?]$/.test(trimmed)) {
+          items.push({ level: "warn", message: "Consider ending a full-sentence description with punctuation so a screen reader pauses naturally." });
+        }
+
+        return items;
+      }
+
+      // ---- Events ----
+
+      dropzone.addEventListener("click", () => fileInput.click());
+      dropzone.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          fileInput.click();
+        }
+      });
+
+      dropzone.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        dropzone.classList.add("dragover");
+      });
+      dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
+      dropzone.addEventListener("drop", (event) => {
+        event.preventDefault();
+        dropzone.classList.remove("dragover");
+        if (event.dataTransfer.files.length) loadFile(event.dataTransfer.files[0]);
+      });
+
+      fileInput.addEventListener("change", () => {
+        if (fileInput.files.length) loadFile(fileInput.files[0]);
+      });
+
+      altInput.addEventListener("input", () => {
+        const len = altInput.value.length;
+        counter.textContent = len + " character" + (len === 1 ? "" : "s");
+      });
+
+      btnCheck.addEventListener("click", () => {
+        renderFeedback(analyze(altInput.value));
+      });
+
+      btnScaffold.addEventListener("click", () => {
+        if (altInput.value.trim() === "") {
+          altInput.value = buildScaffold();
+        } else {
+          altInput.value = altInput.value.trim() + " " + buildScaffold();
+        }
+        altInput.dispatchEvent(new Event("input"));
+        altInput.focus();
+      });
+
+      btnCopy.addEventListener("click", () => {
+        const text = altInput.value.trim();
+        if (!text) {
+          showToast("Nothing to copy yet");
+          return;
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard
+            .writeText(text)
+            .then(() => showToast("Alt text copied!"))
+            .catch(() => showToast("Copy failed — select the text manually"));
+        } else {
+          showToast("Copy failed — clipboard unavailable");
+        }
+      });
+
+      btnClear.addEventListener("click", () => {
+        altInput.value = "";
+        altInput.dispatchEvent(new Event("input"));
+        if (currentObjectUrl) {
+          URL.revokeObjectURL(currentObjectUrl);
+          currentObjectUrl = null;
+        }
+        previewImage.removeAttribute("src");
+        previewWrap.classList.remove("visible");
+        imageMeta.textContent = "";
+        renderFeedback([{ level: "warn", message: "Cleared. Enter a new draft and check it again." }]);
+        altInput.focus();
+      });
+    </script>
+  </body>
+</html>
