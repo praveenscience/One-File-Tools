@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SVG Optimizer — One File Tools</title>
+    <style>
+      /* ========================================
+         Reset & Base
+         ======================================== */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        line-height: 1.6;
+        padding: 2rem;
+        max-width: 960px;
+        margin: 0 auto;
+        background: #fafafa;
+        color: #1a1a1a;
+      }
+
+      /* ========================================
+         Dark Mode
+         ======================================== */
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: #0a0a0a;
+          color: #e5e5e5;
+        }
+      }
+
+      /* ========================================
+         Your styles here
+         ======================================== */
+      header {
+        margin-bottom: 2rem;
+      }
+
+      .container {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+      }
+      @media (min-width: 768px) {
+        .container {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+
+      .card {
+        background: #ffffff;
+        border-radius: 8px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        border: 1px solid #eaeaea;
+        display: flex;
+        flex-direction: column;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .card {
+          background: #171717;
+          border-color: #333;
+        }
+      }
+
+      label {
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .badge {
+        background: #2563eb;
+        color: #fff;
+        font-size: 0.75rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: 9999px;
+      }
+
+      textarea {
+        width: 100%;
+        padding: 0.75rem;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 0.875rem;
+        background: #fff;
+        color: inherit;
+        resize: vertical;
+        min-height: 250px;
+        flex: 1;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        textarea {
+          background: #262626;
+          border-color: #444;
+        }
+      }
+
+      .preview-box {
+        margin-top: 1.5rem;
+        padding: 1rem;
+        border: 1px dashed #ccc;
+        border-radius: 4px;
+        background: #fff;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 150px;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .preview-box {
+          background: #111;
+          border-color: #444;
+        }
+      }
+
+      .preview-box svg {
+        max-width: 100%;
+        max-height: 250px;
+      }
+
+      .controls {
+        display: flex;
+        gap: 1rem;
+        margin-top: 1rem;
+      }
+
+      button {
+        padding: 0.5rem 1rem;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.875rem;
+        font-weight: 500;
+        transition: background-color 0.2s;
+      }
+
+      .btn-primary {
+        background: #2563eb;
+        color: #fff;
+      }
+      .btn-primary:hover {
+        background: #1d4ed8;
+      }
+
+      .stats {
+        margin-top: 1rem;
+        font-size: 0.875rem;
+        color: #10b981;
+        font-weight: 600;
+      }
+
+      footer {
+        margin-top: 3rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>SVG Optimizer</h1>
+      <p>Compress and optimize raw SVG code by removing unnecessary metadata, empty tags, and comments.</p>
+    </header>
+
+    <main>
+      <div class="container">
+        <!-- Input Section -->
+        <div class="card">
+          <label>Raw SVG Input <span class="badge" id="raw-size">0 B</span></label>
+          <textarea id="raw-svg" placeholder="Paste your raw SVG code here..."></textarea>
+          <div class="controls">
+            <button class="btn-primary" id="optimize-btn">Optimize SVG</button>
+          </div>
+        </div>
+
+        <!-- Output Section -->
+        <div class="card">
+          <label>Optimized SVG Output <span class="badge" id="opt-size" style="background: #10b981">0 B</span></label>
+          <textarea id="opt-svg" readonly placeholder="Optimized code will appear here..."></textarea>
+          <div class="controls">
+            <button class="btn-primary" id="copy-btn">Copy to Clipboard</button>
+            <button class="btn-primary" id="download-btn" style="background: #4b5563">Download .svg</button>
+          </div>
+          <div id="savings" class="stats"></div>
+
+          <label style="margin-top: 1.5rem">Live Preview</label>
+          <div class="preview-box" id="preview-container">
+            <span style="color: #666; font-size: 0.875rem">Preview will appear here</span>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      <p>
+        Part of
+        <a href="https://github.com/praveenscience/One-File-Tools">One File Tools</a>
+      </p>
+    </footer>
+
+    <script>
+      const rawSvgInput = document.getElementById("raw-svg");
+      const optSvgInput = document.getElementById("opt-svg");
+      const rawSizeBadge = document.getElementById("raw-size");
+      const optSizeBadge = document.getElementById("opt-size");
+      const savingsInfo = document.getElementById("savings");
+      const previewContainer = document.getElementById("preview-container");
+
+      const optimizeBtn = document.getElementById("optimize-btn");
+      const copyBtn = document.getElementById("copy-btn");
+      const downloadBtn = document.getElementById("download-btn");
+
+      function formatBytes(bytes) {
+        if (bytes === 0) return "0 B";
+        const k = 1024;
+        const sizes = ["B", "KB", "MB"];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+      }
+
+      function updateSizeInfo(rawStr, optStr) {
+        const rawBytes = new Blob([rawStr]).size;
+        const optBytes = new Blob([optStr]).size;
+
+        rawSizeBadge.textContent = formatBytes(rawBytes);
+        optSizeBadge.textContent = formatBytes(optBytes);
+
+        if (rawBytes > 0) {
+          const savings = rawBytes - optBytes;
+          const percent = ((savings / rawBytes) * 100).toFixed(1);
+          if (savings > 0) {
+            savingsInfo.textContent = `Saved ${formatBytes(savings)} (${percent}%)!`;
+          } else {
+            savingsInfo.textContent = "Already optimized!";
+            savingsInfo.style.color = "#6b7280";
+          }
+        } else {
+          savingsInfo.textContent = "";
+        }
+      }
+
+      function optimizeSVG(svgString) {
+        if (!svgString.trim()) return "";
+
+        try {
+          // Parse SVG string to DOM
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(svgString, "image/svg+xml");
+
+          if (doc.querySelector("parsererror")) {
+            throw new Error("Invalid SVG format");
+          }
+
+          // 1. Remove unnecessary metadata elements
+          const tagsToRemove = ["title", "desc", "metadata", "defs"];
+          tagsToRemove.forEach((tag) => {
+            const elements = doc.querySelectorAll(tag);
+            elements.forEach((el) => {
+              // only remove defs if it's completely empty
+              if (tag === "defs" && el.children.length > 0) return;
+              el.parentNode.removeChild(el);
+            });
+          });
+
+          // 2. Remove comments and empty text nodes
+          const walker = document.createTreeWalker(doc, NodeFilter.SHOW_COMMENT | NodeFilter.SHOW_TEXT, null, false);
+          const nodesToRemove = [];
+          let node;
+          while ((node = walker.nextNode())) {
+            if (node.nodeType === Node.COMMENT_NODE) {
+              nodesToRemove.push(node);
+            } else if (node.nodeType === Node.TEXT_NODE && node.nodeValue.trim() === "") {
+              nodesToRemove.push(node);
+            }
+          }
+          nodesToRemove.forEach((n) => n.parentNode.removeChild(n));
+
+          // 3. Remove empty groups <g> recursively
+          let removedGroup;
+          do {
+            removedGroup = false;
+            const groups = doc.querySelectorAll("g");
+            groups.forEach((g) => {
+              if (g.children.length === 0) {
+                g.parentNode.removeChild(g);
+                removedGroup = true;
+              }
+            });
+          } while (removedGroup);
+
+          // Serialize back to string
+          const serializer = new XMLSerializer();
+          let optimized = serializer.serializeToString(doc.documentElement);
+
+          // 4. Minify string (remove unnecessary whitespace between tags)
+          optimized = optimized.replace(/>\s+</g, "><");
+          // Remove whitespace around self closing tags
+          optimized = optimized.replace(/\s+\/>/g, "/>");
+
+          return optimized;
+        } catch (e) {
+          alert("Error parsing SVG: " + e.message);
+          return svgString;
+        }
+      }
+
+      function handleOptimization() {
+        const rawSvg = rawSvgInput.value;
+        const optimizedSvg = optimizeSVG(rawSvg);
+
+        optSvgInput.value = optimizedSvg;
+        updateSizeInfo(rawSvg, optimizedSvg);
+
+        if (optimizedSvg) {
+          previewContainer.innerHTML = optimizedSvg;
+        } else {
+          previewContainer.innerHTML = '<span style="color: #666; font-size: 0.875rem;">Preview will appear here</span>';
+        }
+      }
+
+      optimizeBtn.addEventListener("click", handleOptimization);
+
+      // Auto-update when pasting
+      rawSvgInput.addEventListener("input", () => {
+        // optionally auto-optimize on paste
+        handleOptimization();
+      });
+
+      copyBtn.addEventListener("click", () => {
+        if (!optSvgInput.value) return;
+        navigator.clipboard.writeText(optSvgInput.value).then(() => {
+          const orig = copyBtn.textContent;
+          copyBtn.textContent = "Copied!";
+          setTimeout(() => (copyBtn.textContent = orig), 1500);
+        });
+      });
+
+      downloadBtn.addEventListener("click", () => {
+        if (!optSvgInput.value) return;
+        const blob = new Blob([optSvgInput.value], { type: "image/svg+xml" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "optimized.svg";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      });
+
+      // Init
+      updateSizeInfo("", "");
+    </script>
+  </body>
+</html>

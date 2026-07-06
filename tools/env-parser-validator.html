@@ -1,0 +1,1492 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Parse, inspect, validate, and export .env files locally in your browser without uploading secrets." />
+    <title>.env Parser & Validator - One File Tools</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg-a: #172554;
+        --bg-b: #155e75;
+        --bg-c: #2f3f46;
+        --panel: rgba(255, 255, 255, 0.14);
+        --panel-strong: rgba(255, 255, 255, 0.21);
+        --panel-soft: rgba(255, 255, 255, 0.08);
+        --text: #f8fafc;
+        --muted: #cbd5e1;
+        --subtle: #94a3b8;
+        --border: rgba(255, 255, 255, 0.22);
+        --border-strong: rgba(255, 255, 255, 0.38);
+        --focus: #fcd34d;
+        --good: #34d399;
+        --good-bg: rgba(16, 185, 129, 0.18);
+        --warn: #fbbf24;
+        --warn-bg: rgba(251, 191, 36, 0.18);
+        --bad: #fb7185;
+        --bad-bg: rgba(244, 63, 94, 0.2);
+        --info: #67e8f9;
+        --info-bg: rgba(103, 232, 249, 0.17);
+        --shadow: 0 24px 80px rgba(2, 6, 23, 0.34);
+        --radius: 8px;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        min-width: 320px;
+        background: var(--bg-a);
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--text);
+        font-family: var(--sans);
+        background: radial-gradient(circle at 15% 5%, rgba(56, 189, 248, 0.34), transparent 28rem), radial-gradient(circle at 85% 10%, rgba(244, 114, 182, 0.22), transparent 26rem), linear-gradient(135deg, var(--bg-a), var(--bg-b) 54%, var(--bg-c));
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+
+      button,
+      .file-button {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        min-height: 40px;
+        color: var(--text);
+        background: var(--panel);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.45rem;
+        padding: 0.55rem 0.78rem;
+        cursor: pointer;
+        transition:
+          transform 160ms ease,
+          background 160ms ease,
+          border-color 160ms ease;
+      }
+
+      button:hover,
+      .file-button:hover {
+        background: var(--panel-strong);
+        border-color: var(--border-strong);
+        transform: translateY(-1px);
+      }
+
+      button:focus-visible,
+      input:focus-visible,
+      select:focus-visible,
+      textarea:focus-visible,
+      .file-button:focus-within {
+        outline: 3px solid var(--focus);
+        outline-offset: 2px;
+      }
+
+      button svg,
+      .file-button svg {
+        width: 1rem;
+        height: 1rem;
+        flex: 0 0 auto;
+      }
+
+      .app {
+        width: min(1480px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 24px 0 36px;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 1rem;
+        align-items: end;
+        margin-bottom: 18px;
+      }
+
+      .eyebrow {
+        margin: 0 0 0.35rem;
+        color: var(--info);
+        font-size: 0.75rem;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(2rem, 5vw, 4.6rem);
+        line-height: 0.95;
+        letter-spacing: 0;
+      }
+
+      .hero p {
+        max-width: 780px;
+        margin: 0.8rem 0 0;
+        color: var(--muted);
+        font-size: 1.03rem;
+      }
+
+      .privacy-badge {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: rgba(15, 23, 42, 0.44);
+        padding: 0.8rem 0.95rem;
+        color: #e0f2fe;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .toolbar {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        display: flex;
+        gap: 0.65rem;
+        align-items: center;
+        flex-wrap: wrap;
+        padding: 12px;
+        margin-bottom: 16px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: rgba(15, 23, 42, 0.72);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(18px);
+      }
+
+      .toolbar-spacer {
+        flex: 1 1 auto;
+      }
+
+      .file-button input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .workspace {
+        display: grid;
+        grid-template-columns: minmax(320px, 0.84fr) minmax(420px, 1.16fr);
+        gap: 16px;
+        align-items: start;
+      }
+
+      .panel {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--panel);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(18px);
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.8rem;
+        padding: 14px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .panel-title {
+        margin: 0;
+        font-size: 0.98rem;
+        letter-spacing: 0;
+      }
+
+      .drop-zone {
+        margin: 14px;
+        border: 1px dashed var(--border-strong);
+        border-radius: var(--radius);
+        padding: 13px;
+        color: var(--muted);
+        background: rgba(15, 23, 42, 0.26);
+        text-align: center;
+        transition:
+          background 160ms ease,
+          border-color 160ms ease;
+      }
+
+      .drop-zone.is-dragging {
+        background: rgba(103, 232, 249, 0.18);
+        border-color: var(--info);
+      }
+
+      .editor-shell {
+        display: grid;
+        grid-template-columns: 62px minmax(0, 1fr);
+        min-height: 560px;
+        border-top: 1px solid var(--border);
+        background: rgba(2, 6, 23, 0.46);
+      }
+
+      .line-gutter {
+        padding: 14px 0;
+        overflow: hidden;
+        border-right: 1px solid var(--border);
+        color: var(--subtle);
+        background: rgba(2, 6, 23, 0.36);
+        font: 0.875rem/1.55 var(--mono);
+        text-align: right;
+        user-select: none;
+      }
+
+      .line-number {
+        height: 1.55em;
+        padding: 0 11px 0 4px;
+        border-right: 3px solid transparent;
+      }
+
+      .line-number.has-error {
+        color: #fecdd3;
+        border-color: var(--bad);
+        background: var(--bad-bg);
+      }
+
+      .line-number.has-warning {
+        color: #fde68a;
+        border-color: var(--warn);
+        background: var(--warn-bg);
+      }
+
+      .editor {
+        width: 100%;
+        min-height: 560px;
+        resize: vertical;
+        border: 0;
+        padding: 14px;
+        color: #e2e8f0;
+        background: linear-gradient(90deg, rgba(103, 232, 249, 0.08), transparent 18%), transparent;
+        font: 0.875rem/1.55 var(--mono);
+        caret-color: var(--focus);
+        tab-size: 2;
+      }
+
+      .editor::placeholder {
+        color: #94a3b8;
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+
+      .stat {
+        min-height: 88px;
+        padding: 13px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: rgba(255, 255, 255, 0.11);
+      }
+
+      .stat span {
+        display: block;
+        color: var(--muted);
+        font-size: 0.76rem;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .stat strong {
+        display: block;
+        margin-top: 0.45rem;
+        font-size: 1.8rem;
+        line-height: 1;
+      }
+
+      .controls {
+        display: grid;
+        grid-template-columns: minmax(220px, 1fr) 170px 160px;
+        gap: 10px;
+        padding: 14px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .field {
+        position: relative;
+      }
+
+      .field svg {
+        position: absolute;
+        left: 0.8rem;
+        top: 50%;
+        width: 1rem;
+        height: 1rem;
+        color: var(--subtle);
+        transform: translateY(-50%);
+        pointer-events: none;
+      }
+
+      .search,
+      select {
+        width: 100%;
+        min-height: 42px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        color: var(--text);
+        background: rgba(15, 23, 42, 0.48);
+      }
+
+      .search {
+        padding: 0.6rem 0.8rem 0.6rem 2.2rem;
+      }
+
+      select {
+        padding: 0.6rem 0.72rem;
+      }
+
+      .table-wrap {
+        overflow: auto;
+        max-height: 620px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 820px;
+      }
+
+      th,
+      td {
+        padding: 0.72rem 0.8rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.13);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        background: rgba(15, 23, 42, 0.94);
+        color: var(--muted);
+        font-size: 0.75rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      th button {
+        min-height: auto;
+        padding: 0;
+        border: 0;
+        color: inherit;
+        background: transparent;
+        font-size: inherit;
+        font-weight: 800;
+        letter-spacing: inherit;
+        text-transform: inherit;
+      }
+
+      tbody tr:hover {
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .key-cell,
+      .value-cell {
+        font-family: var(--mono);
+        overflow-wrap: anywhere;
+      }
+
+      .value-cell {
+        max-width: 360px;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.32rem;
+        min-height: 24px;
+        padding: 0.18rem 0.5rem;
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+        color: var(--text);
+        font-size: 0.75rem;
+        font-weight: 800;
+        white-space: nowrap;
+      }
+
+      .badge.good {
+        color: #bbf7d0;
+        background: var(--good-bg);
+        border-color: rgba(52, 211, 153, 0.38);
+      }
+
+      .badge.warn {
+        color: #fde68a;
+        background: var(--warn-bg);
+        border-color: rgba(251, 191, 36, 0.42);
+      }
+
+      .badge.bad {
+        color: #fecdd3;
+        background: var(--bad-bg);
+        border-color: rgba(251, 113, 133, 0.45);
+      }
+
+      .badge.info {
+        color: #cffafe;
+        background: var(--info-bg);
+        border-color: rgba(103, 232, 249, 0.42);
+      }
+
+      .actions {
+        display: flex;
+        gap: 0.4rem;
+        flex-wrap: wrap;
+      }
+
+      .icon-button {
+        width: 36px;
+        height: 36px;
+        min-height: 36px;
+        padding: 0;
+      }
+
+      .empty-state {
+        padding: 44px 20px;
+        color: var(--muted);
+        text-align: center;
+      }
+
+      .exports {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+        margin-top: 16px;
+      }
+
+      .export-panel {
+        padding: 14px;
+      }
+
+      .export-panel h3 {
+        margin: 0 0 0.7rem;
+        font-size: 0.98rem;
+      }
+
+      .option-row {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        flex-wrap: wrap;
+        margin-bottom: 0.75rem;
+      }
+
+      .check {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.42rem;
+        color: var(--muted);
+      }
+
+      .export-box {
+        width: 100%;
+        min-height: 178px;
+        resize: vertical;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 0.75rem;
+        color: #e2e8f0;
+        background: rgba(2, 6, 23, 0.48);
+        font: 0.82rem/1.5 var(--mono);
+      }
+
+      .issues-list {
+        display: grid;
+        gap: 8px;
+        max-height: 230px;
+        overflow: auto;
+        padding: 14px;
+      }
+
+      .issue {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 0.65rem 0.75rem;
+        background: rgba(15, 23, 42, 0.32);
+      }
+
+      .issue strong {
+        display: block;
+        margin-bottom: 0.18rem;
+      }
+
+      .issue span {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .toast {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        z-index: 50;
+        max-width: min(360px, calc(100% - 36px));
+        padding: 0.8rem 1rem;
+        border: 1px solid rgba(52, 211, 153, 0.55);
+        border-radius: var(--radius);
+        color: #dcfce7;
+        background: rgba(6, 78, 59, 0.95);
+        box-shadow: var(--shadow);
+        opacity: 0;
+        transform: translateY(12px);
+        transition:
+          opacity 180ms ease,
+          transform 180ms ease;
+        pointer-events: none;
+      }
+
+      .toast.is-visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      @media (max-width: 1120px) {
+        .workspace,
+        .exports {
+          grid-template-columns: 1fr;
+        }
+
+        .stats-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 720px) {
+        .app {
+          width: min(100% - 20px, 1480px);
+          padding-top: 14px;
+        }
+
+        .hero {
+          grid-template-columns: 1fr;
+        }
+
+        .privacy-badge {
+          white-space: normal;
+        }
+
+        .toolbar {
+          position: static;
+        }
+
+        .controls,
+        .stats-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .editor-shell {
+          grid-template-columns: 48px minmax(0, 1fr);
+        }
+
+        h1 {
+          font-size: clamp(2rem, 14vw, 3.4rem);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          transition-duration: 0.01ms !important;
+          animation-duration: 0.01ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Developer Utilities</p>
+          <h1>.env Parser & Validator</h1>
+          <p>Inspect configuration files locally with duplicate detection, secret masking, type hints, cleanup exports, and live validation.</p>
+        </div>
+        <div class="privacy-badge" aria-label="Privacy notice">Local only. No uploads.</div>
+      </header>
+
+      <nav class="toolbar" aria-label="Primary actions">
+        <label class="file-button" title="Open .env file">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" d="M4 17V7a2 2 0 0 1 2-2h5l2 2h5a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z" /></svg>
+          Open
+          <input id="fileInput" type="file" accept=".env,text/plain" aria-label="Open .env file" />
+        </label>
+        <button type="button" id="sampleButton" title="Load sample .env">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5" /></svg>
+          Sample
+        </button>
+        <button type="button" id="clearButton" title="Clear editor">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /></svg>
+          Clear
+        </button>
+        <div class="toolbar-spacer"></div>
+        <button type="button" id="downloadEnvButton" title="Download cleaned .env">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14" /></svg>
+          .env
+        </button>
+        <button type="button" id="downloadJsonButton" title="Download JSON">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14" /></svg>
+          JSON
+        </button>
+      </nav>
+
+      <section class="workspace">
+        <div class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">Editor</h2>
+            <span id="lineSummary" class="badge info">0 lines</span>
+          </div>
+          <div id="dropZone" class="drop-zone">Drop a .env file here or paste content below.</div>
+          <div class="editor-shell">
+            <div id="lineGutter" class="line-gutter" aria-hidden="true"></div>
+            <textarea id="envInput" class="editor" spellcheck="false" aria-label=".env content editor" placeholder="# Paste .env content here&#10;PORT=3000&#10;NODE_ENV=development&#10;DATABASE_URL=postgres://localhost/app&#10;DEBUG=true"></textarea>
+          </div>
+        </div>
+
+        <div>
+          <section class="stats-grid" aria-label="Validation statistics">
+            <div class="stat"><span>Total variables</span><strong id="totalStat">0</strong></div>
+            <div class="stat"><span>Valid</span><strong id="validStat">0</strong></div>
+            <div class="stat"><span>Errors</span><strong id="errorStat">0</strong></div>
+            <div class="stat"><span>Warnings</span><strong id="warningStat">0</strong></div>
+            <div class="stat"><span>Secrets</span><strong id="secretStat">0</strong></div>
+            <div class="stat"><span>Empty values</span><strong id="emptyStat">0</strong></div>
+            <div class="stat"><span>Duplicate keys</span><strong id="duplicateStat">0</strong></div>
+            <div class="stat"><span>Malformed</span><strong id="malformedStat">0</strong></div>
+          </section>
+
+          <section class="panel" aria-label="Parsed variables">
+            <div class="controls">
+              <label class="field">
+                <span class="sr-only">Search variables</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" d="m21 21-4.3-4.3M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" /></svg>
+                <input id="searchInput" class="search" type="search" placeholder="Search key, value, type, status" autocomplete="off" />
+              </label>
+              <label>
+                <span class="sr-only">Filter variables</span>
+                <select id="filterSelect">
+                  <option value="all">All</option>
+                  <option value="errors">Errors</option>
+                  <option value="warnings">Warnings</option>
+                  <option value="secrets">Secrets</option>
+                  <option value="empty">Empty</option>
+                  <option value="duplicate">Duplicate</option>
+                  <option value="valid">Valid</option>
+                  <option value="malformed">Malformed</option>
+                </select>
+              </label>
+              <label>
+                <span class="sr-only">Rows per page</span>
+                <select id="pageSizeSelect">
+                  <option value="25">25 rows</option>
+                  <option value="50" selected>50 rows</option>
+                  <option value="100">100 rows</option>
+                  <option value="5000">All rows</option>
+                </select>
+              </label>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th><button type="button" data-sort="index">#</button></th>
+                    <th><button type="button" data-sort="key">Variable name</button></th>
+                    <th><button type="button" data-sort="value">Value</button></th>
+                    <th><button type="button" data-sort="type">Type</button></th>
+                    <th><button type="button" data-sort="status">Status</button></th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="variableBody"></tbody>
+              </table>
+              <div id="emptyState" class="empty-state">Paste or upload a .env file to begin.</div>
+            </div>
+            <div class="panel-header">
+              <button type="button" id="prevPage">Previous</button>
+              <span id="pageSummary" class="badge info">Page 1 of 1</span>
+              <button type="button" id="nextPage">Next</button>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section class="exports">
+        <div class="panel export-panel">
+          <h3>JSON Export</h3>
+          <div class="option-row">
+            <label class="check"><input id="prettyJson" type="checkbox" checked /> Pretty JSON</label>
+            <button type="button" id="copyJsonButton">Copy JSON</button>
+          </div>
+          <textarea id="jsonOutput" class="export-box" readonly aria-label="JSON export"></textarea>
+        </div>
+
+        <div class="panel export-panel">
+          <h3>Clean .env Export</h3>
+          <div class="option-row">
+            <label class="check"><input id="removeDuplicates" type="checkbox" checked /> Remove duplicates</label>
+            <label class="check"><input id="removeComments" type="checkbox" /> Remove comments</label>
+            <button type="button" id="copyEnvButton">Copy .env</button>
+          </div>
+          <textarea id="envOutput" class="export-box" readonly aria-label="Clean .env export"></textarea>
+        </div>
+      </section>
+
+      <section class="panel" style="margin-top: 16px" aria-label="Validation issues">
+        <div class="panel-header">
+          <h2 class="panel-title">Validation Summary</h2>
+          <span id="summaryBadge" class="badge good">Ready</span>
+        </div>
+        <div id="issuesList" class="issues-list"></div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script>
+      (() => {
+        "use strict";
+
+        const sampleEnv = ["# Application", "PORT=3000", "NODE_ENV=development", "DEBUG=true", "", "# Database", "DATABASE_URL=postgres://localhost/app", "API_KEY=12345", "EMPTY_VALUE=", "SPACED = value", "BROKEN_LINE", "TOKEN='masked locally'"].join("\n");
+
+        const state = {
+          rows: [],
+          issues: [],
+          comments: [],
+          sortKey: "index",
+          sortDirection: "asc",
+          search: "",
+          filter: "all",
+          page: 1,
+          pageSize: 50,
+          revealed: new Set()
+        };
+
+        const sensitiveKeyPattern = /(API[_-]?KEY|SECRET|PASSWORD|TOKEN|PRIVATE[_-]?KEY|ACCESS[_-]?KEY|SESSION[_-]?SECRET|DATABASE[_-]?URL|JWT[_-]?SECRET|AUTH[_-]?TOKEN)/i;
+        const keyPattern = /^[A-Za-z_][A-Za-z0-9_]*$/;
+        const nodes = {
+          input: document.getElementById("envInput"),
+          fileInput: document.getElementById("fileInput"),
+          dropZone: document.getElementById("dropZone"),
+          lineGutter: document.getElementById("lineGutter"),
+          lineSummary: document.getElementById("lineSummary"),
+          body: document.getElementById("variableBody"),
+          empty: document.getElementById("emptyState"),
+          search: document.getElementById("searchInput"),
+          filter: document.getElementById("filterSelect"),
+          pageSize: document.getElementById("pageSizeSelect"),
+          pageSummary: document.getElementById("pageSummary"),
+          prevPage: document.getElementById("prevPage"),
+          nextPage: document.getElementById("nextPage"),
+          jsonOutput: document.getElementById("jsonOutput"),
+          envOutput: document.getElementById("envOutput"),
+          issuesList: document.getElementById("issuesList"),
+          summaryBadge: document.getElementById("summaryBadge"),
+          toast: document.getElementById("toast"),
+          prettyJson: document.getElementById("prettyJson"),
+          removeDuplicates: document.getElementById("removeDuplicates"),
+          removeComments: document.getElementById("removeComments"),
+          totalStat: document.getElementById("totalStat"),
+          validStat: document.getElementById("validStat"),
+          errorStat: document.getElementById("errorStat"),
+          warningStat: document.getElementById("warningStat"),
+          secretStat: document.getElementById("secretStat"),
+          emptyStat: document.getElementById("emptyStat"),
+          duplicateStat: document.getElementById("duplicateStat"),
+          malformedStat: document.getElementById("malformedStat")
+        };
+
+        function parseEnv(text) {
+          const rows = [];
+          const issues = [];
+          const comments = [];
+          const keyCounts = new Map();
+          const lines = text.replace(/\r\n?/g, "\n").split("\n");
+          let pendingComment = null;
+
+          lines.forEach((line, index) => {
+            const lineNumber = index + 1;
+            const trimmed = line.trim();
+            const hasTrailingSpace = /\s$/.test(line) && line.length > 0;
+
+            if (!trimmed) {
+              if (pendingComment) {
+                comments.push({ lineNumber: pendingComment.lineNumber, text: pendingComment.text, unused: true });
+                pendingComment = null;
+              }
+              return;
+            }
+
+            if (trimmed.startsWith("#")) {
+              if (pendingComment) {
+                comments.push({ lineNumber: pendingComment.lineNumber, text: pendingComment.text, unused: true });
+              }
+              pendingComment = { lineNumber, text: trimmed };
+              return;
+            }
+
+            const equalsIndex = line.indexOf("=");
+            if (equalsIndex === -1) {
+              issues.push(makeIssue(lineNumber, "error", "Missing equals sign", "Lines with variables must use KEY=value syntax."));
+              if (pendingComment) {
+                comments.push({ lineNumber: pendingComment.lineNumber, text: pendingComment.text, unused: true });
+                pendingComment = null;
+              }
+              return;
+            }
+
+            const rawKey = line.slice(0, equalsIndex);
+            const key = rawKey.trim();
+            const rawValue = line.slice(equalsIndex + 1);
+            const parsedValue = parseValue(rawValue);
+            const warnings = [];
+            const errors = [];
+
+            if (!key) {
+              errors.push("Missing variable name");
+            } else if (!keyPattern.test(key)) {
+              errors.push("Invalid key name");
+            }
+
+            if (rawKey !== key || /^\s/.test(rawValue)) {
+              warnings.push("Whitespace around equals sign");
+            }
+
+            if (hasTrailingSpace) {
+              warnings.push("Trailing spaces");
+            }
+
+            if (parsedValue.error) {
+              errors.push(parsedValue.error);
+            }
+
+            if (parsedValue.value.length === 0) {
+              warnings.push("Empty value");
+            }
+
+            if (isSuspiciousValue(key, parsedValue.value)) {
+              warnings.push("Suspicious value");
+            }
+
+            const isSecret = sensitiveKeyPattern.test(key);
+            const row = {
+              index: rows.length + 1,
+              lineNumber,
+              key,
+              value: parsedValue.value,
+              rawValue: rawValue.trim(),
+              quote: parsedValue.quote,
+              type: detectType(key, parsedValue.value),
+              isSecret,
+              isDuplicate: false,
+              errors,
+              warnings,
+              comment: pendingComment ? pendingComment.text : ""
+            };
+
+            rows.push(row);
+            keyCounts.set(key, (keyCounts.get(key) || 0) + 1);
+            pendingComment = null;
+          });
+
+          if (pendingComment) {
+            comments.push({ lineNumber: pendingComment.lineNumber, text: pendingComment.text, unused: true });
+          }
+
+          rows.forEach((row) => {
+            if (row.key && keyCounts.get(row.key) > 1) {
+              row.isDuplicate = true;
+              row.errors.push("Duplicate key");
+            }
+            row.status = row.errors.length ? "Error" : row.warnings.length ? "Warning" : "Valid";
+          });
+
+          comments
+            .filter((comment) => comment.unused)
+            .forEach((comment) => {
+              issues.push(makeIssue(comment.lineNumber, "warning", "Unused comment", "This comment is not attached to a variable."));
+            });
+
+          rows.forEach((row) => {
+            row.errors.forEach((message) => issues.push(makeIssue(row.lineNumber, "error", message, row.key || "Malformed variable")));
+            row.warnings.forEach((message) => issues.push(makeIssue(row.lineNumber, "warning", message, row.key || "Variable warning")));
+            if (row.isSecret) {
+              issues.push(makeIssue(row.lineNumber, "warning", "Sensitive variable", row.key + " is masked by default."));
+            }
+          });
+
+          return { rows, issues, comments, lineCount: lines.length };
+        }
+
+        function parseValue(rawValue) {
+          let text = rawValue.trim();
+          let quote = "";
+          if (!text) {
+            return { value: "", quote, error: "" };
+          }
+
+          if (text.startsWith('"') || text.startsWith("'")) {
+            quote = text.charAt(0);
+            const result = readQuotedValue(text, quote);
+            return {
+              value: result.value,
+              quote,
+              error: result.error
+            };
+          }
+
+          const commentIndex = text.search(/\s#/);
+          if (commentIndex >= 0) {
+            text = text.slice(0, commentIndex).trimEnd();
+          }
+          if (/^.*(^|[^\\])["']$/.test(text)) {
+            return { value: text, quote, error: "Invalid quotes" };
+          }
+          return { value: unescapeText(text), quote, error: "" };
+        }
+
+        function readQuotedValue(text, quote) {
+          let value = "";
+          let escaped = false;
+          for (let index = 1; index < text.length; index += 1) {
+            const char = text.charAt(index);
+            if (escaped) {
+              value += decodeEscape(char);
+              escaped = false;
+              continue;
+            }
+            if (char === "\\") {
+              escaped = true;
+              continue;
+            }
+            if (char === quote) {
+              const rest = text.slice(index + 1).trim();
+              if (rest && !rest.startsWith("#")) {
+                return { value, error: "Invalid quotes" };
+              }
+              return { value, error: "" };
+            }
+            value += char;
+          }
+          return { value, error: "Unclosed quotes" };
+        }
+
+        function decodeEscape(char) {
+          const escapes = { n: "\n", r: "\r", t: "\t", "\\": "\\", '"': '"', "'": "'" };
+          return Object.prototype.hasOwnProperty.call(escapes, char) ? escapes[char] : char;
+        }
+
+        function unescapeText(text) {
+          return text.replace(/\\([nrt\\"'])/g, (_match, char) => decodeEscape(char));
+        }
+
+        function makeIssue(lineNumber, level, title, detail) {
+          return { lineNumber, level, title, detail };
+        }
+
+        function isSuspiciousValue(key, value) {
+          if (!value) return false;
+          const weakWords = /^(changeme|change_me|password|secret|token|todo|example|null|undefined)$/i;
+          if (weakWords.test(value)) return true;
+          return sensitiveKeyPattern.test(key) && value.length < 8;
+        }
+
+        function detectType(key, value) {
+          if (value === "") return "Unknown";
+          if (/^postgres(ql)?:\/\//i.test(value) || /^mysql:\/\//i.test(value) || /^mongodb(\+srv)?:\/\//i.test(value) || /^redis:\/\//i.test(value)) return "Database URL";
+          if (/port/i.test(key) && /^\d+$/.test(value) && Number(value) > 0 && Number(value) <= 65535) return "Port";
+          if (sensitiveKeyPattern.test(key)) {
+            if (/TOKEN/i.test(key)) return "Token";
+            if (/API[_-]?KEY|ACCESS[_-]?KEY/i.test(key)) return "API Key";
+            return "Secret";
+          }
+          if (/^(true|false)$/i.test(value)) return "Boolean";
+          if (/^-?\d+$/.test(value)) return "Integer";
+          if (/^-?\d+\.\d+$/.test(value)) return "Float";
+          if (/^https?:\/\/[^\s]+$/i.test(value)) return "URL";
+          if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return "Email";
+          if (looksLikeJson(value)) return "JSON";
+          if (/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(value)) return "JWT";
+          if (/^[A-Za-z0-9+/]+={0,2}$/.test(value) && value.length >= 16 && value.length % 4 === 0) return "Base64";
+          if (/^([A-Za-z]:\\|\/|\.\/|\.\.\/|~\/)/.test(value)) return "File Path";
+          if (/^-?\d+(\.\d+)?$/.test(value)) return "Number";
+          return value.length ? "String" : "Unknown";
+        }
+
+        function looksLikeJson(value) {
+          if (!/^\s*[[{]/.test(value)) return false;
+          try {
+            JSON.parse(value);
+            return true;
+          } catch {
+            return false;
+          }
+        }
+
+        function renderAll() {
+          const parsed = parseEnv(nodes.input.value);
+          state.rows = parsed.rows;
+          state.issues = parsed.issues;
+          state.comments = parsed.comments;
+          state.page = Math.min(state.page, getPageCount(getFilteredRows()));
+          renderStats(parsed.lineCount);
+          renderGutter(parsed.lineCount);
+          renderTable();
+          renderIssues();
+          renderExports();
+        }
+
+        function renderStats(lineCount) {
+          const stats = getStats();
+          nodes.totalStat.textContent = String(stats.total);
+          nodes.validStat.textContent = String(stats.valid);
+          nodes.errorStat.textContent = String(stats.errors);
+          nodes.warningStat.textContent = String(stats.warnings);
+          nodes.secretStat.textContent = String(stats.secrets);
+          nodes.emptyStat.textContent = String(stats.empty);
+          nodes.duplicateStat.textContent = String(stats.duplicates);
+          nodes.malformedStat.textContent = String(stats.malformed);
+          nodes.lineSummary.textContent = lineCount + (lineCount === 1 ? " line" : " lines");
+          nodes.summaryBadge.textContent = stats.errors ? "Errors found" : stats.warnings ? "Warnings found" : "Valid";
+          nodes.summaryBadge.className = "badge " + (stats.errors ? "bad" : stats.warnings ? "warn" : "good");
+        }
+
+        function getStats() {
+          const malformedLines = new Set(state.issues.filter((issue) => issue.level === "error" && issue.title === "Missing equals sign").map((issue) => issue.lineNumber));
+          return {
+            total: state.rows.length,
+            valid: state.rows.filter((row) => row.status === "Valid").length,
+            errors: state.issues.filter((issue) => issue.level === "error").length,
+            warnings: state.issues.filter((issue) => issue.level === "warning").length,
+            secrets: state.rows.filter((row) => row.isSecret).length,
+            empty: state.rows.filter((row) => row.value === "").length,
+            duplicates: new Set(state.rows.filter((row) => row.isDuplicate).map((row) => row.key)).size,
+            malformed: malformedLines.size
+          };
+        }
+
+        function renderGutter(lineCount) {
+          const fragment = document.createDocumentFragment();
+          const errorLines = new Set(state.issues.filter((issue) => issue.level === "error").map((issue) => issue.lineNumber));
+          const warningLines = new Set(state.issues.filter((issue) => issue.level === "warning").map((issue) => issue.lineNumber));
+          for (let line = 1; line <= Math.max(1, lineCount); line += 1) {
+            const item = document.createElement("div");
+            item.className = "line-number" + (errorLines.has(line) ? " has-error" : warningLines.has(line) ? " has-warning" : "");
+            item.textContent = String(line);
+            fragment.appendChild(item);
+          }
+          nodes.lineGutter.replaceChildren(fragment);
+        }
+
+        function renderTable() {
+          const filteredRows = getFilteredRows();
+          const pageCount = getPageCount(filteredRows);
+          state.page = Math.min(Math.max(1, state.page), pageCount);
+          const start = (state.page - 1) * state.pageSize;
+          const pageRows = filteredRows.slice(start, start + state.pageSize);
+          const fragment = document.createDocumentFragment();
+
+          pageRows.forEach((row) => {
+            const tr = document.createElement("tr");
+            appendCell(tr, String(row.index));
+            appendCell(tr, row.key, "key-cell");
+            appendCell(tr, getDisplayValue(row), "value-cell");
+            appendBadgeCell(tr, row.type, "info");
+            appendStatusCell(tr, row);
+            appendActionsCell(tr, row);
+            fragment.appendChild(tr);
+          });
+
+          nodes.body.replaceChildren(fragment);
+          nodes.empty.hidden = filteredRows.length > 0;
+          nodes.pageSummary.textContent = "Page " + state.page + " of " + pageCount + " (" + filteredRows.length + " rows)";
+          nodes.prevPage.disabled = state.page <= 1;
+          nodes.nextPage.disabled = state.page >= pageCount;
+        }
+
+        function appendCell(rowElement, text, className) {
+          const td = document.createElement("td");
+          if (className) td.className = className;
+          td.textContent = text;
+          rowElement.appendChild(td);
+        }
+
+        function appendBadgeCell(rowElement, text, tone) {
+          const td = document.createElement("td");
+          const badge = document.createElement("span");
+          badge.className = "badge " + tone;
+          badge.textContent = text;
+          td.appendChild(badge);
+          rowElement.appendChild(td);
+        }
+
+        function appendStatusCell(rowElement, row) {
+          const td = document.createElement("td");
+          const status = document.createElement("span");
+          status.className = "badge " + (row.status === "Error" ? "bad" : row.status === "Warning" ? "warn" : "good");
+          status.textContent = row.status;
+          td.appendChild(status);
+          if (row.isSecret) {
+            const secret = document.createElement("span");
+            secret.className = "badge warn";
+            secret.textContent = "Secret";
+            td.appendChild(document.createTextNode(" "));
+            td.appendChild(secret);
+          }
+          rowElement.appendChild(td);
+        }
+
+        function appendActionsCell(rowElement, row) {
+          const td = document.createElement("td");
+          const wrap = document.createElement("div");
+          wrap.className = "actions";
+          [
+            ["toggle", row.isSecret ? (state.revealed.has(row.index) ? "Hide value" : "Reveal value") : "Toggle value"],
+            ["key", "Copy key"],
+            ["value", "Copy value"],
+            ["row", "Copy row"]
+          ].forEach(([action, label]) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "icon-button";
+            button.dataset.action = action;
+            button.dataset.index = String(row.index);
+            button.title = label;
+            button.setAttribute("aria-label", label + " for " + row.key);
+            button.appendChild(makeIcon(action));
+            wrap.appendChild(button);
+          });
+          td.appendChild(wrap);
+          rowElement.appendChild(td);
+        }
+
+        function makeIcon(action) {
+          const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+          svg.setAttribute("viewBox", "0 0 24 24");
+          svg.setAttribute("aria-hidden", "true");
+          const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          path.setAttribute("fill", "none");
+          path.setAttribute("stroke", "currentColor");
+          path.setAttribute("stroke-width", "2");
+          const shapes = {
+            toggle: "M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Zm10 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z",
+            key: "M15 7a4 4 0 1 1-2.8 6.8L4 22l-2-2 8.2-8.2A4 4 0 0 1 15 7Z",
+            value: "M8 8h12v12H8zM4 4h12v4M4 4v12h4",
+            row: "M4 5h16M4 12h16M4 19h16"
+          };
+          path.setAttribute("d", shapes[action]);
+          svg.appendChild(path);
+          return svg;
+        }
+
+        function getDisplayValue(row) {
+          if (row.isSecret && !state.revealed.has(row.index)) {
+            return row.value ? "••••••••" : "";
+          }
+          return row.value;
+        }
+
+        function getFilteredRows() {
+          const query = state.search.trim().toLowerCase();
+          return state.rows
+            .filter((row) => matchesFilter(row))
+            .filter((row) => {
+              if (!query) return true;
+              return [row.key, row.value, row.type, row.status].some((part) => String(part).toLowerCase().includes(query));
+            })
+            .sort(compareRows);
+        }
+
+        function matchesFilter(row) {
+          if (state.filter === "all") return true;
+          if (state.filter === "errors") return row.status === "Error";
+          if (state.filter === "warnings") return row.status === "Warning";
+          if (state.filter === "secrets") return row.isSecret;
+          if (state.filter === "empty") return row.value === "";
+          if (state.filter === "duplicate") return row.isDuplicate;
+          if (state.filter === "valid") return row.status === "Valid";
+          if (state.filter === "malformed") return row.errors.length > 0;
+          return true;
+        }
+
+        function compareRows(a, b) {
+          const key = state.sortKey;
+          const first = String(a[key] ?? "").toLowerCase();
+          const second = String(b[key] ?? "").toLowerCase();
+          const direction = state.sortDirection === "asc" ? 1 : -1;
+          if (key === "index") return (a.index - b.index) * direction;
+          return first.localeCompare(second) * direction;
+        }
+
+        function getPageCount(rows) {
+          return Math.max(1, Math.ceil(rows.length / state.pageSize));
+        }
+
+        function renderIssues() {
+          const fragment = document.createDocumentFragment();
+          if (!state.issues.length) {
+            const item = document.createElement("div");
+            item.className = "issue";
+            const strong = document.createElement("strong");
+            strong.textContent = "No validation issues";
+            const span = document.createElement("span");
+            span.textContent = "The current file has no errors or warnings.";
+            item.append(strong, span);
+            fragment.appendChild(item);
+          } else {
+            state.issues.slice(0, 120).forEach((issue) => {
+              const item = document.createElement("div");
+              item.className = "issue";
+              const strong = document.createElement("strong");
+              strong.textContent = "Line " + issue.lineNumber + ": " + issue.title;
+              const span = document.createElement("span");
+              span.textContent = issue.detail;
+              item.append(strong, span);
+              fragment.appendChild(item);
+            });
+          }
+          nodes.issuesList.replaceChildren(fragment);
+        }
+
+        function renderExports() {
+          const jsonRows = state.rows.map((row) => ({
+            key: row.key,
+            value: row.value,
+            type: row.type,
+            status: row.status,
+            line: row.lineNumber,
+            sensitive: row.isSecret,
+            duplicate: row.isDuplicate,
+            issues: row.errors.concat(row.warnings)
+          }));
+          nodes.jsonOutput.value = JSON.stringify(jsonRows, null, nodes.prettyJson.checked ? 2 : 0);
+          nodes.envOutput.value = buildCleanEnv();
+        }
+
+        function buildCleanEnv() {
+          const seen = new Set();
+          const lines = [];
+          state.rows.forEach((row) => {
+            if (nodes.removeDuplicates.checked && seen.has(row.key)) return;
+            seen.add(row.key);
+            if (!nodes.removeComments.checked && row.comment) lines.push(row.comment);
+            lines.push(row.key + "=" + formatEnvValue(row.value));
+          });
+          return lines.join("\n");
+        }
+
+        function formatEnvValue(value) {
+          if (value === "") return "";
+          if (/[\s#"'\\]/.test(value)) {
+            return '"' + value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t") + '"';
+          }
+          return value;
+        }
+
+        function copyText(text, label) {
+          const fallback = () => {
+            const helper = document.createElement("textarea");
+            helper.value = text;
+            helper.setAttribute("readonly", "");
+            helper.style.position = "fixed";
+            helper.style.opacity = "0";
+            document.body.appendChild(helper);
+            helper.select();
+            document.execCommand("copy");
+            helper.remove();
+            showToast(label + " copied");
+          };
+          if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard
+              .writeText(text)
+              .then(() => showToast(label + " copied"))
+              .catch(fallback);
+          } else {
+            fallback();
+          }
+        }
+
+        function downloadFile(filename, content, type) {
+          const blob = new Blob([content], { type });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          URL.revokeObjectURL(url);
+          showToast(filename + " downloaded");
+        }
+
+        function showToast(message) {
+          nodes.toast.textContent = message;
+          nodes.toast.classList.add("is-visible");
+          window.clearTimeout(showToast.timer);
+          showToast.timer = window.setTimeout(() => nodes.toast.classList.remove("is-visible"), 1800);
+        }
+
+        function openFile(file) {
+          if (!file) return;
+          if (file.size > 5 * 1024 * 1024) {
+            showToast("Large file opened locally");
+          }
+          const reader = new FileReader();
+          reader.onload = () => {
+            nodes.input.value = String(reader.result || "");
+            state.revealed.clear();
+            renderAll();
+          };
+          reader.onerror = () => showToast("Could not read file");
+          reader.readAsText(file);
+        }
+
+        function handleShortcut(event) {
+          const key = event.key.toLowerCase();
+          if ((event.ctrlKey || event.metaKey) && key === "o") {
+            event.preventDefault();
+            nodes.fileInput.click();
+          } else if ((event.ctrlKey || event.metaKey) && event.shiftKey && key === "s") {
+            event.preventDefault();
+            downloadFile("env-report.json", nodes.jsonOutput.value, "application/json");
+          } else if ((event.ctrlKey || event.metaKey) && key === "s") {
+            event.preventDefault();
+            downloadFile("clean.env", nodes.envOutput.value, "text/plain");
+          } else if ((event.ctrlKey || event.metaKey) && key === "f") {
+            event.preventDefault();
+            nodes.search.focus();
+          } else if ((event.ctrlKey || event.metaKey) && key === "l") {
+            event.preventDefault();
+            nodes.input.value = "";
+            state.revealed.clear();
+            renderAll();
+          }
+        }
+
+        nodes.input.addEventListener("input", () => {
+          state.revealed.clear();
+          renderAll();
+        });
+        nodes.input.addEventListener("scroll", () => {
+          nodes.lineGutter.scrollTop = nodes.input.scrollTop;
+        });
+        nodes.fileInput.addEventListener("change", (event) => openFile(event.target.files[0]));
+        nodes.search.addEventListener("input", () => {
+          state.search = nodes.search.value;
+          state.page = 1;
+          renderTable();
+        });
+        nodes.filter.addEventListener("change", () => {
+          state.filter = nodes.filter.value;
+          state.page = 1;
+          renderTable();
+        });
+        nodes.pageSize.addEventListener("change", () => {
+          state.pageSize = Number(nodes.pageSize.value);
+          state.page = 1;
+          renderTable();
+        });
+        nodes.prevPage.addEventListener("click", () => {
+          state.page -= 1;
+          renderTable();
+        });
+        nodes.nextPage.addEventListener("click", () => {
+          state.page += 1;
+          renderTable();
+        });
+        nodes.prettyJson.addEventListener("change", renderExports);
+        nodes.removeDuplicates.addEventListener("change", renderExports);
+        nodes.removeComments.addEventListener("change", renderExports);
+        document.getElementById("sampleButton").addEventListener("click", () => {
+          nodes.input.value = sampleEnv;
+          state.revealed.clear();
+          renderAll();
+        });
+        document.getElementById("clearButton").addEventListener("click", () => {
+          nodes.input.value = "";
+          state.revealed.clear();
+          renderAll();
+        });
+        document.getElementById("copyJsonButton").addEventListener("click", () => copyText(nodes.jsonOutput.value, "JSON"));
+        document.getElementById("copyEnvButton").addEventListener("click", () => copyText(nodes.envOutput.value, ".env"));
+        document.getElementById("downloadEnvButton").addEventListener("click", () => downloadFile("clean.env", nodes.envOutput.value, "text/plain"));
+        document.getElementById("downloadJsonButton").addEventListener("click", () => downloadFile("env-report.json", nodes.jsonOutput.value, "application/json"));
+        document.addEventListener("keydown", handleShortcut);
+
+        document.querySelector("thead").addEventListener("click", (event) => {
+          const button = event.target.closest("button[data-sort]");
+          if (!button) return;
+          const key = button.dataset.sort;
+          if (state.sortKey === key) {
+            state.sortDirection = state.sortDirection === "asc" ? "desc" : "asc";
+          } else {
+            state.sortKey = key;
+            state.sortDirection = "asc";
+          }
+          renderTable();
+        });
+
+        nodes.body.addEventListener("click", (event) => {
+          const button = event.target.closest("button[data-action]");
+          if (!button) return;
+          const row = state.rows.find((item) => item.index === Number(button.dataset.index));
+          if (!row) return;
+          if (button.dataset.action === "toggle") {
+            if (state.revealed.has(row.index)) state.revealed.delete(row.index);
+            else state.revealed.add(row.index);
+            renderTable();
+          } else if (button.dataset.action === "key") {
+            copyText(row.key, "Key");
+          } else if (button.dataset.action === "value") {
+            copyText(row.value, "Value");
+          } else if (button.dataset.action === "row") {
+            copyText(row.key + "=" + formatEnvValue(row.value), "Row");
+          }
+        });
+
+        ["dragenter", "dragover"].forEach((name) => {
+          nodes.dropZone.addEventListener(name, (event) => {
+            event.preventDefault();
+            nodes.dropZone.classList.add("is-dragging");
+          });
+        });
+        ["dragleave", "drop"].forEach((name) => {
+          nodes.dropZone.addEventListener(name, (event) => {
+            event.preventDefault();
+            nodes.dropZone.classList.remove("is-dragging");
+          });
+        });
+        nodes.dropZone.addEventListener("drop", (event) => openFile(event.dataTransfer.files[0]));
+
+        renderAll();
+      })();
+    </script>
+  </body>
+</html>
