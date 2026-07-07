@@ -1,0 +1,586 @@
+<!--
+Base64 Image Converter
+Single-file client-side tool to convert images to Base64 data URIs and
+decode Base64 strings back into viewable images.
+Built for One File Tools.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Base64 Image Converter - One File Tools</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <style>
+      :root {
+        --bg: #030712;
+        --grid-line: #111827;
+        --panel: rgba(17, 24, 39, 0.7);
+        --panel-border: #1f2937;
+        --accent: #f59e0b;
+        --accent-hover: #d97706;
+        --accent-glow: rgba(245, 158, 11, 0.15);
+        --text: #f9fafb;
+        --text-muted: #9ca3af;
+        --text-dim: #4b5563;
+        --radius-sm: 12px;
+        --radius-md: 20px;
+        --font-sans: "Inter", system-ui, sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+        --font-display: "Space Grotesk", sans-serif;
+        --color-weak: #ef4444;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg);
+        background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+        background-size: 32px 32px;
+        color: var(--text);
+        padding: 48px 20px 80px;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+      }
+
+      .app {
+        width: 100%;
+        max-width: 860px;
+      }
+
+      .hero {
+        text-align: center;
+        margin-bottom: 28px;
+      }
+
+      .eyebrow {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        letter-spacing: 0.2em;
+        color: var(--accent);
+        text-transform: uppercase;
+        margin-bottom: 12px;
+        font-weight: 500;
+      }
+
+      .wordmark {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: clamp(26px, 5vw, 38px);
+        letter-spacing: -0.02em;
+        margin-bottom: 12px;
+      }
+
+      .tagline {
+        color: var(--text-muted);
+        font-size: 15px;
+        line-height: 1.5;
+        max-width: 580px;
+        margin: 0 auto;
+      }
+
+      .studio {
+        background: var(--panel);
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-md);
+        padding: 24px;
+        box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.5);
+        margin-bottom: 24px;
+      }
+
+      .tabs {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 18px;
+      }
+
+      .tab-btn {
+        flex: 1;
+        background: rgba(31, 41, 55, 0.5);
+        border: 1px solid var(--panel-border);
+        color: var(--text-muted);
+        border-radius: 8px;
+        padding: 10px 14px;
+        font-family: var(--font-sans);
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .tab-btn.active {
+        background: var(--accent);
+        color: #030712;
+        border-color: var(--accent);
+      }
+
+      .tab-btn:hover:not(.active) {
+        background: rgba(55, 65, 81, 0.7);
+      }
+
+      .tab-btn:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      .panel {
+        display: none;
+      }
+
+      .panel.active {
+        display: block;
+      }
+
+      .section-label {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        display: block;
+        margin-bottom: 14px;
+      }
+
+      .dropzone {
+        border: 2px dashed var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 30px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        background: rgba(3, 7, 18, 0.4);
+      }
+
+      .dropzone:hover,
+      .dropzone.dragover {
+        border-color: var(--accent);
+        background: rgba(245, 158, 11, 0.05);
+      }
+
+      .dropzone:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      .dropzone p {
+        color: var(--text-muted);
+        font-size: 14px;
+      }
+
+      .dropzone .hint {
+        color: var(--text-dim);
+        font-size: 12px;
+        margin-top: 6px;
+      }
+
+      .preview-wrap {
+        margin-top: 16px;
+        display: none;
+        text-align: center;
+      }
+
+      .preview-wrap.visible {
+        display: block;
+      }
+
+      .preview-wrap img {
+        max-width: 100%;
+        max-height: 260px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--panel-border);
+      }
+
+      .meta-line {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--text-dim);
+        margin-top: 8px;
+      }
+
+      textarea {
+        width: 100%;
+        background: rgba(17, 24, 39, 0.8);
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 13px;
+        padding: 12px 14px;
+        resize: vertical;
+        min-height: 130px;
+        line-height: 1.5;
+        word-break: break-all;
+        margin-top: 14px;
+      }
+
+      textarea:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-glow);
+      }
+
+      .actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 14px;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        background: var(--accent);
+        color: #030712;
+        border: none;
+        border-radius: 8px;
+        padding: 11px 18px;
+        font-family: var(--font-sans);
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .btn:hover {
+        background: var(--accent-hover);
+      }
+
+      .btn:focus-visible,
+      .btn-ghost:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      .btn-ghost {
+        background: rgba(31, 41, 55, 0.6);
+        border: 1px solid var(--panel-border);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 11px 16px;
+        font-family: var(--font-sans);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .btn-ghost:hover {
+        background: rgba(55, 65, 81, 0.8);
+      }
+
+      .field-error {
+        font-size: 13px;
+        color: var(--color-weak);
+        margin-top: 10px;
+      }
+
+      .note {
+        margin-top: 16px;
+        font-size: 13px;
+        color: var(--text-muted);
+        line-height: 1.6;
+        background: rgba(245, 158, 11, 0.07);
+        border: 1px solid rgba(245, 158, 11, 0.25);
+        border-radius: var(--radius-sm);
+        padding: 12px 14px;
+      }
+
+      .footer-note {
+        text-align: center;
+        color: var(--text-dim);
+        font-size: 13px;
+        margin-top: 8px;
+      }
+
+      .footer-note a {
+        color: var(--text-muted);
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background: var(--text);
+        color: var(--bg);
+        padding: 12px 22px;
+        border-radius: 99px;
+        font-family: var(--font-sans);
+        font-weight: 600;
+        font-size: 14px;
+        opacity: 0;
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        z-index: 100;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      }
+
+      .toast.show {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+      }
+
+      @media (max-width: 640px) {
+        .studio {
+          padding: 18px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="hero">
+        <div class="eyebrow">Image Tools</div>
+        <h1 class="wordmark">Base64 Image Converter</h1>
+        <p class="tagline">Convert an image to a Base64 data URI, or decode a Base64 string back into a viewable image — entirely offline.</p>
+      </header>
+
+      <main class="studio">
+        <div class="tabs" role="tablist">
+          <button class="tab-btn active" id="tabEncode" role="tab" aria-selected="true" type="button">Image → Base64</button>
+          <button class="tab-btn" id="tabDecode" role="tab" aria-selected="false" type="button">Base64 → Image</button>
+        </div>
+
+        <div class="panel active" id="panelEncode">
+          <span class="section-label">Upload an image</span>
+          <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Upload an image, or press Enter to browse files">
+            <p>Click, press Enter, or drag an image here</p>
+            <p class="hint">Stays on your device — never uploaded</p>
+          </div>
+          <input type="file" id="fileInput" accept="image/*" style="position: absolute; width: 1px; height: 1px; opacity: 0" />
+
+          <div class="preview-wrap" id="previewWrap">
+            <img id="previewImage" alt="Preview of the selected image" />
+            <div class="meta-line" id="encodeMeta"></div>
+          </div>
+
+          <textarea id="base64Output" readonly placeholder="Base64 data URI will appear here…"></textarea>
+
+          <div class="actions">
+            <button class="btn" id="btnCopyBase64" type="button">Copy Base64</button>
+            <button class="btn-ghost" id="btnCopyCssUrl" type="button">Copy as CSS url()</button>
+            <button class="btn-ghost" id="btnClearEncode" type="button">Clear</button>
+          </div>
+        </div>
+
+        <div class="panel" id="panelDecode">
+          <span class="section-label">Paste a Base64 string or data URI</span>
+          <textarea id="base64Input" placeholder="data:image/png;base64,iVBORw0KGgo… (or just the raw base64 without the data: prefix)"></textarea>
+          <div class="field-error" id="decodeError"></div>
+
+          <div class="preview-wrap" id="decodePreviewWrap">
+            <img id="decodePreviewImage" alt="Decoded image preview" />
+            <div class="meta-line" id="decodeMeta"></div>
+          </div>
+
+          <div class="actions">
+            <button class="btn" id="btnDecode" type="button">Decode & preview</button>
+            <button class="btn-ghost" id="btnDownloadDecoded" type="button">Download image</button>
+            <button class="btn-ghost" id="btnClearDecode" type="button">Clear</button>
+          </div>
+        </div>
+
+        <div class="note">
+          Base64-encoded images are roughly 33% larger than their binary source and aren't cached separately by the browser — great for tiny icons or inline SVG, not ideal for large photos.
+        </div>
+      </main>
+
+      <p class="footer-note">Part of <a href="https://github.com/praveenscience/One-File-Tools">One File Tools</a>. All conversion happens in your browser.</p>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script>
+      /* ==========================================================
+         Base64 Image Converter
+         Vanilla JS, no dependencies. Uses FileReader for encode and
+         a plain <img src="data:..."> for decode/preview.
+         ========================================================== */
+
+      const tabEncode = document.getElementById("tabEncode");
+      const tabDecode = document.getElementById("tabDecode");
+      const panelEncode = document.getElementById("panelEncode");
+      const panelDecode = document.getElementById("panelDecode");
+
+      const dropzone = document.getElementById("dropzone");
+      const fileInput = document.getElementById("fileInput");
+      const previewWrap = document.getElementById("previewWrap");
+      const previewImage = document.getElementById("previewImage");
+      const encodeMeta = document.getElementById("encodeMeta");
+      const base64Output = document.getElementById("base64Output");
+      const btnCopyBase64 = document.getElementById("btnCopyBase64");
+      const btnCopyCssUrl = document.getElementById("btnCopyCssUrl");
+      const btnClearEncode = document.getElementById("btnClearEncode");
+
+      const base64Input = document.getElementById("base64Input");
+      const decodeError = document.getElementById("decodeError");
+      const decodePreviewWrap = document.getElementById("decodePreviewWrap");
+      const decodePreviewImage = document.getElementById("decodePreviewImage");
+      const decodeMeta = document.getElementById("decodeMeta");
+      const btnDecode = document.getElementById("btnDecode");
+      const btnDownloadDecoded = document.getElementById("btnDownloadDecoded");
+      const btnClearDecode = document.getElementById("btnClearDecode");
+
+      const toast = document.getElementById("toast");
+
+      let lastDataUri = "";
+
+      /** Shows a brief toast. */
+      function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add("show");
+        setTimeout(() => toast.classList.remove("show"), 2000);
+      }
+
+      /** Copies text with graceful failure. */
+      function copyText(text, message) {
+        if (!text) return;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard
+            .writeText(text)
+            .then(() => showToast(message))
+            .catch(() => showToast("Copy failed"));
+        } else {
+          showToast("Clipboard unavailable");
+        }
+      }
+
+      /** Formats a byte count as a human-readable string. */
+      function formatBytes(bytes) {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+        return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+      }
+
+      // ---- Tabs ----
+
+      function activateTab(tab) {
+        const isEncode = tab === "encode";
+        tabEncode.classList.toggle("active", isEncode);
+        tabDecode.classList.toggle("active", !isEncode);
+        tabEncode.setAttribute("aria-selected", String(isEncode));
+        tabDecode.setAttribute("aria-selected", String(!isEncode));
+        panelEncode.classList.toggle("active", isEncode);
+        panelDecode.classList.toggle("active", !isEncode);
+      }
+
+      tabEncode.addEventListener("click", () => activateTab("encode"));
+      tabDecode.addEventListener("click", () => activateTab("decode"));
+
+      // ---- Encode: image -> Base64 ----
+
+      function loadFile(file) {
+        if (!file || !file.type.startsWith("image/")) {
+          showToast("Please choose an image file");
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+          lastDataUri = reader.result;
+          previewImage.src = lastDataUri;
+          previewWrap.classList.add("visible");
+          base64Output.value = lastDataUri;
+          encodeMeta.textContent = file.name + " · " + formatBytes(file.size) + " · Base64 length: " + lastDataUri.length.toLocaleString() + " chars";
+        };
+        reader.onerror = () => showToast("Could not read that file");
+        reader.readAsDataURL(file);
+      }
+
+      dropzone.addEventListener("click", () => fileInput.click());
+      dropzone.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          fileInput.click();
+        }
+      });
+      dropzone.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        dropzone.classList.add("dragover");
+      });
+      dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
+      dropzone.addEventListener("drop", (event) => {
+        event.preventDefault();
+        dropzone.classList.remove("dragover");
+        if (event.dataTransfer.files.length) loadFile(event.dataTransfer.files[0]);
+      });
+      fileInput.addEventListener("change", () => {
+        if (fileInput.files.length) loadFile(fileInput.files[0]);
+      });
+
+      btnCopyBase64.addEventListener("click", () => copyText(base64Output.value, "Base64 copied!"));
+      btnCopyCssUrl.addEventListener("click", () => {
+        if (!lastDataUri) return;
+        copyText('url("' + lastDataUri + '")', "CSS url() copied!");
+      });
+      btnClearEncode.addEventListener("click", () => {
+        lastDataUri = "";
+        previewImage.removeAttribute("src");
+        previewWrap.classList.remove("visible");
+        base64Output.value = "";
+        encodeMeta.textContent = "";
+        dropzone.focus();
+      });
+
+      // ---- Decode: Base64 -> image ----
+
+      function decodeBase64() {
+        decodeError.textContent = "";
+        let value = base64Input.value.trim();
+        if (!value) {
+          decodeError.textContent = "Paste a Base64 string or data URI first.";
+          return;
+        }
+
+        let dataUri = value;
+        if (!/^data:/.test(value)) {
+          // Assume raw base64 with no MIME prefix — default to PNG.
+          dataUri = "data:image/png;base64," + value.replace(/\s+/g, "");
+        }
+
+        const img = new Image();
+        img.onload = () => {
+          decodePreviewImage.src = dataUri;
+          decodePreviewWrap.classList.add("visible");
+          const approxBytes = Math.round((dataUri.length * 3) / 4);
+          decodeMeta.textContent = img.naturalWidth + " × " + img.naturalHeight + " · ~" + formatBytes(approxBytes);
+        };
+        img.onerror = () => {
+          decodeError.textContent = "Could not decode that as an image. Check that it's valid Base64 image data.";
+          decodePreviewWrap.classList.remove("visible");
+        };
+        img.src = dataUri;
+      }
+
+      btnDecode.addEventListener("click", decodeBase64);
+
+      btnDownloadDecoded.addEventListener("click", () => {
+        if (!decodePreviewImage.src) {
+          showToast("Decode an image first");
+          return;
+        }
+        const anchor = document.createElement("a");
+        anchor.href = decodePreviewImage.src;
+        const match = decodePreviewImage.src.match(/^data:image\/([a-zA-Z0-9+.-]+);/);
+        const ext = match ? match[1].split("+")[0] : "png";
+        anchor.download = "decoded-image." + ext;
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+      });
+
+      btnClearDecode.addEventListener("click", () => {
+        base64Input.value = "";
+        decodeError.textContent = "";
+        decodePreviewImage.removeAttribute("src");
+        decodePreviewWrap.classList.remove("visible");
+        decodeMeta.textContent = "";
+        base64Input.focus();
+      });
+    </script>
+  </body>
+</html>
