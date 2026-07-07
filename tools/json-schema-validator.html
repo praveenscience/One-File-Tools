@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Validate JSON data against a JSON Schema." />
+  <title>JSON Schema Validator — One File Tools</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#fafafa;--surface:#f1f5f9;--text:#1a1a1a;--muted:#64748b;--border:#e2e8f0;--accent:#2563eb;--success:#16a34a;--error:#dc2626;--radius:8px}
+    @media(prefers-color-scheme:dark){:root{--bg:#0a0a0a;--surface:#1a1a1a;--text:#e5e5e5;--muted:#94a3b8;--border:#334155;--accent:#3b82f6}}
+    body{font-family:system-ui,sans-serif;line-height:1.6;background:var(--bg);color:var(--text);min-height:100vh}
+    .container{max-width:1100px;margin:0 auto;padding:2rem}
+    header{text-align:center;margin-bottom:2rem}
+    header h1{font-size:2rem;margin-bottom:0.5rem}
+    header p{color:var(--muted)}
+    .main-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem}
+    @media(max-width:800px){.main-grid{grid-template-columns:1fr}}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem}
+    .card-header{font-weight:600;margin-bottom:1rem;display:flex;justify-content:space-between}
+    textarea{width:100%;min-height:300px;padding:1rem;font-family:monospace;font-size:0.85rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text);resize:vertical}
+    textarea:focus{outline:none;border-color:var(--accent)}
+    textarea.error{border-color:var(--error)}
+    textarea.success{border-color:var(--success)}
+    .result{padding:1rem;border-radius:var(--radius);margin-top:1rem;display:none}
+    .result.show{display:block}
+    .result.success{background:rgba(22,163,74,0.1);border:1px solid var(--success)}
+    .result.error{background:rgba(220,38,38,0.1);border:1px solid var(--error)}
+    .result-title{font-weight:600;margin-bottom:0.5rem}
+    .result-errors{max-height:200px;overflow-y:auto;font-family:monospace;font-size:0.85rem}
+    .btn{width:100%;padding:0.875rem;background:var(--accent);color:white;border:none;border-radius:var(--radius);font-size:1rem;font-weight:600;cursor:pointer;margin-top:1rem}
+    .btn:hover{opacity:0.9}
+    footer{text-align:center;padding:2rem;color:var(--muted);font-size:0.875rem}
+    footer a{color:var(--accent);text-decoration:none}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header><h1>📋 JSON Schema Validator</h1><p>Validate JSON data against a JSON Schema</p></header>
+    
+    <div class="main-grid">
+      <div class="card">
+        <div class="card-header">
+          <span>JSON Schema</span>
+          <button class="btn" style="width:auto;margin:0;padding:0.25rem 0.5rem;font-size:0.75rem" id="sampleSchema">Sample</button>
+        </div>
+        <textarea id="schema" placeholder='{"type":"object","properties":{"name":{"type":"string"},"age":{"type":"number"}}}'></textarea>
+      </div>
+      
+      <div class="card">
+        <div class="card-header">
+          <span>JSON Data</span>
+          <button class="btn" style="width:auto;margin:0;padding:0.25rem 0.5rem;font-size:0.75rem" id="sampleData">Sample</button>
+        </div>
+        <textarea id="data" placeholder='{"name":"John","age":30}'></textarea>
+      </div>
+    </div>
+    
+    <button class="btn" id="validateBtn">Validate</button>
+    
+    <div class="result" id="result">
+      <div class="result-title" id="resultTitle"></div>
+      <div class="result-errors" id="resultErrors"></div>
+    </div>
+  </div>
+  
+  <footer><p>Part of <a href="https://github.com/praveenscience/One-File-Tools">One File Tools</p></footer>
+  
+  <script>
+    var schemaInput=document.getElementById('schema');
+    var dataInput=document.getElementById('data');
+    var result=document.getElementById('result');
+    var resultTitle=document.getElementById('resultTitle');
+    var resultErrors=document.getElementById('resultErrors');
+    var validateBtn=document.getElementById('validateBtn');
+    var sampleSchema=document.getElementById('sampleSchema');
+    var sampleData=document.getElementById('sampleData');
+    
+    var sampleSchemaText='{\n  "type": "object",\n  "properties": {\n    "name": {\n      "type": "string",\n      "minLength": 1\n    },\n    "email": {\n      "type": "string",\n      "format": "email"\n    },\n    "age": {\n      "type": "number",\n      "minimum": 0,\n      "maximum": 150\n    },\n    "tags": {\n      "type": "array",\n      "items": {"type": "string"}\n    }\n  },\n  "required": ["name", "email", "age"]\n}';
+    
+    var sampleDataValid='{\n  "name": "Jane Doe",\n  "email": "jane@example.com",\n  "age": 25,\n  "tags": ["developer", "designer"]\n}';
+    
+    var sampleDataInvalid='{\n  "name": "",\n  "email": "not-an-email",\n  "age": 200\n}';
+    
+    sampleSchema.onclick=function(){schemaInput.value=sampleSchemaText};
+    sampleData.onclick=function(){dataInput.value=sampleDataValid};
+    
+    function validate(){
+      var schema,data;
+      try{schema=JSON.parse(schemaInput.value)}catch(e){schemaInput.classList.add('error');showResult(false,'Invalid Schema: '+e.message);return}
+      schemaInput.classList.remove('error');
+      try{data=JSON.parse(dataInput.value)}catch(e){dataInput.classList.add('error');showResult(false,'Invalid JSON: '+e.message);return}
+      dataInput.classList.remove('error');
+      
+      var errors=validateObject(data,schema,['$root']);
+      if(errors.length===0){
+        showResult(true,'Valid! JSON matches the schema.');
+      }else{
+        var errorMsgs=errors.map(function(e){return e.path+': '+e.message}).join('\n');
+        showResult(false,errors.length+' error(s) found:',errorMsgs);
+      }
+    }
+    
+    function validateObject(obj,schema,path){
+      var errors=[];
+      if(!schema||typeof schema!=='object')return errors;
+      
+      if(schema.type){
+        var type=typeof obj;
+        if(type==='object'&&obj===null&&schema.type!=='null')type='null';
+        var validType={object:obj&&typeof obj==='object'&&!Array.isArray(obj),array:Array.isArray(obj),string:typeof obj==='string',number:typeof obj==='number',integer:Number.isInteger(obj),boolean:typeof obj==='boolean',null:obj===null};
+        if(!validType[schema.type]){
+          errors.push({path:path.join('.'),message:'Expected '+schema.type+', got '+type});
+        }
+      }
+      
+      if(schema.required){
+        schema.required.forEach(function(field){
+          if(obj[field]===undefined){
+            errors.push({path:path.join('.'),message:'Missing required field: '+field});
+          }
+        });
+      }
+      
+      if(schema.properties&&typeof obj==='object'&&obj!==null){
+        Object.keys(schema.properties).forEach(function(key){
+          if(obj[key]!==undefined){
+            errors=errors.concat(validateObject(obj[key],schema.properties[key],path.concat(key)));
+          }
+        });
+      }
+      
+      if(schema.items&&Array.isArray(obj)){
+        obj.forEach(function(item,i){
+          errors=errors.concat(validateObject(item,schema.items,path.concat('['+i+']')));
+        });
+      }
+      
+      if(schema.minLength&&typeof obj==='string'&&obj.length<schema.minLength){
+        errors.push({path:path.join('.'),message:'String too short (min: '+schema.minLength+')'});
+      }
+      
+      if(schema.minimum!==undefined&&typeof obj==='number'&&obj<schema.minimum){
+        errors.push({path:path.join('.'),message:'Number below minimum ('+schema.minimum+')'});
+      }
+      
+      if(schema.maximum!==undefined&&typeof obj==='number'&&obj>schema.maximum){
+        errors.push({path:path.join('.'),message:'Number above maximum ('+schema.maximum+')'});
+      }
+      
+      if(schema.format==='email'&&typeof obj==='string'){
+        if(!obj.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)){
+          errors.push({path:path.join('.'),message:'Invalid email format'});
+        }
+      }
+      
+      return errors;
+    }
+    
+    function showResult(success,title,errors){
+      result.className='result show '+(success?'success':'error');
+      resultTitle.textContent=title;
+      if(errors){
+        resultErrors.innerHTML=errors.split('\n').map(function(e){return'<div>'+e+'</div>'}).join('');
+      }else{
+        resultErrors.innerHTML='';
+      }
+    }
+    
+    validateBtn.onclick=validate;
+  </script>
+</body>
+</html>
