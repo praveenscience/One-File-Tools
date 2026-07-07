@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Mix colors and generate harmonious color palettes." />
+  <title>Color Mixer — One File Tools</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#fafafa;--surface:#f1f5f9;--text:#1a1a1a;--muted:#64748b;--border:#e2e8f0;--accent:#2563eb;--radius:8px}
+    @media(prefers-color-scheme:dark){:root{--bg:#0a0a0a;--surface:#1a1a1a;--text:#e5e5e5;--muted:#94a3b8;--border:#334155;--accent:#3b82f6}}
+    body{font-family:system-ui,sans-serif;line-height:1.6;background:var(--bg);color:var(--text);min-height:100vh}
+    .container{max-width:900px;margin:0 auto;padding:2rem}
+    header{text-align:center;margin-bottom:2rem}
+    header h1{font-size:2rem;margin-bottom:0.5rem}
+    header p{color:var(--muted)}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;margin-bottom:1.5rem}
+    .card-header{font-weight:600;margin-bottom:1rem}
+    .color-inputs{display:grid;grid-template-columns:1fr auto 1fr;gap:1rem;align-items:center}
+    .color-box{aspect-ratio:1;border-radius:var(--radius);border:2px solid var(--border);cursor:pointer;transition:transform 0.2s}
+    .color-box:hover{transform:scale(1.02)}
+    .mixer-icon{font-size:2rem;text-align:center}
+    input[type="color"]{width:100%;height:60px;border:none;border-radius:var(--radius);cursor:pointer}
+    input[type="text"]{width:100%;padding:0.5rem;font-family:monospace;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);text-align:center}
+    .slider-row{display:flex;align-items:center;gap:1rem;margin-bottom:0.75rem}
+    .slider-row label{width:80px;font-size:0.875rem}
+    .slider-row input[type="range"]{flex:1;-webkit-appearance:none;height:8px;border-radius:4px;background:var(--border)}
+    .slider-row input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--accent);cursor:pointer}
+    .slider-row span{width:40px;text-align:right;font-family:monospace}
+    .mix-btn{width:100%;padding:0.875rem;background:var(--accent);color:white;border:none;border-radius:var(--radius);font-size:1rem;font-weight:600;cursor:pointer;margin-top:1rem}
+    .mix-btn:hover{opacity:0.9}
+    .result-box{aspect-ratio:1;border-radius:var(--radius);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:monospace;font-size:1.25rem}
+    .palette{display:grid;grid-template-columns:repeat(5,1fr);gap:0.5rem;margin-top:1rem}
+    .palette-color{aspect-ratio:1;border-radius:4px;cursor:pointer;transition:transform 0.2s}
+    .palette-color:hover{transform:scale(1.1)}
+    footer{text-align:center;padding:2rem;color:var(--muted);font-size:0.875rem}
+    footer a{color:var(--accent);text-decoration:none}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header><h1>🎨 Color Mixer</h1><p>Mix colors and create beautiful palettes</p></header>
+    
+    <div class="card">
+      <div class="card-header">Select Two Colors to Mix</div>
+      <div class="color-inputs">
+        <div>
+          <input type="color" id="color1" value="#FF0000" />
+          <input type="text" id="hex1" value="#FF0000" style="margin-top:0.5rem" />
+        </div>
+        <div class="mixer-icon">+</div>
+        <div>
+          <input type="color" id="color2" value="#0000FF" />
+          <input type="text" id="hex2" value="#0000FF" style="margin-top:0.5rem" />
+        </div>
+      </div>
+    </div>
+    
+    <div class="card">
+      <div class="card-header">Adjust Mix Ratio</div>
+      <div class="slider-row">
+        <label>Color 1</label>
+        <input type="range" id="ratio" min="0" max="100" value="50" />
+        <span id="ratioVal">50%</span>
+        <label>Color 2</label>
+      </div>
+      <div class="result-box" id="result">#800080</div>
+      <button class="mix-btn" id="copyBtn">Copy Hex</button>
+    </div>
+    
+    <div class="card">
+      <div class="card-header">Generated Palette</div>
+      <div class="palette" id="palette"></div>
+    </div>
+  </div>
+  
+  <footer><p>Part of <a href="https://github.com/praveenscience/One-File-Tools">One File Tools</p></footer>
+  
+  <script>
+    var color1=document.getElementById('color1');
+    var color2=document.getElementById('color2');
+    var hex1=document.getElementById('hex1');
+    var hex2=document.getElementById('hex2');
+    var ratio=document.getElementById('ratio');
+    var ratioVal=document.getElementById('ratioVal');
+    var result=document.getElementById('result');
+    var palette=document.getElementById('palette');
+    var copyBtn=document.getElementById('copyBtn');
+    
+    function hexToRgb(hex){
+      var r=parseInt(hex.slice(1,3),16);
+      var g=parseInt(hex.slice(3,5),16);
+      var b=parseInt(hex.slice(5,7),16);
+      return[r,g,b];
+    }
+    
+    function rgbToHex(r,g,b){
+      return'#'+[r,g,b].map(function(x){return Math.round(x).toString(16).padStart(2,'0')}).join('').toUpperCase();
+    }
+    
+    function mixColors(c1,c2,ratio){
+      var rgb1=hexToRgb(c1);
+      var rgb2=hexToRgb(c2);
+      var r=rgb1[0]*(ratio/100)+rgb2[0]*((100-ratio)/100);
+      var g=rgb1[1]*(ratio/100)+rgb2[1]*((100-ratio)/100);
+      var b=rgb1[2]*(ratio/100)+rgb2[2]*((100-ratio)/100);
+      return rgbToHex(r,g,b);
+    }
+    
+    function generatePalette(hex){
+      var rgb=hexToRgb(hex);
+      var colors=[];
+      for(var i=0;i<5;i++){
+        var factor=i===0?0.3:i===4?1.5:0.5+i*0.25;
+        var r=Math.min(255,rgb[0]*factor);
+        var g=Math.min(255,rgb[1]*factor);
+        var b=Math.min(255,rgb[2]*factor);
+        colors.push(rgbToHex(r,g,b));
+      }
+      return colors;
+    }
+    
+    function update(){
+      var mixed=mixColors(hex1.value,hex2.value,parseInt(ratio.value));
+      result.textContent=mixed;
+      result.style.background=mixed;
+      result.style.color=getContrastColor(mixed);
+      
+      var colors=generatePalette(mixed);
+      palette.innerHTML=colors.map(function(c){return'<div class="palette-color" style="background:'+c+'" title="'+c+'"></div>'}).join('');
+    }
+    
+    function getContrastColor(hex){
+      var rgb=hexToRgb(hex);
+      var luminance=(0.299*rgb[0]+0.587*rgb[1]+0.114*rgb[2])/255;
+      return luminance>0.5?'#000':'#fff';
+    }
+    
+    color1.oninput=function(){hex1.value=color1.value;update()};
+    color2.oninput=function(){hex2.value=color2.value;update()};
+    hex1.oninput=function(){
+      if(hex1.value.match(/^#[0-9A-Fa-f]{6}$/)){color1.value=hex1.value;update()}
+    };
+    hex2.oninput=function(){
+      if(hex2.value.match(/^#[0-9A-Fa-f]{6}$/)){color2.value=hex2.value;update()}
+    };
+    ratio.oninput=function(){ratioVal.textContent=ratio.value+'%';update()};
+    
+    copyBtn.onclick=function(){
+      navigator.clipboard.writeText(result.textContent);
+      copyBtn.textContent='Copied!';
+      setTimeout(function(){copyBtn.textContent='Copy Hex'},1000);
+    };
+    
+    palette.onclick=function(e){
+      if(e.target.classList.contains('palette-color')){
+        navigator.clipboard.writeText(e.target.title);
+        e.target.style.transform='scale(1.2)';
+        setTimeout(function(){e.target.style.transform=''},200);
+      }
+    };
+    
+    update();
+  </script>
+</body>
+</html>
