@@ -1,0 +1,652 @@
+<!--
+SVG Previewer
+Single-file client-side tool to paste raw SVG markup and see it rendered
+instantly, with basic validation, sizing controls, and export options.
+Built for One File Tools.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SVG Previewer - One File Tools</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <style>
+      :root {
+        --bg: #030712;
+        --grid-line: #111827;
+        --panel: rgba(17, 24, 39, 0.7);
+        --panel-border: #1f2937;
+        --accent: #c084fc;
+        --accent-hover: #a855f7;
+        --accent-glow: rgba(192, 132, 252, 0.15);
+        --text: #f9fafb;
+        --text-muted: #9ca3af;
+        --text-dim: #4b5563;
+        --radius-sm: 12px;
+        --radius-md: 20px;
+        --font-sans: "Inter", system-ui, sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+        --font-display: "Space Grotesk", sans-serif;
+        --color-weak: #ef4444;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg);
+        background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+        background-size: 32px 32px;
+        color: var(--text);
+        padding: 48px 20px 80px;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+      }
+
+      .app {
+        width: 100%;
+        max-width: 960px;
+      }
+
+      .hero {
+        text-align: center;
+        margin-bottom: 28px;
+      }
+
+      .eyebrow {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        letter-spacing: 0.2em;
+        color: var(--accent);
+        text-transform: uppercase;
+        margin-bottom: 12px;
+        font-weight: 500;
+      }
+
+      .wordmark {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: clamp(26px, 5vw, 38px);
+        letter-spacing: -0.02em;
+        margin-bottom: 12px;
+      }
+
+      .tagline {
+        color: var(--text-muted);
+        font-size: 15px;
+        line-height: 1.5;
+        max-width: 580px;
+        margin: 0 auto;
+      }
+
+      .studio {
+        background: var(--panel);
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-md);
+        padding: 24px;
+        box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.5);
+        margin-bottom: 24px;
+      }
+
+      .section-label {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        display: block;
+        margin-bottom: 14px;
+      }
+
+      textarea {
+        width: 100%;
+        background: rgba(17, 24, 39, 0.8);
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 13px;
+        padding: 12px 14px;
+        resize: vertical;
+        min-height: 220px;
+        line-height: 1.6;
+      }
+
+      textarea:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-glow);
+      }
+
+      .field-error {
+        font-size: 13px;
+        color: var(--color-weak);
+        margin-top: 10px;
+      }
+
+      .actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 14px;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        background: var(--accent);
+        color: #030712;
+        border: none;
+        border-radius: 8px;
+        padding: 11px 18px;
+        font-family: var(--font-sans);
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .btn:hover {
+        background: var(--accent-hover);
+      }
+
+      .btn:focus-visible,
+      .btn-ghost:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      .btn-ghost {
+        background: rgba(31, 41, 55, 0.6);
+        border: 1px solid var(--panel-border);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 11px 16px;
+        font-family: var(--font-sans);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .btn-ghost:hover {
+        background: rgba(55, 65, 81, 0.8);
+      }
+
+      .controls-row {
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+      }
+
+      .control label {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-right: 8px;
+      }
+
+      .control select,
+      .control input[type="range"] {
+        vertical-align: middle;
+      }
+
+      .control select {
+        background: rgba(17, 24, 39, 0.8);
+        border: 1px solid var(--panel-border);
+        border-radius: 6px;
+        color: var(--text);
+        font-family: var(--font-sans);
+        font-size: 13px;
+        padding: 8px 10px;
+      }
+
+      .bg-swatches {
+        display: flex;
+        gap: 6px;
+      }
+
+      .bg-swatch {
+        width: 26px;
+        height: 26px;
+        border-radius: 6px;
+        border: 1px solid var(--panel-border);
+        cursor: pointer;
+      }
+
+      .bg-swatch.active {
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
+      }
+
+      .stage {
+        background: repeating-conic-gradient(#1f2937 0% 25%, #111827 0% 50%) 50% / 20px 20px;
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        min-height: 260px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: auto;
+        padding: 20px;
+      }
+
+      .stage svg,
+      .stage img {
+        max-width: 100%;
+        max-height: 400px;
+      }
+
+      .empty-preview {
+        color: var(--text-dim);
+        font-size: 14px;
+      }
+
+      .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 10px;
+        margin-top: 16px;
+      }
+
+      .info-card {
+        background: rgba(3, 7, 18, 0.5);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 12px 14px;
+      }
+
+      .info-card .label {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 4px;
+      }
+
+      .info-card .value {
+        font-family: var(--font-mono);
+        font-size: 14px;
+        color: var(--text);
+        word-break: break-word;
+      }
+
+      .footer-note {
+        text-align: center;
+        color: var(--text-dim);
+        font-size: 13px;
+        margin-top: 8px;
+      }
+
+      .footer-note a {
+        color: var(--text-muted);
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background: var(--text);
+        color: var(--bg);
+        padding: 12px 22px;
+        border-radius: 99px;
+        font-family: var(--font-sans);
+        font-weight: 600;
+        font-size: 14px;
+        opacity: 0;
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        z-index: 100;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      }
+
+      .toast.show {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+      }
+
+      @media (max-width: 640px) {
+        .studio {
+          padding: 18px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="hero">
+        <div class="eyebrow">Image Tools</div>
+        <h1 class="wordmark">SVG Previewer</h1>
+        <p class="tagline">Paste raw SVG markup and see it rendered instantly, with validation, a checkerboard background for transparency, and quick export options.</p>
+      </header>
+
+      <main class="studio">
+        <span class="section-label">SVG markup</span>
+        <textarea id="svgInput" spellcheck="false" placeholder="&lt;svg viewBox=&quot;0 0 100 100&quot;&gt;…&lt;/svg&gt;">&lt;svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"&gt;
+  &lt;circle cx="50" cy="50" r="40" fill="#c084fc" /&gt;
+&lt;/svg&gt;</textarea>
+        <div class="field-error" id="svgError"></div>
+        <div class="actions">
+          <button class="btn" id="btnFormat" type="button">Format / Indent</button>
+          <button class="btn-ghost" id="btnCopySvg" type="button">Copy SVG</button>
+          <button class="btn-ghost" id="btnCopyDataUri" type="button">Copy as data URI</button>
+          <button class="btn-ghost" id="btnDownloadSvg" type="button">Download .svg</button>
+          <button class="btn-ghost" id="btnDownloadPng" type="button">Download .png</button>
+          <button class="btn-ghost" id="btnClear" type="button">Clear</button>
+        </div>
+      </main>
+
+      <main class="studio">
+        <span class="section-label">Preview</span>
+        <div class="controls-row">
+          <div class="control">
+            <label for="zoomRange">Zoom</label>
+            <input type="range" id="zoomRange" min="25" max="400" step="25" value="100" />
+            <span id="zoomValue">100%</span>
+          </div>
+          <div class="control">
+            <label>Background</label>
+            <div class="bg-swatches" id="bgSwatches"></div>
+          </div>
+        </div>
+
+        <div class="stage" id="stage">
+          <p class="empty-preview" id="emptyPreview">Paste valid SVG markup above to preview it here.</p>
+        </div>
+
+        <div class="info-grid" id="infoGrid" hidden></div>
+      </main>
+
+      <p class="footer-note">Part of <a href="https://github.com/praveenscience/One-File-Tools">One File Tools</a>. Runs entirely offline — nothing is uploaded.</p>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script>
+      /* ==========================================================
+         SVG Previewer
+         Vanilla JS, no dependencies. Parses the pasted markup with
+         DOMParser to validate it before rendering.
+         ========================================================== */
+
+      const svgInput = document.getElementById("svgInput");
+      const svgError = document.getElementById("svgError");
+      const stage = document.getElementById("stage");
+      const emptyPreview = document.getElementById("emptyPreview");
+      const infoGrid = document.getElementById("infoGrid");
+      const zoomRange = document.getElementById("zoomRange");
+      const zoomValue = document.getElementById("zoomValue");
+      const bgSwatches = document.getElementById("bgSwatches");
+      const btnFormat = document.getElementById("btnFormat");
+      const btnCopySvg = document.getElementById("btnCopySvg");
+      const btnCopyDataUri = document.getElementById("btnCopyDataUri");
+      const btnDownloadSvg = document.getElementById("btnDownloadSvg");
+      const btnDownloadPng = document.getElementById("btnDownloadPng");
+      const btnClear = document.getElementById("btnClear");
+      const toast = document.getElementById("toast");
+
+      const BACKGROUNDS = [
+        { id: "checker", label: "Checkerboard", css: "repeating-conic-gradient(#1f2937 0% 25%, #111827 0% 50%) 50% / 20px 20px" },
+        { id: "white", label: "White", css: "#ffffff" },
+        { id: "black", label: "Black", css: "#000000" },
+        { id: "dark", label: "Dark panel", css: "#111827" }
+      ];
+      let activeBg = "checker";
+
+      let currentSvgText = "";
+
+      /** Shows a brief toast. */
+      function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add("show");
+        setTimeout(() => toast.classList.remove("show"), 2000);
+      }
+
+      /** Copies text with graceful failure. */
+      function copyText(text, message) {
+        if (!text) return;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard
+            .writeText(text)
+            .then(() => showToast(message))
+            .catch(() => showToast("Copy failed"));
+        } else {
+          showToast("Clipboard unavailable");
+        }
+      }
+
+      /** Renders the background swatch selector. */
+      function renderSwatches() {
+        bgSwatches.innerHTML = "";
+        BACKGROUNDS.forEach((bg) => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "bg-swatch" + (bg.id === activeBg ? " active" : "");
+          btn.style.background = bg.css;
+          btn.title = bg.label;
+          btn.setAttribute("aria-label", "Background: " + bg.label);
+          btn.addEventListener("click", () => {
+            activeBg = bg.id;
+            stage.style.background = bg.css;
+            renderSwatches();
+          });
+          bgSwatches.appendChild(btn);
+        });
+      }
+
+      /** Parses and validates the SVG text, returning the root <svg> element or null. */
+      function parseSvg(text) {
+        const trimmed = text.trim();
+        if (!trimmed) return { svg: null, error: "" };
+        if (!/^<svg[\s>]/i.test(trimmed)) {
+          return { svg: null, error: "Markup must start with an <svg> root element." };
+        }
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(trimmed, "image/svg+xml");
+        const parserError = doc.querySelector("parsererror");
+        if (parserError) {
+          return { svg: null, error: "Invalid SVG/XML — check for unclosed tags or a stray character." };
+        }
+
+        const svgEl = doc.documentElement;
+        if (!svgEl || svgEl.nodeName.toLowerCase() !== "svg") {
+          return { svg: null, error: "Root element must be <svg>." };
+        }
+
+        return { svg: svgEl, error: "" };
+      }
+
+      /** Renders the preview, info cards, and validation state from the current input. */
+      function render() {
+        const text = svgInput.value;
+        const { svg, error } = parseSvg(text);
+
+        if (error) {
+          svgError.textContent = error;
+          stage.innerHTML = "";
+          emptyPreview.textContent = "Fix the error above to see a preview.";
+          stage.appendChild(emptyPreview);
+          infoGrid.hidden = true;
+          currentSvgText = "";
+          return;
+        }
+
+        svgError.textContent = "";
+
+        if (!svg) {
+          stage.innerHTML = "";
+          emptyPreview.textContent = "Paste valid SVG markup above to preview it here.";
+          stage.appendChild(emptyPreview);
+          infoGrid.hidden = true;
+          currentSvgText = "";
+          return;
+        }
+
+        currentSvgText = text.trim();
+
+        stage.innerHTML = "";
+        const clone = svg.cloneNode(true);
+        clone.style.transform = "scale(" + zoomRange.value / 100 + ")";
+        stage.appendChild(clone);
+
+        const viewBox = svg.getAttribute("viewBox") || "—";
+        const width = svg.getAttribute("width") || "(from viewBox)";
+        const height = svg.getAttribute("height") || "(from viewBox)";
+        const elementCount = svg.querySelectorAll("*").length;
+
+        const cards = [
+          { label: "viewBox", value: viewBox },
+          { label: "width", value: width },
+          { label: "height", value: height },
+          { label: "Elements", value: String(elementCount) },
+          { label: "Size", value: (new Blob([text]).size / 1024).toFixed(2) + " KB" }
+        ];
+
+        infoGrid.innerHTML = "";
+        cards.forEach((card) => {
+          const div = document.createElement("div");
+          div.className = "info-card";
+          const label = document.createElement("div");
+          label.className = "label";
+          label.textContent = card.label;
+          const value = document.createElement("div");
+          value.className = "value";
+          value.textContent = card.value;
+          div.appendChild(label);
+          div.appendChild(value);
+          infoGrid.appendChild(div);
+        });
+        infoGrid.hidden = false;
+      }
+
+      /** Very light indentation pass for readability — not a full pretty-printer. */
+      function formatSvg(text) {
+        const trimmed = text.trim();
+        let formatted = "";
+        let indent = 0;
+        const tokens = trimmed.replace(/></g, ">\n<").split("\n");
+        tokens.forEach((line) => {
+          const isClosing = /^<\//.test(line);
+          const isSelfClosing = /\/>$/.test(line);
+          const isOpeningOnly = /^<[^!/][^>]*[^/]>$/.test(line);
+          if (isClosing) indent = Math.max(0, indent - 1);
+          formatted += "  ".repeat(indent) + line.trim() + "\n";
+          if (isOpeningOnly && !isSelfClosing) indent += 1;
+        });
+        return formatted.trim();
+      }
+
+      // ---- Events ----
+
+      svgInput.addEventListener("input", render);
+
+      zoomRange.addEventListener("input", () => {
+        zoomValue.textContent = zoomRange.value + "%";
+        render();
+      });
+
+      btnFormat.addEventListener("click", () => {
+        svgInput.value = formatSvg(svgInput.value);
+        render();
+      });
+
+      btnCopySvg.addEventListener("click", () => copyText(currentSvgText, "SVG copied!"));
+
+      btnCopyDataUri.addEventListener("click", () => {
+        if (!currentSvgText) {
+          showToast("Nothing to copy yet");
+          return;
+        }
+        const encoded = "data:image/svg+xml," + encodeURIComponent(currentSvgText);
+        copyText(encoded, "Data URI copied!");
+      });
+
+      btnDownloadSvg.addEventListener("click", () => {
+        if (!currentSvgText) {
+          showToast("Nothing to download yet");
+          return;
+        }
+        const blob = new Blob([currentSvgText], { type: "image/svg+xml" });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = "image.svg";
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+      });
+
+      btnDownloadPng.addEventListener("click", () => {
+        if (!currentSvgText) {
+          showToast("Nothing to export yet");
+          return;
+        }
+        const { svg } = parseSvg(currentSvgText);
+        if (!svg) return;
+
+        const viewBoxAttr = svg.getAttribute("viewBox");
+        let vbWidth = 300;
+        let vbHeight = 300;
+        if (viewBoxAttr) {
+          const parts = viewBoxAttr.split(/\s+/).map(Number);
+          if (parts.length === 4) {
+            vbWidth = parts[2];
+            vbHeight = parts[3];
+          }
+        }
+
+        const svgBlob = new Blob([currentSvgText], { type: "image/svg+xml" });
+        const url = URL.createObjectURL(svgBlob);
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = vbWidth;
+          canvas.height = vbHeight;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, vbWidth, vbHeight);
+          URL.revokeObjectURL(url);
+
+          canvas.toBlob((blob) => {
+            const pngUrl = URL.createObjectURL(blob);
+            const anchor = document.createElement("a");
+            anchor.href = pngUrl;
+            anchor.download = "image.png";
+            document.body.appendChild(anchor);
+            anchor.click();
+            document.body.removeChild(anchor);
+            setTimeout(() => URL.revokeObjectURL(pngUrl), 0);
+          }, "image/png");
+        };
+        img.onerror = () => {
+          showToast("Could not rasterize this SVG for PNG export");
+          URL.revokeObjectURL(url);
+        };
+        img.src = url;
+      });
+
+      btnClear.addEventListener("click", () => {
+        svgInput.value = "";
+        render();
+        svgInput.focus();
+      });
+
+      renderSwatches();
+      stage.style.background = BACKGROUNDS[0].css;
+      render();
+    </script>
+  </body>
+</html>
