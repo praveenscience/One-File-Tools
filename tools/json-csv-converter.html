@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Convert between JSON and CSV formats with bidirectional conversion." />
+  <title>JSON CSV Converter — One File Tools</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#fafafa;--surface:#f1f5f9;--text:#1a1a1a;--muted:#64748b;--border:#e2e8f0;--accent:#2563eb;--success:#16a34a;--error:#dc2626;--radius:8px}
+    @media(prefers-color-scheme:dark){:root{--bg:#0a0a0a;--surface:#1a1a1a;--text:#e5e5e5;--muted:#94a3b8;--border:#334155;--accent:#3b82f6}}
+    body{font-family:system-ui,sans-serif;line-height:1.6;background:var(--bg);color:var(--text);min-height:100vh}
+    .container{max-width:1200px;margin:0 auto;padding:2rem}
+    header{text-align:center;margin-bottom:2rem}
+    header h1{font-size:2rem;margin-bottom:0.5rem}
+    header p{color:var(--muted)}
+    .main-grid{display:grid;grid-template-columns:1fr auto 1fr;gap:1rem;align-items:start}
+    @media(max-width:900px){.main-grid{grid-template-columns:1fr}}
+    .card{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem}
+    .card-header{font-weight:600;margin-bottom:1rem;display:flex;justify-content:space-between}
+    textarea{width:100%;min-height:300px;padding:1rem;font-family:monospace;font-size:0.85rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text);resize:vertical}
+    textarea:focus{outline:none;border-color:var(--accent)}
+    textarea.error{border-color:var(--error)}
+    textarea.success{border-color:var(--success)}
+    .arrow{ display:flex;flex-direction:column;gap:0.5rem;padding-top:2rem}
+    .btn{padding:0.5rem 1rem;border:1px solid var(--border);border-radius:4px;background:var(--bg);cursor:pointer;font-size:0.875rem;white-space:nowrap}
+    .btn:hover{background:var(--surface)}
+    .btn-primary{background:var(--accent);color:white;border-color:var(--accent)}
+    .btn-primary:hover{opacity:0.9}
+    .error-msg{color:var(--error);font-size:0.85rem;margin-top:0.5rem;display:none}
+    .error-msg.show{display:block}
+    .stats{font-size:0.85rem;color:var(--muted);margin-top:0.5rem}
+    .options{display:flex;gap:1rem;margin-bottom:1rem;flex-wrap:wrap}
+    .option-group{display:flex;align-items:center;gap:0.5rem}
+    .option-group label{font-size:0.875rem}
+    select{padding:0.5rem;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)}
+    footer{text-align:center;padding:2rem;color:var(--muted);font-size:0.875rem}
+    footer a{color:var(--accent);text-decoration:none}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header><h1>📊 JSON CSV Converter</h1><p>Convert between JSON and CSV formats instantly</p></header>
+    
+    <div class="options">
+      <div class="option-group">
+        <label>Delimiter:</label>
+        <select id="delimiter"><option value=",">Comma (,)</option><option value="	">Tab</option><option value=";">Semicolon (;)</option><option value="|">Pipe (|)</option></select>
+      </div>
+    </div>
+    
+    <div class="main-grid">
+      <div class="card">
+        <div class="card-header">
+          <span>JSON Input</span>
+          <button class="btn" id="sampleJsonBtn">Sample JSON</button>
+        </div>
+        <textarea id="jsonInput" placeholder='[{"name":"John","age":30,"city":"NYC"},{"name":"Jane","age":25,"city":"LA"}]'></textarea>
+        <div class="error-msg" id="jsonError"></div>
+        <div class="stats" id="jsonStats"></div>
+        <button class="btn btn-primary" id="convertToCsv" style="margin-top:1rem">Convert to CSV →</button>
+      </div>
+      
+      <div class="arrow">
+        <button class="btn" id="toCsvBtn">↓ CSV ↓</button>
+        <button class="btn" id="toJsonBtn">↑ JSON ↑</button>
+      </div>
+      
+      <div class="card">
+        <div class="card-header">
+          <span>CSV Output</span>
+          <button class="btn" id="sampleCsvBtn">Sample CSV</button>
+        </div>
+        <textarea id="csvInput" placeholder='name,age,city
+John,30,NYC
+Jane,25,LA'></textarea>
+        <div class="error-msg" id="csvError"></div>
+        <div class="stats" id="csvStats"></div>
+        <button class="btn btn-primary" id="convertToJson" style="margin-top:1rem">Convert to JSON ↑</button>
+      </div>
+    </div>
+  </div>
+  
+  <footer><p>Part of <a href="https://github.com/praveenscience/One-File-Tools">One File Tools</a></p></footer>
+  
+  <script>
+    var jsonInput=document.getElementById('jsonInput');
+    var csvInput=document.getElementById('csvInput');
+    var jsonError=document.getElementById('jsonError');
+    var csvError=document.getElementById('csvError');
+    var jsonStats=document.getElementById('jsonStats');
+    var csvStats=document.getElementById('csvStats');
+    var delimiter=document.getElementById('delimiter');
+    var toCsvBtn=document.getElementById('toCsvBtn');
+    var toJsonBtn=document.getElementById('toJsonBtn');
+    
+    var sampleJson='[\n  {"name":"Alice","email":"alice@example.com","role":"Developer"},\n  {"name":"Bob","email":"bob@example.com","role":"Designer"},\n  {"name":"Charlie","email":"charlie@example.com","role":"Manager"}\n]';
+    
+    var sampleCsv='name,email,role\nAlice,alice@example.com,Developer\nBob,bob@example.com,Designer\nCharlie,charlie@example.com,Manager';
+    
+    document.getElementById('sampleJsonBtn').onclick=function(){jsonInput.value=sampleJson;jsonInput.classList.remove('error');jsonError.classList.remove('show');updateJsonStats()};
+    document.getElementById('sampleCsvBtn').onclick=function(){csvInput.value=sampleCsv;csvInput.classList.remove('error');csvError.classList.remove('show');updateCsvStats()};
+    document.getElementById('convertToCsv').onclick=jsonToCsv;
+    document.getElementById('convertToJson').onclick=csvToJson;
+    toCsvBtn.onclick=jsonToCsv;
+    toJsonBtn.onclick=csvToJson;
+    delimiter.onchange=function(){if(csvInput.value)csvToJson()};
+    
+    jsonInput.oninput=updateJsonStats;
+    csvInput.oninput=updateCsvStats;
+    
+    function updateJsonStats(){
+      try{
+        var data=JSON.parse(jsonInput.value||'[]');
+        var count=Array.isArray(data)?data.length:1;
+        jsonStats.textContent='Array: '+count+' item'+(count!==1?'s':'');
+      }catch(e){jsonStats.textContent=''}
+    }
+    
+    function updateCsvStats(){
+      var lines=csvInput.value.trim().split('\n');
+      jsonStats.textContent='Rows: '+(lines.length-1)+' data rows';
+    }
+    
+    function jsonToCsv(){
+      jsonError.classList.remove('show');
+      var del=delimiter.value;
+      
+      try{
+        var data=JSON.parse(jsonInput.value);
+        if(!Array.isArray(data))data=[data];
+        
+        if(data.length===0){jsonError.textContent='No data to convert';jsonError.classList.add('show');return}
+        
+        var headers=Object.keys(data[0]);
+        var csv=headers.join(del)+'\n';
+        
+        for(var i=0;i<data.length;i++){
+          var row=headers.map(function(h){
+            var val=data[i][h];
+            if(val===null||val===undefined)return '';
+            val=String(val);
+            if(val.includes(del)||val.includes('"')||val.includes('\n')){
+              return'"'+val.replace(/"/g,'""')+'"';
+            }
+            return val;
+          });
+          csv+=row.join(del)+'\n';
+        }
+        
+        csvInput.value=csv.trim();
+        jsonInput.classList.add('success');
+        csvInput.classList.add('success');
+        setTimeout(function(){
+          jsonInput.classList.remove('success');
+          csvInput.classList.remove('success');
+        },1500);
+        updateCsvStats();
+      }catch(e){
+        jsonError.textContent='Invalid JSON: '+e.message;
+        jsonError.classList.add('show');
+        jsonInput.classList.add('error');
+        setTimeout(function(){jsonInput.classList.remove('error')},2000);
+      }
+    }
+    
+    function csvToJson(){
+      csvError.classList.remove('show');
+      var del=delimiter.value;
+      
+      try{
+        var lines=csvInput.value.trim().split('\n');
+        if(lines.length<2){csvError.textContent='CSV needs header and at least 1 data row';csvError.classList.add('show');return}
+        
+        var headers=lines[0].split(del).map(function(h){return h.trim().replace(/^["']|["']$/g,'')});
+        var data=[];
+        
+        for(var i=1;i<lines.length;i++){
+          if(!lines[i].trim())continue;
+          var values=parseCSVLine(lines[i],del);
+          var obj={};
+          for(var j=0;j<headers.length;j++){
+            var val=values[j]||'';
+            val=val.trim().replace(/^["']|["']$/g,'');
+            if(val===''||val==='null')obj[headers[j]]=null;
+            else if(val==='undefined')obj[headers[j]]=undefined;
+            else if(!isNaN(val)&&val!=='')obj[headers[j]]=Number(val);
+            else obj[headers[j]]=val;
+          }
+          data.push(obj);
+        }
+        
+        jsonInput.value=JSON.stringify(data,null,2);
+        csvInput.classList.add('success');
+        jsonInput.classList.add('success');
+        setTimeout(function(){
+          csvInput.classList.remove('success');
+          jsonInput.classList.remove('success');
+        },1500);
+        updateJsonStats();
+      }catch(e){
+        csvError.textContent='Invalid CSV: '+e.message;
+        csvError.classList.add('show');
+        csvInput.classList.add('error');
+        setTimeout(function(){csvInput.classList.remove('error')},2000);
+      }
+    }
+    
+    function parseCSVLine(line,del){
+      var result=[];
+      var current='';
+      var inQuotes=false;
+      
+      for(var i=0;i<line.length;i++){
+        var char=line[i];
+        if(char==='"'){
+          if(inQuotes&&line[i+1]==='"'){current+='"';i++;}
+          else inQuotes=!inQuotes;
+        }else if(char===del&&!inQuotes){
+          result.push(current);
+          current='';
+        }else{
+          current+=char;
+        }
+      }
+      result.push(current);
+      return result;
+    }
+  </script>
+</body>
+</html>
