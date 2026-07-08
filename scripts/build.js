@@ -31,6 +31,12 @@ const questsDataRaw = fs.existsSync(questsPath) ? JSON.parse(fs.readFileSync(que
 const questCategories = questsDataRaw.categories || [];
 const quests = questsDataRaw.quests || [];
 
+// Quizzes registry is optional — build should not fail if it doesn't exist yet.
+const quizzesPath = path.join(rootDir, "data", "quizzes.json");
+const quizzesDataRaw = fs.existsSync(quizzesPath) ? JSON.parse(fs.readFileSync(quizzesPath, "utf-8")) : { categories: [], quizzes: [] };
+const quizCategories = quizzesDataRaw.categories || [];
+const quizzes = quizzesDataRaw.quizzes || [];
+
 // ──────────────────────────────────────────────
 // Helpers
 // ──────────────────────────────────────────────
@@ -148,6 +154,10 @@ function questThumbnailExists(questId) {
   return fs.existsSync(path.join(rootDir, "quests", questId + ".png"));
 }
 
+function quizThumbnailExists(quizId) {
+  return fs.existsSync(path.join(rootDir, "quizzes", quizId + ".png"));
+}
+
 // ──────────────────────────────────────────────
 // Build tool data
 // ──────────────────────────────────────────────
@@ -223,6 +233,40 @@ questCategories.forEach((c) => { questCountByCategory[c.id] = 0; });
 questsDataBuilt.forEach((q) => { if (questCountByCategory[q.category] !== undefined) questCountByCategory[q.category]++; });
 
 // ──────────────────────────────────────────────
+// Build quiz data
+// ──────────────────────────────────────────────
+
+const quizCategoryMap = {};
+quizCategories.forEach((c) => {
+  quizCategoryMap[c.id] = c;
+});
+
+const quizzesDataBuilt = quizzes.map((q) => ({
+  id: q.id,
+  name: q.name,
+  shortDescription: q.shortDescription,
+  longDescriptionHtml: markdownToHtml(q.longDescription),
+  category: q.category,
+  categoryName: quizCategoryMap[q.category]?.name || q.category,
+  categoryIcon: quizCategoryMap[q.category]?.icon || "",
+  tags: q.tags || [],
+  techStack: q.techStack || [],
+  difficulty: q.difficulty || "Easy",
+  status: q.status || "idea",
+  hasThumbnail: quizThumbnailExists(q.id),
+  file: `quizzes/${q.id}.html`,
+  thumbnail: `quizzes/${q.id}.png`,
+  github: `${site.github}/blob/main/quizzes/${q.id}.html`,
+  live: `${site.url}/quizzes/${q.id}`
+}));
+
+const totalQuizCount = quizzesDataBuilt.length;
+
+const quizCountByCategory = {};
+quizCategories.forEach((c) => { quizCountByCategory[c.id] = 0; });
+quizzesDataBuilt.forEach((q) => { if (quizCountByCategory[q.category] !== undefined) quizCountByCategory[q.category]++; });
+
+// ──────────────────────────────────────────────
 // Template-based index.html generation
 // ──────────────────────────────────────────────
 
@@ -269,6 +313,13 @@ function buildPillarCards() {
       count: totalQuestCount + " quest" + (totalQuestCount === 1 ? "" : "s"),
       desc: "Interactive, gamified lessons to learn Git, CSS, and JS by doing.",
       icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z"/></svg>'
+    },
+    {
+      id: "quizzes",
+      title: "One File Quizzes",
+      count: totalQuizCount + " quiz" + (totalQuizCount === 1 ? "" : "zes"),
+      desc: "Quick multiple-choice challenges to test your Git, CSS, and JS knowledge.",
+      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>'
     },
     {
       id: "soon",
@@ -332,7 +383,6 @@ function buildToolCards() {
       '<div class="card-foot">' +
       '<span class="badge-diff ' + diff + '">' + escapeHtml(t.difficulty) + '</span>' +
       '<span class="card-links">' +
-      '<a class="link-btn" href="tools/' + escapeAttr(t.id) + '.html" data-nomodal>Open</a>' +
       '<a class="link-btn primary" href="' + escapeAttr(liveUrl) + '" target="_blank" rel="noopener noreferrer" data-nomodal>Live <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg></a>' +
       '</span></div></div></article>';
   }).join("\n");
@@ -373,8 +423,47 @@ function buildQuestCards() {
       '<div class="card-foot">' +
       '<span class="badge-diff ' + diff + '">' + escapeHtml(q.difficulty) + '</span>' +
       '<span class="card-links">' +
-      '<a class="link-btn" href="quests/' + escapeAttr(q.id) + '.html" data-nomodal>Preview</a>' +
       '<a class="link-btn primary" href="' + escapeAttr(liveUrl) + '" target="_blank" rel="noopener noreferrer" data-nomodal>Start Quest <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg></a>' +
+      '</span></div></div></article>';
+  }).join("\n");
+}
+
+// ── Build quiz filter pills (static HTML) ──
+
+function buildQuizFilterPills() {
+  const pills = ['              <button class="pill" type="button" data-cat="all" aria-pressed="true"><span class="pi" aria-hidden="true">\u25A6</span> All <span class="pill-count">(' + totalQuizCount + ')</span></button>'];
+  quizCategories.forEach((c) => {
+    const count = quizCountByCategory[c.id] || 0;
+    if (count === 0) return;
+    pills.push('              <button class="pill" type="button" data-cat="' + escapeAttr(c.id) + '" aria-pressed="false"><span class="pi" aria-hidden="true">' + c.icon + '</span> ' + escapeHtml(c.name) + ' <span class="pill-count">(' + count + ')</span></button>');
+  });
+  return pills.join("\n");
+}
+
+// ── Build quiz cards (static HTML) ──
+
+function buildQuizCards() {
+  return quizzesDataBuilt.map((q) => {
+    const cat = quizCategoryMap[q.category];
+    const diff = q.difficulty.toLowerCase();
+    const searchData = (q.name + " " + q.shortDescription + " " + q.tags.join(" ")).toLowerCase();
+    const liveUrl = site.url + "/quizzes/" + q.id;
+
+    const thumbHtml = q.hasThumbnail
+      ? '<img class="card-thumb" src="quizzes/' + escapeAttr(q.id) + '.png" alt="' + escapeAttr(q.name) + '" loading="lazy" />'
+      : '<div class="card-thumb-placeholder">' + (cat ? cat.icon : '') + '</div>';
+
+    return '            <article class="card" data-id="' + escapeAttr(q.id) + '" data-category="' + escapeAttr(q.category) + '" data-search="' + escapeAttr(searchData) + '" tabindex="0" role="button" aria-label="View details for ' + escapeAttr(q.name) + '">' +
+      thumbHtml +
+      '<div class="card-body">' +
+      '<div class="card-top"><h4>' + escapeHtml(q.name) + '</h4>' +
+      '<span class="badge-cat"><span aria-hidden="true">' + (cat ? cat.icon : '') + '</span> ' + escapeHtml(q.categoryName) + '</span></div>' +
+      '<p class="desc">' + escapeHtml(q.shortDescription) + '</p>' +
+      '<div class="path mono">quizzes/' + escapeHtml(q.id) + '.html</div>' +
+      '<div class="card-foot">' +
+      '<span class="badge-diff ' + diff + '">' + escapeHtml(q.difficulty) + '</span>' +
+      '<span class="card-links">' +
+      '<a class="link-btn primary" href="' + escapeAttr(liveUrl) + '" target="_blank" rel="noopener noreferrer" data-nomodal>Start Quiz <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg></a>' +
       '</span></div></div></article>';
   }).join("\n");
 }
@@ -436,6 +525,11 @@ const questsJson = JSON.stringify(questsDataBuilt.map((q) => ({
   category: q.category, tags: q.tags, techStack: q.techStack, difficulty: q.difficulty
 })));
 const questCategoriesJson = JSON.stringify(questCategories.map((c) => ({ id: c.id, name: c.name, icon: c.icon })));
+const quizzesJson = JSON.stringify(quizzesDataBuilt.map((q) => ({
+  id: q.id, name: q.name, shortDescription: q.shortDescription, longDescription: quizzes.find((x) => x.id === q.id)?.longDescription || "",
+  category: q.category, tags: q.tags, techStack: q.techStack, difficulty: q.difficulty
+})));
+const quizCategoriesJson = JSON.stringify(quizCategories.map((c) => ({ id: c.id, name: c.name, icon: c.icon })));
 
 // ── Inject into template ──
 
@@ -455,13 +549,18 @@ let html = template
   .replace("{{PORTFOLIO_CARDS}}", buildPortfolioCards())
   .replace("{{QUEST_FILTER_PILLS}}", buildQuestFilterPills())
   .replace("{{QUEST_CARDS}}", buildQuestCards())
+  .replace(/\{\{QUIZ_COUNT\}\}/g, String(totalQuizCount))
+  .replace("{{QUIZ_FILTER_PILLS}}", buildQuizFilterPills())
+  .replace("{{QUIZ_CARDS}}", buildQuizCards())
   .replace("{{SITE_JSON}}", siteJson)
   .replace("{{CATEGORIES_JSON}}", categoriesJson)
   .replace("{{TOOLS_JSON}}", toolsJson)
   .replace("{{RESUME_THEMES_JSON}}", resumeThemesJson)
   .replace("{{PORTFOLIO_THEMES_JSON}}", portfolioThemesJson)
   .replace("{{QUESTS_JSON}}", questsJson)
-  .replace("{{QUEST_CATEGORIES_JSON}}", questCategoriesJson);
+  .replace("{{QUEST_CATEGORIES_JSON}}", questCategoriesJson)
+  .replace("{{QUIZZES_JSON}}", quizzesJson)
+  .replace("{{QUIZ_CATEGORIES_JSON}}", quizCategoriesJson);
 
 // ──────────────────────────────────────────────
 // Write output
@@ -473,6 +572,7 @@ fs.writeFileSync(outPath, html, "utf-8");
 console.log("Built index.html successfully.");
 console.log("  " + totalCount + " tools across " + categories.length + " categories (" + liveCount + " live, " + (totalCount - liveCount) + " ideas)");
 console.log("  " + totalQuestCount + " quests across " + questCategories.length + " categories");
+console.log("  " + totalQuizCount + " quizzes across " + quizCategories.length + " categories");
 console.log("  Template: " + templatePath);
 console.log("  Output: " + outPath);
 

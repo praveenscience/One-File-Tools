@@ -349,7 +349,8 @@ One-File-Tools/
 │   ├── profile.json      # Sample data for resume & portfolio generation
 │   ├── tools.json        # Tool registry (metadata for landing page)
 │   ├── themes.json       # Theme registry (resume/portfolio metadata)
-│   └── quests.json       # Quest registry (interactive learning games)
+│   ├── quests.json       # Quest registry (interactive learning games)
+│   └── quizzes.json      # Quiz registry (multiple-choice challenges)
 ├── scripts/              # Build tooling
 │   ├── build.js          # Generates index.html (landing page)
 │   ├── theme-gen.js      # Generates resume/portfolio HTML from .hbs + profile.json
@@ -368,6 +369,8 @@ One-File-Tools/
 │   └── developer.png     # Screenshot
 ├── quests/               # Pillar 4: Interactive learning quests & games
 │   └── Contributing.md   # Quest-specific contribution guide
+├── quizzes/              # Pillar 5: Quick multiple-choice challenges
+│   └── Contributing.md   # Quiz-specific contribution guide
 ├── Contributing.md       # Contribution guide
 ├── index.html            # Generated: landing page (gitignored)
 ├── ReadMe.md             # This file
