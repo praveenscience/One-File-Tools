@@ -1344,6 +1344,38 @@
             <a class="link-btn primary" href="{{GITHUB_URL}}/blob/main/quests/Contributing.md" target="_blank" rel="noopener noreferrer">Contributing Guide <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg></a>
           </div>
         </section>
+
+        <!-- ===================== QUIZZES SECTION ===================== -->
+        <section class="section" id="section-quizzes" aria-labelledby="quizzes-heading">
+          <div class="section-head">
+            <div class="kicker">~/quizzes</div>
+            <h2 id="quizzes-heading">One File Quizzes</h2>
+            <p>Quick multiple-choice challenges to test your Git, CSS, and JavaScript knowledge — each one a single HTML file with progress saved locally.</p>
+          </div>
+
+          <div class="toolbar">
+            <div class="search">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+              <input type="search" id="quizSearch" placeholder="Search quizzes…" aria-label="Search quizzes" autocomplete="off" />
+            </div>
+            <div class="filters" id="quizFilters" role="group" aria-label="Filter quizzes by category">
+{{QUIZ_FILTER_PILLS}}
+            </div>
+          </div>
+
+          <p class="count-row" id="quizCountRow" aria-live="polite"><b>{{QUIZ_COUNT}}</b> quizzes</p>
+          <div class="grid" id="quizGrid">
+{{QUIZ_CARDS}}
+          </div>
+
+          <div class="contribute-cta">
+            <p><strong>Want to add a quiz?</strong> Check the quizzes contributing guide and submit a PR.</p>
+            <a class="link-btn primary" href="{{GITHUB_URL}}/blob/main/quizzes/Contributing.md" target="_blank" rel="noopener noreferrer">Contributing Guide <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg></a>
+          </div>
+        </section>
       </div>
     </main>
 
@@ -1404,6 +1436,8 @@
       const PORTFOLIO_THEMES = {{PORTFOLIO_THEMES_JSON}};
       const QUESTS = {{QUESTS_JSON}};
       const QUEST_CATEGORIES = {{QUEST_CATEGORIES_JSON}};
+      const QUIZZES = {{QUIZZES_JSON}};
+      const QUIZ_CATEGORIES = {{QUIZ_CATEGORIES_JSON}};
 
       /* =================================================================
    UTILITIES
@@ -1412,6 +1446,7 @@
       const $$ = (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
       const catById = (id) => CATEGORIES.find((c) => c.id === id);
       const questCatById = (id) => QUEST_CATEGORIES.find((c) => c.id === id);
+      const quizCatById = (id) => QUIZ_CATEGORIES.find((c) => c.id === id);
 
       function escapeHtml(str) {
         return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
@@ -1463,7 +1498,7 @@
       /* =================================================================
    PILLARS
    ================================================================= */
-      const VALID_PILLARS = ["tools", "resume", "portfolio", "quests"];
+      const VALID_PILLARS = ["tools", "resume", "portfolio", "quests", "quizzes"];
       let currentPillar = "tools";
 
       $$(".pillar[data-pillar]").forEach((btn) => {
@@ -1574,6 +1609,49 @@
       filterAndUpdateQuests();
 
       /* =================================================================
+   QUIZZES: search + filter (same pattern as quests)
+   ================================================================= */
+      let quizActiveCategory = "all";
+      let quizSearchTerm = "";
+
+      $$("#quizFilters .pill").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          quizActiveCategory = btn.dataset.cat;
+          $$("#quizFilters .pill").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+          filterAndUpdateQuizzes();
+        });
+      });
+
+      function filterAndUpdateQuizzes() {
+        const q = quizSearchTerm.trim().toLowerCase();
+        const cards = $$("#quizGrid .card");
+        let visible = 0;
+
+        cards.forEach((card) => {
+          const cat = card.dataset.category;
+          const hay = card.dataset.search;
+          const catMatch = quizActiveCategory === "all" || cat === quizActiveCategory;
+          const searchMatch = !q || hay.includes(q);
+          const show = catMatch && searchMatch;
+          card.style.display = show ? "" : "none";
+          if (show) visible++;
+        });
+
+        const catName = quizActiveCategory !== "all" ? (quizCatById(quizActiveCategory) || {}).name || quizActiveCategory : "";
+        const countEl = $("#quizCountRow");
+        countEl.innerHTML = "<b>" + visible + "</b> " + (visible === 1 ? "quiz" : "quizzes") +
+          (catName ? " in " + escapeHtml(catName) : "") +
+          (q ? " matching \u201C" + escapeHtml(quizSearchTerm.trim()) + "\u201D" : "");
+      }
+
+      $("#quizSearch").addEventListener("input", (e) => {
+        quizSearchTerm = e.target.value;
+        filterAndUpdateQuizzes();
+      });
+
+      filterAndUpdateQuizzes();
+
+      /* =================================================================
    Cmd/Ctrl+K to focus search
    ================================================================= */
       document.addEventListener("keydown", (e) => {
@@ -1595,11 +1673,12 @@
       function showModal(itemId, pushHash, kind) {
         kind = kind || "tools";
         const isQuest = kind === "quests";
-        const collection = isQuest ? QUESTS : TOOLS;
-        const catLookup = isQuest ? questCatById : catById;
-        const folder = isQuest ? "quests" : "tools";
-        const openLabel = isQuest ? "Preview file" : "Open file";
-        const liveLabel = isQuest ? "Start quest " : "Try live ";
+        const isQuiz = kind === "quizzes";
+        const collection = isQuiz ? QUIZZES : isQuest ? QUESTS : TOOLS;
+        const catLookup = isQuiz ? quizCatById : isQuest ? questCatById : catById;
+        const folder = isQuiz ? "quizzes" : isQuest ? "quests" : "tools";
+        const openLabel = isQuiz ? "Preview file" : isQuest ? "Preview file" : "Open file";
+        const liveLabel = isQuiz ? "Start quiz " : isQuest ? "Start quest " : "Try live ";
 
         const t = collection.find((x) => x.id === itemId);
         if (!t) return;
@@ -1635,6 +1714,8 @@
           history.replaceState(null, "", "#tools");
         } else if (restoreHash && location.hash.startsWith("#quests/")) {
           history.replaceState(null, "", "#quests");
+        } else if (restoreHash && location.hash.startsWith("#quizzes/")) {
+          history.replaceState(null, "", "#quizzes");
         }
       }
 
@@ -1661,6 +1742,7 @@
       }
       wireCardModals("toolGrid", "tools");
       wireCardModals("questGrid", "quests");
+      wireCardModals("quizGrid", "quizzes");
 
       /* =================================================================
    HASH ROUTING
@@ -1679,6 +1761,11 @@
         if (pillar === "quests" && itemId) {
           selectPillar("quests", { scroll: false });
           if (QUESTS.some((q) => q.id === itemId)) { showModal(itemId, false, "quests"); return; }
+        }
+
+        if (pillar === "quizzes" && itemId) {
+          selectPillar("quizzes", { scroll: false });
+          if (QUIZZES.some((q) => q.id === itemId)) { showModal(itemId, false, "quizzes"); return; }
         }
 
         if (VALID_PILLARS.includes(pillar)) {
