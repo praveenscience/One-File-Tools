@@ -1,0 +1,484 @@
+<!--
+YAML <-> JSON Converter
+Single-file client-side tool to convert between YAML and JSON in both
+directions, with validation and pretty-printing.
+Uses js-yaml via CDN for standards-compliant YAML parsing/serialization
+(hand-writing a full YAML parser would be fragile and error-prone on edge
+cases like anchors, flow collections, and multi-line strings).
+Built for One File Tools.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>YAML / JSON Converter - One File Tools</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <!-- js-yaml: lightweight, well-maintained YAML parser/dumper -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+
+    <style>
+      :root {
+        --bg: #030712;
+        --grid-line: #111827;
+        --panel: rgba(17, 24, 39, 0.7);
+        --panel-border: #1f2937;
+        --accent: #facc15;
+        --accent-hover: #eab308;
+        --accent-glow: rgba(250, 204, 21, 0.15);
+        --text: #f9fafb;
+        --text-muted: #9ca3af;
+        --text-dim: #4b5563;
+        --radius-sm: 12px;
+        --radius-md: 20px;
+        --font-sans: "Inter", system-ui, sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+        --font-display: "Space Grotesk", sans-serif;
+        --color-weak: #ef4444;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg);
+        background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+        background-size: 32px 32px;
+        color: var(--text);
+        padding: 48px 20px 80px;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+      }
+
+      .app {
+        width: 100%;
+        max-width: 960px;
+      }
+
+      .hero {
+        text-align: center;
+        margin-bottom: 28px;
+      }
+
+      .eyebrow {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        letter-spacing: 0.2em;
+        color: var(--accent);
+        text-transform: uppercase;
+        margin-bottom: 12px;
+        font-weight: 500;
+      }
+
+      .wordmark {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: clamp(26px, 5vw, 38px);
+        letter-spacing: -0.02em;
+        margin-bottom: 12px;
+      }
+
+      .tagline {
+        color: var(--text-muted);
+        font-size: 15px;
+        line-height: 1.5;
+        max-width: 600px;
+        margin: 0 auto;
+      }
+
+      .studio {
+        background: var(--panel);
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-md);
+        padding: 24px;
+        box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.5);
+        margin-bottom: 24px;
+      }
+
+      .direction-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        margin-bottom: 18px;
+      }
+
+      .direction-label {
+        font-family: var(--font-mono);
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--text-muted);
+        min-width: 90px;
+        text-align: center;
+      }
+
+      .direction-label.active {
+        color: var(--accent);
+      }
+
+      .btn-swap {
+        background: rgba(31, 41, 55, 0.6);
+        border: 1px solid var(--panel-border);
+        color: var(--text);
+        border-radius: 8px;
+        width: 40px;
+        height: 40px;
+        cursor: pointer;
+        font-size: 16px;
+      }
+
+      .btn-swap:hover {
+        background: rgba(55, 65, 81, 0.9);
+      }
+
+      .btn-swap:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      .split-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+
+      .field label {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        display: block;
+        margin-bottom: 8px;
+      }
+
+      textarea {
+        width: 100%;
+        background: rgba(17, 24, 39, 0.8);
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 13px;
+        padding: 12px 14px;
+        resize: vertical;
+        min-height: 320px;
+        line-height: 1.6;
+        white-space: pre;
+      }
+
+      textarea:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-glow);
+      }
+
+      textarea[readonly] {
+        background: rgba(3, 7, 18, 0.5);
+      }
+
+      .field-error {
+        font-size: 12px;
+        color: var(--color-weak);
+        margin-top: 8px;
+        white-space: pre-wrap;
+      }
+
+      .options-row {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-top: 16px;
+        flex-wrap: wrap;
+      }
+
+      .options-row label {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--text-dim);
+      }
+
+      .options-row select {
+        background: rgba(17, 24, 39, 0.8);
+        border: 1px solid var(--panel-border);
+        border-radius: 6px;
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 13px;
+        padding: 7px 10px;
+      }
+
+      .actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 14px;
+        flex-wrap: wrap;
+      }
+
+      .btn-ghost {
+        background: rgba(31, 41, 55, 0.6);
+        border: 1px solid var(--panel-border);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 10px 16px;
+        font-family: var(--font-sans);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .btn-ghost:hover {
+        background: rgba(55, 65, 81, 0.8);
+      }
+
+      .btn-ghost:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      .footer-note {
+        text-align: center;
+        color: var(--text-dim);
+        font-size: 13px;
+        margin-top: 8px;
+      }
+
+      .footer-note a {
+        color: var(--text-muted);
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background: var(--text);
+        color: var(--bg);
+        padding: 12px 22px;
+        border-radius: 99px;
+        font-family: var(--font-sans);
+        font-weight: 600;
+        font-size: 14px;
+        opacity: 0;
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        z-index: 100;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      }
+
+      .toast.show {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+      }
+
+      @media (max-width: 640px) {
+        .studio {
+          padding: 18px;
+        }
+        .split-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="hero">
+        <div class="eyebrow">JSON & API</div>
+        <h1 class="wordmark">YAML / JSON Converter</h1>
+        <p class="tagline">Convert between YAML and JSON in either direction, with live validation and pretty-printed output.</p>
+      </header>
+
+      <main class="studio">
+        <div class="direction-row">
+          <span class="direction-label active" id="labelYaml">YAML</span>
+          <button class="btn-swap" id="btnSwapDirection" type="button" title="Swap conversion direction" aria-label="Swap conversion direction">⇄</button>
+          <span class="direction-label" id="labelJson">JSON</span>
+        </div>
+
+        <div class="split-grid">
+          <div class="field">
+            <label for="inputArea" id="inputLabel">YAML input</label>
+            <textarea id="inputArea" spellcheck="false">name: One File Tools
+version: 1
+features:
+  - offline
+  - single-file
+  - no-dependencies
+config:
+  darkMode: true
+  maxItems: null</textarea>
+          </div>
+          <div class="field">
+            <label for="outputArea" id="outputLabel">JSON output</label>
+            <textarea id="outputArea" spellcheck="false" readonly></textarea>
+          </div>
+        </div>
+        <div class="field-error" id="conversionError"></div>
+
+        <div class="options-row">
+          <label for="indentSelect">Indentation</label>
+          <select id="indentSelect">
+            <option value="2" selected>2 spaces</option>
+            <option value="4">4 spaces</option>
+            <option value="tab">Tab</option>
+          </select>
+        </div>
+
+        <div class="actions">
+          <button class="btn-ghost" id="btnCopyOutput" type="button">Copy output</button>
+          <button class="btn-ghost" id="btnUseOutput" type="button">Use output as input</button>
+          <button class="btn-ghost" id="btnClear" type="button">Clear</button>
+        </div>
+      </main>
+
+      <p class="footer-note">Part of <a href="https://github.com/praveenscience/One-File-Tools">One File Tools</a>. Runs entirely in your browser — nothing is uploaded.</p>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script>
+      /* ==========================================================
+         YAML / JSON Converter
+         Vanilla JS + js-yaml (CDN) for standards-compliant parsing.
+         ========================================================== */
+
+      const labelYaml = document.getElementById("labelYaml");
+      const labelJson = document.getElementById("labelJson");
+      const btnSwapDirection = document.getElementById("btnSwapDirection");
+      const inputArea = document.getElementById("inputArea");
+      const outputArea = document.getElementById("outputArea");
+      const inputLabel = document.getElementById("inputLabel");
+      const outputLabel = document.getElementById("outputLabel");
+      const conversionError = document.getElementById("conversionError");
+      const indentSelect = document.getElementById("indentSelect");
+      const btnCopyOutput = document.getElementById("btnCopyOutput");
+      const btnUseOutput = document.getElementById("btnUseOutput");
+      const btnClear = document.getElementById("btnClear");
+      const toast = document.getElementById("toast");
+
+      let direction = "yaml-to-json"; // "yaml-to-json" | "json-to-yaml"
+
+      const SAMPLE = {
+        "yaml-to-json": `name: One File Tools
+version: 1
+features:
+  - offline
+  - single-file
+  - no-dependencies
+config:
+  darkMode: true
+  maxItems: null`,
+        "json-to-yaml": `{
+  "name": "One File Tools",
+  "version": 1,
+  "features": ["offline", "single-file", "no-dependencies"],
+  "config": { "darkMode": true, "maxItems": null }
+}`
+      };
+
+      function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add("show");
+        setTimeout(() => toast.classList.remove("show"), 2000);
+      }
+
+      function currentIndent() {
+        const value = indentSelect.value;
+        return value === "tab" ? "\t" : Number(value);
+      }
+
+      /** Converts the current input string per the active direction. Returns { output, error }. */
+      function convert(text) {
+        if (text.trim() === "") return { output: "", error: null };
+
+        try {
+          if (direction === "yaml-to-json") {
+            const data = jsyaml.load(text);
+            const indent = currentIndent();
+            const jsonIndent = indent === "\t" ? "\t" : indent;
+            return { output: JSON.stringify(data === undefined ? null : data, null, jsonIndent), error: null };
+          } else {
+            const data = JSON.parse(text);
+            const indent = currentIndent();
+            const yamlIndent = indent === "\t" ? 2 : indent; // js-yaml dump indent must be numeric.
+            return { output: jsyaml.dump(data, { indent: yamlIndent, lineWidth: -1 }), error: null };
+          }
+        } catch (err) {
+          return { output: "", error: err.message };
+        }
+      }
+
+      /** Re-runs the conversion and updates output/error state. */
+      function render() {
+        const { output, error } = convert(inputArea.value);
+        outputArea.value = output;
+        conversionError.textContent = error ? "Parse error: " + error : "";
+      }
+
+      /** Switches direction, swaps the current input/output content, and updates labels. */
+      function swapDirection() {
+        const previousOutput = outputArea.value;
+        direction = direction === "yaml-to-json" ? "json-to-yaml" : "yaml-to-json";
+
+        const isYamlToJson = direction === "yaml-to-json";
+        labelYaml.classList.toggle("active", isYamlToJson);
+        labelJson.classList.toggle("active", !isYamlToJson);
+        inputLabel.textContent = isYamlToJson ? "YAML input" : "JSON input";
+        outputLabel.textContent = isYamlToJson ? "JSON output" : "YAML output";
+
+        // Carry the previous output into the new input for a smooth toggle,
+        // falling back to a direction-appropriate sample when there's nothing yet.
+        inputArea.value = previousOutput.trim() !== "" ? previousOutput : SAMPLE[direction];
+        render();
+      }
+
+      inputArea.addEventListener("input", render);
+      indentSelect.addEventListener("change", render);
+      btnSwapDirection.addEventListener("click", swapDirection);
+
+      btnCopyOutput.addEventListener("click", () => {
+        const text = outputArea.value;
+        if (!text) {
+          showToast("Nothing to copy yet");
+          return;
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard
+            .writeText(text)
+            .then(() => showToast("Output copied!"))
+            .catch(() => showToast("Copy failed — select the text manually"));
+        } else {
+          showToast("Clipboard unavailable");
+        }
+      });
+
+      btnUseOutput.addEventListener("click", () => {
+        if (!outputArea.value) return;
+        swapDirection();
+      });
+
+      btnClear.addEventListener("click", () => {
+        inputArea.value = "";
+        outputArea.value = "";
+        conversionError.textContent = "";
+        inputArea.focus();
+      });
+
+      // Guard against the CDN script failing to load (e.g. offline first run).
+      if (typeof jsyaml === "undefined") {
+        conversionError.textContent = "Could not load the YAML library from the CDN. Check your internet connection and reload — this tool needs js-yaml for standards-compliant parsing.";
+        inputArea.disabled = true;
+      } else {
+        render();
+      }
+    </script>
+  </body>
+</html>
