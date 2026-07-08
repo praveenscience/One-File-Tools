@@ -1,0 +1,467 @@
+<!--
+Responsive Image Simulator
+Single-file client-side tool to preview a responsive image (srcset/sizes) at
+common device breakpoints and see exactly which source the browser selects
+and at what rendered width.
+Built for One File Tools.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Responsive Image Simulator - One File Tools</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <style>
+      :root {
+        --bg: #030712;
+        --grid-line: #111827;
+        --panel: rgba(17, 24, 39, 0.7);
+        --panel-border: #1f2937;
+        --accent: #fb923c;
+        --accent-hover: #f97316;
+        --accent-glow: rgba(251, 146, 60, 0.15);
+        --text: #f9fafb;
+        --text-muted: #9ca3af;
+        --text-dim: #4b5563;
+        --radius-sm: 12px;
+        --radius-md: 20px;
+        --font-sans: "Inter", system-ui, sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+        --font-display: "Space Grotesk", sans-serif;
+        --color-weak: #ef4444;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg);
+        background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+        background-size: 32px 32px;
+        color: var(--text);
+        padding: 48px 20px 80px;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+      }
+
+      .app {
+        width: 100%;
+        max-width: 960px;
+      }
+
+      .hero {
+        text-align: center;
+        margin-bottom: 32px;
+      }
+
+      .eyebrow {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        letter-spacing: 0.2em;
+        color: var(--accent);
+        text-transform: uppercase;
+        margin-bottom: 12px;
+        font-weight: 500;
+      }
+
+      .wordmark {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: clamp(26px, 5vw, 38px);
+        letter-spacing: -0.02em;
+        margin-bottom: 12px;
+      }
+
+      .tagline {
+        color: var(--text-muted);
+        font-size: 15px;
+        line-height: 1.5;
+        max-width: 600px;
+        margin: 0 auto;
+      }
+
+      .studio {
+        background: var(--panel);
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-md);
+        padding: 28px;
+        box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.5);
+        margin-bottom: 24px;
+      }
+
+      .section-label {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        display: block;
+        margin-bottom: 14px;
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 14px;
+      }
+
+      .field label {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .field input,
+      .field textarea {
+        background: rgba(17, 24, 39, 0.8);
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 14px;
+        padding: 10px 12px;
+        width: 100%;
+      }
+
+      .field textarea {
+        resize: vertical;
+        min-height: 70px;
+        line-height: 1.5;
+      }
+
+      .field input:focus,
+      .field textarea:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-glow);
+      }
+
+      .field-error {
+        font-size: 12px;
+        color: var(--color-weak);
+        min-height: 14px;
+      }
+
+      .breakpoint-tabs {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+      }
+
+      .bp-tab {
+        background: rgba(31, 41, 55, 0.5);
+        border: 1px solid var(--panel-border);
+        color: var(--text-muted);
+        border-radius: 8px;
+        padding: 8px 14px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      .bp-tab.active {
+        background: var(--accent);
+        color: #030712;
+        border-color: var(--accent);
+        font-weight: 700;
+      }
+
+      .bp-tab:hover:not(.active) {
+        background: rgba(55, 65, 81, 0.7);
+      }
+
+      .bp-tab:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      .device-frame {
+        background: rgba(3, 7, 18, 0.5);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 16px;
+        overflow-x: auto;
+      }
+
+      .viewport-shell {
+        margin: 0 auto;
+        border: 2px solid var(--panel-border);
+        border-radius: 10px;
+        overflow: hidden;
+        transition: width 0.3s ease;
+        background: #000;
+      }
+
+      .viewport-shell img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      .viewport-meta {
+        text-align: center;
+        margin-top: 10px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+
+      .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 10px;
+        margin-top: 16px;
+      }
+
+      .info-card {
+        background: rgba(3, 7, 18, 0.5);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 12px 14px;
+      }
+
+      .info-card .label {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 4px;
+      }
+
+      .info-card .value {
+        font-family: var(--font-mono);
+        font-size: 15px;
+        color: var(--text);
+        word-break: break-all;
+      }
+
+      .note {
+        margin-top: 16px;
+        font-size: 13px;
+        color: var(--text-muted);
+        line-height: 1.6;
+        background: rgba(251, 146, 60, 0.07);
+        border: 1px solid rgba(251, 146, 60, 0.25);
+        border-radius: var(--radius-sm);
+        padding: 12px 14px;
+      }
+
+      .note code {
+        color: var(--text);
+        font-family: var(--font-mono);
+      }
+
+      .footer-note {
+        text-align: center;
+        color: var(--text-dim);
+        font-size: 13px;
+        margin-top: 8px;
+      }
+
+      .footer-note a {
+        color: var(--text-muted);
+      }
+
+      @media (max-width: 640px) {
+        .studio {
+          padding: 20px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="hero">
+        <div class="eyebrow">Image Tools</div>
+        <h1 class="wordmark">Responsive Image Simulator</h1>
+        <p class="tagline">Preview a <code>srcset</code>/<code>sizes</code> image at common device breakpoints, and see exactly which source the browser would pick and at what rendered width.</p>
+      </header>
+
+      <main class="studio">
+        <span class="section-label">Image markup</span>
+        <div class="field">
+          <label for="srcsetInput">srcset</label>
+          <textarea id="srcsetInput" spellcheck="false">https://picsum.photos/id/1015/400/300 400w,
+https://picsum.photos/id/1015/800/600 800w,
+https://picsum.photos/id/1015/1200/900 1200w,
+https://picsum.photos/id/1015/1600/1200 1600w</textarea>
+          <div class="field-error" id="srcsetError"></div>
+        </div>
+        <div class="field">
+          <label for="sizesInput">sizes</label>
+          <input type="text" id="sizesInput" value="(max-width: 600px) 100vw, (max-width: 1024px) 50vw, 33vw" spellcheck="false" />
+        </div>
+        <div class="field">
+          <label for="fallbackInput">Fallback src (for browsers without srcset support)</label>
+          <input type="text" id="fallbackInput" value="https://picsum.photos/id/1015/800/600" spellcheck="false" />
+        </div>
+      </main>
+
+      <main class="studio">
+        <span class="section-label">Simulated viewport</span>
+        <div class="breakpoint-tabs" id="breakpointTabs"></div>
+
+        <div class="device-frame">
+          <div class="viewport-shell" id="viewportShell">
+            <img id="previewImage" alt="Responsive preview" />
+          </div>
+          <p class="viewport-meta" id="viewportMeta"></p>
+        </div>
+
+        <div class="info-grid" id="infoGrid"></div>
+
+        <div class="note">
+          The simulator renders the image inside a container scaled to the chosen viewport width, then reads the browser's actual <code>currentSrc</code> to report which candidate it selected — the same algorithm your visitors' browsers use, so this reflects real behavior rather than a guess.
+        </div>
+      </main>
+
+      <p class="footer-note">Part of <a href="https://github.com/praveenscience/One-File-Tools">One File Tools</a>. Images load from their original URLs — nothing is uploaded or proxied.</p>
+    </div>
+
+    <script>
+      /* ==========================================================
+         Responsive Image Simulator
+         Vanilla JS, no dependencies.
+         ========================================================== */
+
+      const srcsetInput = document.getElementById("srcsetInput");
+      const sizesInput = document.getElementById("sizesInput");
+      const fallbackInput = document.getElementById("fallbackInput");
+      const srcsetError = document.getElementById("srcsetError");
+      const breakpointTabs = document.getElementById("breakpointTabs");
+      const viewportShell = document.getElementById("viewportShell");
+      const previewImage = document.getElementById("previewImage");
+      const viewportMeta = document.getElementById("viewportMeta");
+      const infoGrid = document.getElementById("infoGrid");
+
+      // Common device breakpoints to simulate. Width is the CSS viewport width
+      // in pixels; the shell is scaled down visually via max-width for display,
+      // but the actual <img> element is rendered at this width so srcset/sizes
+      // resolve exactly as they would on a real device of that width.
+      const BREAKPOINTS = [
+        { id: "mobile-s", label: "Mobile S", width: 360 },
+        { id: "mobile-l", label: "Mobile L", width: 480 },
+        { id: "tablet", label: "Tablet", width: 768 },
+        { id: "laptop", label: "Laptop", width: 1024 },
+        { id: "desktop", label: "Desktop", width: 1440 },
+        { id: "wide", label: "Wide", width: 1920 }
+      ];
+
+      let activeBreakpoint = BREAKPOINTS[2]; // Tablet by default.
+
+      /** Renders the breakpoint tab buttons. */
+      function renderTabs() {
+        breakpointTabs.innerHTML = "";
+        BREAKPOINTS.forEach((bp) => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "bp-tab" + (bp.id === activeBreakpoint.id ? " active" : "");
+          btn.textContent = bp.label + " · " + bp.width + "px";
+          btn.addEventListener("click", () => {
+            activeBreakpoint = bp;
+            renderTabs();
+            updatePreview();
+          });
+          breakpointTabs.appendChild(btn);
+        });
+      }
+
+      /** Validates and normalizes the srcset textarea into a single-line attribute value. */
+      function parseSrcset(rawText) {
+        const lines = rawText
+          .split(/[\n,]/)
+          .map((line) => line.trim())
+          .filter(Boolean);
+
+        if (lines.length === 0) return { value: "", error: "Add at least one candidate (URL + width, e.g. image.jpg 800w)." };
+
+        for (const line of lines) {
+          if (!/^\S+\s+\d+w$/.test(line)) {
+            return { value: "", error: 'Each candidate must be "URL widthw" (e.g. photo.jpg 800w). Problem: "' + line + '"' };
+          }
+        }
+
+        return { value: lines.join(", "), error: null };
+      }
+
+      /** Formats dimensions as "W × H" or an em dash when unavailable. */
+      function formatDimensions(width, height) {
+        if (!width || !height) return "—";
+        return width + " × " + height;
+      }
+
+      /** Renders the info cards describing the resolved image source. */
+      function renderInfo() {
+        infoGrid.innerHTML = "";
+        const cards = [
+          { label: "Viewport width", value: activeBreakpoint.width + "px" },
+          { label: "Selected source", value: previewImage.currentSrc || "(loading…)" },
+          { label: "Natural size", value: formatDimensions(previewImage.naturalWidth, previewImage.naturalHeight) },
+          { label: "sizes value", value: sizesInput.value.trim() || "(none — defaults to 100vw)" }
+        ];
+        cards.forEach((card) => {
+          const div = document.createElement("div");
+          div.className = "info-card";
+          const label = document.createElement("div");
+          label.className = "label";
+          label.textContent = card.label;
+          const value = document.createElement("div");
+          value.className = "value";
+          value.textContent = card.value;
+          div.appendChild(label);
+          div.appendChild(value);
+          infoGrid.appendChild(div);
+        });
+      }
+
+      /**
+       * Rebuilds the <img> with the current srcset/sizes/fallback and sizes the
+       * viewport shell to the active breakpoint's width, then waits for the
+       * browser to resolve currentSrc before updating the info cards.
+       */
+      function updatePreview() {
+        const { value: srcsetValue, error } = parseSrcset(srcsetInput.value);
+        srcsetError.textContent = error || "";
+        if (error) return;
+
+        viewportShell.style.width = activeBreakpoint.width + "px";
+        viewportShell.style.maxWidth = "100%";
+
+        previewImage.srcset = srcsetValue;
+        previewImage.sizes = sizesInput.value.trim();
+        previewImage.src = fallbackInput.value.trim();
+
+        viewportMeta.textContent = "Rendered at " + activeBreakpoint.width + "px viewport width";
+
+        // currentSrc is only reliably populated after the image finishes
+        // resolving/loading, so refresh the info cards on load and also once
+        // immediately for instant feedback while it loads.
+        renderInfo();
+        previewImage.onload = renderInfo;
+      }
+
+      [srcsetInput, sizesInput, fallbackInput].forEach((el) => {
+        el.addEventListener("input", updatePreview);
+      });
+
+      renderTabs();
+      updatePreview();
+    </script>
+  </body>
+</html>
