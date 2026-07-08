@@ -1,0 +1,639 @@
+<!--
+Contrast Checker
+Single-file client-side tool to evaluate WCAG 2.1 contrast ratio between a
+foreground and background color, with AA/AAA compliance status and a live
+text preview.
+Built for One File Tools.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Contrast Checker - One File Tools</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <style>
+      :root {
+        --bg: #030712;
+        --grid-line: #111827;
+        --panel: rgba(17, 24, 39, 0.7);
+        --panel-border: #1f2937;
+        --accent: #34d399;
+        --accent-hover: #10b981;
+        --accent-glow: rgba(52, 211, 153, 0.15);
+        --text: #f9fafb;
+        --text-muted: #9ca3af;
+        --text-dim: #4b5563;
+        --radius-sm: 12px;
+        --radius-md: 20px;
+        --font-sans: "Inter", system-ui, sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+        --font-display: "Space Grotesk", sans-serif;
+        --color-weak: #ef4444;
+        --color-strong: #10b981;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg);
+        background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+        background-size: 32px 32px;
+        color: var(--text);
+        padding: 48px 20px 80px;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+      }
+
+      .app {
+        width: 100%;
+        max-width: 860px;
+      }
+
+      .hero {
+        text-align: center;
+        margin-bottom: 28px;
+      }
+
+      .eyebrow {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        letter-spacing: 0.2em;
+        color: var(--accent);
+        text-transform: uppercase;
+        margin-bottom: 12px;
+        font-weight: 500;
+      }
+
+      .wordmark {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: clamp(26px, 5vw, 38px);
+        letter-spacing: -0.02em;
+        margin-bottom: 12px;
+      }
+
+      .tagline {
+        color: var(--text-muted);
+        font-size: 15px;
+        line-height: 1.5;
+        max-width: 580px;
+        margin: 0 auto;
+      }
+
+      .studio {
+        background: var(--panel);
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-md);
+        padding: 24px;
+        box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.5);
+        margin-bottom: 24px;
+      }
+
+      .section-label {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        display: block;
+        margin-bottom: 14px;
+      }
+
+      .color-inputs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+
+      .color-field {
+        background: rgba(3, 7, 18, 0.5);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 14px;
+      }
+
+      .color-field .field-title {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 10px;
+      }
+
+      .color-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .color-row input[type="color"] {
+        width: 40px;
+        height: 40px;
+        padding: 2px;
+        border-radius: 8px;
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+
+      .color-row input[type="text"] {
+        flex: 1;
+        background: rgba(17, 24, 39, 0.8);
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 13px;
+        padding: 9px 10px;
+      }
+
+      .color-row input:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-glow);
+      }
+
+      .format-tabs {
+        display: flex;
+        gap: 4px;
+        margin-top: 10px;
+      }
+
+      .format-tab {
+        flex: 1;
+        background: rgba(31, 41, 55, 0.5);
+        border: 1px solid var(--panel-border);
+        color: var(--text-muted);
+        border-radius: 6px;
+        padding: 5px 8px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        cursor: pointer;
+      }
+
+      .format-tab.active {
+        background: var(--accent);
+        color: #030712;
+        border-color: var(--accent);
+      }
+
+      .swap-row {
+        text-align: center;
+        margin: 12px 0;
+      }
+
+      .btn-ghost {
+        background: rgba(31, 41, 55, 0.6);
+        border: 1px solid var(--panel-border);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 10px 16px;
+        font-family: var(--font-sans);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .btn-ghost:hover {
+        background: rgba(55, 65, 81, 0.8);
+      }
+
+      .btn-ghost:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      .ratio-display {
+        text-align: center;
+        margin: 8px 0 20px;
+      }
+
+      .ratio-number {
+        font-family: var(--font-display);
+        font-size: 48px;
+        font-weight: 700;
+        color: var(--accent);
+      }
+
+      .ratio-label {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--text-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+      }
+
+      .compliance-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 10px;
+      }
+
+      .compliance-card {
+        background: rgba(3, 7, 18, 0.5);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 12px 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .compliance-card .name {
+        font-size: 13px;
+        color: var(--text-muted);
+      }
+
+      .status-pill {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 99px;
+      }
+
+      .status-pill.pass {
+        background: rgba(16, 185, 129, 0.15);
+        color: var(--color-strong);
+      }
+
+      .status-pill.fail {
+        background: rgba(239, 68, 68, 0.15);
+        color: var(--color-weak);
+      }
+
+      .preview-box {
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--panel-border);
+        padding: 24px;
+        margin-top: 16px;
+      }
+
+      .preview-box .large-text {
+        font-size: 28px;
+        font-weight: 700;
+        margin-bottom: 8px;
+      }
+
+      .preview-box .normal-text {
+        font-size: 16px;
+      }
+
+      .footer-note {
+        text-align: center;
+        color: var(--text-dim);
+        font-size: 13px;
+        margin-top: 8px;
+      }
+
+      .footer-note a {
+        color: var(--text-muted);
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background: var(--text);
+        color: var(--bg);
+        padding: 12px 22px;
+        border-radius: 99px;
+        font-family: var(--font-sans);
+        font-weight: 600;
+        font-size: 14px;
+        opacity: 0;
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        z-index: 100;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      }
+
+      .toast.show {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+      }
+
+      @media (max-width: 640px) {
+        .studio {
+          padding: 18px;
+        }
+        .color-inputs {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="hero">
+        <div class="eyebrow">Color Tools</div>
+        <h1 class="wordmark">Contrast Checker</h1>
+        <p class="tagline">Check the WCAG 2.1 contrast ratio between two colors and see AA/AAA compliance at a glance, with a live text preview.</p>
+      </header>
+
+      <main class="studio">
+        <span class="section-label">Colors</span>
+        <div class="color-inputs">
+          <div class="color-field">
+            <div class="field-title">Foreground (text)</div>
+            <div class="color-row">
+              <input type="color" id="fgPicker" value="#f9fafb" />
+              <input type="text" id="fgText" spellcheck="false" />
+            </div>
+            <div class="format-tabs" id="fgFormatTabs"></div>
+          </div>
+          <div class="color-field">
+            <div class="field-title">Background</div>
+            <div class="color-row">
+              <input type="color" id="bgPicker" value="#0f172a" />
+              <input type="text" id="bgText" spellcheck="false" />
+            </div>
+            <div class="format-tabs" id="bgFormatTabs"></div>
+          </div>
+        </div>
+
+        <div class="swap-row">
+          <button class="btn-ghost" id="btnSwap" type="button">⇄ Swap colors</button>
+          <button class="btn-ghost" id="btnReset" type="button">Reset</button>
+        </div>
+      </main>
+
+      <main class="studio">
+        <div class="ratio-display">
+          <div class="ratio-number" id="ratioNumber">—</div>
+          <div class="ratio-label">Contrast ratio</div>
+        </div>
+
+        <div class="compliance-grid" id="complianceGrid"></div>
+
+        <div class="preview-box" id="previewBox">
+          <div class="large-text" id="largeTextSample">Large text preview (18pt bold / 24pt+)</div>
+          <div class="normal-text" id="normalTextSample">Normal text preview — the quick brown fox jumps over the lazy dog.</div>
+        </div>
+      </main>
+
+      <p class="footer-note">Part of <a href="https://github.com/praveenscience/One-File-Tools">One File Tools</a>. Runs completely offline.</p>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script>
+      /* ==========================================================
+         Contrast Checker
+         Vanilla JS, no dependencies. Implements the WCAG 2.1
+         relative luminance and contrast ratio formulas.
+         ========================================================== */
+
+      const fgPicker = document.getElementById("fgPicker");
+      const fgText = document.getElementById("fgText");
+      const bgPicker = document.getElementById("bgPicker");
+      const bgText = document.getElementById("bgText");
+      const fgFormatTabs = document.getElementById("fgFormatTabs");
+      const bgFormatTabs = document.getElementById("bgFormatTabs");
+      const btnSwap = document.getElementById("btnSwap");
+      const btnReset = document.getElementById("btnReset");
+      const ratioNumber = document.getElementById("ratioNumber");
+      const complianceGrid = document.getElementById("complianceGrid");
+      const previewBox = document.getElementById("previewBox");
+      const largeTextSample = document.getElementById("largeTextSample");
+      const normalTextSample = document.getElementById("normalTextSample");
+      const toast = document.getElementById("toast");
+
+      const DEFAULT_FG = "#f9fafb";
+      const DEFAULT_BG = "#0f172a";
+
+      let fgFormat = "hex";
+      let bgFormat = "hex";
+      let fgRgb = hexToRgb(DEFAULT_FG);
+      let bgRgb = hexToRgb(DEFAULT_BG);
+
+      function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add("show");
+        setTimeout(() => toast.classList.remove("show"), 2000);
+      }
+
+      // ---- Color parsing/formatting ----
+
+      function hexToRgb(hex) {
+        const clean = hex.replace("#", "").trim();
+        let full = clean;
+        if (clean.length === 3) full = clean.split("").map((c) => c + c).join("");
+        if (!/^[0-9a-f]{6}$/i.test(full)) return null;
+        return { r: parseInt(full.slice(0, 2), 16), g: parseInt(full.slice(2, 4), 16), b: parseInt(full.slice(4, 6), 16) };
+      }
+
+      function rgbToHex(rgb) {
+        const toHex = (n) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, "0");
+        return "#" + toHex(rgb.r) + toHex(rgb.g) + toHex(rgb.b);
+      }
+
+      function parseRgbText(text) {
+        const parts = text.split(/[\s,\/]+/).filter(Boolean).map(Number);
+        if (parts.length !== 3 || parts.some((n) => isNaN(n) || n < 0 || n > 255)) return null;
+        return { r: parts[0], g: parts[1], b: parts[2] };
+      }
+
+      function parseHslText(text) {
+        const parts = text.split(/[\s,\/%]+/).filter(Boolean).map(Number);
+        if (parts.length !== 3 || parts.some(isNaN)) return null;
+        return hslToRgb(parts[0], parts[1], parts[2]);
+      }
+
+      function hslToRgb(h, s, l) {
+        h = ((h % 360) + 360) % 360;
+        s = Math.max(0, Math.min(100, s)) / 100;
+        l = Math.max(0, Math.min(100, l)) / 100;
+        const c = (1 - Math.abs(2 * l - 1)) * s;
+        const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+        const m = l - c / 2;
+        let r1, g1, b1;
+        if (h < 60) [r1, g1, b1] = [c, x, 0];
+        else if (h < 120) [r1, g1, b1] = [x, c, 0];
+        else if (h < 180) [r1, g1, b1] = [0, c, x];
+        else if (h < 240) [r1, g1, b1] = [0, x, c];
+        else if (h < 300) [r1, g1, b1] = [x, 0, c];
+        else [r1, g1, b1] = [c, 0, x];
+        return { r: (r1 + m) * 255, g: (g1 + m) * 255, b: (b1 + m) * 255 };
+      }
+
+      function rgbToHslText(rgb) {
+        const r = rgb.r / 255, g = rgb.g / 255, b = rgb.b / 255;
+        const max = Math.max(r, g, b), min = Math.min(r, g, b);
+        const l = (max + min) / 2;
+        let h = 0, s = 0;
+        const d = max - min;
+        if (d !== 0) {
+          s = d / (1 - Math.abs(2 * l - 1));
+          if (max === r) h = ((g - b) / d) % 6;
+          else if (max === g) h = (b - r) / d + 2;
+          else h = (r - g) / d + 4;
+          h *= 60;
+          if (h < 0) h += 360;
+        }
+        return Math.round(h) + ", " + Math.round(s * 100) + "%, " + Math.round(l * 100) + "%";
+      }
+
+      function formatForDisplay(rgb, format) {
+        if (format === "rgb") return Math.round(rgb.r) + ", " + Math.round(rgb.g) + ", " + Math.round(rgb.b);
+        if (format === "hsl") return rgbToHslText(rgb);
+        return rgbToHex(rgb);
+      }
+
+      function parseForFormat(text, format) {
+        if (format === "rgb") return parseRgbText(text);
+        if (format === "hsl") return parseHslText(text);
+        return hexToRgb(text);
+      }
+
+      // ---- WCAG contrast math ----
+
+      /** Relative luminance per WCAG 2.1 (sRGB -> linear -> weighted sum). */
+      function relativeLuminance(rgb) {
+        const toLinear = (channel) => {
+          const c = channel / 255;
+          return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+        };
+        const r = toLinear(rgb.r);
+        const g = toLinear(rgb.g);
+        const b = toLinear(rgb.b);
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      }
+
+      /** WCAG contrast ratio between two colors, always >= 1. */
+      function contrastRatio(rgbA, rgbB) {
+        const l1 = relativeLuminance(rgbA);
+        const l2 = relativeLuminance(rgbB);
+        const lighter = Math.max(l1, l2);
+        const darker = Math.min(l1, l2);
+        return (lighter + 0.05) / (darker + 0.05);
+      }
+
+      // ---- Rendering ----
+
+      function buildFormatTabs(container, getFormat, setFormat) {
+        container.innerHTML = "";
+        ["hex", "rgb", "hsl"].forEach((format) => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "format-tab" + (getFormat() === format ? " active" : "");
+          btn.textContent = format.toUpperCase();
+          btn.addEventListener("click", () => {
+            setFormat(format);
+            render();
+          });
+          container.appendChild(btn);
+        });
+      }
+
+      function render() {
+        // Sync text inputs to current format/rgb.
+        fgText.value = formatForDisplay(fgRgb, fgFormat);
+        bgText.value = formatForDisplay(bgRgb, bgFormat);
+        fgPicker.value = rgbToHex(fgRgb);
+        bgPicker.value = rgbToHex(bgRgb);
+
+        buildFormatTabs(fgFormatTabs, () => fgFormat, (f) => (fgFormat = f));
+        buildFormatTabs(bgFormatTabs, () => bgFormat, (f) => (bgFormat = f));
+
+        const ratio = contrastRatio(fgRgb, bgRgb);
+        ratioNumber.textContent = ratio.toFixed(2) + ":1";
+
+        const checks = [
+          { name: "AA — Normal text", pass: ratio >= 4.5 },
+          { name: "AA — Large text", pass: ratio >= 3 },
+          { name: "AAA — Normal text", pass: ratio >= 7 },
+          { name: "AAA — Large text", pass: ratio >= 4.5 }
+        ];
+
+        complianceGrid.innerHTML = "";
+        checks.forEach((check) => {
+          const card = document.createElement("div");
+          card.className = "compliance-card";
+          const name = document.createElement("span");
+          name.className = "name";
+          name.textContent = check.name;
+          const pill = document.createElement("span");
+          pill.className = "status-pill " + (check.pass ? "pass" : "fail");
+          pill.textContent = check.pass ? "Pass" : "Fail";
+          card.appendChild(name);
+          card.appendChild(pill);
+          complianceGrid.appendChild(card);
+        });
+
+        const fgHex = rgbToHex(fgRgb);
+        const bgHex = rgbToHex(bgRgb);
+        previewBox.style.background = bgHex;
+        largeTextSample.style.color = fgHex;
+        normalTextSample.style.color = fgHex;
+      }
+
+      // ---- Events ----
+
+      fgPicker.addEventListener("input", () => {
+        fgRgb = hexToRgb(fgPicker.value);
+        fgFormat = "hex";
+        render();
+      });
+      bgPicker.addEventListener("input", () => {
+        bgRgb = hexToRgb(bgPicker.value);
+        bgFormat = "hex";
+        render();
+      });
+
+      fgText.addEventListener("input", () => {
+        const rgb = parseForFormat(fgText.value, fgFormat);
+        if (rgb) {
+          fgRgb = rgb;
+          render();
+        }
+      });
+      bgText.addEventListener("input", () => {
+        const rgb = parseForFormat(bgText.value, bgFormat);
+        if (rgb) {
+          bgRgb = rgb;
+          render();
+        }
+      });
+
+      btnSwap.addEventListener("click", () => {
+        const temp = fgRgb;
+        fgRgb = bgRgb;
+        bgRgb = temp;
+        render();
+      });
+
+      btnReset.addEventListener("click", () => {
+        fgRgb = hexToRgb(DEFAULT_FG);
+        bgRgb = hexToRgb(DEFAULT_BG);
+        fgFormat = "hex";
+        bgFormat = "hex";
+        render();
+      });
+
+      // Copy a color value when its text field is clicked-to-select isn't enough;
+      // wire dedicated double-click-to-copy for convenience.
+      [fgText, bgText].forEach((input) => {
+        input.addEventListener("dblclick", () => {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(input.value).then(() => showToast("Copied!"));
+          }
+        });
+      });
+
+      render();
+    </script>
+  </body>
+</html>
