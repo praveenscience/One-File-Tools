@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Event Loop Arena — One File Tools</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+    <style>
+      /* ========================================
+         Reset & Variables
+         ======================================== */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --bg: #080c14;
+        --surface: #0d1117;
+        --surface-2: #161b22;
+        --border: #21262d;
+        --amber: #ffaa00;
+        --amber-dim: rgba(255, 170, 0, 0.12);
+        --amber-glow: rgba(255, 170, 0, 0.4);
+        --cyan: #00ccff;
+        --cyan-dim: rgba(0, 204, 255, 0.12);
+        --green: #00ff88;
+        --green-dim: rgba(0, 255, 136, 0.12);
+        --pink: #ff3366;
+        --pink-dim: rgba(255, 51, 102, 0.12);
+        --gold: #ffd700;
+        --text: #e6edf3;
+        --text-dim: #7d8590;
+        --font: "Space Mono", monospace;
+        /* Syntax colors */
+        --syn-str: #a5d6a7;
+        --syn-kw: #c792ea;
+        --syn-fn: #ffcb6b;
+        --syn-num: #f78c6c;
+        --syn-cmt: #546e7a;
+      }
+
+      /* ========================================
+         Layout
+         ======================================== */
+      body {
+        font-family: var(--font);
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 1.5rem;
+        background-image: radial-gradient(circle at 50% 0%, rgba(255, 170, 0, 0.03) 0%, transparent 50%);
+      }
+
+      .container {
+        width: 100%;
+        max-width: 720px;
+      }
+
+      /* ========================================
+         Buttons
+         ======================================== */
+      .btn {
+        display: inline-block;
+        font-family: var(--font);
+        font-size: 0.9rem;
+        font-weight: 700;
+        padding: 0.65rem 2rem;
+        border: 2px solid var(--amber);
+        color: var(--amber);
+        background: transparent;
+        border-radius: 6px;
+        cursor: pointer;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        transition: all 0.2s;
+      }
+
+      .btn:hover {
+        background: var(--amber);
+        color: var(--bg);
+        box-shadow: 0 0 20px var(--amber-glow);
+      }
+
+      .btn-small {
+        font-size: 0.75rem;
+        padding: 0.45rem 1rem;
+      }
+
+      .btn-ghost {
+        border-color: var(--border);
+        color: var(--text-dim);
+      }
+
+      .btn-ghost:hover {
+        border-color: var(--text-dim);
+        color: var(--text);
+        background: var(--surface-2);
+        box-shadow: none;
+      }
+
+      /* ========================================
+         Title Screen
+         ======================================== */
+      .title-screen {
+        text-align: center;
+        padding: 3rem 1rem;
+        animation: fadeIn 0.5s ease;
+      }
+
+      .title-screen h1 {
+        font-size: 2.4rem;
+        font-weight: 700;
+        color: var(--amber);
+        text-shadow: 0 0 30px var(--amber-glow);
+        letter-spacing: 3px;
+        margin-bottom: 0.5rem;
+      }
+
+      .title-screen .subtitle {
+        color: var(--text-dim);
+        font-size: 0.85rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .title-screen .tagline {
+        color: var(--cyan);
+        font-size: 0.8rem;
+        margin-bottom: 2rem;
+        opacity: 0.8;
+      }
+
+      .title-screen .how-to {
+        text-align: left;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 1.25rem 1.5rem;
+        margin-bottom: 2rem;
+        font-size: 0.8rem;
+        line-height: 1.8;
+        color: var(--text-dim);
+      }
+
+      .title-screen .how-to h3 {
+        color: var(--text);
+        font-size: 0.85rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .title-screen .how-to .hl {
+        color: var(--amber);
+      }
+
+      .title-actions {
+        display: flex;
+        justify-content: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+      }
+
+      /* ========================================
+         Game Screen
+         ======================================== */
+      .game-screen {
+        animation: fadeIn 0.35s ease;
+      }
+
+      .game-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 0.75rem;
+        flex-wrap: wrap;
+      }
+
+      .level-badge {
+        font-size: 0.75rem;
+        color: var(--amber);
+        border: 1px solid rgba(255, 170, 0, 0.3);
+        padding: 0.2rem 0.6rem;
+        border-radius: 4px;
+        background: var(--amber-dim);
+        white-space: nowrap;
+      }
+
+      .level-name {
+        font-size: 1.2rem;
+        font-weight: 700;
+      }
+
+      .level-desc {
+        color: var(--text-dim);
+        font-size: 0.8rem;
+        margin-bottom: 1.25rem;
+      }
+
+      /* ========================================
+         Code Block
+         ======================================== */
+      .code-block {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 1.25rem;
+      }
+
+      .code-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0.6rem 1rem;
+        border-bottom: 1px solid var(--border);
+        background: var(--surface-2);
+      }
+
+      .code-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+      }
+
+      .code-dot.red {
+        background: #ff5f57;
+      }
+
+      .code-dot.yellow {
+        background: #febc2e;
+      }
+
+      .code-dot.green {
+        background: #28c840;
+      }
+
+      .code-title {
+        margin-left: 8px;
+        font-size: 0.72rem;
+        color: var(--text-dim);
+      }
+
+      .code-body {
+        padding: 1rem 1.25rem;
+        overflow-x: auto;
+        font-size: 0.82rem;
+        line-height: 1.7;
+        tab-size: 2;
+      }
+
+      .code-body .str {
+        color: var(--syn-str);
+      }
+
+      .code-body .kw {
+        color: var(--syn-kw);
+      }
+
+      .code-body .fn {
+        color: var(--syn-fn);
+      }
+
+      .code-body .num {
+        color: var(--syn-num);
+      }
+
+      .code-body .cmt {
+        color: var(--syn-cmt);
+        font-style: italic;
+      }
+
+      /* ========================================
+         Prompt & Choices
+         ======================================== */
+      .prompt {
+        font-size: 0.82rem;
+        color: var(--cyan);
+        margin-bottom: 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .prompt .step-num {
+        background: var(--cyan-dim);
+        border: 1px solid rgba(0, 204, 255, 0.3);
+        padding: 0.15rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.72rem;
+      }
+
+      .choices {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        margin-bottom: 1.25rem;
+        min-height: 48px;
+      }
+
+      .choice-btn {
+        font-family: var(--font);
+        font-size: 0.95rem;
+        font-weight: 700;
+        padding: 0.5rem 1.4rem;
+        background: var(--surface-2);
+        border: 2px solid var(--border);
+        color: var(--text);
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+
+      .choice-btn:hover {
+        border-color: var(--amber);
+        color: var(--amber);
+        background: var(--amber-dim);
+        transform: translateY(-2px);
+      }
+
+      .choice-btn.correct {
+        border-color: var(--green);
+        color: var(--green);
+        background: var(--green-dim);
+        cursor: default;
+        opacity: 0.4;
+        pointer-events: none;
+      }
+
+      .choice-btn.wrong {
+        animation: shake 0.4s ease;
+        border-color: var(--pink);
+        color: var(--pink);
+      }
+
+      .choice-btn.hint {
+        animation: pulse 0.6s ease;
+        border-color: var(--green);
+        color: var(--green);
+        background: var(--green-dim);
+      }
+
+      @keyframes shake {
+        0%,
+        100% {
+          transform: translateX(0);
+        }
+        20% {
+          transform: translateX(-6px);
+        }
+        40% {
+          transform: translateX(6px);
+        }
+        60% {
+          transform: translateX(-4px);
+        }
+        80% {
+          transform: translateX(4px);
+        }
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          box-shadow: none;
+        }
+        50% {
+          box-shadow: 0 0 15px rgba(0, 255, 136, 0.5);
+        }
+      }
+
+      /* ========================================
+         Console Output
+         ======================================== */
+      .console-area {
+        background: #030508;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 1.25rem;
+      }
+
+      .console-header {
+        padding: 0.45rem 1rem;
+        font-size: 0.7rem;
+        color: var(--text-dim);
+        border-bottom: 1px solid var(--border);
+        background: var(--surface);
+        letter-spacing: 1px;
+        text-transform: uppercase;
+      }
+
+      .console-body {
+        padding: 0.75rem 1rem;
+        min-height: 60px;
+        font-size: 0.85rem;
+        line-height: 1.8;
+      }
+
+      .console-line {
+        color: var(--green);
+        animation: fadeIn 0.2s ease;
+      }
+
+      .console-line::before {
+        content: "> ";
+        color: var(--text-dim);
+      }
+
+      .console-cursor {
+        display: inline-block;
+        color: var(--text-dim);
+      }
+
+      .console-cursor::after {
+        content: "_";
+        animation: blink 0.8s step-end infinite;
+      }
+
+      @keyframes blink {
+        50% {
+          opacity: 0;
+        }
+      }
+
+      /* ========================================
+         Score Bar & Stats
+         ======================================== */
+      .stats-bar {
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        margin-bottom: 1rem;
+        font-size: 0.78rem;
+        color: var(--text-dim);
+        flex-wrap: wrap;
+      }
+
+      .stats-bar strong {
+        color: var(--text);
+      }
+
+      .mistakes-counter.has-mistakes strong {
+        color: var(--pink);
+      }
+
+      .stars {
+        display: flex;
+        gap: 3px;
+      }
+
+      .star {
+        color: var(--border);
+        transition: all 0.3s;
+      }
+
+      .star.earned {
+        color: var(--gold);
+        text-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
+        animation: starPop 0.3s ease;
+      }
+
+      @keyframes starPop {
+        60% {
+          transform: scale(1.3);
+        }
+      }
+
+      .actions {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+      }
+
+      /* ========================================
+         Progress Bar
+         ======================================== */
+      .progress-bar {
+        margin-top: 1.5rem;
+      }
+
+      .progress-track {
+        height: 4px;
+        background: var(--surface-2);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+
+      .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--amber), var(--cyan));
+        border-radius: 2px;
+        transition: width 0.5s ease;
+      }
+
+      .progress-label {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 0.4rem;
+        font-size: 0.7rem;
+        color: var(--text-dim);
+      }
+
+      /* ========================================
+         Level Complete
+         ======================================== */
+      .level-complete {
+        text-align: center;
+        padding: 2rem 0.5rem;
+        animation: fadeIn 0.4s ease;
+      }
+
+      .result-stars {
+        font-size: 2.5rem;
+        margin-bottom: 0.75rem;
+        display: flex;
+        justify-content: center;
+        gap: 6px;
+      }
+
+      .result-label {
+        font-size: 1.4rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+      }
+
+      .result-label.perfect {
+        color: var(--gold);
+      }
+
+      .result-label.great {
+        color: var(--green);
+      }
+
+      .result-label.good {
+        color: var(--cyan);
+      }
+
+      .concept-box {
+        text-align: left;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-left: 3px solid var(--amber);
+        border-radius: 6px;
+        padding: 1rem 1.25rem;
+        margin: 1.5rem 0;
+        font-size: 0.82rem;
+        line-height: 1.7;
+        color: var(--text-dim);
+      }
+
+      .concept-box strong {
+        color: var(--amber);
+      }
+
+      .concept-box .concept-title {
+        color: var(--text);
+        font-weight: 700;
+        margin-bottom: 0.4rem;
+        font-size: 0.85rem;
+      }
+
+      .level-complete .actions {
+        justify-content: center;
+      }
+
+      /* ========================================
+         Scorecard
+         ======================================== */
+      .scorecard {
+        text-align: center;
+        padding: 1rem 0;
+        animation: fadeIn 0.5s ease;
+      }
+
+      .scorecard h2 {
+        font-size: 1.6rem;
+        color: var(--amber);
+        text-shadow: 0 0 20px var(--amber-glow);
+        margin-bottom: 0.5rem;
+      }
+
+      .scorecard .total-stars {
+        font-size: 1.3rem;
+        margin-bottom: 1.5rem;
+        color: var(--text-dim);
+      }
+
+      .sc-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 1.5rem;
+        font-size: 0.78rem;
+      }
+
+      .sc-table th {
+        padding: 0.5rem;
+        border-bottom: 2px solid var(--border);
+        color: var(--text-dim);
+        font-weight: 400;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-size: 0.68rem;
+      }
+
+      .sc-table td {
+        padding: 0.45rem 0.5rem;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .sc-table .lvl-num {
+        color: var(--amber);
+      }
+
+      .sc-table .perfect-score {
+        color: var(--green);
+      }
+
+      .sc-table .ok-score {
+        color: var(--cyan);
+      }
+
+      .sc-table .bad-score {
+        color: var(--pink);
+      }
+
+      .scorecard .actions {
+        justify-content: center;
+      }
+
+      /* ========================================
+         Footer & Animations
+         ======================================== */
+      footer {
+        margin-top: auto;
+        padding-top: 2rem;
+        text-align: center;
+        font-size: 0.72rem;
+        color: var(--text-dim);
+      }
+
+      footer a {
+        color: var(--cyan);
+        text-decoration: none;
+      }
+
+      footer a:hover {
+        text-decoration: underline;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .confetti-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 1000;
+        overflow: hidden;
+      }
+
+      .confetti-piece {
+        position: absolute;
+        top: -10px;
+        animation: confettiFall linear forwards;
+      }
+
+      @keyframes confettiFall {
+        0% {
+          opacity: 1;
+          transform: translateY(0) rotate(0deg);
+        }
+        100% {
+          opacity: 0;
+          transform: translateY(100vh) rotate(720deg);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container" id="app"></div>
+
+    <footer>
+      <p>Part of <a href="https://github.com/praveenscience/One-File-Tools">One File Tools</a></p>
+    </footer>
+
+    <script>
+      /* ========================================
+         Level Data
+         ======================================== */
+      const LEVELS = [
+        {
+          name: "Sync City",
+          desc: "No tricks. Just top-to-bottom execution.",
+          concept: "<strong>Synchronous code</strong> runs line by line, top to bottom. Each statement completes before the next one starts. This is the baseline\u2009\u2014\u2009everything else builds on this.",
+          code: 'console.log("A");\nconsole.log("B");\nconsole.log("C");',
+          answer: ["A", "B", "C"]
+        },
+        {
+          name: "Timeout Twist",
+          desc: "setTimeout(0) doesn\u2019t mean \u201crun immediately.\u201d",
+          concept: "<strong>setTimeout(fn, 0)</strong> schedules the callback as a <strong>macrotask</strong>. Even with a 0ms delay, it waits until all synchronous code finishes. The call stack must be empty first.",
+          code: 'console.log("A");\nsetTimeout(() => console.log("B"), 0);\nconsole.log("C");',
+          answer: ["A", "C", "B"]
+        },
+        {
+          name: "Promise Land",
+          desc: "Promises resolve fast. But not THAT fast.",
+          concept: "<strong>Promise.then()</strong> callbacks are <strong>microtasks</strong>. Like macrotasks, they wait for synchronous code to finish\u2009\u2014\u2009but they\u2019re processed before the next macrotask.",
+          code: 'console.log("A");\nPromise.resolve().then(() => console.log("B"));\nconsole.log("C");',
+          answer: ["A", "C", "B"]
+        },
+        {
+          name: "Micro vs Macro",
+          desc: "When a microtask and a macrotask both wait, who goes first?",
+          concept: "<strong>Microtasks always beat macrotasks.</strong> After synchronous code finishes, the engine drains the entire microtask queue (Promise.then) before picking up the next macrotask (setTimeout).",
+          code: 'console.log("A");\nsetTimeout(() => console.log("B"), 0);\nPromise.resolve().then(() => console.log("C"));\nconsole.log("D");',
+          answer: ["A", "D", "C", "B"]
+        },
+        {
+          name: "Chain Reaction",
+          desc: "Chained .then() calls don\u2019t all fire at once.",
+          concept: "Each <strong>.then()</strong> in a chain creates a <strong>new microtask only after the previous one completes</strong>. So B runs first (microtask), and only then does C get queued as the next microtask.",
+          code: 'console.log("A");\nPromise.resolve()\n  .then(() => console.log("B"))\n  .then(() => console.log("C"));\nconsole.log("D");',
+          answer: ["A", "D", "B", "C"]
+        },
+        {
+          name: "Nested Timeout",
+          desc: "A macrotask inside a macrotask. Timeout-ception.",
+          concept: "A <strong>setTimeout inside another setTimeout</strong> schedules a new macrotask from within a macrotask. The inner one goes to the back of the macrotask queue\u2009\u2014\u2009it can\u2019t run until the outer callback finishes.",
+          code: 'console.log("A");\nsetTimeout(() => {\n  console.log("B");\n  setTimeout(() => console.log("C"), 0);\n}, 0);\nconsole.log("D");',
+          answer: ["A", "D", "B", "C"]
+        },
+        {
+          name: "Priority Queue",
+          desc: "Multiple microtasks, multiple macrotasks. Untangle them.",
+          concept: "The event loop order: <strong>1) Synchronous code</strong> \u2192 <strong>2) All microtasks</strong> (drained completely) \u2192 <strong>3) One macrotask</strong> \u2192 repeat. Microtasks that schedule new macrotasks push them to the end of the macrotask queue.",
+          code: 'setTimeout(() => console.log("A"), 0);\nPromise.resolve().then(() => {\n  console.log("B");\n  setTimeout(() => console.log("C"), 0);\n});\nPromise.resolve().then(() => console.log("D"));\nconsole.log("E");',
+          answer: ["E", "B", "D", "A", "C"]
+        },
+        {
+          name: "Async Debut",
+          desc: "async/await is just sugar on top of Promises. Or is it?",
+          concept: "<strong>await</strong> pauses the async function and schedules the rest as a microtask. Code <em>after</em> the function call continues synchronously. Think of <code>await x</code> as <code>x.then(rest_of_function)</code>.",
+          code: 'async function foo() {\n  console.log("A");\n  await Promise.resolve();\n  console.log("B");\n}\nconsole.log("C");\nfoo();\nconsole.log("D");',
+          answer: ["C", "A", "D", "B"]
+        },
+        {
+          name: "Async Mixup",
+          desc: "async + setTimeout + Promise.then. All at once.",
+          concept: "Combining all three: <strong>sync runs first</strong> (including everything before the first await inside an async function), then <strong>microtasks</strong> (await continuations and .then callbacks in queue order), then <strong>macrotasks</strong> (setTimeout).",
+          code: 'async function foo() {\n  console.log("A");\n  await Promise.resolve();\n  console.log("B");\n}\nsetTimeout(() => console.log("C"), 0);\nfoo();\nPromise.resolve().then(() => console.log("D"));\nconsole.log("E");',
+          answer: ["A", "E", "B", "D", "C"]
+        },
+        {
+          name: "The Final Boss",
+          desc: "Nested microtasks. This is where it gets real.",
+          concept: "A <strong>microtask can spawn another microtask</strong>, and the engine drains them all before moving to macrotasks. When C\u2019s callback queues D, D runs immediately after F (both are microtasks)\u2009\u2014\u2009before any setTimeout fires.",
+          code: 'console.log("A");\nsetTimeout(() => console.log("B"), 0);\nPromise.resolve().then(() => {\n  console.log("C");\n  Promise.resolve().then(() => console.log("D"));\n});\nsetTimeout(() => console.log("E"), 0);\nPromise.resolve().then(() => console.log("F"));\nconsole.log("G");',
+          answer: ["A", "G", "C", "F", "D", "B", "E"]
+        }
+      ];
+
+      /* ========================================
+         State
+         ======================================== */
+      const STORAGE_KEY = "event-loop-arena-progress";
+      let progress = loadProgress();
+      let currentLevel = 0;
+      let picked = [];
+      let mistakes = 0;
+      let shuffledChoices = [];
+      const app = document.getElementById("app");
+
+      function loadProgress() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) return JSON.parse(raw);
+        } catch {}
+        return { best: {} };
+      }
+
+      function saveProgress(p) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
+        } catch {}
+      }
+
+      /* ========================================
+         Helpers
+         ======================================== */
+      function escHtml(s) {
+        const d = document.createElement("div");
+        d.textContent = s;
+        return d.innerHTML;
+      }
+
+      function shuffle(arr) {
+        const a = [...arr];
+        for (let i = a.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [a[i], a[j]] = [a[j], a[i]];
+        }
+        if (a.length > 1 && a.every((v, i) => v === arr[i])) {
+          [a[0], a[a.length - 1]] = [a[a.length - 1], a[0]];
+        }
+        return a;
+      }
+
+      function highlight(code) {
+        return code
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/(\/\/.*$)/gm, '<span class="cmt">$1</span>')
+          .replace(/("(?:[^"\\]|\\.)*")/g, '<span class="str">$1</span>')
+          .replace(/\b(console|Promise|setTimeout|async|await|function|const|let|var|return|new|queueMicrotask)\b/g, '<span class="kw">$1</span>')
+          .replace(/\.(log|resolve|then|reject|all|race)\b/g, '.<span class="fn">$1</span>')
+          .replace(/\b(\d+)\b/g, '<span class="num">$1</span>');
+      }
+
+      function getStars(m) {
+        if (m === 0) return 3;
+        if (m === 1) return 2;
+        return 1;
+      }
+
+      function renderStars(n) {
+        return [1, 2, 3].map((i) => '<span class="star ' + (i <= n ? "earned" : "") + '">&#9733;</span>').join("");
+      }
+
+      function getTotalStars() {
+        return LEVELS.reduce((s, _, i) => s + (progress.best[i] != null ? getStars(progress.best[i]) : 0), 0);
+      }
+
+      function spawnConfetti() {
+        const c = document.createElement("div");
+        c.className = "confetti-container";
+        document.body.appendChild(c);
+        const colors = ["#ffaa00", "#00ccff", "#ffd700", "#ff3366", "#00ff88", "#c792ea"];
+        for (let i = 0; i < 50; i++) {
+          const p = document.createElement("div");
+          p.className = "confetti-piece";
+          p.style.left = Math.random() * 100 + "%";
+          p.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+          p.style.width = 4 + Math.random() * 8 + "px";
+          p.style.height = 4 + Math.random() * 8 + "px";
+          p.style.borderRadius = Math.random() > 0.5 ? "50%" : "1px";
+          p.style.animationDuration = 1.5 + Math.random() * 2 + "s";
+          p.style.animationDelay = Math.random() * 0.4 + "s";
+          c.appendChild(p);
+        }
+        setTimeout(() => c.remove(), 4000);
+      }
+
+      /* ========================================
+         Rendering
+         ======================================== */
+      function renderTitle() {
+        const solved = Object.keys(progress.best).length;
+        app.innerHTML =
+          '<div class="title-screen">' +
+          "<h1>EVENT LOOP ARENA</h1>" +
+          '<p class="subtitle">Predict the output. Master the loop.</p>' +
+          '<p class="tagline">10 levels &bull; setTimeout, Promises, async/await</p>' +
+          '<div class="how-to">' +
+          "<h3>How to Play</h3>" +
+          '<p>Each level shows a JavaScript code snippet with multiple <span class="hl">console.log()</span> calls.</p>' +
+          '<p>Click the outputs in the <span class="hl">exact order</span> they\'ll print. Wrong pick? Try again for that position.</p>' +
+          '<p>Fewer mistakes = more stars. <span class="hl">0 mistakes = &#9733;&#9733;&#9733;</span>.</p>' +
+          "</div>" +
+          '<div class="title-actions">' +
+          '<button class="btn" onclick="startLevel(0)">START</button>' +
+          (solved > 0 ? '<button class="btn btn-small btn-ghost" onclick="renderScorecard()">SCORECARD (' + solved + "/10)</button>" : "") +
+          (solved > 0 ? '<button class="btn btn-small btn-ghost" onclick="resetAll()">RESET</button>' : "") +
+          "</div>" +
+          "</div>";
+      }
+
+      function renderLevel() {
+        const lvl = LEVELS[currentLevel];
+        const remaining = shuffledChoices.filter((v) => picked.indexOf(v) === -1);
+        const nextPos = picked.length + 1;
+        const total = lvl.answer.length;
+        const done = picked.length === total;
+
+        let consoleLines = picked.map((v) => '<div class="console-line">' + escHtml(v) + "</div>").join("");
+        if (!done) consoleLines += '<div class="console-cursor"></div>';
+
+        let choiceBtns = shuffledChoices
+          .map((v) => {
+            const isPicked = picked.indexOf(v) !== -1;
+            return '<button class="choice-btn' + (isPicked ? " correct" : "") + '" data-val="' + escHtml(v) + '"' + (isPicked || done ? " disabled" : "") + ">" + escHtml(v) + "</button>";
+          })
+          .join("");
+
+        const bestMistakes = progress.best[currentLevel];
+
+        app.innerHTML =
+          '<div class="game-screen">' +
+          '<div class="game-header">' +
+          '<span class="level-badge">LEVEL ' + (currentLevel + 1) + " / " + LEVELS.length + "</span>" +
+          '<span class="level-name">' + escHtml(lvl.name) + "</span>" +
+          "</div>" +
+          '<p class="level-desc">' + escHtml(lvl.desc) + "</p>" +
+          '<div class="code-block">' +
+          '<div class="code-header">' +
+          '<span class="code-dot red"></span><span class="code-dot yellow"></span><span class="code-dot green"></span>' +
+          '<span class="code-title">script.js</span>' +
+          "</div>" +
+          '<pre class="code-body">' + highlight(lvl.code) + "</pre>" +
+          "</div>" +
+          '<div class="prompt">' +
+          '<span class="step-num">' + nextPos + " / " + total + "</span>" +
+          (done ? "Complete!" : "What prints next?") +
+          "</div>" +
+          '<div class="choices">' + choiceBtns + "</div>" +
+          '<div class="console-area">' +
+          '<div class="console-header">Console Output</div>' +
+          '<div class="console-body">' + consoleLines + "</div>" +
+          "</div>" +
+          '<div class="stats-bar">' +
+          '<span class="mistakes-counter' + (mistakes > 0 ? " has-mistakes" : "") + '">Mistakes: <strong>' + mistakes + "</strong></span>" +
+          "<span>" + renderStars(done ? getStars(mistakes) : 0) + "</span>" +
+          (bestMistakes != null ? "<span>Best: <strong>" + bestMistakes + "</strong></span>" : "") +
+          "</div>" +
+          '<div class="actions">' +
+          (done ? '<button class="btn" onclick="' + (currentLevel < LEVELS.length - 1 ? "startLevel(" + (currentLevel + 1) + ")" : "renderScorecard()") + '">' + (currentLevel < LEVELS.length - 1 ? "NEXT LEVEL &rarr;" : "SCORECARD") + "</button>" : "") +
+          '<button class="btn btn-small btn-ghost" onclick="resetLevel()">RETRY</button>' +
+          (currentLevel > 0 ? '<button class="btn btn-small btn-ghost" onclick="startLevel(' + (currentLevel - 1) + ')">&larr; PREV</button>' : "") +
+          (currentLevel < LEVELS.length - 1 && !done ? '<button class="btn btn-small btn-ghost" onclick="startLevel(' + (currentLevel + 1) + ')">SKIP &rarr;</button>' : "") +
+          '<button class="btn btn-small btn-ghost" onclick="renderTitle()" style="margin-left:auto">MENU</button>' +
+          "</div>" +
+          '<div class="progress-bar"><div class="progress-track"><div class="progress-fill" style="width:' + (Object.keys(progress.best).length / LEVELS.length) * 100 + '%"></div></div>' +
+          '<div class="progress-label"><span>' + Object.keys(progress.best).length + " / " + LEVELS.length + " completed</span><span>" + getTotalStars() + " &#9733;</span></div></div>" +
+          "</div>";
+
+        if (!done) {
+          app.querySelectorAll(".choice-btn:not(.correct)").forEach((btn) => {
+            btn.addEventListener("click", () => handlePick(btn));
+          });
+        }
+
+        if (done) {
+          if (progress.best[currentLevel] == null || mistakes < progress.best[currentLevel]) {
+            progress.best[currentLevel] = mistakes;
+            saveProgress(progress);
+          }
+          if (mistakes === 0) spawnConfetti();
+          setTimeout(() => renderComplete(), 600);
+        }
+      }
+
+      function handlePick(btn) {
+        const val = btn.dataset.val;
+        const lvl = LEVELS[currentLevel];
+        const expected = lvl.answer[picked.length];
+
+        if (val === expected) {
+          picked.push(val);
+          renderLevel();
+        } else {
+          mistakes++;
+          btn.classList.add("wrong");
+          const correctBtn = [...app.querySelectorAll(".choice-btn:not(.correct)")].find((b) => b.dataset.val === expected);
+          if (correctBtn) setTimeout(() => correctBtn.classList.add("hint"), 200);
+          setTimeout(() => {
+            btn.classList.remove("wrong");
+            if (correctBtn) correctBtn.classList.remove("hint");
+            renderLevel();
+          }, 800);
+        }
+      }
+
+      function renderComplete() {
+        const lvl = LEVELS[currentLevel];
+        const stars = getStars(mistakes);
+        const labels = { 3: ["PERFECT!", "perfect"], 2: ["GREAT!", "great"], 1: ["GOOD!", "good"] };
+        const [label, cls] = labels[stars];
+        const isLast = currentLevel === LEVELS.length - 1;
+
+        app.innerHTML =
+          '<div class="level-complete">' +
+          '<div class="result-stars">' + renderStars(stars) + "</div>" +
+          '<div class="result-label ' + cls + '">' + label + "</div>" +
+          "<p>" + escHtml(lvl.name) + " \u2014 " + mistakes + " mistake" + (mistakes !== 1 ? "s" : "") + "</p>" +
+          '<div class="concept-box">' +
+          '<div class="concept-title">How it works</div>' +
+          "<p>" + lvl.concept + "</p>" +
+          "</div>" +
+          '<div class="actions">' +
+          (!isLast ? '<button class="btn" onclick="startLevel(' + (currentLevel + 1) + ')">NEXT LEVEL &rarr;</button>' : '<button class="btn" onclick="renderScorecard()">SCORECARD</button>') +
+          '<button class="btn btn-small btn-ghost" onclick="resetLevel()">RETRY</button>' +
+          '<button class="btn btn-small btn-ghost" onclick="renderTitle()">MENU</button>' +
+          "</div>" +
+          "</div>";
+      }
+
+      function renderScorecard() {
+        const solved = Object.keys(progress.best).length;
+        const ts = getTotalStars();
+        if (solved === LEVELS.length) spawnConfetti();
+
+        const rows = LEVELS.map((lvl, i) => {
+          const b = progress.best[i];
+          const s = b != null;
+          const stars = s ? getStars(b) : 0;
+          const cls = !s ? "" : b === 0 ? "perfect-score" : b === 1 ? "ok-score" : "bad-score";
+          return "<tr><td class='lvl-num'>" + (i + 1) + "</td><td style='text-align:left'>" + escHtml(lvl.name) + "</td><td class='" + cls + "'>" + (s ? b : "-") + "</td><td>" + renderStars(stars) + "</td></tr>";
+        }).join("");
+
+        app.innerHTML =
+          '<div class="scorecard">' +
+          "<h2>" + (solved === LEVELS.length ? "ARENA COMPLETE!" : "SCORECARD") + "</h2>" +
+          '<div class="total-stars">' + ts + " / " + LEVELS.length * 3 + " &#9733;</div>" +
+          '<table class="sc-table"><thead><tr><th>#</th><th style="text-align:left">Level</th><th>Mistakes</th><th>Stars</th></tr></thead><tbody>' +
+          rows +
+          "</tbody></table>" +
+          '<div class="actions">' +
+          (solved < LEVELS.length ? '<button class="btn" onclick="goNextUnsolved()">CONTINUE</button>' : "") +
+          '<button class="btn ' + (solved < LEVELS.length ? "btn-ghost" : "") + '" onclick="renderTitle()">MENU</button>' +
+          '<button class="btn btn-small btn-ghost" onclick="resetAll()">RESET</button>' +
+          "</div></div>";
+      }
+
+      /* ========================================
+         Navigation
+         ======================================== */
+      function startLevel(n) {
+        currentLevel = n;
+        picked = [];
+        mistakes = 0;
+        shuffledChoices = shuffle(LEVELS[n].answer);
+        renderLevel();
+      }
+
+      function resetLevel() {
+        picked = [];
+        mistakes = 0;
+        shuffledChoices = shuffle(LEVELS[currentLevel].answer);
+        renderLevel();
+      }
+
+      function resetAll() {
+        progress = { best: {} };
+        saveProgress(progress);
+        renderTitle();
+      }
+
+      function goNextUnsolved() {
+        for (let i = 0; i < LEVELS.length; i++) {
+          if (progress.best[i] == null) {
+            startLevel(i);
+            return;
+          }
+        }
+        startLevel(0);
+      }
+
+      /* ========================================
+         Init
+         ======================================== */
+      renderTitle();
+    </script>
+  </body>
+</html>
