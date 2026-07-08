@@ -1,0 +1,957 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dead Scope — One File Tools</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=VT323&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --void: #050307;
+        --surface: #100a0e;
+        --surface-2: #1a1016;
+        --border: #35222b;
+        --bone: #cfc6b8;
+        --bone-dim: #8a8177;
+        --blood: #b3122e;
+        --blood-bright: #ff2244;
+        --blood-soft: rgba(179, 18, 46, 0.16);
+        --rot: #6fa07a;
+        --rot-soft: rgba(111, 160, 122, 0.14);
+        --ember: #c9862a;
+        --font-crt: "VT323", "Consolas", monospace;
+        --font-fell: "IM Fell English", Georgia, serif;
+        --radius: 3px;
+      }
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html {
+        background: var(--void);
+      }
+      body {
+        background: radial-gradient(ellipse at 50% -20%, #1c0a12 0%, transparent 55%), var(--void);
+        color: var(--bone);
+        font-family: var(--font-fell);
+        min-height: 100vh;
+        line-height: 1.6;
+        display: flex;
+        flex-direction: column;
+        overflow-x: hidden;
+      }
+      /* ---- The dark itself: scanlines + vignette that deepens with dread ---- */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 50;
+        background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0px, rgba(0, 0, 0, 0.22) 1px, transparent 1px, transparent 3px);
+        mix-blend-mode: multiply;
+      }
+      body::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 51;
+        box-shadow: inset 0 0 min(28vw, 220px) rgba(0, 0, 0, var(--dread, 0.55));
+        transition: box-shadow 1.2s ease;
+      }
+      body.dread-1::after {
+        --dread: 0.7;
+      }
+      body.dread-2::after {
+        --dread: 0.82;
+      }
+      body.dread-3::after {
+        --dread: 0.92;
+      }
+      body.shake {
+        animation: quake 0.45s ease;
+      }
+      @keyframes quake {
+        10% {
+          transform: translate(-6px, 2px);
+        }
+        30% {
+          transform: translate(5px, -3px);
+        }
+        50% {
+          transform: translate(-4px, 1px);
+        }
+        70% {
+          transform: translate(3px, -2px);
+        }
+        90% {
+          transform: translate(-2px, 1px);
+        }
+      }
+      .blood-flash {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 60;
+        background: radial-gradient(ellipse at center, transparent 40%, rgba(179, 18, 46, 0.45) 100%);
+        animation: flash-fade 0.9s ease-out forwards;
+      }
+      @keyframes flash-fade {
+        from {
+          opacity: 1;
+        }
+        to {
+          opacity: 0;
+        }
+      }
+      button {
+        font-family: inherit;
+        cursor: pointer;
+      }
+      button:focus-visible,
+      a:focus-visible {
+        outline: 2px solid var(--blood-bright);
+        outline-offset: 2px;
+      }
+      .wrap {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 32px 20px 60px;
+        width: 100%;
+        position: relative;
+        z-index: 1;
+      }
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px;
+      }
+      .brand {
+        font-family: var(--font-crt);
+        font-size: 15px;
+        color: var(--bone-dim);
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+      }
+      .sanity {
+        font-family: var(--font-crt);
+        font-size: 16px;
+        color: var(--bone-dim);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .sanity-bar {
+        width: 90px;
+        height: 8px;
+        border: 1px solid var(--border);
+        background: var(--surface);
+      }
+      .sanity-fill {
+        display: block;
+        height: 100%;
+        background: linear-gradient(90deg, var(--blood), var(--blood-bright));
+        transition: width 0.6s ease;
+      }
+      /* ---- Graveyard progress: one headstone per level ---- */
+      .graveyard {
+        display: flex;
+        gap: 8px;
+        margin: 18px 0 26px;
+        flex-wrap: wrap;
+        align-items: flex-end;
+      }
+      .grave {
+        width: 18px;
+        height: 22px;
+        border: 1px solid var(--border);
+        border-radius: 8px 8px 0 0;
+        background: var(--surface);
+        position: relative;
+        transition:
+          border-color 0.3s,
+          background 0.3s;
+      }
+      .grave.done {
+        border-color: var(--bone-dim);
+        background: var(--surface-2);
+      }
+      .grave.done::after {
+        content: "†";
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        font-size: 13px;
+        color: var(--bone-dim);
+        font-family: var(--font-fell);
+        line-height: 1;
+      }
+      .grave.current {
+        border-color: var(--blood-bright);
+        box-shadow:
+          0 0 10px var(--blood-soft),
+          0 0 22px var(--blood-soft);
+        animation: grave-pulse 2.4s ease-in-out infinite;
+      }
+      @keyframes grave-pulse {
+        50% {
+          box-shadow: 0 0 4px var(--blood-soft);
+        }
+      }
+      .screen {
+        animation: screenIn 0.5s ease both;
+      }
+      @keyframes screenIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      /* ---- Title ---- */
+      .hero {
+        text-align: center;
+        padding: 56px 0 20px;
+      }
+      .hero-badge {
+        font-family: var(--font-crt);
+        font-size: 15px;
+        letter-spacing: 0.3em;
+        text-transform: uppercase;
+        color: var(--blood-bright);
+        margin-bottom: 14px;
+      }
+      .hero-title {
+        font-family: var(--font-crt);
+        font-size: clamp(52px, 11vw, 96px);
+        color: var(--bone);
+        line-height: 0.95;
+        margin-bottom: 6px;
+        font-weight: 400;
+        letter-spacing: 0.04em;
+        text-shadow:
+          0 0 18px rgba(179, 18, 46, 0.55),
+          2px 0 0 rgba(255, 34, 68, 0.35),
+          -2px 0 0 rgba(111, 160, 122, 0.25);
+        animation: crt-flicker 6s infinite;
+      }
+      @keyframes crt-flicker {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        92% {
+          opacity: 1;
+        }
+        93% {
+          opacity: 0.55;
+        }
+        94% {
+          opacity: 1;
+        }
+        96.5% {
+          opacity: 0.7;
+        }
+        97% {
+          opacity: 1;
+        }
+      }
+      .hero-epitaph {
+        font-family: var(--font-fell);
+        font-style: italic;
+        color: var(--bone-dim);
+        font-size: 17px;
+        max-width: 46ch;
+        margin: 18px auto 10px;
+      }
+      .hero-warning {
+        font-family: var(--font-crt);
+        font-size: 15px;
+        color: var(--blood);
+        margin-bottom: 36px;
+        letter-spacing: 0.08em;
+      }
+      /* ---- Cursed terminal ---- */
+      .code-block {
+        background: #060a07;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 18px 22px;
+        font-family: var(--font-crt);
+        font-size: 19px;
+        line-height: 1.55;
+        overflow-x: auto;
+        margin-bottom: 26px;
+        color: #9db8a2;
+        position: relative;
+        box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.6);
+      }
+      .code-block::before {
+        content: "EXHIBIT " attr(data-exhibit) " — RECOVERED FROM THE MACHINE";
+        display: block;
+        font-size: 13px;
+        letter-spacing: 0.18em;
+        color: var(--blood);
+        margin-bottom: 10px;
+        border-bottom: 1px dashed var(--border);
+        padding-bottom: 8px;
+      }
+      .kw {
+        color: #c46a8a;
+      }
+      .fn {
+        color: #7fa3c4;
+      }
+      .str {
+        color: #a4c49a;
+      }
+      .num {
+        color: var(--ember);
+      }
+      .question {
+        font-family: var(--font-fell);
+        font-size: 21px;
+        margin-bottom: 18px;
+        color: var(--bone);
+      }
+      .question em {
+        color: var(--blood-bright);
+        font-style: italic;
+      }
+      /* ---- Options ---- */
+      .options {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+      .option {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 14px 18px;
+        text-align: left;
+        color: var(--bone);
+        transition:
+          border-color 0.15s,
+          background 0.15s,
+          transform 0.1s;
+        font-family: var(--font-crt);
+        font-size: 18px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .option:hover:not(:disabled) {
+        border-color: var(--blood);
+        background: var(--surface-2);
+        transform: translateX(3px);
+      }
+      .option.selected {
+        border-color: var(--blood-bright);
+        background: var(--blood-soft);
+      }
+      .option.correct {
+        border-color: var(--rot);
+        background: var(--rot-soft);
+      }
+      .option.wrong {
+        border-color: var(--blood-bright);
+        background: var(--blood-soft);
+        animation: option-tremor 0.4s ease;
+      }
+      @keyframes option-tremor {
+        25% {
+          transform: translateX(-5px);
+        }
+        50% {
+          transform: translateX(4px);
+        }
+        75% {
+          transform: translateX(-2px);
+        }
+      }
+      .option-letter {
+        width: 26px;
+        height: 26px;
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+        display: grid;
+        place-items: center;
+        font-size: 15px;
+        flex-shrink: 0;
+        color: var(--bone-dim);
+      }
+      .option.selected .option-letter {
+        background: var(--blood-bright);
+        color: var(--void);
+        border-color: var(--blood-bright);
+      }
+      .option.correct .option-letter {
+        background: var(--rot);
+        color: var(--void);
+        border-color: var(--rot);
+      }
+      .option.wrong .option-letter {
+        background: var(--blood-bright);
+        color: var(--void);
+        border-color: var(--blood-bright);
+      }
+      .btn {
+        padding: 12px 26px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        font-family: var(--font-crt);
+        font-size: 18px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        transition:
+          background 0.15s,
+          border-color 0.15s,
+          color 0.15s;
+        background: var(--surface-2);
+        color: var(--bone);
+      }
+      .btn-primary {
+        background: var(--blood);
+        border-color: var(--blood);
+        color: #f5e9e9;
+      }
+      .btn-primary:hover:not(:disabled) {
+        background: var(--blood-bright);
+        border-color: var(--blood-bright);
+      }
+      .btn-secondary:hover:not(:disabled) {
+        border-color: var(--blood);
+      }
+      .btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      .actions {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      /* ---- Post-mortem / whispers ---- */
+      .explanation {
+        background: var(--surface);
+        border-left: 3px solid var(--blood);
+        border-radius: var(--radius);
+        padding: 18px 22px;
+        margin-bottom: 20px;
+      }
+      .explanation.survived {
+        border-left-color: var(--rot);
+      }
+      .explanation-title {
+        font-family: var(--font-crt);
+        font-size: 16px;
+        color: var(--blood-bright);
+        margin-bottom: 6px;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+      }
+      .explanation.survived .explanation-title {
+        color: var(--rot);
+      }
+      .explanation-text {
+        font-size: 16px;
+        line-height: 1.7;
+        color: var(--bone-dim);
+        font-family: var(--font-fell);
+      }
+      .hint-box {
+        background: var(--surface);
+        border: 1px dashed var(--border);
+        border-radius: var(--radius);
+        padding: 14px 18px;
+        margin-bottom: 20px;
+      }
+      .hint-text {
+        font-size: 16px;
+        color: var(--bone-dim);
+        font-family: var(--font-fell);
+        font-style: italic;
+      }
+      .hint-text::before {
+        content: "a voice from the walls: ";
+        color: var(--blood);
+        font-family: var(--font-crt);
+        font-style: normal;
+        font-size: 14px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      .level-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border-bottom: 1px solid var(--border);
+        padding: 0 2px 4px;
+        font-family: var(--font-crt);
+        font-size: 16px;
+        color: var(--bone-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.15em;
+        margin-bottom: 6px;
+      }
+      .level-name {
+        font-family: var(--font-fell);
+        font-style: italic;
+        font-size: 26px;
+        color: var(--bone);
+        margin-bottom: 14px;
+      }
+      .timer {
+        font-family: var(--font-crt);
+        font-size: 15px;
+        color: var(--bone-dim);
+        margin-bottom: 14px;
+      }
+      .timer::before {
+        content: "time in the dark — ";
+        color: var(--border);
+      }
+      /* ---- Verdict ---- */
+      .final-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 40px 32px;
+        text-align: center;
+        margin-bottom: 20px;
+      }
+      .final-title {
+        font-family: var(--font-crt);
+        font-size: 44px;
+        margin-bottom: 4px;
+        color: var(--bone);
+        text-shadow: 0 0 16px rgba(179, 18, 46, 0.5);
+      }
+      .final-subtitle {
+        color: var(--bone-dim);
+        font-style: italic;
+        margin-bottom: 28px;
+        font-size: 17px;
+      }
+      .candles {
+        display: flex;
+        justify-content: center;
+        gap: 18px;
+        margin-bottom: 24px;
+      }
+      .candle {
+        font-size: 30px;
+        filter: grayscale(1) brightness(0.4);
+        transition: filter 0.6s;
+      }
+      .candle.lit {
+        filter: none;
+        animation: candle-waver 2.8s ease-in-out infinite;
+      }
+      @keyframes candle-waver {
+        50% {
+          transform: scale(1.06) rotate(1.5deg);
+          opacity: 0.85;
+        }
+      }
+      .stats {
+        display: flex;
+        justify-content: center;
+        gap: 28px;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+      }
+      .stat-value {
+        font-family: var(--font-crt);
+        font-size: 30px;
+        color: var(--blood-bright);
+      }
+      .stat-label {
+        font-size: 12px;
+        color: var(--bone-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.15em;
+        font-family: var(--font-crt);
+      }
+      .badge-list {
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 28px;
+      }
+      .badge {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 8px 16px;
+        font-family: var(--font-crt);
+        font-size: 15px;
+        color: var(--border);
+        letter-spacing: 0.06em;
+      }
+      .badge.earned {
+        border-color: var(--blood);
+        color: var(--bone);
+        box-shadow: 0 0 12px var(--blood-soft);
+      }
+      /* ---- Falling ash on completion ---- */
+      .ash {
+        position: fixed;
+        top: -12px;
+        pointer-events: none;
+        z-index: 55;
+        border-radius: 50%;
+        animation: ash-fall linear forwards;
+      }
+      @keyframes ash-fall {
+        0% {
+          transform: translateY(-5vh) translateX(0) rotate(0deg);
+          opacity: 0.9;
+        }
+        100% {
+          transform: translateY(105vh) translateX(6vw) rotate(300deg);
+          opacity: 0;
+        }
+      }
+      @media (max-width: 600px) {
+        .wrap {
+          padding: 20px 16px 40px;
+        }
+        .hero-title {
+          font-size: 52px;
+        }
+        .code-block {
+          font-size: 16px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation: none !important;
+          transition: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script>
+      // Same puzzles, darker premises. A closure is, after all, a variable
+      // that refuses to die when its function does.
+      const LEVELS = [
+        { level: 1, title: "The Shadow Self", category: "scope", code: "let x='global';\nfunction foo(){\n  let x='local';\n  return x;\n}\nfoo();", question: "Two variables wear the same name. Which one answers when foo() calls?", options: ["global", "local", "undefined", "ReferenceError"], correct: 1, explanation: "Inside foo(), the local x shadows the global x — the outer one still exists, but its voice cannot reach into the function. foo() returns 'local'." },
+        { level: 2, title: "The Keeper of Counts", category: "closure", code: "function counter(){\n  let count=0;\n  return function(){\n    return ++count;\n  };\n}\nconst c=counter();\nconsole.log(c());", question: "counter() has already died. What does its orphan c() whisper first?", options: ["0", "1", "undefined", "NaN"], correct: 1, explanation: "The inner function closed over count before its parent perished. ++count pre-increments, so the first call returns 1. The variable lives on in the closure — it did not die with counter()." },
+        { level: 3, title: "Buried in the Block", category: "scope", code: "let x=1;\nif(true){\n  let x=2;\n  console.log(x);\n}\nconsole.log(x);", question: "One x is buried inside the block. What is logged?", options: ["2 then 2", "2 then 1", "1 then 2", "undefined"], correct: 1, explanation: "The let inside the if creates a second x, sealed within that block like a coffin. Inside, it logs 2. Outside, the original x — untouched — logs 1." },
+        { level: 4, title: "The Risen", category: "scope", code: "console.log(a);\nvar a=5;", question: "The declaration rises from below before the code runs. What is logged?", options: ["5", "undefined", "ReferenceError", "null"], correct: 1, explanation: "var declarations are hoisted — dragged up from where they were buried to the top of their scope — but they rise empty. a exists at the log, but holds only undefined." },
+        { level: 5, title: "Séance of State", category: "closure", code: "function makeCounter(){\n  let count=0;\n  return{\n    increment:function(){return++count;},\n    decrement:function(){return--count;},\n    get:function(){return count;}\n  };\n}\nconst c=makeCounter();\nc.increment();\nconsole.log(c.get());", question: "Three methods commune with the same departed scope. What does get() report?", options: ["0", "1", "2", "undefined"], correct: 1, explanation: "All three methods share one closure over count — three hands on the same planchette. increment() moves it to 1, and get() reads what the others have done." },
+        { level: 6, title: "The Secret That Survived Death", category: "closure", code: "function secret(){\n  const hidden='secret';\n  return function(){\n    return hidden;\n  };\n}\nconst getSecret=secret();\nconsole.log(getSecret());", question: "secret() is long gone. Can its secret still be spoken?", options: ["secret", "undefined", "hidden", "ReferenceError"], correct: 0, explanation: "The inner function captured hidden in its closure. The enclosing function finished — died, if you like — yet getSecret() still speaks its secret. Nothing sealed in a closure is ever truly gone." },
+        { level: 7, title: "Three Ghosts, One Grave", category: "scope", code: "for(var i=0;i&lt;3;i++){\n  setTimeout(()=>console.log(i),10);\n}", question: "Three callbacks wake after the loop has died. What do they say?", options: ["0,1,2 (once each)", "3,3,3 (three times)", "0,1,2 (three times)", "undefined"], correct: 1, explanation: "var is function-scoped: there is only one i, one shared grave. By the time the timers wake, the loop has ended and i is 3 — so all three ghosts moan the same number." },
+        { level: 8, title: "Each Soul Its Own Grave", category: "scope", code: "for(let i=0;i&lt;3;i++){\n  setTimeout(()=>console.log(i),10);\n}", question: "Same ritual, but with let. What do the callbacks say now?", options: ["0,1,2", "3,3,3", "undefined", "throws error"], correct: 0, explanation: "let is block-scoped: each iteration is granted its own i, its own grave. Each callback closes over its own binding and speaks its own number — 0, 1, 2." },
+        { level: 9, title: "The Curse Factory", category: "closure", code: "function makeMultiplier(factor){\n  return function(x){\n    return x*factor;\n  };\n}\nconst triple=makeMultiplier(3);\nconsole.log(triple(4));", question: "The factory brands each function it births. What does triple(4) yield?", options: ["7", "12", "4", "undefined"], correct: 1, explanation: "triple carries factor=3 forever — a curse sealed at creation, remembered through closure. triple(4) returns 4 × 3 = 12." },
+        { level: 10, title: "Voices from the Loop", category: "closure", code: "const fns=[];\nfor(let i=0;i&lt;3;i++){\n  fns.push(()=>i);\n}\nconsole.log(fns.map(f=>f()).join(','));", question: "Three voices were bottled during the loop. What do they say when uncorked?", options: ["0,1,2", "3,3,3", "undefined", "throws"], correct: 0, explanation: "let forges a fresh binding per iteration. Each arrow function bottled its own i at the moment of capture — so the voices answer 0, 1, 2, each true to the instant it was sealed." }
+      ];
+
+      const STORAGE_KEY = "dead_scope_v1";
+
+      function loadProgress() {
+        try {
+          const saved = localStorage.getItem(STORAGE_KEY);
+          if (saved) {
+            const data = JSON.parse(saved);
+            return { currentLevel: data.currentLevel || 0, mistakes: data.mistakes || 0, hintsUsed: data.hintsUsed || 0, startTime: data.startTime || Date.now(), completed: data.completed || false, badges: data.badges || [], candles: data.candles || 0 };
+          }
+        } catch (e) {}
+        return { currentLevel: 0, mistakes: 0, hintsUsed: 0, startTime: Date.now(), completed: false, badges: [], candles: 0 };
+      }
+
+      function saveProgress() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+        } catch (e) {}
+      }
+
+      let progress = loadProgress();
+      let currentHint = null;
+      let selectedOption = null;
+      let hasAnswered = false;
+      let timerInterval;
+
+      function renderScreen(html) {
+        document.getElementById("app").innerHTML = html;
+      }
+
+      function escapeHtml(str) {
+        const div = document.createElement("div");
+        div.textContent = str;
+        return div.innerHTML;
+      }
+
+      function highlightCode(code) {
+        return code
+          .replace(/const|let|var|function|return|if|for/g, '<span class="kw">$&</span>')
+          .replace(/console\.log/g, '<span class="fn">$&</span>')
+          .replace(/'[^']*'/g, '<span class="str">$&</span>')
+          .replace(/\b\d+\b/g, '<span class="num">$&</span>');
+      }
+
+      function updateDread() {
+        document.body.classList.remove("dread-1", "dread-2", "dread-3");
+        if (progress.mistakes >= 5) document.body.classList.add("dread-3");
+        else if (progress.mistakes >= 3) document.body.classList.add("dread-2");
+        else if (progress.mistakes >= 1) document.body.classList.add("dread-1");
+      }
+
+      function sanityPercent() {
+        return Math.max(0, 100 - progress.mistakes * 15 - progress.hintsUsed * 5);
+      }
+
+      function renderGraveyard() {
+        let html = '<div class="graveyard" aria-label="Progress">';
+        LEVELS.forEach((_, i) => {
+          let cls = "";
+          if (i < progress.currentLevel) cls = "done";
+          else if (i === progress.currentLevel) cls = "current";
+          html += `<div class="grave ${cls}"></div>`;
+        });
+        return html + "</div>";
+      }
+
+      function renderTitle() {
+        clearInterval(timerInterval);
+        renderScreen(`<div class="wrap"><div class="hero screen">
+          <div class="hero-badge">One File Tools presents</div>
+          <h1 class="hero-title">DEAD SCOPE</h1>
+          <p class="hero-epitaph">Ten functions have died in this machine. Their variables did not die with them. Trace what still lingers in the closures they left behind — and pray you trace it correctly.</p>
+          <p class="hero-warning">&gt; every wrong answer feeds the dark_</p>
+          <div class="actions"><button class="btn btn-primary" onclick="startGame()">Enter the Codebase</button></div>
+        </div></div>`);
+      }
+
+      function startGame() {
+        progress.currentLevel = 0;
+        progress.mistakes = 0;
+        progress.hintsUsed = 0;
+        progress.startTime = Date.now();
+        progress.completed = false;
+        saveProgress();
+        updateDread();
+        renderLevel();
+      }
+
+      function renderLevel() {
+        const level = LEVELS[progress.currentLevel];
+        if (!level) return renderFinal();
+        const letters = ["A", "B", "C", "D"];
+        let html = `<div class="wrap screen">
+          <div class="topbar">
+            <span class="brand">Dead Scope</span>
+            <span class="sanity">sanity <span class="sanity-bar"><span class="sanity-fill" style="width:${sanityPercent()}%"></span></span></span>
+          </div>
+          ${renderGraveyard()}
+          <div class="level-badge">Haunting ${level.level} of 10 — ${level.category}</div>
+          <div class="level-name">${level.title}</div>
+          <div class="timer" id="timer">0:00</div>
+          <div class="code-block" data-exhibit="${String(level.level).padStart(2, "0")}">${highlightCode(level.code)}</div>
+          <h2 class="question">${level.question}</h2>
+          <div class="options">`;
+        level.options.forEach((opt, i) => {
+          html += `<button class="option" onclick="selectOption(${i})" id="opt-${i}"><span class="option-letter">${letters[i]}</span><span>${escapeHtml(opt)}</span></button>`;
+        });
+        html += `</div>
+          <div id="hint-area"></div>
+          <div id="explanation-area"></div>
+          <div class="actions">
+            <button class="btn btn-secondary" onclick="showHint()">Listen to the Walls (−5 sanity)</button>
+            <button class="btn btn-primary" onclick="submitAnswer()" id="submit-btn" disabled>Speak Your Answer</button>
+          </div>
+        </div>`;
+        renderScreen(html);
+        startTimer();
+      }
+
+      function startTimer() {
+        clearInterval(timerInterval);
+        const start = Date.now();
+        timerInterval = setInterval(() => {
+          const elapsed = Math.floor((Date.now() - start) / 1000);
+          const el = document.getElementById("timer");
+          if (el) el.textContent = `${Math.floor(elapsed / 60)}:${(elapsed % 60).toString().padStart(2, "0")}`;
+        }, 1000);
+      }
+
+      function selectOption(index) {
+        if (hasAnswered) return;
+        selectedOption = index;
+        document.querySelectorAll(".option").forEach((el, i) => {
+          el.classList.toggle("selected", i === index);
+        });
+        document.getElementById("submit-btn").disabled = false;
+      }
+
+      function showHint() {
+        if (hasAnswered || currentHint) return;
+        const level = LEVELS[progress.currentLevel];
+        document.getElementById("hint-area").innerHTML = `<div class="hint-box"><div class="hint-text">${getHint(level)}</div></div>`;
+        currentHint = true;
+        progress.hintsUsed++;
+        const fill = document.querySelector(".sanity-fill");
+        if (fill) fill.style.width = sanityPercent() + "%";
+      }
+
+      function getHint(level) {
+        const hints = {
+          scope: "ask not what the variable holds… ask which scope can see it, and which is blind.",
+          closure: "the inner function remembers everything it saw before its parent died. everything."
+        };
+        return hints[level.category] || "trace the values. slowly. the code punishes the hasty.";
+      }
+
+      function frighten() {
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        document.body.classList.add("shake");
+        const flash = document.createElement("div");
+        flash.className = "blood-flash";
+        document.body.appendChild(flash);
+        setTimeout(() => {
+          document.body.classList.remove("shake");
+          flash.remove();
+        }, 900);
+      }
+
+      function submitAnswer() {
+        if (hasAnswered || selectedOption === null) return;
+        hasAnswered = true;
+        const level = LEVELS[progress.currentLevel];
+        const correct = selectedOption === level.correct;
+        document.querySelectorAll(".option").forEach((el, i) => {
+          el.classList.remove("selected");
+          if (i === level.correct) el.classList.add("correct");
+          else if (i === selectedOption) el.classList.add("wrong");
+          el.disabled = true;
+        });
+        document.getElementById("submit-btn").disabled = true;
+        if (!correct) {
+          progress.mistakes++;
+          updateDread();
+          frighten();
+          const fill = document.querySelector(".sanity-fill");
+          if (fill) fill.style.width = sanityPercent() + "%";
+        }
+        document.getElementById("explanation-area").innerHTML = `<div class="explanation ${correct ? "survived" : ""}">
+            <div class="explanation-title">${correct ? "You survive. For now." : "The dark takes its toll."}</div>
+            <div class="explanation-text">${level.explanation}</div>
+          </div>`;
+        setTimeout(
+          () => {
+            progress.currentLevel++;
+            saveProgress();
+            if (progress.currentLevel >= LEVELS.length) {
+              renderFinal();
+            } else {
+              currentHint = null;
+              selectedOption = null;
+              hasAnswered = false;
+              renderLevel();
+            }
+          },
+          correct ? 1800 : 3400
+        );
+      }
+
+      function renderFinal() {
+        clearInterval(timerInterval);
+        const totalTime = Math.floor((Date.now() - progress.startTime) / 1000);
+        const minutes = Math.floor(totalTime / 60);
+        const seconds = totalTime % 60;
+        const accuracy = Math.round(((LEVELS.length - progress.mistakes) / LEVELS.length) * 100);
+        const candles = calculateCandles();
+        progress.candles = candles;
+        progress.completed = true;
+        calculateBadges();
+        saveProgress();
+        const verdicts = ["You crawled out. Barely. The closures still whisper your name.", "You walked out of the dark with most of your mind intact.", "You walked out of the dark, and the dark blinked first."];
+        let html = `<div class="wrap screen"><div class="final-card">
+          <div class="hero-badge">The Machine Falls Silent</div>
+          <h1 class="final-title">DEAD SCOPE</h1>
+          <p class="final-subtitle">${verdicts[candles - 1]}</p>
+          <div class="candles">`;
+        for (let i = 0; i < 3; i++) {
+          html += `<span class="candle ${i < candles ? "lit" : ""}">🕯️</span>`;
+        }
+        html += `</div><div class="stats">
+            <div class="stat"><div class="stat-value">${accuracy}%</div><div class="stat-label">Accuracy</div></div>
+            <div class="stat"><div class="stat-value">${sanityPercent()}%</div><div class="stat-label">Sanity Left</div></div>
+            <div class="stat"><div class="stat-value">${minutes}:${seconds.toString().padStart(2, "0")}</div><div class="stat-label">In the Dark</div></div>
+          </div><div class="badge-list">`;
+        getBadgeList().forEach((b) => {
+          html += `<div class="badge ${progress.badges.includes(b.id) ? "earned" : ""}">${b.name}</div>`;
+        });
+        html += `</div><div class="actions">
+            <button class="btn btn-primary" onclick="resetProgress()">Descend Again</button>
+            <button class="btn btn-secondary" onclick="renderTitle()">Flee</button>
+          </div></div></div>`;
+        renderScreen(html);
+        if (candles >= 2) launchAsh();
+      }
+
+      function calculateCandles() {
+        if (progress.mistakes === 0) return 3;
+        if (progress.mistakes <= 2) return 2;
+        return 1;
+      }
+
+      function calculateBadges() {
+        const badges = [];
+        if (progress.mistakes === 0) badges.push("unscathed");
+        if (progress.hintsUsed === 0) badges.push("deaf-to-whispers");
+        if (LEVELS.length - progress.mistakes >= 7) badges.push("exorcist");
+        progress.badges = badges;
+      }
+
+      function getBadgeList() {
+        return [
+          { id: "unscathed", name: "Unscathed" },
+          { id: "deaf-to-whispers", name: "Deaf to the Whispers" },
+          { id: "exorcist", name: "Exorcist of Scope" }
+        ];
+      }
+
+      function launchAsh() {
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        for (let i = 0; i < 40; i++) {
+          const a = document.createElement("div");
+          const size = 2 + Math.random() * 4;
+          const grey = 120 + Math.floor(Math.random() * 80);
+          a.className = "ash";
+          a.style.cssText = `left:${Math.random() * 100}vw;width:${size}px;height:${size}px;background:rgb(${grey},${grey - 10},${grey - 15});animation-duration:${3 + Math.random() * 4}s;animation-delay:${Math.random() * 1.5}s`;
+          document.body.appendChild(a);
+          setTimeout(() => a.remove(), 9000);
+        }
+      }
+
+      function resetProgress() {
+        progress = { currentLevel: 0, mistakes: 0, hintsUsed: 0, startTime: Date.now(), completed: false, badges: [], candles: 0 };
+        saveProgress();
+        updateDread();
+        startGame();
+      }
+
+      renderTitle();
+    </script>
+  </body>
+</html>
