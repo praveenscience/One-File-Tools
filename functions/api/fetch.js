@@ -1,13 +1,41 @@
 export async function onRequestGet(context) {
   const { request } = context;
-  const { searchParams } = new URL(request.url);
+  const requestUrl = new URL(request.url);
+  const origin = request.headers.get("origin");
+  const referer = request.headers.get("referer");
+
+  // Validate that the request originates from our own domain (or localhost during dev)
+  let isAllowed = true;
+  if (origin) {
+    try {
+      isAllowed = new URL(origin).origin === requestUrl.origin;
+    } catch {
+      isAllowed = false;
+    }
+  } else if (referer) {
+    try {
+      isAllowed = new URL(referer).origin === requestUrl.origin;
+    } catch {
+      isAllowed = false;
+    }
+  }
+
+  if (!isAllowed) {
+    return new Response("Access Denied: This proxy is only available for requests originating from the same domain.", {
+      status: 403,
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8"
+      }
+    });
+  }
+
+  const { searchParams } = requestUrl;
   const targetUrl = searchParams.get("url");
 
   if (!targetUrl) {
     return new Response("Missing url parameter", {
       status: 400,
       headers: {
-        "Access-Control-Allow-Origin": "*",
         "Content-Type": "text/plain; charset=utf-8"
       }
     });
@@ -19,7 +47,6 @@ export async function onRequestGet(context) {
       return new Response("Invalid URL protocol. Only http and https are supported.", {
         status: 400,
         headers: {
-          "Access-Control-Allow-Origin": "*",
           "Content-Type": "text/plain; charset=utf-8"
         }
       });
@@ -45,21 +72,28 @@ export async function onRequestGet(context) {
 
     const text = await response.text();
 
+    const responseHeaders = {
+      "Content-Type": response.headers.get("content-type") || "text/html; charset=utf-8",
+      "X-Proxy-Success": "true"
+    };
+    if (origin) {
+      responseHeaders["Access-Control-Allow-Origin"] = origin;
+    }
+
     return new Response(text, {
       status: response.status,
-      headers: {
-        "Content-Type": response.headers.get("content-type") || "text/html; charset=utf-8",
-        "Access-Control-Allow-Origin": "*",
-        "X-Proxy-Success": "true"
-      }
+      headers: responseHeaders
     });
   } catch (error) {
+    const responseHeaders = {
+      "Content-Type": "text/plain; charset=utf-8"
+    };
+    if (origin) {
+      responseHeaders["Access-Control-Allow-Origin"] = origin;
+    }
     return new Response(`Proxy Error: ${error.message}`, {
       status: 500,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Content-Type": "text/plain; charset=utf-8"
-      }
+      headers: responseHeaders
     });
   }
 }
