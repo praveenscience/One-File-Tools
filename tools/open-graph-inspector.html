@@ -1355,6 +1355,13 @@
           <div class="url-input-wrapper" id="urlInputWrapper">
             <input type="url" class="url-input" id="urlInput" placeholder="Enter a URL to inspect (e.g. https://example.com)" spellcheck="false" autocomplete="off" />
           </div>
+          <div class="proxy-option-container" id="proxyOptionContainer" style="margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 0.85rem; color: var(--text-secondary);">
+            <input type="checkbox" id="allowPublicProxies" checked style="cursor: pointer;" />
+            <label for="allowPublicProxies" style="cursor: pointer; display: inline-flex; align-items: center; gap: 4px; user-select: none;">
+              Allow public CORS proxy fallback on direct fetch failure
+              <span style="cursor: help;" title="If checked, URL queries that fail direct browser fetching will use public third-party proxies (allorigins.win, corsproxy.io) to fetch page content. If unchecked, external requests will only go through direct fetch or the deployment server proxy.">ℹ️</span>
+            </label>
+          </div>
           <div class="html-input-wrapper" id="htmlInputWrapper">
             <textarea class="html-textarea" id="htmlInput" placeholder="Paste the full HTML source of the page here...&#10;&#10;Tip: Right-click on a page &#x2192; View Page Source &#x2192; Select All &#x2192; Copy"></textarea>
           </div>
@@ -1453,6 +1460,7 @@
         currentMode = mode;
         document.querySelectorAll(".input-mode-tab").forEach((t) => t.classList.toggle("active", t.dataset.mode === mode));
         document.getElementById("urlInputWrapper").style.display = mode === "url" ? "flex" : "none";
+        document.getElementById("proxyOptionContainer").style.display = mode === "url" ? "flex" : "none";
         document.getElementById("htmlInputWrapper").classList.toggle("active", mode === "html");
         document.getElementById("corsNotice").classList.remove("visible");
       }
@@ -1825,6 +1833,8 @@
          * When running locally (file://) it falls back to public proxies.
          */
         const isDeployed = location.protocol === "https:" || location.protocol === "http:";
+        const allowPublic = document.getElementById("allowPublicProxies")?.checked !== false;
+
         const attempts = [
           /* 1. Our own server-side proxy (works when deployed to Cloudflare Pages) */
           ...(isDeployed
@@ -1853,22 +1863,26 @@
               });
             }),
           /* 3. Public CORS proxies as last resort */
-          () =>
-            fetch("https://api.allorigins.win/raw?url=" + encodeURIComponent(url)).then((r) => {
-              if (!r.ok) throw new Error(r.status);
-              return r.text().then((text) => {
-                if (!looksLikeHtml(text)) throw new Error("Invalid HTML response");
-                return text;
-              });
-            }),
-          () =>
-            fetch("https://corsproxy.io/?" + encodeURIComponent(url)).then((r) => {
-              if (!r.ok) throw new Error(r.status);
-              return r.text().then((text) => {
-                if (!looksLikeHtml(text)) throw new Error("Invalid HTML response");
-                return text;
-              });
-            })
+          ...(allowPublic
+            ? [
+                () =>
+                  fetch("https://api.allorigins.win/raw?url=" + encodeURIComponent(url)).then((r) => {
+                    if (!r.ok) throw new Error(r.status);
+                    return r.text().then((text) => {
+                      if (!looksLikeHtml(text)) throw new Error("Invalid HTML response");
+                      return text;
+                    });
+                  }),
+                () =>
+                  fetch("https://corsproxy.io/?" + encodeURIComponent(url)).then((r) => {
+                    if (!r.ok) throw new Error(r.status);
+                    return r.text().then((text) => {
+                      if (!looksLikeHtml(text)) throw new Error("Invalid HTML response");
+                      return text;
+                    });
+                  })
+              ]
+            : [])
         ];
 
         for (const attempt of attempts) {
