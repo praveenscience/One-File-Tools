@@ -1,0 +1,615 @@
+<!--
+Query String Builder
+Single-file client-side tool to build and parse URL query strings, with
+support for duplicate keys, full URL assembly, and encoded/readable preview.
+Built for One File Tools.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Query String Builder - One File Tools</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <style>
+      :root {
+        --bg: #030712;
+        --grid-line: #111827;
+        --panel: rgba(17, 24, 39, 0.7);
+        --panel-border: #1f2937;
+        --accent: #38bdf8;
+        --accent-hover: #0ea5e9;
+        --accent-glow: rgba(56, 189, 248, 0.15);
+        --text: #f9fafb;
+        --text-muted: #9ca3af;
+        --text-dim: #4b5563;
+        --radius-sm: 12px;
+        --radius-md: 20px;
+        --font-sans: "Inter", system-ui, sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+        --font-display: "Space Grotesk", sans-serif;
+        --color-weak: #ef4444;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg);
+        background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+        background-size: 32px 32px;
+        color: var(--text);
+        padding: 48px 20px 80px;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+      }
+
+      .app {
+        width: 100%;
+        max-width: 900px;
+      }
+
+      .hero {
+        text-align: center;
+        margin-bottom: 28px;
+      }
+
+      .eyebrow {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        letter-spacing: 0.2em;
+        color: var(--accent);
+        text-transform: uppercase;
+        margin-bottom: 12px;
+        font-weight: 500;
+      }
+
+      .wordmark {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: clamp(26px, 5vw, 38px);
+        letter-spacing: -0.02em;
+        margin-bottom: 12px;
+      }
+
+      .tagline {
+        color: var(--text-muted);
+        font-size: 15px;
+        line-height: 1.5;
+        max-width: 600px;
+        margin: 0 auto;
+      }
+
+      .studio {
+        background: var(--panel);
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-md);
+        padding: 24px;
+        box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.5);
+        margin-bottom: 24px;
+      }
+
+      .section-label {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 14px;
+      }
+
+      .field {
+        margin-bottom: 14px;
+      }
+
+      .field label {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        display: block;
+        margin-bottom: 6px;
+      }
+
+      .field input {
+        width: 100%;
+        background: rgba(17, 24, 39, 0.8);
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 14px;
+        padding: 10px 12px;
+      }
+
+      .field input:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-glow);
+      }
+
+      .param-row {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 8px;
+        align-items: center;
+      }
+
+      .param-row input {
+        flex: 1;
+        background: rgba(17, 24, 39, 0.8);
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 13px;
+        padding: 9px 11px;
+      }
+
+      .param-row input:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-glow);
+      }
+
+      .param-row .eq-sign {
+        color: var(--text-dim);
+        font-family: var(--font-mono);
+      }
+
+      .icon-btn-sm {
+        background: rgba(31, 41, 55, 0.6);
+        border: 1px solid var(--panel-border);
+        color: var(--text-muted);
+        border-radius: 6px;
+        width: 34px;
+        height: 34px;
+        cursor: pointer;
+        font-size: 15px;
+        flex-shrink: 0;
+      }
+
+      .icon-btn-sm:hover {
+        background: rgba(55, 65, 81, 0.9);
+        color: var(--text);
+      }
+
+      .icon-btn-sm:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+      }
+
+      .btn {
+        background: var(--accent);
+        color: #030712;
+        border: none;
+        border-radius: 8px;
+        padding: 10px 16px;
+        font-family: var(--font-sans);
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .btn:hover {
+        background: var(--accent-hover);
+      }
+
+      .btn:focus-visible,
+      .btn-ghost:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      .btn-ghost {
+        background: rgba(31, 41, 55, 0.6);
+        border: 1px solid var(--panel-border);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 10px 16px;
+        font-family: var(--font-sans);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .btn-ghost:hover {
+        background: rgba(55, 65, 81, 0.8);
+      }
+
+      .toggle-row {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 14px;
+      }
+
+      .toggle-btn {
+        flex: 1;
+        background: rgba(31, 41, 55, 0.5);
+        border: 1px solid var(--panel-border);
+        color: var(--text-muted);
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      .toggle-btn.active {
+        background: var(--accent);
+        color: #030712;
+        border-color: var(--accent);
+        font-weight: 700;
+      }
+
+      .toggle-btn:hover:not(.active) {
+        background: rgba(55, 65, 81, 0.7);
+      }
+
+      .output-block {
+        font-family: var(--font-mono);
+        font-size: 13px;
+        line-height: 1.7;
+        background: rgba(3, 7, 18, 0.5);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 14px 16px;
+        word-break: break-all;
+        margin-bottom: 10px;
+        min-height: 24px;
+        color: var(--text);
+      }
+
+      .output-block:empty::before {
+        content: "—";
+        color: var(--text-dim);
+      }
+
+      .output-label {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 6px;
+      }
+
+      .actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 14px;
+        flex-wrap: wrap;
+      }
+
+      .footer-note {
+        text-align: center;
+        color: var(--text-dim);
+        font-size: 13px;
+        margin-top: 8px;
+      }
+
+      .footer-note a {
+        color: var(--text-muted);
+      }
+
+      .field-error {
+        font-size: 12px;
+        color: var(--color-weak);
+        margin-top: 8px;
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background: var(--text);
+        color: var(--bg);
+        padding: 12px 22px;
+        border-radius: 99px;
+        font-family: var(--font-sans);
+        font-weight: 600;
+        font-size: 14px;
+        opacity: 0;
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        z-index: 100;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      }
+
+      .toast.show {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+      }
+
+      @media (max-width: 640px) {
+        .studio {
+          padding: 18px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="hero">
+        <div class="eyebrow">JSON & API</div>
+        <h1 class="wordmark">Query String Builder</h1>
+        <p class="tagline">Build and parse URL query strings visually — add key-value pairs, generate properly encoded output, or paste an existing query string to break it apart.</p>
+      </header>
+
+      <main class="studio">
+        <div class="field">
+          <label for="baseUrlInput">Base URL (optional)</label>
+          <input type="text" id="baseUrlInput" placeholder="https://example.com/search" spellcheck="false" />
+        </div>
+      </main>
+
+      <main class="studio">
+        <span class="section-label">
+          Parameters
+          <button class="btn-ghost" id="btnAddParam" type="button">+ Add parameter</button>
+        </span>
+        <div id="paramsList"></div>
+
+        <div class="field" style="margin-top: 14px">
+          <label for="parseInput">Or paste a query string / URL to parse</label>
+          <input type="text" id="parseInput" placeholder="?q=cats&page=2  or  https://example.com/search?q=cats&page=2" spellcheck="false" />
+        </div>
+        <div class="actions">
+          <button class="btn" id="btnParse" type="button">Parse into parameters</button>
+          <button class="btn-ghost" id="btnReset" type="button">Reset</button>
+        </div>
+        <div class="field-error" id="parseError"></div>
+      </main>
+
+      <main class="studio">
+        <div class="toggle-row">
+          <button class="toggle-btn active" id="toggleEncoded" type="button">Encoded</button>
+          <button class="toggle-btn" id="toggleReadable" type="button">Readable</button>
+        </div>
+
+        <div class="output-label">Query string</div>
+        <div class="output-block" id="queryStringOutput"></div>
+
+        <div class="output-label">Full URL</div>
+        <div class="output-block" id="fullUrlOutput"></div>
+
+        <div class="actions">
+          <button class="btn-ghost" id="btnCopyQuery" type="button">Copy query string</button>
+          <button class="btn-ghost" id="btnCopyUrl" type="button">Copy full URL</button>
+        </div>
+      </main>
+
+      <p class="footer-note">Part of <a href="https://github.com/praveenscience/One-File-Tools">One File Tools</a>. Runs completely offline.</p>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script>
+      /* ==========================================================
+         Query String Builder
+         Vanilla JS, no dependencies. Uses URLSearchParams for
+         standards-compliant encoding/decoding.
+         ========================================================== */
+
+      const baseUrlInput = document.getElementById("baseUrlInput");
+      const paramsList = document.getElementById("paramsList");
+      const btnAddParam = document.getElementById("btnAddParam");
+      const parseInput = document.getElementById("parseInput");
+      const btnParse = document.getElementById("btnParse");
+      const btnReset = document.getElementById("btnReset");
+      const parseError = document.getElementById("parseError");
+      const toggleEncoded = document.getElementById("toggleEncoded");
+      const toggleReadable = document.getElementById("toggleReadable");
+      const queryStringOutput = document.getElementById("queryStringOutput");
+      const fullUrlOutput = document.getElementById("fullUrlOutput");
+      const btnCopyQuery = document.getElementById("btnCopyQuery");
+      const btnCopyUrl = document.getElementById("btnCopyUrl");
+      const toast = document.getElementById("toast");
+
+      let paramIdCounter = 0;
+      let params = [];
+      let previewMode = "encoded"; // "encoded" | "readable"
+
+      function defaultParams() {
+        paramIdCounter = 0;
+        return [
+          { id: ++paramIdCounter, key: "q", value: "cats & dogs" },
+          { id: ++paramIdCounter, key: "page", value: "2" }
+        ];
+      }
+      params = defaultParams();
+
+      function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add("show");
+        setTimeout(() => toast.classList.remove("show"), 2000);
+      }
+
+      function copyText(text, message) {
+        if (!text) {
+          showToast("Nothing to copy yet");
+          return;
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard
+            .writeText(text)
+            .then(() => showToast(message))
+            .catch(() => showToast("Copy failed"));
+        } else {
+          showToast("Clipboard unavailable");
+        }
+      }
+
+      /** Renders the editable parameter rows. */
+      function renderParamsList() {
+        paramsList.innerHTML = "";
+        params.forEach((param) => {
+          const row = document.createElement("div");
+          row.className = "param-row";
+
+          const keyInput = document.createElement("input");
+          keyInput.type = "text";
+          keyInput.placeholder = "key";
+          keyInput.value = param.key;
+          keyInput.spellcheck = false;
+          keyInput.addEventListener("input", () => {
+            param.key = keyInput.value;
+            render();
+          });
+
+          const eq = document.createElement("span");
+          eq.className = "eq-sign";
+          eq.textContent = "=";
+
+          const valueInput = document.createElement("input");
+          valueInput.type = "text";
+          valueInput.placeholder = "value";
+          valueInput.value = param.value;
+          valueInput.spellcheck = false;
+          valueInput.addEventListener("input", () => {
+            param.value = valueInput.value;
+            render();
+          });
+
+          const removeBtn = document.createElement("button");
+          removeBtn.type = "button";
+          removeBtn.className = "icon-btn-sm";
+          removeBtn.textContent = "✕";
+          removeBtn.title = "Remove parameter";
+          removeBtn.addEventListener("click", () => {
+            params = params.filter((p) => p.id !== param.id);
+            render();
+          });
+
+          row.appendChild(keyInput);
+          row.appendChild(eq);
+          row.appendChild(valueInput);
+          row.appendChild(removeBtn);
+          paramsList.appendChild(row);
+        });
+      }
+
+      /** Builds the encoded query string from current params (supports duplicate keys). */
+      function buildEncodedQueryString() {
+        const usp = new URLSearchParams();
+        params.forEach((p) => {
+          if (p.key.trim() === "") return;
+          usp.append(p.key, p.value);
+        });
+        const str = usp.toString();
+        return str ? "?" + str : "";
+      }
+
+      /** Builds a human-readable (unencoded) version of the query string for display only. */
+      function buildReadableQueryString() {
+        const parts = params.filter((p) => p.key.trim() !== "").map((p) => p.key + "=" + p.value);
+        return parts.length ? "?" + parts.join("&") : "";
+      }
+
+      /** Renders the query string + full URL outputs based on the active preview mode. */
+      function render() {
+        renderParamsList();
+
+        const queryString = previewMode === "encoded" ? buildEncodedQueryString() : buildReadableQueryString();
+        queryStringOutput.textContent = queryString;
+
+        const base = baseUrlInput.value.trim();
+        fullUrlOutput.textContent = base ? base.replace(/\/?$/, "") + queryString : queryString || "(no base URL set)";
+      }
+
+      /** Parses a pasted query string or full URL into editable parameter rows. */
+      function parseIntoParams() {
+        parseError.textContent = "";
+        const raw = parseInput.value.trim();
+        if (!raw) {
+          parseError.textContent = "Paste a query string or URL first.";
+          return;
+        }
+
+        let queryPart = raw;
+        let basePart = "";
+
+        if (/^https?:\/\//i.test(raw)) {
+          try {
+            const url = new URL(raw);
+            basePart = url.origin + url.pathname;
+            queryPart = url.search;
+          } catch (err) {
+            parseError.textContent = "Could not parse that as a valid URL.";
+            return;
+          }
+        }
+
+        queryPart = queryPart.replace(/^\?/, "");
+        const usp = new URLSearchParams(queryPart);
+        const parsed = [];
+        usp.forEach((value, key) => {
+          paramIdCounter += 1;
+          parsed.push({ id: paramIdCounter, key, value });
+        });
+
+        if (parsed.length === 0) {
+          parseError.textContent = "No parameters found in that input.";
+          return;
+        }
+
+        params = parsed;
+        if (basePart) baseUrlInput.value = basePart;
+        parseInput.value = "";
+        render();
+        showToast("Parsed " + parsed.length + " parameter" + (parsed.length === 1 ? "" : "s"));
+      }
+
+      // ---- Events ----
+
+      btnAddParam.addEventListener("click", () => {
+        paramIdCounter += 1;
+        params.push({ id: paramIdCounter, key: "", value: "" });
+        render();
+      });
+
+      baseUrlInput.addEventListener("input", render);
+      btnParse.addEventListener("click", parseIntoParams);
+
+      btnReset.addEventListener("click", () => {
+        params = defaultParams();
+        baseUrlInput.value = "";
+        parseInput.value = "";
+        parseError.textContent = "";
+        render();
+      });
+
+      toggleEncoded.addEventListener("click", () => {
+        previewMode = "encoded";
+        toggleEncoded.classList.add("active");
+        toggleReadable.classList.remove("active");
+        render();
+      });
+      toggleReadable.addEventListener("click", () => {
+        previewMode = "readable";
+        toggleReadable.classList.add("active");
+        toggleEncoded.classList.remove("active");
+        render();
+      });
+
+      btnCopyQuery.addEventListener("click", () => copyText(queryStringOutput.textContent, "Query string copied!"));
+      btnCopyUrl.addEventListener("click", () => copyText(fullUrlOutput.textContent, "Full URL copied!"));
+
+      render();
+    </script>
+  </body>
+</html>
