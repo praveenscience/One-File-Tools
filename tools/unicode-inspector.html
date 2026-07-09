@@ -1,0 +1,605 @@
+<!--
+Unicode Inspector
+Single-file client-side tool to inspect Unicode characters: code point,
+UTF-8/UTF-16 bytes, category, escape sequences, and invisible-character
+detection.
+Built for One File Tools.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Unicode Inspector - One File Tools</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <style>
+      :root {
+        --bg: #030712;
+        --grid-line: #111827;
+        --panel: rgba(17, 24, 39, 0.7);
+        --panel-border: #1f2937;
+        --accent: #818cf8;
+        --accent-hover: #6366f1;
+        --accent-glow: rgba(129, 140, 248, 0.15);
+        --text: #f9fafb;
+        --text-muted: #9ca3af;
+        --text-dim: #4b5563;
+        --radius-sm: 12px;
+        --radius-md: 20px;
+        --font-sans: "Inter", system-ui, sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+        --font-display: "Space Grotesk", sans-serif;
+        --color-fair: #f59e0b;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg);
+        background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+        background-size: 32px 32px;
+        color: var(--text);
+        padding: 48px 20px 80px;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+      }
+
+      .app {
+        width: 100%;
+        max-width: 920px;
+      }
+
+      .hero {
+        text-align: center;
+        margin-bottom: 28px;
+      }
+
+      .eyebrow {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        letter-spacing: 0.2em;
+        color: var(--accent);
+        text-transform: uppercase;
+        margin-bottom: 12px;
+        font-weight: 500;
+      }
+
+      .wordmark {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: clamp(26px, 5vw, 38px);
+        letter-spacing: -0.02em;
+        margin-bottom: 12px;
+      }
+
+      .tagline {
+        color: var(--text-muted);
+        font-size: 15px;
+        line-height: 1.5;
+        max-width: 600px;
+        margin: 0 auto;
+      }
+
+      .studio {
+        background: var(--panel);
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-md);
+        padding: 24px;
+        box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.5);
+        margin-bottom: 24px;
+      }
+
+      .section-label {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        display: block;
+        margin-bottom: 14px;
+      }
+
+      textarea {
+        width: 100%;
+        background: rgba(17, 24, 39, 0.8);
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 15px;
+        padding: 12px 14px;
+        resize: vertical;
+        min-height: 90px;
+        line-height: 1.6;
+      }
+
+      textarea:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-glow);
+      }
+
+      .summary-row {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-top: 14px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+
+      .actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 14px;
+        flex-wrap: wrap;
+      }
+
+      .btn-ghost {
+        background: rgba(31, 41, 55, 0.6);
+        border: 1px solid var(--panel-border);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 10px 16px;
+        font-family: var(--font-sans);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .btn-ghost:hover {
+        background: rgba(55, 65, 81, 0.8);
+      }
+
+      .btn-ghost:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      .char-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-height: 520px;
+        overflow-y: auto;
+      }
+
+      .char-row {
+        display: grid;
+        grid-template-columns: 48px 1fr 90px;
+        align-items: center;
+        gap: 12px;
+        background: rgba(3, 7, 18, 0.5);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 10px 14px;
+      }
+
+      .char-row.invisible {
+        border-color: rgba(245, 158, 11, 0.4);
+        background: rgba(245, 158, 11, 0.06);
+      }
+
+      .char-glyph {
+        font-family: var(--font-mono);
+        font-size: 20px;
+        text-align: center;
+        color: var(--accent);
+        white-space: pre;
+      }
+
+      .char-glyph.invisible-glyph {
+        color: var(--color-fair);
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      .char-details {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+
+      .char-details .name {
+        color: var(--text);
+        font-size: 13px;
+      }
+
+      .char-details .meta-line {
+        color: var(--text-dim);
+      }
+
+      .char-copy-btn {
+        background: rgba(31, 41, 55, 0.6);
+        border: 1px solid var(--panel-border);
+        color: var(--text-muted);
+        border-radius: 6px;
+        padding: 6px 8px;
+        font-size: 11px;
+        font-family: var(--font-sans);
+        cursor: pointer;
+        justify-self: end;
+      }
+
+      .char-copy-btn:hover {
+        background: rgba(55, 65, 81, 0.9);
+        color: var(--text);
+      }
+
+      .empty-state {
+        color: var(--text-dim);
+        font-size: 14px;
+        text-align: center;
+        padding: 20px 0;
+      }
+
+      .note {
+        margin-top: 16px;
+        font-size: 13px;
+        color: var(--text-muted);
+        line-height: 1.6;
+        background: rgba(129, 140, 248, 0.07);
+        border: 1px solid rgba(129, 140, 248, 0.25);
+        border-radius: var(--radius-sm);
+        padding: 12px 14px;
+      }
+
+      .note code {
+        color: var(--text);
+        font-family: var(--font-mono);
+      }
+
+      .footer-note {
+        text-align: center;
+        color: var(--text-dim);
+        font-size: 13px;
+        margin-top: 8px;
+      }
+
+      .footer-note a {
+        color: var(--text-muted);
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background: var(--text);
+        color: var(--bg);
+        padding: 12px 22px;
+        border-radius: 99px;
+        font-family: var(--font-sans);
+        font-weight: 600;
+        font-size: 14px;
+        opacity: 0;
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        z-index: 100;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      }
+
+      .toast.show {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+      }
+
+      @media (max-width: 640px) {
+        .studio {
+          padding: 18px;
+        }
+        .char-row {
+          grid-template-columns: 40px 1fr 70px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="hero">
+        <div class="eyebrow">Text & Content</div>
+        <h1 class="wordmark">Unicode Inspector</h1>
+        <p class="tagline">Paste or type text to inspect every character's code point, UTF-8/UTF-16 bytes, category, and escape sequences — with invisible characters flagged.</p>
+      </header>
+
+      <main class="studio">
+        <label class="section-label" for="textInput">Text to inspect</label>
+        <textarea id="textInput" spellcheck="false" placeholder="Type or paste text…">Café 😀​A</textarea>
+        <div class="summary-row" id="summaryRow"></div>
+        <div class="actions">
+          <button class="btn-ghost" id="btnClear" type="button">Clear</button>
+        </div>
+      </main>
+
+      <main class="studio">
+        <span class="section-label">Characters</span>
+        <div class="char-list" id="charList"></div>
+        <p class="empty-state" id="emptyState">Type or paste text above to inspect its characters.</p>
+
+        <div class="note">Character <strong>names</strong> are provided for common ranges (Basic Latin, Latin-1 Supplement, common punctuation/symbols, and a set of frequently used emoji); characters outside those ranges show their Unicode <strong>category</strong> instead, since the full Unicode Character Database (150,000+ named characters) is too large to ship in a single offline file. Category detection itself uses native JS Unicode property regex (<code>\p{...}</code>), so it's accurate for any character.</div>
+      </main>
+
+      <p class="footer-note">Part of <a href="https://github.com/praveenscience/One-File-Tools">One File Tools</a>. Runs completely offline.</p>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script>
+      /* ==========================================================
+         Unicode Inspector
+         Vanilla JS, no dependencies. Iterates by code point (not by
+         UTF-16 code unit) using the string iterator, so surrogate
+         pairs (e.g. emoji) are treated as a single character.
+         ========================================================== */
+
+      const textInput = document.getElementById("textInput");
+      const summaryRow = document.getElementById("summaryRow");
+      const charList = document.getElementById("charList");
+      const emptyState = document.getElementById("emptyState");
+      const btnClear = document.getElementById("btnClear");
+      const toast = document.getElementById("toast");
+
+      // A small curated set of names for characters that fall outside common
+      // named ranges but are frequently encountered (whitespace/control chars
+      // plus a handful of popular emoji). Named ranges below cover the rest.
+      const SPECIAL_NAMES = {
+        0x0009: "TAB",
+        0x000a: "LINE FEED",
+        0x000d: "CARRIAGE RETURN",
+        0x0020: "SPACE",
+        0x00a0: "NO-BREAK SPACE",
+        0x200b: "ZERO WIDTH SPACE",
+        0x200c: "ZERO WIDTH NON-JOINER",
+        0x200d: "ZERO WIDTH JOINER",
+        0x200e: "LEFT-TO-RIGHT MARK",
+        0x200f: "RIGHT-TO-LEFT MARK",
+        0x2028: "LINE SEPARATOR",
+        0x2029: "PARAGRAPH SEPARATOR",
+        0xfeff: "ZERO WIDTH NO-BREAK SPACE (BOM)",
+        0x1f600: "GRINNING FACE",
+        0x1f603: "GRINNING FACE WITH BIG EYES",
+        0x1f604: "GRINNING FACE WITH SMILING EYES",
+        0x1f60a: "SMILING FACE WITH SMILING EYES",
+        0x1f602: "FACE WITH TEARS OF JOY",
+        0x2764: "HEAVY BLACK HEART",
+        0x1f44d: "THUMBS UP SIGN",
+        0x1f44e: "THUMBS DOWN SIGN",
+        0x1f525: "FIRE",
+        0x2705: "WHITE HEAVY CHECK MARK"
+      };
+
+      // Basic Latin control/printable range names for a nicer common case.
+      const BASIC_LATIN_NAMES = {
+        0x0021: "EXCLAMATION MARK",
+        0x0022: "QUOTATION MARK",
+        0x0023: "NUMBER SIGN",
+        0x0024: "DOLLAR SIGN",
+        0x0025: "PERCENT SIGN",
+        0x0026: "AMPERSAND",
+        0x0027: "APOSTROPHE",
+        0x0028: "LEFT PARENTHESIS",
+        0x0029: "RIGHT PARENTHESIS",
+        0x002a: "ASTERISK",
+        0x002b: "PLUS SIGN",
+        0x002c: "COMMA",
+        0x002d: "HYPHEN-MINUS",
+        0x002e: "FULL STOP",
+        0x002f: "SOLIDUS",
+        0x003a: "COLON",
+        0x003b: "SEMICOLON",
+        0x003c: "LESS-THAN SIGN",
+        0x003d: "EQUALS SIGN",
+        0x003e: "GREATER-THAN SIGN",
+        0x003f: "QUESTION MARK",
+        0x0040: "COMMERCIAL AT",
+        0x005b: "LEFT SQUARE BRACKET",
+        0x005c: "REVERSE SOLIDUS",
+        0x005d: "RIGHT SQUARE BRACKET",
+        0x005f: "LOW LINE",
+        0x0060: "GRAVE ACCENT",
+        0x007b: "LEFT CURLY BRACKET",
+        0x007c: "VERTICAL LINE",
+        0x007d: "RIGHT CURLY BRACKET",
+        0x007e: "TILDE"
+      };
+
+      /** Best-effort character name using curated tables and simple range rules. */
+      function getCharacterName(codePoint) {
+        if (SPECIAL_NAMES[codePoint]) return SPECIAL_NAMES[codePoint];
+        if (BASIC_LATIN_NAMES[codePoint]) return BASIC_LATIN_NAMES[codePoint];
+        if (codePoint >= 0x30 && codePoint <= 0x39) return "DIGIT " + String.fromCodePoint(codePoint);
+        if (codePoint >= 0x41 && codePoint <= 0x5a) return "LATIN CAPITAL LETTER " + String.fromCodePoint(codePoint);
+        if (codePoint >= 0x61 && codePoint <= 0x7a) return "LATIN SMALL LETTER " + String.fromCodePoint(codePoint).toUpperCase();
+        return null;
+      }
+
+      // Unicode General Category groups, tested via native \p{} property
+      // escapes (no external database required).
+      const CATEGORY_TESTS = [
+        { label: "Uppercase Letter", re: /\p{Lu}/u },
+        { label: "Lowercase Letter", re: /\p{Ll}/u },
+        { label: "Letter", re: /\p{L}/u },
+        { label: "Decimal Number", re: /\p{Nd}/u },
+        { label: "Number", re: /\p{N}/u },
+        { label: "Punctuation", re: /\p{P}/u },
+        { label: "Symbol", re: /\p{S}/u },
+        { label: "Space Separator", re: /\p{Zs}/u },
+        { label: "Line/Paragraph Separator", re: /\p{Zl}|\p{Zp}/u },
+        { label: "Control", re: /\p{Cc}/u },
+        { label: "Format", re: /\p{Cf}/u },
+        { label: "Mark", re: /\p{M}/u }
+      ];
+
+      function getCategory(char) {
+        for (const test of CATEGORY_TESTS) {
+          if (test.re.test(char)) return test.label;
+        }
+        return "Other";
+      }
+
+      // Characters that render as nothing/blank but occupy a position — worth
+      // flagging distinctly so users notice hidden formatting/tracking chars.
+      const INVISIBLE_CODE_POINTS = new Set([0x0009, 0x000a, 0x000d, 0x0020, 0x00a0, 0x200b, 0x200c, 0x200d, 0x200e, 0x200f, 0x2028, 0x2029, 0xfeff]);
+
+      /** Returns a short display glyph for invisible characters, or null for visible ones. */
+      function invisibleLabel(codePoint) {
+        const labels = {
+          0x0009: "\\t",
+          0x000a: "\\n",
+          0x000d: "\\r",
+          0x0020: "SP",
+          0x00a0: "NBSP",
+          0x200b: "ZWSP",
+          0x200c: "ZWNJ",
+          0x200d: "ZWJ",
+          0x200e: "LRM",
+          0x200f: "RLM",
+          0x2028: "LS",
+          0x2029: "PS",
+          0xfeff: "BOM"
+        };
+        return INVISIBLE_CODE_POINTS.has(codePoint) ? labels[codePoint] || "?" : null;
+      }
+
+      /** Formats a code point as U+XXXX with at least 4 hex digits. */
+      function formatCodePoint(codePoint) {
+        return "U+" + codePoint.toString(16).toUpperCase().padStart(4, "0");
+      }
+
+      /** Returns the UTF-8 byte sequence for a code point as hex pairs. */
+      function utf8Bytes(codePoint) {
+        const bytes = [];
+        if (codePoint <= 0x7f) {
+          bytes.push(codePoint);
+        } else if (codePoint <= 0x7ff) {
+          bytes.push(0xc0 | (codePoint >> 6), 0x80 | (codePoint & 0x3f));
+        } else if (codePoint <= 0xffff) {
+          bytes.push(0xe0 | (codePoint >> 12), 0x80 | ((codePoint >> 6) & 0x3f), 0x80 | (codePoint & 0x3f));
+        } else {
+          bytes.push(0xf0 | (codePoint >> 18), 0x80 | ((codePoint >> 12) & 0x3f), 0x80 | ((codePoint >> 6) & 0x3f), 0x80 | (codePoint & 0x3f));
+        }
+        return bytes.map((b) => b.toString(16).toUpperCase().padStart(2, "0")).join(" ");
+      }
+
+      /** Returns the UTF-16 code unit sequence for a code point as hex pairs. */
+      function utf16Units(char) {
+        const units = [];
+        for (let i = 0; i < char.length; i++) {
+          units.push(char.charCodeAt(i).toString(16).toUpperCase().padStart(4, "0"));
+        }
+        return units.join(" ");
+      }
+
+      /** Builds the HTML entity (&#xHHHH;) and JS escape (\uHHHH or \u{H+}) forms. */
+      function escapeSequences(codePoint) {
+        const hex = codePoint.toString(16).toUpperCase();
+        const htmlEntity = "&#x" + hex + ";";
+        const jsEscape = codePoint > 0xffff ? "\\u{" + hex + "}" : "\\u" + hex.padStart(4, "0");
+        return { htmlEntity, jsEscape };
+      }
+
+      /** Shows a brief toast. */
+      function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add("show");
+        setTimeout(() => toast.classList.remove("show"), 1800);
+      }
+
+      function copyText(text, message) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard
+            .writeText(text)
+            .then(() => showToast(message))
+            .catch(() => showToast("Copy failed"));
+        } else {
+          showToast("Clipboard unavailable");
+        }
+      }
+
+      /** Renders the character-by-character breakdown and summary counts. */
+      function render() {
+        const text = textInput.value;
+        charList.innerHTML = "";
+
+        if (text === "") {
+          emptyState.hidden = false;
+          summaryRow.textContent = "";
+          return;
+        }
+        emptyState.hidden = true;
+
+        // Spread iterates by Unicode code point, correctly grouping surrogate
+        // pairs (e.g. most emoji) into a single "character".
+        const chars = Array.from(text);
+        summaryRow.textContent = chars.length + " character" + (chars.length === 1 ? "" : "s") + " · " + text.length + " UTF-16 code unit" + (text.length === 1 ? "" : "s");
+
+        chars.forEach((char) => {
+          const codePoint = char.codePointAt(0);
+          const name = getCharacterName(codePoint);
+          const category = getCategory(char);
+          const invisible = invisibleLabel(codePoint);
+          const { htmlEntity, jsEscape } = escapeSequences(codePoint);
+
+          const row = document.createElement("div");
+          row.className = "char-row" + (invisible ? " invisible" : "");
+
+          const glyph = document.createElement("div");
+          glyph.className = "char-glyph" + (invisible ? " invisible-glyph" : "");
+          glyph.textContent = invisible ? invisible : char;
+
+          const details = document.createElement("div");
+          details.className = "char-details";
+          const nameLine = document.createElement("div");
+          nameLine.className = "name";
+          nameLine.textContent = name || category;
+          const metaLine1 = document.createElement("div");
+          metaLine1.className = "meta-line";
+          metaLine1.textContent = formatCodePoint(codePoint) + " · " + category + " · UTF-8: " + utf8Bytes(codePoint) + " · UTF-16: " + utf16Units(char);
+          const metaLine2 = document.createElement("div");
+          metaLine2.className = "meta-line";
+          metaLine2.textContent = "HTML: " + htmlEntity + "   JS: " + jsEscape;
+
+          details.appendChild(nameLine);
+          details.appendChild(metaLine1);
+          details.appendChild(metaLine2);
+
+          const copyBtn = document.createElement("button");
+          copyBtn.type = "button";
+          copyBtn.className = "char-copy-btn";
+          copyBtn.textContent = "Copy";
+          copyBtn.title = "Copy code point";
+          copyBtn.addEventListener("click", () => copyText(formatCodePoint(codePoint), "Copied " + formatCodePoint(codePoint)));
+
+          row.appendChild(glyph);
+          row.appendChild(details);
+          row.appendChild(copyBtn);
+          charList.appendChild(row);
+        });
+      }
+
+      textInput.addEventListener("input", render);
+
+      btnClear.addEventListener("click", () => {
+        textInput.value = "";
+        render();
+        textInput.focus();
+      });
+
+      render();
+    </script>
+  </body>
+</html>

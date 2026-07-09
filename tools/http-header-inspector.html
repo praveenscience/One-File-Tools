@@ -478,24 +478,62 @@ Built for One File Tools.
         if (event.key === "Enter") inspect();
       });
 
-      btnCopy.addEventListener("click", async () => {
-        if (!lastResult) return;
-        const lines = [lastResult.method + " " + lastResult.url, "Status: " + lastResult.status + " " + lastResult.statusText, "Time: " + lastResult.durationMs + " ms", "", ...lastResult.headers.map((h) => h.name + ": " + h.value)];
-        const text = lines.join("\n");
-        if (!navigator.clipboard || !navigator.clipboard.writeText) {
-          alert("Clipboard API not available in this browser/context.");
-          return;
+      function copyTextFallback(text) {
+        // Fallback for contexts where Clipboard API exists but writeText fails (permissions, iframes, non-secure).
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.setAttribute("readonly", "");
+        textarea.style.position = "fixed";
+        textarea.style.top = "-9999px";
+        textarea.style.left = "-9999px";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+
+        let ok = false;
+        try {
+          ok = document.execCommand("copy");
+        } catch {
+          ok = false;
+        } finally {
+          document.body.removeChild(textarea);
         }
 
+        return ok;
+      }
+
+      btnCopy.addEventListener("click", async () => {
+        if (!lastResult) return;
+
+        const lines = [lastResult.method + " " + lastResult.url, "Status: " + lastResult.status + " " + lastResult.statusText, "Time: " + lastResult.durationMs + " ms", "", ...lastResult.headers.map((h) => h.name + ": " + h.value)];
+        const text = lines.join("\n");
+
+        const originalText = btnCopy.textContent;
         try {
-          await navigator.clipboard.writeText(text);
-          const originalText = btnCopy.textContent;
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(text);
+          } else {
+            const ok = copyTextFallback(text);
+            if (!ok) throw new Error("Fallback copy failed");
+          }
+
           btnCopy.textContent = "Copied!";
           setTimeout(() => {
             btnCopy.textContent = originalText;
           }, 1500);
-        } catch {
-          alert("Failed to copy to clipboard.");
+        } catch (err) {
+          // Retry with fallback when Clipboard API exists but permission is denied.
+          const ok = copyTextFallback(text);
+          if (ok) {
+            btnCopy.textContent = "Copied!";
+            setTimeout(() => {
+              btnCopy.textContent = originalText;
+            }, 1500);
+            return;
+          }
+
+          alert("Failed to copy to clipboard. Your browser may block clipboard permissions in this context.");
         }
       });
 

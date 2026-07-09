@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Visual Turing Machine Simulator — One File Tools</title>
+    <style>
+      :root {
+        --app-bg: #0d1117;
+        --app-text: #c9d1d9;
+        --app-primary: #58a6ff;
+        --app-primary-hover: #79c0ff;
+        --app-secondary: #21262d;
+        --app-panel: #161b22;
+        --app-border: #30363d;
+        --accent-green: #2ea043;
+        --accent-red: #da3633;
+        --tape-bg: #f0f6fc;
+        --tape-text: #24292f;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family:
+          "Inter",
+          -apple-system,
+          sans-serif;
+        background-color: var(--app-bg);
+        color: var(--app-text);
+        padding: 2rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-height: 100vh;
+      }
+
+      header {
+        text-align: center;
+        margin-bottom: 2rem;
+      }
+      h1 {
+        color: var(--app-primary);
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+      }
+
+      main {
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+        width: 100%;
+        max-width: 1000px;
+      }
+
+      .panel {
+        background: var(--app-panel);
+        border: 1px solid var(--app-border);
+        border-radius: 12px;
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      /* Tape Visualization */
+      .tape-container {
+        display: flex;
+        justify-content: center;
+        overflow: hidden;
+        padding: 1rem 0;
+        position: relative;
+        background: var(--app-secondary);
+        border-radius: 8px;
+        border: 1px solid var(--app-border);
+      }
+
+      .tape {
+        display: flex;
+        transition: transform 0.3s ease;
+      }
+
+      .cell {
+        width: 50px;
+        height: 50px;
+        background: var(--tape-bg);
+        color: var(--tape-text);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        font-weight: bold;
+        border: 2px solid #ccc;
+        margin: 0 2px;
+        border-radius: 4px;
+      }
+
+      .head-pointer {
+        position: absolute;
+        top: 80px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 0;
+        height: 0;
+        border-left: 15px solid transparent;
+        border-right: 15px solid transparent;
+        border-bottom: 20px solid var(--accent-red);
+      }
+
+      /* State & Code blocks */
+      .editor-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+      }
+
+      @media (max-width: 768px) {
+        .editor-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      textarea {
+        width: 100%;
+        height: 250px;
+        background: var(--app-bg);
+        color: var(--app-text);
+        border: 1px solid var(--app-border);
+        border-radius: 6px;
+        padding: 1rem;
+        font-family: monospace;
+        resize: vertical;
+      }
+
+      .controls {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      button {
+        background: var(--app-primary);
+        color: #000;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      button:hover {
+        background: var(--app-primary-hover);
+      }
+      .btn-danger {
+        background: var(--accent-red);
+        color: white;
+      }
+      .btn-success {
+        background: var(--accent-green);
+        color: white;
+      }
+
+      .status-bar {
+        display: flex;
+        justify-content: space-between;
+        background: var(--app-secondary);
+        padding: 1rem;
+        border-radius: 8px;
+        font-family: monospace;
+        font-size: 1.1rem;
+      }
+      .state-badge {
+        color: var(--app-primary);
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Visual Turing Machine Simulator</h1>
+      <p>A compiler and visualization engine for Turing Machine rules (State / Read / Write / Move / Next).</p>
+    </header>
+
+    <main>
+      <!-- Tape Display -->
+      <div class="panel">
+        <h2 style="font-size: 1.2rem; color: var(--app-primary)">Turing Tape</h2>
+        <div style="display: flex; gap: 1rem">
+          <input type="text" id="initialInput" placeholder="Initial Tape Input (e.g. 1101)" style="flex: 1; padding: 0.5rem; border-radius: 4px; border: 1px solid var(--app-border); background: var(--app-bg); color: white" />
+          <button id="btnLoad">Load Tape</button>
+        </div>
+
+        <div class="tape-container">
+          <div class="tape" id="tapeView"></div>
+          <div class="head-pointer"></div>
+        </div>
+
+        <div class="status-bar">
+          <span>Current State: <span class="state-badge" id="lblState">q0</span></span>
+          <span>Steps: <span id="lblSteps">0</span></span>
+          <span id="lblStatus" style="color: #8b949e">Idle</span>
+        </div>
+
+        <div class="controls">
+          <button id="btnStep">Step >|</button>
+          <button id="btnRun" class="btn-success">Run >></button>
+          <button id="btnPause" class="btn-danger">Pause ||</button>
+          <button id="btnReset">Reset</button>
+          <label style="margin-left: auto"> Speed (ms): <input type="number" id="runSpeed" value="200" style="width: 80px; padding: 0.2rem" /> </label>
+        </div>
+      </div>
+
+      <!-- Editor Panel -->
+      <div class="panel">
+        <div class="editor-grid">
+          <div>
+            <h2 style="font-size: 1.2rem; color: var(--app-primary); margin-bottom: 0.5rem">State Transition Rules</h2>
+            <p style="font-size: 0.85rem; color: #8b949e; margin-bottom: 0.5rem">Format: <code>CurrentState ReadSymbol WriteSymbol Direction NextState</code>. Use <code>_</code> for blank.</p>
+            <textarea id="codeEditor">
+// Example: Invert binary string
+q0 0 1 R q0
+q0 1 0 R q0
+q0 _ _ L halt
+            </textarea>
+          </div>
+          <div>
+            <h2 style="font-size: 1.2rem; color: var(--app-primary); margin-bottom: 0.5rem">How to write rules</h2>
+            <div style="background: var(--app-bg); padding: 1rem; border-radius: 6px; font-size: 0.9rem; border: 1px solid var(--app-border); height: 250px; overflow-y: auto">
+              <p>The machine consists of an infinite tape and a read/write head.</p>
+              <br />
+              <strong>Syntax:</strong>
+              <pre style="color: var(--accent-green)">State  Read  Write  Dir  NextState</pre>
+              <ul>
+                <li><strong>State:</strong> Arbitrary string (start is always 'q0')</li>
+                <li><strong>Read:</strong> Symbol on tape under head</li>
+                <li><strong>Write:</strong> Symbol to write to tape</li>
+                <li><strong>Dir:</strong> 'L' (Left), 'R' (Right), or '*' (Stay)</li>
+                <li><strong>NextState:</strong> The state to transition to (use 'halt' to stop)</li>
+                <li><strong>Blank Symbol:</strong> '_' represents empty tape</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      const tapeView = document.getElementById("tapeView");
+      const lblState = document.getElementById("lblState");
+      const lblSteps = document.getElementById("lblSteps");
+      const lblStatus = document.getElementById("lblStatus");
+
+      const inputTape = document.getElementById("initialInput");
+      const codeEditor = document.getElementById("codeEditor");
+      const runSpeed = document.getElementById("runSpeed");
+
+      // Machine State
+      let tape = {};
+      let headPos = 0;
+      let currentState = "q0";
+      let steps = 0;
+      let isRunning = false;
+      let runInterval = null;
+      let compiledRules = {};
+
+      // Initialize tape
+      function loadTape() {
+        tape = {};
+        const str = inputTape.value || "";
+        for (let i = 0; i < str.length; i++) {
+          tape[i] = str[i];
+        }
+        headPos = 0;
+        currentState = "q0";
+        steps = 0;
+        lblStatus.textContent = "Loaded";
+        lblStatus.style.color = "#8b949e";
+        compileRules();
+        updateUI();
+      }
+
+      function compileRules() {
+        compiledRules = {};
+        const lines = codeEditor.value.split("\n");
+        lines.forEach((line) => {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith("//")) return;
+          const parts = trimmed.split(/\s+/);
+          if (parts.length === 5) {
+            const [state, read, write, dir, next] = parts;
+            if (!compiledRules[state]) compiledRules[state] = {};
+            compiledRules[state][read] = { write, dir, next };
+          }
+        });
+      }
+
+      function updateUI() {
+        lblState.textContent = currentState;
+        lblSteps.textContent = steps;
+
+        // Render visible tape (headPos - 5 to headPos + 5)
+        tapeView.innerHTML = "";
+        const VISIBLE_RADIUS = 7;
+
+        for (let i = headPos - VISIBLE_RADIUS; i <= headPos + VISIBLE_RADIUS; i++) {
+          const cell = document.createElement("div");
+          cell.className = "cell";
+          cell.textContent = tape[i] && tape[i] !== "_" ? tape[i] : "";
+          tapeView.appendChild(cell);
+        }
+      }
+
+      function step() {
+        if (currentState === "halt" || currentState.toLowerCase().includes("halt")) {
+          pause();
+          lblStatus.textContent = "Halted";
+          lblStatus.style.color = "var(--accent-green)";
+          return false;
+        }
+
+        const readSymbol = tape[headPos] || "_";
+        const rulesForState = compiledRules[currentState];
+
+        if (!rulesForState) {
+          pause();
+          lblStatus.textContent = `Error: No rules for state '${currentState}'`;
+          lblStatus.style.color = "var(--accent-red)";
+          return false;
+        }
+
+        const rule = rulesForState[readSymbol];
+        if (!rule) {
+          pause();
+          lblStatus.textContent = `Error: No rule for state '${currentState}' reading '${readSymbol}'`;
+          lblStatus.style.color = "var(--accent-red)";
+          return false;
+        }
+
+        // Apply rule
+        if (rule.write !== "_") {
+          tape[headPos] = rule.write;
+        } else {
+          delete tape[headPos];
+        }
+
+        if (rule.dir === "R") headPos++;
+        else if (rule.dir === "L") headPos--;
+
+        currentState = rule.next;
+        steps++;
+
+        updateUI();
+        lblStatus.textContent = "Running...";
+        lblStatus.style.color = "var(--app-primary)";
+        return true;
+      }
+
+      function run() {
+        if (isRunning) return;
+        isRunning = true;
+        const speed = Math.max(10, parseInt(runSpeed.value) || 200);
+        runInterval = setInterval(() => {
+          if (!step()) pause();
+        }, speed);
+      }
+
+      function pause() {
+        isRunning = false;
+        clearInterval(runInterval);
+        if (lblStatus.textContent === "Running...") {
+          lblStatus.textContent = "Paused";
+          lblStatus.style.color = "#8b949e";
+        }
+      }
+
+      document.getElementById("btnLoad").addEventListener("click", loadTape);
+      document.getElementById("btnStep").addEventListener("click", () => {
+        pause();
+        step();
+      });
+      document.getElementById("btnRun").addEventListener("click", run);
+      document.getElementById("btnPause").addEventListener("click", pause);
+      document.getElementById("btnReset").addEventListener("click", () => {
+        pause();
+        loadTape();
+      });
+
+      // Init
+      inputTape.value = "10110";
+      loadTape();
+    </script>
+  </body>
+</html>

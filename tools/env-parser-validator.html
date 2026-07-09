@@ -1055,7 +1055,11 @@
           state.rows = parsed.rows;
           state.issues = parsed.issues;
           state.comments = parsed.comments;
+
+          // Keep page in-range after parsing and after filters/search changes.
+          // renderTable() will handle the page=0 case when there are no results.
           state.page = Math.min(state.page, getPageCount(getFilteredRows()));
+
           renderStats(parsed.lineCount);
           renderGutter(parsed.lineCount);
           renderTable();
@@ -1108,8 +1112,15 @@
         function renderTable() {
           const filteredRows = getFilteredRows();
           const pageCount = getPageCount(filteredRows);
-          state.page = Math.min(Math.max(1, state.page), pageCount);
-          const start = (state.page - 1) * state.pageSize;
+
+          // If there are no results, use page=0 to keep pagination math + UI consistent.
+          if (pageCount === 0) {
+            state.page = 0;
+          } else {
+            state.page = Math.min(Math.max(1, state.page), pageCount);
+          }
+
+          const start = state.page === 0 ? 0 : (state.page - 1) * state.pageSize;
           const pageRows = filteredRows.slice(start, start + state.pageSize);
           const fragment = document.createDocumentFragment();
 
@@ -1126,9 +1137,11 @@
 
           nodes.body.replaceChildren(fragment);
           nodes.empty.hidden = filteredRows.length > 0;
-          nodes.pageSummary.textContent = "Page " + state.page + " of " + pageCount + " (" + filteredRows.length + " rows)";
-          nodes.prevPage.disabled = state.page <= 1;
-          nodes.nextPage.disabled = state.page >= pageCount;
+
+          nodes.pageSummary.textContent = pageCount === 0 ? "No results (0 rows)" : "Page " + state.page + " of " + pageCount + " (" + filteredRows.length + " rows)";
+
+          nodes.prevPage.disabled = pageCount === 0 || state.page <= 1;
+          nodes.nextPage.disabled = pageCount === 0 || state.page >= pageCount;
         }
 
         function appendCell(rowElement, text, className) {
@@ -1246,7 +1259,8 @@
         }
 
         function getPageCount(rows) {
-          return Math.max(1, Math.ceil(rows.length / state.pageSize));
+          // When there are 0 rows after filtering, treat it as 0 pages.
+          return Math.ceil(rows.length / state.pageSize);
         }
 
         function renderIssues() {

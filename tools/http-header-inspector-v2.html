@@ -1,0 +1,1112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HTTP Header Inspector</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg: #eef1f4;
+        --panel: #ffffff;
+        --panel-2: #f6f8fa;
+        --ink: #131a22;
+        --ink-soft: #3c4650;
+        --muted: #6b7684;
+        --rule: #d7dee4;
+        --rule-strong: #bec8d1;
+        --focus: #2563a8;
+
+        --c-security: #0f8b6c;
+        --c-caching: #c77d2e;
+        --c-encoding: #6e56cf;
+        --c-server: #2563a8;
+        --c-cors: #b23a6b;
+        --c-cookies: #9c7a0f;
+        --c-routing: #1b8a9a;
+        --c-other: #7a8794;
+
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+        --radius: 3px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background: var(--bg);
+        background-image: linear-gradient(var(--rule) 1px, transparent 1px), linear-gradient(90deg, var(--rule) 1px, transparent 1px);
+        background-size: 28px 28px;
+        background-position: -1px -1px;
+        color: var(--ink);
+        font-family: var(--sans);
+        line-height: 1.5;
+        min-height: 100vh;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation-duration: 0.001ms !important;
+          transition-duration: 0.001ms !important;
+        }
+      }
+
+      a {
+        color: var(--focus);
+      }
+
+      .wrap {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 40px 20px 80px;
+      }
+
+      /* ---------- Hero ---------- */
+      .hero {
+        margin-bottom: 28px;
+      }
+      .eyebrow {
+        font-family: var(--mono);
+        font-size: 12px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+      .eyebrow .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--c-security);
+        box-shadow: 0 0 0 3px rgba(15, 139, 108, 0.15);
+      }
+      h1 {
+        font-family: var(--mono);
+        font-weight: 700;
+        font-size: clamp(26px, 4vw, 36px);
+        letter-spacing: -0.01em;
+        margin: 0 0 8px;
+      }
+      .lede {
+        color: var(--ink-soft);
+        max-width: 60ch;
+        margin: 0;
+        font-size: 15px;
+      }
+
+      /* ---------- Prompt bar ---------- */
+      .promptbar {
+        margin-top: 24px;
+        background: var(--ink);
+        border-radius: var(--radius);
+        padding: 4px;
+        display: flex;
+        align-items: stretch;
+        gap: 4px;
+        box-shadow:
+          0 1px 0 rgba(255, 255, 255, 0.06) inset,
+          0 8px 20px -12px rgba(19, 26, 34, 0.5);
+      }
+      .promptbar .verb {
+        font-family: var(--mono);
+        font-weight: 600;
+        font-size: 13px;
+        color: #7ce0c6;
+        background: #0d1319;
+        border-radius: 2px;
+        padding: 0 14px;
+        display: flex;
+        align-items: center;
+        white-space: nowrap;
+      }
+      .promptbar input[type="text"] {
+        flex: 1;
+        min-width: 0;
+        background: #0d1319;
+        border: none;
+        outline: none;
+        color: #eaf0f4;
+        font-family: var(--mono);
+        font-size: 14px;
+        padding: 0 12px;
+        border-radius: 2px;
+      }
+      .promptbar input[type="text"]::placeholder {
+        color: #57636d;
+      }
+      .promptbar button {
+        font-family: var(--mono);
+        font-weight: 600;
+        font-size: 13px;
+        background: #e7873f;
+        color: #1d1305;
+        border: none;
+        border-radius: 2px;
+        padding: 0 18px;
+        cursor: pointer;
+        transition: filter 0.12s ease;
+      }
+      .promptbar button:hover {
+        filter: brightness(1.08);
+      }
+      .promptbar button:active {
+        filter: brightness(0.95);
+      }
+      .promptbar button:disabled {
+        opacity: 0.6;
+        cursor: progress;
+      }
+
+      .mode-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 10px;
+        flex-wrap: wrap;
+      }
+      .mode-toggle {
+        display: inline-flex;
+        background: var(--panel);
+        border: 1px solid var(--rule);
+        border-radius: var(--radius);
+        padding: 2px;
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+      .mode-toggle button {
+        border: none;
+        background: transparent;
+        padding: 6px 12px;
+        border-radius: 2px;
+        cursor: pointer;
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+      .mode-toggle button.active {
+        background: var(--ink);
+        color: #fff;
+      }
+      .hint {
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .paste-panel {
+        margin-top: 12px;
+        display: none;
+      }
+      .paste-panel.show {
+        display: block;
+      }
+      .paste-panel textarea {
+        width: 100%;
+        min-height: 130px;
+        background: var(--panel);
+        border: 1px solid var(--rule);
+        border-radius: var(--radius);
+        font-family: var(--mono);
+        font-size: 13px;
+        color: var(--ink);
+        padding: 12px;
+        resize: vertical;
+      }
+      .paste-panel textarea:focus {
+        outline: 2px solid var(--focus);
+        outline-offset: 1px;
+      }
+      .paste-panel .paste-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 8px;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .btn-secondary {
+        font-family: var(--mono);
+        font-size: 12px;
+        background: var(--panel);
+        border: 1px solid var(--rule-strong);
+        color: var(--ink-soft);
+        border-radius: var(--radius);
+        padding: 7px 12px;
+        cursor: pointer;
+      }
+      .btn-secondary:hover {
+        border-color: var(--focus);
+        color: var(--focus);
+      }
+
+      .advanced {
+        margin-top: 10px;
+      }
+      .advanced summary {
+        cursor: pointer;
+        font-size: 12px;
+        color: var(--muted);
+        font-family: var(--mono);
+      }
+      .advanced .adv-body {
+        margin-top: 8px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .advanced input[type="text"] {
+        font-family: var(--mono);
+        font-size: 12px;
+        padding: 7px 10px;
+        border: 1px solid var(--rule);
+        border-radius: var(--radius);
+        background: var(--panel);
+        color: var(--ink);
+        flex: 1;
+        min-width: 220px;
+      }
+
+      /* ---------- Status strip ---------- */
+      .status-strip {
+        margin-top: 22px;
+        display: none;
+        background: var(--panel);
+        border: 1px solid var(--rule);
+        border-left: 4px solid var(--c-server);
+        border-radius: var(--radius);
+        padding: 12px 14px;
+        font-family: var(--mono);
+        font-size: 13px;
+      }
+      .status-strip.show {
+        display: flex;
+        gap: 18px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .status-strip.error {
+        border-left-color: #c0392b;
+      }
+      .status-strip .field .k {
+        color: var(--muted);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        display: block;
+        margin-bottom: 2px;
+      }
+      .status-strip .field .v {
+        color: var(--ink);
+      }
+      .status-strip.error .field .v {
+        color: #c0392b;
+      }
+
+      .note-box {
+        display: none;
+        margin-top: 10px;
+        background: #fbf3e8;
+        border: 1px solid #ead3ae;
+        color: #7a4e12;
+        border-radius: var(--radius);
+        padding: 10px 14px;
+        font-size: 13px;
+      }
+      .note-box.show {
+        display: block;
+      }
+      .note-box code {
+        font-family: var(--mono);
+        background: rgba(0, 0, 0, 0.05);
+        padding: 1px 5px;
+        border-radius: 2px;
+      }
+
+      /* ---------- Signal panel ---------- */
+      .signal-panel {
+        margin-top: 22px;
+        display: none;
+        background: var(--panel);
+        border: 1px solid var(--rule);
+        border-radius: var(--radius);
+        padding: 14px 16px;
+      }
+      .signal-panel.show {
+        display: block;
+      }
+      .signal-title {
+        font-family: var(--mono);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+        margin-bottom: 10px;
+      }
+      .signal-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .signal-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--ink-soft);
+        background: var(--panel-2);
+        border: 1px solid var(--rule);
+        border-radius: 999px;
+        padding: 5px 11px 5px 9px;
+        cursor: pointer;
+        user-select: none;
+      }
+      .signal-chip .led {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+      .signal-chip .count {
+        color: var(--ink);
+        font-weight: 600;
+      }
+      .signal-chip.off {
+        opacity: 0.35;
+      }
+      .signal-chip.off .led {
+        box-shadow: none;
+      }
+
+      /* ---------- Controls ---------- */
+      .controls {
+        margin-top: 22px;
+        display: none;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .controls.show {
+        display: flex;
+      }
+      .search-box {
+        position: relative;
+        flex: 1;
+        min-width: 200px;
+      }
+      .search-box input {
+        width: 100%;
+        font-family: var(--mono);
+        font-size: 13px;
+        padding: 9px 12px 9px 30px;
+        border: 1px solid var(--rule);
+        border-radius: var(--radius);
+        background: var(--panel);
+        color: var(--ink);
+      }
+      .search-box input:focus {
+        outline: 2px solid var(--focus);
+        outline-offset: 1px;
+      }
+      .search-box::before {
+        content: "";
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        width: 11px;
+        height: 11px;
+        margin-top: -6px;
+        border: 1.5px solid var(--muted);
+        border-radius: 50%;
+        box-shadow: 4px 4px 0 -3px var(--muted);
+      }
+      .count-badge {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      /* ---------- Results ---------- */
+      .results {
+        margin-top: 14px;
+        display: none;
+      }
+      .results.show {
+        display: block;
+      }
+      .row {
+        background: var(--panel);
+        border: 1px solid var(--rule);
+        border-radius: var(--radius);
+        margin-bottom: 8px;
+        overflow: hidden;
+      }
+      .row-main {
+        display: grid;
+        grid-template-columns: 5px minmax(150px, 220px) 1fr auto;
+        align-items: start;
+        gap: 0;
+      }
+      .row-led {
+        align-self: stretch;
+      }
+      .row-name {
+        font-family: var(--mono);
+        font-weight: 600;
+        font-size: 13px;
+        padding: 12px 12px;
+        color: var(--ink);
+        cursor: pointer;
+        word-break: break-word;
+      }
+      .row-name .cat-label {
+        display: block;
+        font-family: var(--sans);
+        font-weight: 500;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-top: 3px;
+      }
+      .row-value {
+        font-family: var(--mono);
+        font-size: 13px;
+        padding: 12px 12px;
+        color: var(--ink-soft);
+        word-break: break-word;
+        white-space: pre-wrap;
+      }
+      .row-actions {
+        padding: 10px 10px;
+        display: flex;
+        gap: 6px;
+        align-items: flex-start;
+      }
+      .icon-btn {
+        font-family: var(--mono);
+        font-size: 11px;
+        background: var(--panel-2);
+        border: 1px solid var(--rule);
+        color: var(--muted);
+        border-radius: var(--radius);
+        padding: 5px 9px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .icon-btn:hover {
+        color: var(--ink);
+        border-color: var(--rule-strong);
+      }
+      .icon-btn.copied {
+        color: var(--c-security);
+        border-color: var(--c-security);
+      }
+
+      .row-explain {
+        max-height: 0;
+        overflow: hidden;
+        transition:
+          max-height 0.18s ease,
+          padding 0.18s ease;
+        background: var(--panel-2);
+        border-top: 1px solid transparent;
+      }
+      .row.open .row-explain {
+        max-height: 300px;
+        padding: 12px 14px;
+        border-top: 1px solid var(--rule);
+      }
+      .row-explain p {
+        margin: 0;
+        font-size: 13px;
+        color: var(--ink-soft);
+        max-width: 70ch;
+      }
+
+      .empty-state {
+        display: none;
+        text-align: center;
+        padding: 40px 20px;
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 13px;
+      }
+      .empty-state.show {
+        display: block;
+      }
+
+      /* ---------- Footer ---------- */
+      footer {
+        margin-top: 48px;
+        padding-top: 18px;
+        border-top: 1px solid var(--rule);
+        font-size: 12px;
+        color: var(--muted);
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      footer .fk {
+        font-family: var(--mono);
+      }
+
+      @media (max-width: 620px) {
+        .row-main {
+          grid-template-columns: 4px 1fr;
+        }
+        .row-value {
+          grid-column: 2;
+          padding-top: 0;
+        }
+        .row-actions {
+          grid-column: 2;
+          padding-top: 0;
+        }
+      }
+
+      :focus-visible {
+        outline: 2px solid var(--focus);
+        outline-offset: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="hero">
+        <div class="eyebrow"><span class="dot"></span>json &amp; api tools</div>
+        <h1>HTTP Header Inspector</h1>
+        <p class="lede">Look under the hood of an HTTP response — caching rules, security policy, compression, server fingerprint, and redirects — in a searchable, explained table.</p>
+      </div>
+
+      <div class="promptbar">
+        <span class="verb">GET</span>
+        <input type="text" id="urlInput" placeholder="https://example.com/" autocomplete="off" spellcheck="false" />
+        <button id="fetchBtn" type="button">Inspect</button>
+      </div>
+
+      <div class="mode-row">
+        <div class="mode-toggle" role="tablist" aria-label="Input mode">
+          <button type="button" id="modeFetchBtn" class="active" role="tab" aria-selected="true">Fetch in browser</button>
+          <button type="button" id="modePasteBtn" role="tab" aria-selected="false">Paste headers</button>
+        </div>
+        <span class="hint" id="modeHint">Browsers only expose a limited set of headers for cross-origin requests. Switch to “Paste headers” for a full, offline view.</span>
+      </div>
+
+      <div class="paste-panel" id="pastePanel">
+        <textarea
+          id="pasteInput"
+          placeholder="Paste raw response headers here, e.g. from a terminal:
+&#10;curl -I https://example.com&#10;&#10;or copied from your browser&#8217;s DevTools → Network tab → a request → Headers → &#8220;Response Headers&#8221; (raw)."
+        ></textarea>
+        <div class="paste-actions">
+          <span class="hint">One header per line, formatted as <code style="font-family: var(--mono)">Name: value</code>. Works fully offline.</span>
+          <button class="btn-secondary" id="parseBtn" type="button">Parse headers</button>
+        </div>
+      </div>
+
+      <details class="advanced" id="advancedDetails">
+        <summary>Advanced: use a CORS proxy for fetch mode</summary>
+        <div class="adv-body">
+          <input type="text" id="proxyInput" placeholder="Optional proxy prefix, e.g. https://your-proxy.example/?url=" />
+          <span class="hint">Left empty by default. If set, requests go to <span style="font-family: var(--mono)">prefix + your URL</span> instead of the URL directly. Only use a proxy you trust.</span>
+        </div>
+      </details>
+
+      <div class="status-strip" id="statusStrip"></div>
+      <div class="note-box" id="noteBox"></div>
+
+      <div class="signal-panel" id="signalPanel">
+        <div class="signal-title">Signal panel — click a category to filter</div>
+        <div class="signal-row" id="signalRow"></div>
+      </div>
+
+      <div class="controls" id="controls">
+        <div class="search-box">
+          <input type="text" id="searchInput" placeholder="Search header names or values…" />
+        </div>
+        <span class="count-badge" id="countBadge"></span>
+        <button class="btn-secondary" id="copyAllBtn" type="button">Copy all</button>
+        <button class="btn-secondary" id="clearFilterBtn" type="button">Reset filters</button>
+      </div>
+
+      <div class="results" id="results"></div>
+      <div class="empty-state" id="emptyState">No headers match your filters.</div>
+
+      <footer>
+        <span class="fk">http-header-inspector</span>
+        <span>Paste mode runs entirely in your browser — nothing leaves your machine.</span>
+      </footer>
+    </div>
+
+    <script>
+      (function () {
+        "use strict";
+
+        // ---------- Header knowledge base ----------
+        // category keys map to CSS vars: security, caching, encoding, server, cors, cookies, routing, other
+        var CATS = {
+          security: { label: "Security", color: "var(--c-security)" },
+          caching: { label: "Caching", color: "var(--c-caching)" },
+          encoding: { label: "Compression", color: "var(--c-encoding)" },
+          server: { label: "Server info", color: "var(--c-server)" },
+          cors: { label: "CORS", color: "var(--c-cors)" },
+          cookies: { label: "Cookies", color: "var(--c-cookies)" },
+          routing: { label: "Routing", color: "var(--c-routing)" },
+          other: { label: "Other", color: "var(--c-other)" }
+        };
+
+        var KB = {
+          "cache-control": { cat: "caching", d: "Tells browsers and caches how long a response can be reused, and under what conditions, before it must be checked again or refetched." },
+          expires: { cat: "caching", d: "A specific date and time after which the response is considered stale. Mostly superseded by Cache-Control, but still respected by older caches." },
+          etag: { cat: "caching", d: "A fingerprint for this exact version of the resource. Clients send it back on the next request so the server can reply \u201cnot modified\u201d instead of resending the full body." },
+          "last-modified": { cat: "caching", d: "The date the resource was last changed. Used alongside conditional requests to avoid re-downloading unchanged content." },
+          age: { cat: "caching", d: "How many seconds a cache in front of the origin server has been holding this response." },
+          vary: { cat: "caching", d: "Lists which request headers (like Accept-Encoding or Accept-Language) affect the response, so caches know to store separate versions." },
+          pragma: { cat: "caching", d: "A legacy caching directive, typically \u201cno-cache\u201d, kept for compatibility with very old HTTP/1.0 clients." },
+          "surrogate-control": { cat: "caching", d: "Caching instructions aimed specifically at CDNs and reverse proxies, separate from the rules browsers follow." },
+
+          "strict-transport-security": { cat: "security", d: "Tells the browser to only ever contact this site over HTTPS for a set period, even if the user types a plain http:// address." },
+          "content-security-policy": { cat: "security", d: "Restricts which sources scripts, styles, images, and other resources can load from, reducing the impact of injected or malicious code." },
+          "content-security-policy-report-only": { cat: "security", d: "Same rules as Content-Security-Policy, but only reports violations without actually blocking anything \u2014 used to test a policy safely." },
+          "x-frame-options": { cat: "security", d: "Controls whether this page can be embedded in a frame on another site, guarding against clickjacking." },
+          "x-content-type-options": { cat: "security", d: "When set to \u201cnosniff\u201d, stops the browser from guessing a different content type than the one declared, which closes off some attack paths." },
+          "x-xss-protection": { cat: "security", d: "A legacy browser feature that tried to block reflected cross-site scripting. Deprecated in modern browsers in favor of Content-Security-Policy." },
+          "referrer-policy": { cat: "security", d: "Controls how much of this page's URL is shared as the referrer when a user follows a link away from it." },
+          "permissions-policy": { cat: "security", d: "Turns browser features like camera, microphone, or geolocation on or off for this page and any content it embeds." },
+          "cross-origin-opener-policy": { cat: "security", d: "Isolates this page's browsing context from other origins, closing off certain cross-window timing attacks." },
+          "cross-origin-embedder-policy": { cat: "security", d: "Requires embedded cross-origin resources to explicitly opt in, needed to unlock some powerful browser APIs safely." },
+          "cross-origin-resource-policy": { cat: "security", d: "Declares whether this resource is allowed to be loaded by other origins, sites, or nowhere but its own origin." },
+          "x-permitted-cross-domain-policies": { cat: "security", d: "Controls whether older Flash or PDF clients are allowed to request cross-domain policy files from this server." },
+          "expect-ct": { cat: "security", d: "A now-deprecated header that asked browsers to enforce Certificate Transparency for this site's TLS certificate." },
+          nel: { cat: "security", d: "Network Error Logging \u2014 asks the browser to report connection failures for this origin back to a reporting endpoint." },
+          "report-to": { cat: "security", d: "Names the endpoint(s) the browser should send NEL, CSP, and other reporting-API violations to." },
+
+          "content-encoding": { cat: "encoding", d: "The compression algorithm applied to the body, such as gzip, br (Brotli), or deflate. The client decompresses it after receiving it." },
+          "transfer-encoding": { cat: "encoding", d: "Describes how the body is encoded for transfer between server and client, such as chunked, independent of any content compression." },
+          "content-length": { cat: "encoding", d: "The size of the response body in bytes, letting the client know when it has received everything." },
+          "content-type": { cat: "encoding", d: "Tells the client what kind of content this is \u2014 HTML, JSON, an image, and so on \u2014 and often its character encoding." },
+          "accept-ranges": { cat: "encoding", d: "Indicates whether the server supports partial requests for this resource, which enables features like resuming a download." },
+
+          server: { cat: "server", d: "Identifies the software (and sometimes version) running the origin server. Often trimmed or hidden for security reasons." },
+          "x-powered-by": { cat: "server", d: "Names the framework or platform generating the response, such as Express or PHP. Frequently removed to reduce fingerprinting." },
+          date: { cat: "server", d: "The date and time the server generated this response, according to the server's own clock." },
+          connection: { cat: "server", d: "Controls whether the underlying network connection stays open (keep-alive) or closes after this response." },
+          "keep-alive": { cat: "server", d: "Fine-tunes how long an open connection is kept around and how many requests it may carry." },
+          via: { cat: "server", d: "Lists the proxies or gateways this response passed through on its way to the client." },
+          "x-request-id": { cat: "server", d: "A unique identifier for this specific request, useful for tracing it through server logs." },
+          "x-cache": { cat: "server", d: "Shows whether a CDN or caching layer served this response from cache (HIT) or had to fetch it fresh (MISS)." },
+          "cf-ray": { cat: "server", d: "Cloudflare's unique identifier for this request, useful when reporting issues to Cloudflare support." },
+          "x-served-by": { cat: "server", d: "Identifies which specific server or cache node handled this request, common on Fastly and similar edge networks." },
+          "alt-svc": { cat: "server", d: "Advertises alternative protocols or endpoints (like HTTP/3) that the client could use for future requests to this host." },
+
+          "access-control-allow-origin": { cat: "cors", d: "Names which origins are allowed to read this response from a cross-origin browser request. A * allows any origin." },
+          "access-control-allow-credentials": { cat: "cors", d: "Says whether cross-origin requests are allowed to include cookies or HTTP authentication." },
+          "access-control-allow-methods": { cat: "cors", d: "Lists the HTTP methods a cross-origin caller is permitted to use against this resource." },
+          "access-control-allow-headers": { cat: "cors", d: "Lists the request headers a cross-origin caller is permitted to send." },
+          "access-control-expose-headers": { cat: "cors", d: "Lists extra response headers that cross-origin JavaScript is allowed to read. Without this, most headers stay hidden from browser scripts." },
+          "access-control-max-age": { cat: "cors", d: "How long, in seconds, the browser may cache the result of a CORS preflight check before asking again." },
+          "timing-allow-origin": { cat: "cors", d: "Allows a cross-origin page to read detailed timing information about this resource via the Resource Timing API." },
+
+          "set-cookie": { cat: "cookies", d: "Asks the browser to store a cookie, optionally scoped by domain, path, expiry, and security flags like HttpOnly or Secure." },
+          "clear-site-data": { cat: "cookies", d: "Instructs the browser to wipe cookies, storage, cache, or other site data for this origin." },
+
+          location: { cat: "routing", d: "The URL to follow for a redirect response (3xx status codes), or the URL of a newly created resource for a 201." },
+          refresh: { cat: "routing", d: "A non-standard instruction to reload or redirect the page after a set number of seconds." },
+          "retry-after": { cat: "routing", d: "Tells the client how long to wait before retrying, typically alongside a 429 (rate limited) or 503 (unavailable) response." },
+          link: { cat: "routing", d: "Points to related resources, such as a preload hint, a canonical URL, or pagination links." },
+          "content-disposition": { cat: "routing", d: "Suggests how the content should be handled \u2014 displayed inline or downloaded as a file, and under what filename." },
+          allow: { cat: "routing", d: "Lists the HTTP methods supported by this resource, usually sent alongside a 405 Method Not Allowed response." }
+        };
+
+        function lookup(name) {
+          var key = name.toLowerCase();
+          if (KB[key]) return KB[key];
+          if (key.indexOf("x-") === 0) return { cat: "other", d: "A custom or vendor-specific header. Not part of the core HTTP standard, but commonly used to pass extra application or infrastructure information." };
+          return { cat: "other", d: "Not in this tool's built-in reference. It may be application-specific, deprecated, or newly proposed." };
+        }
+
+        // ---------- State ----------
+        var state = {
+          headers: [], // [{name, value}]
+          activeFilters: new Set(Object.keys(CATS)),
+          query: ""
+        };
+
+        // ---------- Elements ----------
+        var $ = function (id) {
+          return document.getElementById(id);
+        };
+        var urlInput = $("urlInput"),
+          fetchBtn = $("fetchBtn");
+        var modeFetchBtn = $("modeFetchBtn"),
+          modePasteBtn = $("modePasteBtn"),
+          modeHint = $("modeHint");
+        var pastePanel = $("pastePanel"),
+          pasteInput = $("pasteInput"),
+          parseBtn = $("parseBtn");
+        var proxyInput = $("proxyInput");
+        var statusStrip = $("statusStrip"),
+          noteBox = $("noteBox");
+        var signalPanel = $("signalPanel"),
+          signalRow = $("signalRow");
+        var controls = $("controls"),
+          searchInput = $("searchInput"),
+          countBadge = $("countBadge");
+        var copyAllBtn = $("copyAllBtn"),
+          clearFilterBtn = $("clearFilterBtn");
+        var resultsEl = $("results"),
+          emptyState = $("emptyState");
+
+        var mode = "fetch";
+
+        modeFetchBtn.addEventListener("click", function () {
+          mode = "fetch";
+          modeFetchBtn.classList.add("active");
+          modeFetchBtn.setAttribute("aria-selected", "true");
+          modePasteBtn.classList.remove("active");
+          modePasteBtn.setAttribute("aria-selected", "false");
+          pastePanel.classList.remove("show");
+          modeHint.textContent = "Browsers only expose a limited set of headers for cross-origin requests. Switch to \u201cPaste headers\u201d for a full, offline view.";
+        });
+        modePasteBtn.addEventListener("click", function () {
+          mode = "paste";
+          modePasteBtn.classList.add("active");
+          modePasteBtn.setAttribute("aria-selected", "true");
+          modeFetchBtn.classList.remove("active");
+          modeFetchBtn.setAttribute("aria-selected", "false");
+          pastePanel.classList.add("show");
+          modeHint.textContent = "Paste headers copied from curl -I, DevTools, or any HTTP client. Fully offline, no request is made.";
+          pasteInput.focus();
+        });
+
+        function setStatus(html, isError) {
+          statusStrip.innerHTML = html;
+          statusStrip.classList.add("show");
+          statusStrip.classList.toggle("error", !!isError);
+        }
+        function clearStatus() {
+          statusStrip.classList.remove("show");
+          statusStrip.innerHTML = "";
+        }
+        function setNote(text) {
+          if (!text) {
+            noteBox.classList.remove("show");
+            noteBox.innerHTML = "";
+            return;
+          }
+          noteBox.innerHTML = text;
+          noteBox.classList.add("show");
+        }
+
+        function statusField(k, v) {
+          return '<span class="field"><span class="k">' + escapeHtml(k) + '</span><span class="v">' + escapeHtml(v) + "</span></span>";
+        }
+
+        function escapeHtml(s) {
+          return String(s).replace(/[&<>"']/g, function (c) {
+            return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+          });
+        }
+
+        // ---------- Fetch mode ----------
+        fetchBtn.addEventListener("click", function () {
+          doFetch();
+        });
+        urlInput.addEventListener("keydown", function (e) {
+          if (e.key === "Enter") doFetch();
+        });
+
+        function normalizeUrl(u) {
+          u = u.trim();
+          if (!u) return "";
+          if (!/^https?:\/\//i.test(u)) u = "https://" + u;
+          return u;
+        }
+
+        function doFetch() {
+          var raw = urlInput.value;
+          var url = normalizeUrl(raw);
+          if (!url) {
+            urlInput.focus();
+            return;
+          }
+
+          var target = url;
+          var proxyPrefix = proxyInput.value.trim();
+          if (proxyPrefix) target = proxyPrefix + encodeURIComponent(url);
+
+          fetchBtn.disabled = true;
+          fetchBtn.textContent = "Inspecting\u2026";
+          clearStatus();
+          setNote("");
+
+          fetch(target, { mode: "cors", redirect: "follow" })
+            .then(function (resp) {
+              var pairs = [];
+              resp.headers.forEach(function (value, name) {
+                pairs.push({ name: name, value: value });
+              });
+
+              var statusHtml = statusField("Requested", url) + statusField("Final URL", resp.url || url) + statusField("Status", resp.status + " " + resp.statusText) + statusField("Redirected", resp.redirected ? "yes" : "no");
+              setStatus(statusHtml, !resp.ok);
+
+              if (pairs.length <= 6) {
+                setNote("Only " + pairs.length + " header" + (pairs.length === 1 ? "" : "s") + " came through. This is expected: browsers hide most cross-origin response headers unless the server explicitly lists them in <code>Access-Control-Expose-Headers</code>. " + "For a complete picture, open your browser\u2019s DevTools \u2192 Network tab \u2192 this request \u2192 copy the response headers \u2192 switch to \u201cPaste headers\u201d above.");
+              }
+
+              renderHeaders(pairs);
+              fetchBtn.disabled = false;
+              fetchBtn.textContent = "Inspect";
+            })
+            .catch(function (err) {
+              setStatus(statusField("Requested", url) + statusField("Error", err && err.message ? err.message : String(err)), true);
+              setNote("The request was blocked or failed \u2014 almost always a CORS restriction, since the target server didn\u2019t grant this page permission to read its response, or it isn\u2019t reachable at all. " + "Try the DevTools Network tab or a terminal (<code>curl -I " + escapeHtml(url) + "</code>) and paste the result using \u201cPaste headers\u201d above.");
+              renderHeaders([]);
+              fetchBtn.disabled = false;
+              fetchBtn.textContent = "Inspect";
+            });
+        }
+
+        // ---------- Paste mode ----------
+        parseBtn.addEventListener("click", function () {
+          var text = pasteInput.value;
+          var pairs = parseRawHeaders(text);
+          clearStatus();
+          if (pairs.length === 0) {
+            setNote("No headers were recognized. Make sure each line looks like <code>Name: value</code>, one per line.");
+          } else {
+            setNote("");
+            setStatus(statusField("Source", "pasted text") + statusField("Headers found", String(pairs.length)), false);
+          }
+          renderHeaders(pairs);
+        });
+
+        function parseRawHeaders(text) {
+          var lines = text.split(/\r?\n/);
+          var out = [];
+          lines.forEach(function (line) {
+            line = line.trim();
+            if (!line) return;
+            if (/^HTTP\/\d/i.test(line)) return; // status line, e.g. from curl -I
+            var idx = line.indexOf(":");
+            if (idx === -1) return;
+            var name = line.slice(0, idx).trim();
+            var value = line.slice(idx + 1).trim();
+            if (!name) return;
+            out.push({ name: name, value: value });
+          });
+          return out;
+        }
+
+        // ---------- Render ----------
+        function renderHeaders(pairs) {
+          state.headers = pairs;
+          state.activeFilters = new Set(Object.keys(CATS));
+          state.query = "";
+          searchInput.value = "";
+
+          if (pairs.length === 0) {
+            signalPanel.classList.remove("show");
+            controls.classList.remove("show");
+            resultsEl.classList.remove("show");
+            resultsEl.innerHTML = "";
+            emptyState.classList.remove("show");
+            return;
+          }
+
+          buildSignalPanel();
+          controls.classList.add("show");
+          resultsEl.classList.add("show");
+          applyFilters();
+        }
+
+        function buildSignalPanel() {
+          var counts = {};
+          Object.keys(CATS).forEach(function (k) {
+            counts[k] = 0;
+          });
+          state.headers.forEach(function (h) {
+            var info = lookup(h.name);
+            counts[info.cat] = (counts[info.cat] || 0) + 1;
+          });
+
+          signalRow.innerHTML = "";
+          Object.keys(CATS).forEach(function (key) {
+            if (counts[key] === 0) return;
+            var chip = document.createElement("button");
+            chip.type = "button";
+            chip.className = "signal-chip";
+            chip.dataset.cat = key;
+            chip.innerHTML = '<span class="led" style="background:' + CATS[key].color + '"></span>' + "<span>" + CATS[key].label + "</span>" + '<span class="count">' + counts[key] + "</span>";
+            chip.addEventListener("click", function () {
+              if (state.activeFilters.has(key)) {
+                state.activeFilters.delete(key);
+                chip.classList.add("off");
+              } else {
+                state.activeFilters.add(key);
+                chip.classList.remove("off");
+              }
+              applyFilters();
+            });
+            signalRow.appendChild(chip);
+          });
+          signalPanel.classList.add("show");
+        }
+
+        searchInput.addEventListener("input", function () {
+          state.query = searchInput.value.trim().toLowerCase();
+          applyFilters();
+        });
+
+        clearFilterBtn.addEventListener("click", function () {
+          state.activeFilters = new Set(Object.keys(CATS));
+          state.query = "";
+          searchInput.value = "";
+          Array.prototype.forEach.call(signalRow.querySelectorAll(".signal-chip"), function (c) {
+            c.classList.remove("off");
+          });
+          applyFilters();
+        });
+
+        function applyFilters() {
+          var q = state.query;
+          var filtered = state.headers.filter(function (h) {
+            var info = lookup(h.name);
+            if (!state.activeFilters.has(info.cat)) return false;
+            if (!q) return true;
+            return h.name.toLowerCase().indexOf(q) !== -1 || h.value.toLowerCase().indexOf(q) !== -1;
+          });
+          countBadge.textContent = filtered.length + " of " + state.headers.length + " headers";
+          renderRows(filtered);
+        }
+
+        function renderRows(list) {
+          resultsEl.innerHTML = "";
+          emptyState.classList.toggle("show", list.length === 0);
+
+          list.forEach(function (h, i) {
+            var info = lookup(h.name);
+            var row = document.createElement("div");
+            row.className = "row";
+
+            var main = document.createElement("div");
+            main.className = "row-main";
+
+            var led = document.createElement("div");
+            led.className = "row-led";
+            led.style.background = info.color;
+
+            var nameEl = document.createElement("div");
+            nameEl.className = "row-name";
+            nameEl.innerHTML = escapeHtml(h.name) + '<span class="cat-label" style="color:' + info.color + '">' + CATS[info.cat].label + "</span>";
+            nameEl.tabIndex = 0;
+            nameEl.setAttribute("role", "button");
+            nameEl.setAttribute("aria-expanded", "false");
+            nameEl.addEventListener("click", function () {
+              toggleRow(row, nameEl);
+            });
+            nameEl.addEventListener("keydown", function (e) {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                toggleRow(row, nameEl);
+              }
+            });
+
+            var valueEl = document.createElement("div");
+            valueEl.className = "row-value";
+            valueEl.textContent = h.value;
+
+            var actions = document.createElement("div");
+            actions.className = "row-actions";
+            var copyBtn = document.createElement("button");
+            copyBtn.type = "button";
+            copyBtn.className = "icon-btn";
+            copyBtn.textContent = "Copy";
+            copyBtn.addEventListener("click", function () {
+              copyText(h.name + ": " + h.value, copyBtn);
+            });
+            actions.appendChild(copyBtn);
+
+            main.appendChild(led);
+            main.appendChild(nameEl);
+            main.appendChild(valueEl);
+            main.appendChild(actions);
+
+            var explain = document.createElement("div");
+            explain.className = "row-explain";
+            explain.innerHTML = "<p>" + escapeHtml(info.d) + "</p>";
+
+            row.appendChild(main);
+            row.appendChild(explain);
+            resultsEl.appendChild(row);
+          });
+        }
+
+        function toggleRow(row, nameEl) {
+          var isOpen = row.classList.toggle("open");
+          nameEl.setAttribute("aria-expanded", isOpen ? "true" : "false");
+        }
+
+        function copyText(text, btn) {
+          var done = function () {
+            var original = btn.textContent;
+            btn.textContent = "Copied";
+            btn.classList.add("copied");
+            setTimeout(function () {
+              btn.textContent = original;
+              btn.classList.remove("copied");
+            }, 1200);
+          };
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard
+              .writeText(text)
+              .then(done)
+              .catch(function () {
+                fallbackCopy(text);
+                done();
+              });
+          } else {
+            fallbackCopy(text);
+            done();
+          }
+        }
+        function fallbackCopy(text) {
+          var ta = document.createElement("textarea");
+          ta.value = text;
+          ta.style.position = "fixed";
+          ta.style.left = "-9999px";
+          document.body.appendChild(ta);
+          ta.select();
+          try {
+            document.execCommand("copy");
+          } catch (e) {}
+          document.body.removeChild(ta);
+        }
+
+        copyAllBtn.addEventListener("click", function () {
+          var text = state.headers
+            .map(function (h) {
+              return h.name + ": " + h.value;
+            })
+            .join("\n");
+          copyText(text, copyAllBtn);
+        });
+      })();
+    </script>
+  </body>
+</html>

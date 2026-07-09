@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Target Grade & GPA Forecaster — One File Tools</title>
+    <style>
+      :root {
+        --app-bg: #0d1117;
+        --app-text: #c9d1d9;
+        --app-primary: #58a6ff;
+        --app-primary-hover: #79c0ff;
+        --app-secondary: #21262d;
+        --app-panel: #161b22;
+        --app-border: #30363d;
+        --accent-green: #2ea043;
+        --accent-red: #da3633;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family:
+          "Inter",
+          -apple-system,
+          sans-serif;
+        background-color: var(--app-bg);
+        color: var(--app-text);
+        padding: 2rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-height: 100vh;
+      }
+
+      header {
+        text-align: center;
+        margin-bottom: 2rem;
+      }
+      h1 {
+        color: var(--app-primary);
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+      }
+
+      main {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+        width: 100%;
+        max-width: 1000px;
+      }
+
+      @media (max-width: 768px) {
+        main {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .panel {
+        background: var(--app-panel);
+        border: 1px solid var(--app-border);
+        border-radius: 12px;
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+      }
+
+      h2 {
+        font-size: 1.2rem;
+        border-bottom: 1px solid var(--app-border);
+        padding-bottom: 0.5rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .assignment-row {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        background: var(--app-secondary);
+        padding: 0.75rem;
+        border-radius: 6px;
+      }
+
+      input[type="text"],
+      input[type="number"] {
+        width: 100%;
+        padding: 0.6rem;
+        border-radius: 6px;
+        border: 1px solid var(--app-border);
+        background: var(--app-bg);
+        color: var(--app-text);
+      }
+
+      .btn {
+        background: var(--app-primary);
+        color: #000;
+        border: none;
+        padding: 0.6rem 1.2rem;
+        border-radius: 6px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .btn:hover {
+        background: var(--app-primary-hover);
+      }
+      .btn-danger {
+        background: var(--accent-red);
+        color: white;
+        padding: 0.6rem;
+      }
+      .btn-danger:hover {
+        opacity: 0.8;
+      }
+      .btn-secondary {
+        background: var(--app-secondary);
+        color: var(--app-primary);
+        border: 1px solid var(--app-primary);
+      }
+
+      .stat-card {
+        background: var(--app-secondary);
+        padding: 1.5rem;
+        border-radius: 8px;
+        text-align: center;
+        border: 1px solid var(--app-border);
+      }
+
+      .stat-value {
+        font-size: 2.5rem;
+        font-weight: bold;
+        margin-top: 0.5rem;
+      }
+
+      .color-green {
+        color: var(--accent-green);
+      }
+      .color-red {
+        color: var(--accent-red);
+      }
+      .color-primary {
+        color: var(--app-primary);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Target Grade & GPA Forecaster</h1>
+      <p>Calculate your current average and find out exactly what you need on the final.</p>
+    </header>
+
+    <main>
+      <div class="panel">
+        <div style="display: flex; justify-content: space-between; align-items: center">
+          <h2>Current Assignments</h2>
+          <button class="btn btn-secondary" onclick="addAssignment()" style="padding: 0.4rem 0.8rem; font-size: 0.85rem">+ Add Row</button>
+        </div>
+
+        <div id="assignmentsList" style="display: flex; flex-direction: column; gap: 0.75rem">
+          <!-- Assignment rows injected here -->
+        </div>
+
+        <div style="text-align: right; margin-top: 0.5rem; font-size: 0.9rem; color: #8b949e">Total Weight Entered: <strong id="totalWeightStr">0%</strong></div>
+      </div>
+
+      <div class="panel">
+        <h2>Forecaster</h2>
+
+        <div class="stat-card">
+          <div>Current Running Average</div>
+          <div class="stat-value color-primary" id="currentAvg">0.00%</div>
+        </div>
+
+        <div style="margin-top: 1rem">
+          <label style="font-weight: bold; font-size: 0.9rem; margin-bottom: 0.5rem; display: block">Target Final Course Grade (%)</label>
+          <input type="number" id="targetGrade" value="90" oninput="calculate()" style="font-size: 1.2rem; font-weight: bold; text-align: center" />
+        </div>
+
+        <div class="stat-card" style="margin-top: 1rem">
+          <div>Required Score on Remaining Weight (<span id="remainingWeight">0</span>%)</div>
+          <div class="stat-value" id="requiredScore">-</div>
+          <div id="statusMsg" style="margin-top: 0.5rem; font-size: 0.9rem"></div>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      let assignments = [
+        { name: "Midterm", grade: 85, weight: 30 },
+        { name: "Assignment 1", grade: 90, weight: 10 }
+      ];
+
+      function renderAssignments() {
+        const list = document.getElementById("assignmentsList");
+        list.innerHTML = "";
+        assignments.forEach((a, i) => {
+          const row = document.createElement("div");
+          row.className = "assignment-row";
+          row.innerHTML = `
+            <input type="text" value="${a.name}" placeholder="Name" oninput="update(${i}, 'name', this.value)" style="flex: 2;">
+            <input type="number" value="${a.grade}" placeholder="Grade %" oninput="update(${i}, 'grade', this.value)" style="flex: 1;" title="Grade received">
+            <input type="number" value="${a.weight}" placeholder="Weight %" oninput="update(${i}, 'weight', this.value)" style="flex: 1;" title="Weight in syllabus">
+            <button class="btn btn-danger" onclick="remove(${i})">X</button>
+          `;
+          list.appendChild(row);
+        });
+        calculate();
+      }
+
+      window.update = (index, field, value) => {
+        if (field === "grade" || field === "weight") value = parseFloat(value) || 0;
+        assignments[index][field] = value;
+        calculate();
+      };
+
+      window.addAssignment = () => {
+        assignments.push({ name: "", grade: 0, weight: 0 });
+        renderAssignments();
+      };
+
+      window.remove = (index) => {
+        assignments.splice(index, 1);
+        renderAssignments();
+      };
+
+      function calculate() {
+        let totalWeight = 0;
+        let weightedSum = 0;
+
+        assignments.forEach((a) => {
+          totalWeight += a.weight;
+          weightedSum += a.grade * (a.weight / 100);
+        });
+
+        document.getElementById("totalWeightStr").textContent = totalWeight.toFixed(1) + "%";
+
+        const currentAvg = totalWeight > 0 ? weightedSum / (totalWeight / 100) : 0;
+        document.getElementById("currentAvg").textContent = currentAvg.toFixed(2) + "%";
+
+        const remainingWeight = 100 - totalWeight;
+        document.getElementById("remainingWeight").textContent = remainingWeight.toFixed(1);
+
+        const requiredScoreEl = document.getElementById("requiredScore");
+        const statusMsgEl = document.getElementById("statusMsg");
+
+        if (remainingWeight <= 0) {
+          requiredScoreEl.textContent = "N/A";
+          requiredScoreEl.className = "stat-value";
+          statusMsgEl.textContent = totalWeight > 100 ? "Error: Weight exceeds 100%" : "All weight accounted for!";
+          statusMsgEl.className = "";
+          return;
+        }
+
+        const target = parseFloat(document.getElementById("targetGrade").value) || 0;
+
+        // Equation: Target = WeightedSum + (Required * (RemainingWeight/100))
+        // Required = (Target - WeightedSum) / (RemainingWeight/100)
+        const requiredScore = (target - weightedSum) / (remainingWeight / 100);
+
+        requiredScoreEl.textContent = requiredScore.toFixed(2) + "%";
+
+        if (requiredScore > 100) {
+          requiredScoreEl.className = "stat-value color-red";
+          statusMsgEl.textContent = "Mathematically impossible! Even with 100%, you can't reach the target.";
+          statusMsgEl.className = "color-red";
+        } else if (requiredScore <= 0) {
+          requiredScoreEl.className = "stat-value color-green";
+          statusMsgEl.textContent = "You already achieved the target! You could score a 0 and still pass.";
+          statusMsgEl.className = "color-green";
+        } else {
+          requiredScoreEl.className = "stat-value color-primary";
+          statusMsgEl.textContent = "Achievable. Study hard!";
+          statusMsgEl.className = "";
+        }
+      }
+
+      renderAssignments();
+    </script>
+  </body>
+</html>

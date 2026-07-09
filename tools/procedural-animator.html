@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Procedural Pixel Art Sprite Generator & Animator — One File Tools</title>
+    <style>
+      :root {
+        --app-bg: #1e1e2e;
+        --app-text: #cdd6f4;
+        --app-primary: #89b4fa;
+        --app-primary-hover: #b4befe;
+        --app-secondary: #313244;
+        --app-panel: #181825;
+        --app-border: #45475a;
+        --accent-green: #a6e3a1;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family:
+          "Inter",
+          -apple-system,
+          sans-serif;
+        background-color: var(--app-bg);
+        color: var(--app-text);
+        padding: 2rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-height: 100vh;
+      }
+
+      header {
+        text-align: center;
+        margin-bottom: 2rem;
+      }
+
+      h1 {
+        color: var(--app-primary);
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+      }
+
+      main {
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+        width: 100%;
+        max-width: 900px;
+      }
+
+      @media (min-width: 768px) {
+        main {
+          flex-direction: row;
+        }
+      }
+
+      .panel {
+        background: var(--app-panel);
+        border: 1px solid var(--app-border);
+        border-radius: 12px;
+        padding: 1.5rem;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+
+      .canvas-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: var(--app-secondary);
+        border-radius: 8px;
+        padding: 2rem;
+        border: 1px dashed var(--app-border);
+        image-rendering: pixelated;
+      }
+
+      canvas {
+        width: 256px;
+        height: 256px;
+        image-rendering: pixelated;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        background: transparent;
+      }
+
+      .controls {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      .control-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+
+      label {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--app-primary);
+      }
+
+      input[type="range"] {
+        width: 100%;
+        accent-color: var(--app-primary);
+      }
+
+      .color-picker {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+      }
+
+      input[type="color"] {
+        background: none;
+        border: none;
+        width: 40px;
+        height: 40px;
+        cursor: pointer;
+      }
+
+      button {
+        background: var(--app-primary);
+        color: #111;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 6px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+      }
+
+      button:hover {
+        background: var(--app-primary-hover);
+        transform: translateY(-2px);
+      }
+
+      .btn-secondary {
+        background: var(--app-secondary);
+        color: var(--app-text);
+        border: 1px solid var(--app-border);
+      }
+
+      .btn-secondary:hover {
+        background: #3f415c;
+      }
+
+      .timeline {
+        display: flex;
+        gap: 0.5rem;
+        justify-content: center;
+        margin-top: 1rem;
+      }
+
+      .frame-btn {
+        width: 30px;
+        height: 30px;
+        border-radius: 4px;
+        border: 1px solid var(--app-border);
+        background: var(--app-secondary);
+        color: var(--app-text);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.8rem;
+      }
+
+      .frame-btn.active {
+        background: var(--app-primary);
+        color: #000;
+        border-color: var(--app-primary);
+      }
+
+      footer {
+        margin-top: 3rem;
+        text-align: center;
+        font-size: 0.9rem;
+      }
+      a {
+        color: var(--app-primary);
+        text-decoration: none;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Procedural Pixel Art Sprite Generator & Animator</h1>
+      <p>Generate symmetrical retro 8-bit sprites using cellular automata and random noise.</p>
+    </header>
+
+    <main>
+      <!-- Preview Panel -->
+      <div class="panel">
+        <div class="canvas-container">
+          <canvas id="spriteCanvas" width="16" height="16"></canvas>
+
+          <div class="timeline" id="timeline">
+            <!-- Frame buttons populated by JS -->
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 1rem; justify-content: center">
+          <button id="btnPlayPause">⏸ Pause Anim</button>
+          <button id="btnExport" class="btn-secondary">💾 Export PNG</button>
+        </div>
+      </div>
+
+      <!-- Controls Panel -->
+      <div class="panel">
+        <div class="controls">
+          <button id="btnGenerate" style="margin-bottom: 1rem">🎲 Generate New Sprite</button>
+
+          <div class="control-group">
+            <label for="gridSize">Grid Size (Resolution): <span id="valSize">16</span>x<span id="valSize2">16</span></label>
+            <input type="range" id="gridSize" min="8" max="32" step="4" value="16" />
+          </div>
+
+          <div class="control-group">
+            <label for="noiseDensity">Noise Density (Fill Rate): <span id="valDensity">50</span>%</label>
+            <input type="range" id="noiseDensity" min="20" max="80" step="5" value="50" />
+          </div>
+
+          <div class="control-group">
+            <label for="smoothingSteps">Cellular Smoothing Steps: <span id="valSmooth">2</span></label>
+            <input type="range" id="smoothingSteps" min="0" max="5" step="1" value="2" />
+          </div>
+
+          <div class="control-group">
+            <label>Color Palette</label>
+            <div class="color-picker">
+              <input type="color" id="colorBody" value="#89b4fa" title="Body Color" />
+              <input type="color" id="colorEdge" value="#11111b" title="Outline Color" />
+              <button id="btnRandomColors" class="btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem">Randomize Colors</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      <p>Part of <a href="https://github.com/praveenscience/One-File-Tools">One File Tools</a></p>
+    </footer>
+
+    <script>
+      const canvas = document.getElementById("spriteCanvas");
+      const ctx = canvas.getContext("2d");
+
+      const elGridSize = document.getElementById("gridSize");
+      const elNoiseDensity = document.getElementById("noiseDensity");
+      const elSmoothingSteps = document.getElementById("smoothingSteps");
+      const elColorBody = document.getElementById("colorBody");
+      const elColorEdge = document.getElementById("colorEdge");
+
+      const btnGenerate = document.getElementById("btnGenerate");
+      const btnPlayPause = document.getElementById("btnPlayPause");
+      const btnExport = document.getElementById("btnExport");
+      const btnRandomColors = document.getElementById("btnRandomColors");
+      const timeline = document.getElementById("timeline");
+
+      let currentFrames = [];
+      let currentFrameIndex = 0;
+      let isPlaying = true;
+      let animInterval = null;
+      let lastSeed = null;
+
+      // Update UI labels
+      function updateLabels() {
+        document.getElementById("valSize").textContent = elGridSize.value;
+        document.getElementById("valSize2").textContent = elGridSize.value;
+        document.getElementById("valDensity").textContent = elNoiseDensity.value;
+        document.getElementById("valSmooth").textContent = elSmoothingSteps.value;
+      }
+
+      [elGridSize, elNoiseDensity, elSmoothingSteps].forEach((el) => {
+        el.addEventListener("input", () => {
+          updateLabels();
+          generateSpriteSequence();
+        });
+      });
+
+      elColorBody.addEventListener("input", drawCurrentFrame);
+      elColorEdge.addEventListener("input", drawCurrentFrame);
+
+      // Random color generator
+      btnRandomColors.addEventListener("click", () => {
+        const randomColor = () =>
+          "#" +
+          Math.floor(Math.random() * 16777215)
+            .toString(16)
+            .padStart(6, "0");
+        elColorBody.value = randomColor();
+        drawCurrentFrame();
+      });
+
+      // Procedural Generation Logic
+      function generateNoiseGrid(size, density, seedModifier = 0) {
+        const grid = Array(size)
+          .fill(0)
+          .map(() => Array(size).fill(0));
+        // We only generate left half, then mirror it
+        const half = Math.ceil(size / 2);
+
+        for (let y = 0; y < size; y++) {
+          for (let x = 0; x < half; x++) {
+            // Simple pseudo-random using seed, coords, modifier
+            const rand = Math.random();
+            if (rand * 100 < density) {
+              grid[y][x] = 1;
+            }
+          }
+        }
+        return grid;
+      }
+
+      function applyCellularAutomata(grid, size) {
+        const newGrid = JSON.parse(JSON.stringify(grid));
+        const half = Math.ceil(size / 2);
+
+        for (let y = 0; y < size; y++) {
+          for (let x = 0; x < half; x++) {
+            let neighbors = 0;
+            // Check 8 neighbors
+            for (let dy = -1; dy <= 1; dy++) {
+              for (let dx = -1; dx <= 1; dx++) {
+                if (dx === 0 && dy === 0) continue;
+                let nx = x + dx;
+                let ny = y + dy;
+                // If neighbor crosses the mirror line, reflect nx
+                if (nx >= half) nx = half - 1 - (nx - half);
+
+                if (nx >= 0 && nx < half && ny >= 0 && ny < size) {
+                  neighbors += grid[ny][nx] === 1 ? 1 : 0;
+                }
+              }
+            }
+
+            // Birth/Death Rules (similar to standard cave generation)
+            if (grid[y][x] === 1 && neighbors < 2)
+              newGrid[y][x] = 0; // Death by isolation
+            else if (grid[y][x] === 0 && neighbors > 3) newGrid[y][x] = 1; // Birth
+          }
+        }
+        return newGrid;
+      }
+
+      function mirrorGrid(grid, size) {
+        const finalGrid = JSON.parse(JSON.stringify(grid));
+        const half = Math.ceil(size / 2);
+        for (let y = 0; y < size; y++) {
+          for (let x = 0; x < half; x++) {
+            // Mirror to the right side
+            finalGrid[y][size - 1 - x] = finalGrid[y][x];
+          }
+        }
+        return finalGrid;
+      }
+
+      // Calculate borders/edges
+      function calculateEdges(grid, size) {
+        const edgedGrid = JSON.parse(JSON.stringify(grid));
+        // 0 = empty, 1 = body, 2 = edge
+        for (let y = 0; y < size; y++) {
+          for (let x = 0; x < size; x++) {
+            if (grid[y][x] === 1) {
+              // Check 4 cardinal neighbors
+              const n = [y > 0 ? grid[y - 1][x] : 0, y < size - 1 ? grid[y + 1][x] : 0, x > 0 ? grid[y][x - 1] : 0, x < size - 1 ? grid[y][x + 1] : 0];
+              // If exposed to empty space, make it an edge
+              if (n.includes(0)) {
+                edgedGrid[y][x] = 2;
+              }
+            }
+          }
+        }
+        return edgedGrid;
+      }
+
+      // Generate a slight mutation for animation frames
+      function mutateGrid(grid, size, mutationRate) {
+        const newGrid = JSON.parse(JSON.stringify(grid));
+        const half = Math.ceil(size / 2);
+        for (let y = 0; y < size; y++) {
+          for (let x = 0; x < half; x++) {
+            if (Math.random() < mutationRate) {
+              // Flip pixel on edges to create wobble
+              newGrid[y][x] = newGrid[y][x] === 1 ? 0 : 1;
+            }
+          }
+        }
+        return newGrid;
+      }
+
+      function generateSpriteSequence() {
+        const size = parseInt(elGridSize.value);
+        const density = parseInt(elNoiseDensity.value);
+        const steps = parseInt(elSmoothingSteps.value);
+
+        canvas.width = size;
+        canvas.height = size;
+
+        currentFrames = [];
+
+        // Base Frame
+        let baseGrid = generateNoiseGrid(size, density);
+        for (let i = 0; i < steps; i++) {
+          baseGrid = applyCellularAutomata(baseGrid, size);
+        }
+
+        // Generate 4 animation frames (idle wobble)
+        for (let f = 0; f < 4; f++) {
+          let frameGrid = JSON.parse(JSON.stringify(baseGrid));
+          if (f > 0) {
+            frameGrid = mutateGrid(frameGrid, size, 0.05); // 5% mutation per frame
+            frameGrid = applyCellularAutomata(frameGrid, size); // Smooth the mutation
+          }
+          let mirrored = mirrorGrid(frameGrid, size);
+          let finalEdged = calculateEdges(mirrored, size);
+          currentFrames.push(finalEdged);
+        }
+
+        // Mirror the frames to create a ping-pong loop (0,1,2,3,2,1)
+        currentFrames.push(currentFrames[2]);
+        currentFrames.push(currentFrames[1]);
+
+        buildTimeline();
+        currentFrameIndex = 0;
+        drawCurrentFrame();
+      }
+
+      function drawCurrentFrame() {
+        if (!currentFrames.length) return;
+        const size = parseInt(elGridSize.value);
+        const grid = currentFrames[currentFrameIndex];
+
+        ctx.clearRect(0, 0, size, size);
+
+        for (let y = 0; y < size; y++) {
+          for (let x = 0; x < size; x++) {
+            if (grid[y][x] === 1) {
+              ctx.fillStyle = elColorBody.value;
+              ctx.fillRect(x, y, 1, 1);
+            } else if (grid[y][x] === 2) {
+              ctx.fillStyle = elColorEdge.value;
+              ctx.fillRect(x, y, 1, 1);
+            }
+          }
+        }
+        updateTimelineUI();
+      }
+
+      function buildTimeline() {
+        timeline.innerHTML = "";
+        currentFrames.forEach((_, i) => {
+          const btn = document.createElement("div");
+          btn.className = "frame-btn";
+          btn.textContent = i + 1;
+          btn.onclick = () => {
+            currentFrameIndex = i;
+            if (isPlaying) togglePlay();
+            drawCurrentFrame();
+          };
+          timeline.appendChild(btn);
+        });
+      }
+
+      function updateTimelineUI() {
+        const btns = timeline.querySelectorAll(".frame-btn");
+        btns.forEach((b, i) => {
+          b.classList.toggle("active", i === currentFrameIndex);
+        });
+      }
+
+      function nextFrame() {
+        if (!currentFrames.length) return;
+        currentFrameIndex = (currentFrameIndex + 1) % currentFrames.length;
+        drawCurrentFrame();
+      }
+
+      function togglePlay() {
+        isPlaying = !isPlaying;
+        if (isPlaying) {
+          btnPlayPause.textContent = "⏸ Pause Anim";
+          animInterval = setInterval(nextFrame, 150);
+        } else {
+          btnPlayPause.textContent = "▶️ Play Anim";
+          clearInterval(animInterval);
+        }
+      }
+
+      // Initial Setup
+      btnGenerate.addEventListener("click", generateSpriteSequence);
+      btnPlayPause.addEventListener("click", togglePlay);
+
+      btnExport.addEventListener("click", () => {
+        // Create an offscreen canvas to scale up the pixel art without blurring for export
+        const scale = 16;
+        const size = parseInt(elGridSize.value);
+        const off = document.createElement("canvas");
+        off.width = size * scale;
+        off.height = size * scale;
+        const octx = off.getContext("2d");
+
+        // Disable smoothing
+        octx.imageSmoothingEnabled = false;
+
+        // Draw image scaled
+        octx.drawImage(canvas, 0, 0, size * scale, size * scale);
+
+        const link = document.createElement("a");
+        link.download = `procedural-sprite-${Date.now()}.png`;
+        link.href = off.toDataURL();
+        link.click();
+      });
+
+      // Start
+      updateLabels();
+      generateSpriteSequence();
+      animInterval = setInterval(nextFrame, 150);
+    </script>
+  </body>
+</html>
