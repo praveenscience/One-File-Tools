@@ -1,0 +1,704 @@
+<!--
+DNS Record Lookup
+Single-file client-side tool to query DNS records via public
+DNS-over-HTTPS (DoH) endpoints (Cloudflare / Google), with no backend.
+Built for One File Tools.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DNS Record Lookup - One File Tools</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <style>
+      :root {
+        --bg: #030712;
+        --grid-line: #111827;
+        --panel: rgba(17, 24, 39, 0.7);
+        --panel-border: #1f2937;
+        --accent: #38bdf8;
+        --accent-hover: #0ea5e9;
+        --accent-glow: rgba(56, 189, 248, 0.15);
+        --text: #f9fafb;
+        --text-muted: #9ca3af;
+        --text-dim: #4b5563;
+        --radius-sm: 12px;
+        --radius-md: 20px;
+        --font-sans: "Inter", system-ui, sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+        --font-display: "Space Grotesk", sans-serif;
+        --color-weak: #ef4444;
+        --color-fair: #f59e0b;
+        --color-strong: #10b981;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg);
+        background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+        background-size: 32px 32px;
+        color: var(--text);
+        padding: 48px 20px 80px;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+      }
+
+      .app {
+        width: 100%;
+        max-width: 960px;
+      }
+
+      .hero {
+        text-align: center;
+        margin-bottom: 28px;
+      }
+
+      .eyebrow {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        letter-spacing: 0.2em;
+        color: var(--accent);
+        text-transform: uppercase;
+        margin-bottom: 12px;
+        font-weight: 500;
+      }
+
+      .wordmark {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: clamp(26px, 5vw, 38px);
+        letter-spacing: -0.02em;
+        margin-bottom: 12px;
+      }
+
+      .tagline {
+        color: var(--text-muted);
+        font-size: 15px;
+        line-height: 1.5;
+        max-width: 600px;
+        margin: 0 auto;
+      }
+
+      .studio {
+        background: var(--panel);
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-md);
+        padding: 24px;
+        box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.5);
+        margin-bottom: 24px;
+      }
+
+      .query-row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .query-row input[type="text"] {
+        flex: 1;
+        min-width: 200px;
+        background: rgba(17, 24, 39, 0.8);
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 14px;
+        padding: 11px 14px;
+      }
+
+      .query-row input:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-glow);
+      }
+
+      select {
+        background: rgba(17, 24, 39, 0.8);
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 13px;
+        padding: 11px 10px;
+      }
+
+      .btn {
+        background: var(--accent);
+        color: #030712;
+        border: none;
+        border-radius: 8px;
+        padding: 11px 18px;
+        font-family: var(--font-sans);
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+
+      .btn:hover {
+        background: var(--accent-hover);
+      }
+
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .btn:focus-visible,
+      .btn-ghost:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      .btn-ghost {
+        background: rgba(31, 41, 55, 0.6);
+        border: 1px solid var(--panel-border);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 10px 16px;
+        font-family: var(--font-sans);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .btn-ghost:hover {
+        background: rgba(55, 65, 81, 0.8);
+      }
+
+      .record-types-row {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-top: 12px;
+      }
+
+      .type-chip {
+        background: rgba(31, 41, 55, 0.5);
+        border: 1px solid var(--panel-border);
+        color: var(--text-muted);
+        border-radius: 99px;
+        padding: 6px 12px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      .type-chip.active {
+        background: var(--accent);
+        color: #030712;
+        border-color: var(--accent);
+        font-weight: 700;
+      }
+
+      .type-chip:hover:not(.active) {
+        background: rgba(55, 65, 81, 0.7);
+      }
+
+      .status-bar {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-top: 16px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+      }
+
+      .status-pill {
+        padding: 5px 12px;
+        border-radius: 99px;
+        border: 1px solid var(--panel-border);
+        background: rgba(3, 7, 18, 0.5);
+        color: var(--text-muted);
+      }
+
+      .status-pill.ok {
+        color: var(--color-strong);
+        border-color: rgba(16, 185, 129, 0.4);
+      }
+
+      .status-pill.err {
+        color: var(--color-weak);
+        border-color: rgba(239, 68, 68, 0.4);
+      }
+
+      .field-error {
+        font-size: 13px;
+        color: var(--color-weak);
+        margin-top: 10px;
+        line-height: 1.5;
+      }
+
+      .records-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 16px;
+        font-family: var(--font-mono);
+        font-size: 13px;
+      }
+
+      .records-table th {
+        text-align: left;
+        color: var(--text-dim);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--panel-border);
+      }
+
+      .records-table td {
+        padding: 10px;
+        border-bottom: 1px solid rgba(31, 41, 55, 0.6);
+        vertical-align: top;
+        word-break: break-all;
+      }
+
+      .type-badge {
+        display: inline-block;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 99px;
+        color: #030712;
+      }
+
+      .copy-cell-btn {
+        background: rgba(31, 41, 55, 0.6);
+        border: 1px solid var(--panel-border);
+        color: var(--text-muted);
+        border-radius: 6px;
+        padding: 5px 9px;
+        font-size: 11px;
+        font-family: var(--font-sans);
+        cursor: pointer;
+      }
+
+      .copy-cell-btn:hover {
+        background: rgba(55, 65, 81, 0.9);
+        color: var(--text);
+      }
+
+      .empty-state {
+        color: var(--text-dim);
+        font-size: 14px;
+        text-align: center;
+        padding: 24px 0;
+      }
+
+      .history-list {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+      }
+
+      .history-chip {
+        background: rgba(31, 41, 55, 0.5);
+        border: 1px solid var(--panel-border);
+        color: var(--text-muted);
+        border-radius: 8px;
+        padding: 6px 10px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      .history-chip:hover {
+        background: rgba(55, 65, 81, 0.7);
+        color: var(--text);
+      }
+
+      .actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 14px;
+        flex-wrap: wrap;
+      }
+
+      .footer-note {
+        text-align: center;
+        color: var(--text-dim);
+        font-size: 13px;
+        margin-top: 8px;
+      }
+
+      .footer-note a {
+        color: var(--text-muted);
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background: var(--text);
+        color: var(--bg);
+        padding: 12px 22px;
+        border-radius: 99px;
+        font-family: var(--font-sans);
+        font-weight: 600;
+        font-size: 14px;
+        opacity: 0;
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        z-index: 100;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      }
+
+      .toast.show {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+      }
+
+      @media (max-width: 640px) {
+        .studio {
+          padding: 18px;
+        }
+        .records-table {
+          font-size: 12px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="hero">
+        <div class="eyebrow">Browser & Network</div>
+        <h1 class="wordmark">DNS Record Lookup</h1>
+        <p class="tagline">Query DNS records for any domain via DNS-over-HTTPS — no terminal, no backend, just your browser.</p>
+      </header>
+
+      <main class="studio">
+        <div class="query-row">
+          <input type="text" id="domainInput" placeholder="example.com" spellcheck="false" />
+          <select id="providerSelect">
+            <option value="cloudflare">Cloudflare (1.1.1.1)</option>
+            <option value="google">Google Public DNS</option>
+          </select>
+          <button class="btn" id="btnLookup" type="button">Lookup</button>
+        </div>
+
+        <div class="record-types-row" id="recordTypesRow"></div>
+
+        <div class="status-bar" id="statusBar" hidden>
+          <span class="status-pill" id="statusPill">—</span>
+          <span class="status-pill" id="timingPill">—</span>
+        </div>
+        <div class="field-error" id="lookupError"></div>
+
+        <div class="history-list" id="historyList"></div>
+      </main>
+
+      <main class="studio">
+        <table class="records-table" id="recordsTable" hidden>
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Name</th>
+              <th>TTL</th>
+              <th>Data</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="recordsBody"></tbody>
+        </table>
+        <p class="empty-state" id="emptyState">Enter a domain above and click Lookup to see its DNS records here.</p>
+
+        <div class="actions">
+          <button class="btn-ghost" id="btnCopyAll" type="button">Copy full response</button>
+          <button class="btn-ghost" id="btnDownload" type="button">Download JSON</button>
+        </div>
+      </main>
+
+      <p class="footer-note">Part of <a href="https://github.com/praveenscience/One-File-Tools">One File Tools</a>. Lookups are sent directly to the selected public DoH provider — nothing passes through a server we control.</p>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script>
+      /* ==========================================================
+         DNS Record Lookup
+         Vanilla JS, no dependencies. Queries public DNS-over-HTTPS
+         (RFC 8484) JSON endpoints directly from the browser.
+         ========================================================== */
+
+      const domainInput = document.getElementById("domainInput");
+      const providerSelect = document.getElementById("providerSelect");
+      const btnLookup = document.getElementById("btnLookup");
+      const recordTypesRow = document.getElementById("recordTypesRow");
+      const statusBar = document.getElementById("statusBar");
+      const statusPill = document.getElementById("statusPill");
+      const timingPill = document.getElementById("timingPill");
+      const lookupError = document.getElementById("lookupError");
+      const historyList = document.getElementById("historyList");
+      const recordsTable = document.getElementById("recordsTable");
+      const recordsBody = document.getElementById("recordsBody");
+      const emptyState = document.getElementById("emptyState");
+      const btnCopyAll = document.getElementById("btnCopyAll");
+      const btnDownload = document.getElementById("btnDownload");
+      const toast = document.getElementById("toast");
+
+      const RECORD_TYPES = ["A", "AAAA", "MX", "TXT", "CNAME", "NS", "SOA", "CAA"];
+      const TYPE_COLORS = {
+        A: "#38bdf8",
+        AAAA: "#22d3ee",
+        MX: "#a78bfa",
+        TXT: "#f59e0b",
+        CNAME: "#4ade80",
+        NS: "#f472b6",
+        SOA: "#fb923c",
+        CAA: "#e879f9"
+      };
+
+      // DoH JSON API endpoints. Both accept GET with `name` and `type` query
+      // params and return a JSON body per RFC 8484 / their own JSON dialect.
+      const PROVIDERS = {
+        cloudflare: { label: "Cloudflare", url: "https://cloudflare-dns.com/dns-query", accept: "application/dns-json" },
+        google: { label: "Google Public DNS", url: "https://dns.google/resolve", accept: "application/dns-json" }
+      };
+
+      // Standard DNS RCODE meanings for human-readable error explanations.
+      const RCODE_MEANINGS = {
+        0: "No error",
+        1: "Format error — the DNS query itself was malformed",
+        2: "SERVFAIL — the server encountered an internal error",
+        3: "NXDOMAIN — this domain does not exist",
+        4: "Not implemented — the server doesn't support this query type",
+        5: "REFUSED — the server refused to answer this query"
+      };
+
+      let activeType = "A";
+      let lastResponse = null;
+      let history = [];
+
+      function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add("show");
+        setTimeout(() => toast.classList.remove("show"), 2000);
+      }
+
+      function copyText(text, message) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard
+            .writeText(text)
+            .then(() => showToast(message))
+            .catch(() => showToast("Copy failed"));
+        } else {
+          showToast("Clipboard unavailable");
+        }
+      }
+
+      /** Renders the record-type selector chips. */
+      function renderTypeChips() {
+        recordTypesRow.innerHTML = "";
+        RECORD_TYPES.forEach((type) => {
+          const chip = document.createElement("button");
+          chip.type = "button";
+          chip.className = "type-chip" + (type === activeType ? " active" : "");
+          chip.textContent = type;
+          chip.addEventListener("click", () => {
+            activeType = type;
+            renderTypeChips();
+          });
+          recordTypesRow.appendChild(chip);
+        });
+      }
+
+      /** Renders the session query-history chips (most recent first). */
+      function renderHistory() {
+        historyList.innerHTML = "";
+        history.forEach((item) => {
+          const chip = document.createElement("button");
+          chip.type = "button";
+          chip.className = "history-chip";
+          chip.textContent = item.domain + " · " + item.type;
+          chip.addEventListener("click", () => {
+            domainInput.value = item.domain;
+            activeType = item.type;
+            renderTypeChips();
+            performLookup();
+          });
+          historyList.appendChild(chip);
+        });
+      }
+
+      /** Formats a DNS record's rdata into a readable string based on its type. */
+      function formatRecordData(answer) {
+        // The DoH JSON APIs already return a decoded `data` string for most
+        // types; we just clean up quoting for TXT.
+        if (answer.type === 16 && typeof answer.data === "string") {
+          return answer.data.replace(/^"|"$/g, "");
+        }
+        return answer.data;
+      }
+
+      /** Maps DNS numeric type codes back to their mnemonic (A, MX, etc.). */
+      const TYPE_CODE_TO_NAME = { 1: "A", 28: "AAAA", 15: "MX", 16: "TXT", 5: "CNAME", 2: "NS", 6: "SOA", 257: "CAA" };
+
+      /** Performs the DoH lookup for the current domain + selected type. */
+      async function performLookup() {
+        const domain = domainInput.value.trim();
+        lookupError.textContent = "";
+        if (!domain) {
+          lookupError.textContent = "Enter a domain name first.";
+          domainInput.focus();
+          return;
+        }
+
+        const provider = PROVIDERS[providerSelect.value];
+        const url = provider.url + "?name=" + encodeURIComponent(domain) + "&type=" + activeType;
+
+        btnLookup.disabled = true;
+        btnLookup.textContent = "Looking up…";
+        emptyState.hidden = false;
+        emptyState.textContent = "Loading…";
+        recordsTable.hidden = true;
+        statusBar.hidden = true;
+
+        const start = performance.now();
+        try {
+          const response = await fetch(url, { headers: { Accept: provider.accept } });
+          const durationMs = Math.round(performance.now() - start);
+
+          if (!response.ok) {
+            throw new Error("HTTP " + response.status + " from " + provider.label);
+          }
+
+          const data = await response.json();
+          lastResponse = data;
+          renderStatus(data, durationMs);
+          renderRecords(data);
+
+          // Track in session history (dedupe by domain+type, most recent first).
+          history = history.filter((h) => !(h.domain === domain && h.type === activeType));
+          history.unshift({ domain, type: activeType });
+          history = history.slice(0, 8);
+          renderHistory();
+        } catch (err) {
+          const durationMs = Math.round(performance.now() - start);
+          statusBar.hidden = false;
+          statusPill.textContent = "Request failed";
+          statusPill.className = "status-pill err";
+          timingPill.textContent = durationMs + " ms";
+          timingPill.className = "status-pill";
+          recordsTable.hidden = true;
+          emptyState.hidden = false;
+          emptyState.textContent = "Lookup failed.";
+          lookupError.textContent = "Could not complete the lookup: " + err.message + ". This can happen if the DoH provider is unreachable or blocked on your network.";
+        } finally {
+          btnLookup.disabled = false;
+          btnLookup.textContent = "Lookup";
+        }
+      }
+
+      /** Renders the status pills (RCODE meaning + timing). */
+      function renderStatus(data, durationMs) {
+        statusBar.hidden = false;
+        const rcode = data.Status;
+        const meaning = RCODE_MEANINGS[rcode] || "Unknown status code " + rcode;
+        statusPill.textContent = "Status " + rcode + ": " + meaning;
+        statusPill.className = "status-pill " + (rcode === 0 ? "ok" : "err");
+        timingPill.textContent = durationMs + " ms";
+        timingPill.className = "status-pill";
+      }
+
+      /** Renders the answer records table, or the empty state if there are none. */
+      function renderRecords(data) {
+        const answers = data.Answer || [];
+        recordsBody.innerHTML = "";
+
+        if (answers.length === 0) {
+          recordsTable.hidden = true;
+          emptyState.hidden = false;
+          emptyState.textContent = data.Status === 3 ? "NXDOMAIN — this domain does not exist." : "No " + activeType + " records found for this domain.";
+          return;
+        }
+
+        answers.forEach((answer) => {
+          const typeName = TYPE_CODE_TO_NAME[answer.type] || "TYPE" + answer.type;
+          const tr = document.createElement("tr");
+
+          const typeTd = document.createElement("td");
+          const badge = document.createElement("span");
+          badge.className = "type-badge";
+          badge.style.background = TYPE_COLORS[typeName] || "#9ca3af";
+          badge.textContent = typeName;
+          typeTd.appendChild(badge);
+
+          const nameTd = document.createElement("td");
+          nameTd.textContent = answer.name;
+
+          const ttlTd = document.createElement("td");
+          ttlTd.textContent = answer.TTL + "s";
+
+          const dataTd = document.createElement("td");
+          const recordData = formatRecordData(answer);
+          dataTd.textContent = recordData;
+
+          const copyTd = document.createElement("td");
+          const copyBtn = document.createElement("button");
+          copyBtn.type = "button";
+          copyBtn.className = "copy-cell-btn";
+          copyBtn.textContent = "Copy";
+          copyBtn.addEventListener("click", () => copyText(recordData, "Record data copied!"));
+          copyTd.appendChild(copyBtn);
+
+          tr.appendChild(typeTd);
+          tr.appendChild(nameTd);
+          tr.appendChild(ttlTd);
+          tr.appendChild(dataTd);
+          tr.appendChild(copyTd);
+          recordsBody.appendChild(tr);
+        });
+
+        recordsTable.hidden = false;
+        emptyState.hidden = true;
+      }
+
+      // ---- Events ----
+
+      btnLookup.addEventListener("click", performLookup);
+      domainInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") performLookup();
+      });
+
+      btnCopyAll.addEventListener("click", () => {
+        if (!lastResponse) {
+          showToast("Run a lookup first");
+          return;
+        }
+        copyText(JSON.stringify(lastResponse, null, 2), "Full response copied!");
+      });
+
+      btnDownload.addEventListener("click", () => {
+        if (!lastResponse) {
+          showToast("Run a lookup first");
+          return;
+        }
+        const blob = new Blob([JSON.stringify(lastResponse, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = "dns-lookup-" + (domainInput.value.trim() || "result") + ".json";
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+      });
+
+      renderTypeChips();
+    </script>
+  </body>
+</html>
