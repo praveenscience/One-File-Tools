@@ -1355,6 +1355,13 @@
           <div class="url-input-wrapper" id="urlInputWrapper">
             <input type="url" class="url-input" id="urlInput" placeholder="Enter a URL to inspect (e.g. https://example.com)" spellcheck="false" autocomplete="off" />
           </div>
+          <div class="proxy-option-container" id="proxyOptionContainer" style="margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 0.85rem; color: var(--text-secondary)">
+            <input type="checkbox" id="allowPublicProxies" checked style="cursor: pointer" />
+            <label for="allowPublicProxies" style="cursor: pointer; display: inline-flex; align-items: center; gap: 4px; user-select: none">
+              Allow public CORS proxy fallback on direct fetch failure
+              <span style="cursor: help" title="If checked, URL queries that fail direct browser fetching will use public third-party proxies (allorigins.win, corsproxy.io) to fetch page content. If unchecked, external requests will only go through direct fetch or the deployment server proxy.">ℹ️</span>
+            </label>
+          </div>
           <div class="html-input-wrapper" id="htmlInputWrapper">
             <textarea class="html-textarea" id="htmlInput" placeholder="Paste the full HTML source of the page here...&#10;&#10;Tip: Right-click on a page &#x2192; View Page Source &#x2192; Select All &#x2192; Copy"></textarea>
           </div>
@@ -1453,6 +1460,7 @@
         currentMode = mode;
         document.querySelectorAll(".input-mode-tab").forEach((t) => t.classList.toggle("active", t.dataset.mode === mode));
         document.getElementById("urlInputWrapper").style.display = mode === "url" ? "flex" : "none";
+        document.getElementById("proxyOptionContainer").style.display = mode === "url" ? "flex" : "none";
         document.getElementById("htmlInputWrapper").classList.toggle("active", mode === "html");
         document.getElementById("corsNotice").classList.remove("visible");
       }
@@ -1568,6 +1576,16 @@
           return new URL(url, base).href;
         } catch {
           return url;
+        }
+      }
+
+      function isSafeUrl(url) {
+        if (!url) return false;
+        try {
+          const parsed = new URL(url, window.location.href);
+          return parsed.protocol === "http:" || parsed.protocol === "https:";
+        } catch {
+          return false;
         }
       }
 
@@ -1818,6 +1836,8 @@
          * When running locally (file://) it falls back to public proxies.
          */
         const isDeployed = location.protocol === "https:" || location.protocol === "http:";
+        const allowPublic = document.getElementById("allowPublicProxies")?.checked !== false;
+
         const attempts = [
           /* 1. Our own server-side proxy (works when deployed to Cloudflare Pages) */
           ...(isDeployed
@@ -1846,22 +1866,26 @@
               });
             }),
           /* 3. Public CORS proxies as last resort */
-          () =>
-            fetch("https://api.allorigins.win/raw?url=" + encodeURIComponent(url)).then((r) => {
-              if (!r.ok) throw new Error(r.status);
-              return r.text().then((text) => {
-                if (!looksLikeHtml(text)) throw new Error("Invalid HTML response");
-                return text;
-              });
-            }),
-          () =>
-            fetch("https://corsproxy.io/?" + encodeURIComponent(url)).then((r) => {
-              if (!r.ok) throw new Error(r.status);
-              return r.text().then((text) => {
-                if (!looksLikeHtml(text)) throw new Error("Invalid HTML response");
-                return text;
-              });
-            })
+          ...(allowPublic
+            ? [
+                () =>
+                  fetch("https://api.allorigins.win/raw?url=" + encodeURIComponent(url)).then((r) => {
+                    if (!r.ok) throw new Error(r.status);
+                    return r.text().then((text) => {
+                      if (!looksLikeHtml(text)) throw new Error("Invalid HTML response");
+                      return text;
+                    });
+                  }),
+                () =>
+                  fetch("https://corsproxy.io/?" + encodeURIComponent(url)).then((r) => {
+                    if (!r.ok) throw new Error(r.status);
+                    return r.text().then((text) => {
+                      if (!looksLikeHtml(text)) throw new Error("Invalid HTML response");
+                      return text;
+                    });
+                  })
+              ]
+            : [])
         ];
 
         for (const attempt of attempts) {
@@ -2061,7 +2085,7 @@
           ["robots", data.seo.robots],
           ["canonical", data.seo.canonical, true]
         ])}
-        ${data.favicon ? `<div class="meta-row"><span class="meta-key">favicon</span><span class="meta-value"><img src="${escHtml(data.favicon)}" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;" onerror="this.style.display='none'"><a href="${escHtml(data.favicon)}" target="_blank" rel="noopener">${escHtml(data.favicon)}</a></span></div>` : ""}
+        ${data.favicon ? `<div class="meta-row"><span class="meta-key">favicon</span><span class="meta-value">${isSafeUrl(data.favicon) ? `<img src="${escHtml(data.favicon)}" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;" onerror="this.style.display='none'"><a href="${escHtml(data.favicon)}" target="_blank" rel="noopener">${escHtml(data.favicon)}</a>` : escHtml(data.favicon)}</span></div>` : ""}
       </div>
     </div>`;
 
@@ -2158,7 +2182,7 @@
       function renderMetaRows(rows) {
         return rows
           .map(([key, val, isUrl]) => {
-            const display = val ? (isUrl ? `<a href="${escHtml(val)}" target="_blank" rel="noopener">${escHtml(val)}</a>` : escHtml(val)) : '<span class="missing">Not set</span>';
+            const display = val ? (isUrl && isSafeUrl(val) ? `<a href="${escHtml(val)}" target="_blank" rel="noopener">${escHtml(val)}</a>` : escHtml(val)) : '<span class="missing">Not set</span>';
             return `<div class="meta-row"><span class="meta-key">${escHtml(key)}</span><span class="meta-value${val ? "" : " missing"}">${display}</span></div>`;
           })
           .join("");
