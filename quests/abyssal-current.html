@@ -1,0 +1,1428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Abyssal Current — Learn CSS Animation by Diving</title>
+<style>
+:root{
+  --abyss:#05080d;
+  --trench:#0a1622;
+  --trench-2:#0d1e2b;
+  --panel:#0f2029;
+  --current-teal:#0e2f38;
+  --cyan:#4de8d4;
+  --cyan-dim:#2a8a80;
+  --amber:#ffb454;
+  --coral:#ff5c5c;
+  --foam:#eaf6f6;
+  --foam-dim:#9fb7bb;
+  --line: rgba(77,232,212,0.16);
+  --display: ui-serif, "New York", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --body-f: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", monospace;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--abyss);color:var(--foam);font-family:var(--body-f);overflow-x:hidden;}
+body{-webkit-font-smoothing:antialiased;}
+::selection{background:var(--cyan);color:var(--abyss);}
+button{font-family:inherit;cursor:pointer;}
+svg{display:block;}
+.hidden{display:none !important;}
+
+/* subtle drifting particulate for the whole app */
+#particulate{position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.5;}
+#landing-view {
+  width: 100%;
+}
+
+#game-view {
+  display: none;
+  width: 100%;
+  position: relative;
+}
+
+#landing-view {
+  transition: transform 1s cubic-bezier(.4,0,.2,1), opacity 1s ease;
+}
+
+.fade-up-out {
+  transform: translateY(-15vh) scale(0.95);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.descend-out {
+  animation: sinkOut 0.9s forwards cubic-bezier(.4,0,.2,1);
+}
+.descend-in {
+  animation: sinkIn 0.9s forwards cubic-bezier(.4,0,.2,1);
+}
+
+.ghost-buoy {
+  position: absolute; width: 26px; height: 26px; border-radius: 50%; transform: translate(-50%,-50%);
+  border: 2px dashed rgba(255, 180, 84, 0.4);
+  background: transparent;
+  pointer-events: none; z-index: 1;
+  opacity: 0.8;
+}
+.ghost-line {
+  position: absolute; width: 1px; background: rgba(255, 180, 84, 0.15); left: 0; bottom: 0; transform: translateX(-50%);
+  pointer-events: none; z-index: 1;
+}
+
+@keyframes sinkOut {
+  0% { transform: translateY(0) scale(1); opacity: 1; }
+  100% { transform: translateY(-100px) scale(0.97); opacity: 0; filter: blur(6px); }
+}
+@keyframes sinkIn {
+  0% { transform: translateY(100px) scale(0.97); opacity: 0; filter: blur(6px); }
+  100% { transform: translateY(0) scale(1); opacity: 1; filter: blur(0); }
+}
+
+/* ============================================================
+   DEPTH TIMELINE SIDEBAR
+   ============================================================ */
+#game-sidebar {
+  position: fixed;
+  left: 0; top: 0; bottom: 0;
+  width: 80px;
+  border-right: 1px solid var(--line);
+  background: rgba(3, 6, 10, 0.4);
+  backdrop-filter: blur(8px);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-line {
+  position: absolute;
+  top: 0; bottom: 0; left: 50%;
+  width: 1px;
+  background: rgba(77,232,212,0.15);
+  transform: translateX(-50%);
+  z-index: -1;
+}
+
+.sidebar-node {
+  position: relative;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--foam-dim);
+  background: var(--abyss);
+  margin: 40px 0;
+  transition: all 0.5s ease;
+}
+
+.sidebar-node::after {
+  content: attr(data-depth);
+  position: absolute;
+  left: 20px; top: -2px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--foam-dim);
+  white-space: nowrap;
+  letter-spacing: .05em;
+  transition: color 0.5s ease;
+}
+
+.sidebar-node.passed {
+  border-color: var(--cyan-dim);
+  background: var(--cyan-dim);
+}
+
+.sidebar-node.active {
+  border-color: var(--cyan);
+  background: var(--cyan);
+  box-shadow: 0 0 14px var(--cyan);
+  transform: scale(1.3);
+}
+.sidebar-node.active::after {
+  color: var(--cyan);
+  font-weight: 700;
+  text-shadow: 0 0 8px rgba(77,232,212,.6);
+  transform: scale(0.77); /* counter scale */
+}
+
+@media(max-width: 920px) {
+  #game-sidebar { width: 50px; }
+  .sidebar-node::after { display: none; }
+}
+
+
+/* ============================================================
+   HERO
+   ============================================================ */
+#hero{
+  position:relative;
+  min-height:100vh;
+  background:
+    radial-gradient(ellipse at 50% -10%, #123240 0%, transparent 55%),
+    linear-gradient(180deg, #071019 0%, #050b12 40%, #03060a 100%);
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:80px 20px 60px;
+}
+
+/* depth rule signature element, left margin */
+.depth-rule{
+  position:absolute; left:0; top:0; bottom:0; width:64px;
+  border-right:1px solid var(--line);
+  z-index:3;
+}
+.depth-rule .tick{
+  position:absolute; left:0; width:100%;
+  display:flex; align-items:center; gap:6px;
+  font-family:var(--mono); font-size:10px; letter-spacing:.05em;
+  color:var(--cyan-dim);
+}
+.depth-rule .tick::before{content:"";width:14px;height:1px;background:var(--cyan-dim);display:inline-block;margin-left:8px;}
+.depth-rule .tick b{color:var(--cyan); text-shadow:0 0 6px rgba(77,232,212,.6); font-weight:600;}
+
+.creature-field{position:absolute;inset:0;z-index:2;}
+.creature-field svg{position:absolute; filter:drop-shadow(0 0 10px rgba(77,232,212,.25));}
+
+.hero-inner{position:relative;z-index:4;text-align:center;max-width:820px;}
+.eyebrow{
+  font-family:var(--mono); font-size:11px; letter-spacing:.32em; text-transform:uppercase;
+  color:var(--cyan); opacity:.8; margin-bottom:18px;
+}
+h1.title{
+  font-family:var(--display);
+  font-variant:small-caps;
+  font-size:clamp(42px,7vw,84px);
+  line-height:0.98;
+  letter-spacing:.02em;
+  margin:0 0 18px;
+  color:var(--foam);
+  text-shadow:
+    0 0 6px rgba(77,232,212,.35),
+    0 0 26px rgba(77,232,212,.18),
+    0 2px 0 rgba(0,0,0,.6);
+  position:relative;
+}
+h1.title span{display:block; color:var(--cyan); font-style:italic;}
+.subtitle{
+  font-size:17px; line-height:1.65; color:var(--foam-dim);
+  max-width:560px; margin:0 auto 34px;
+  font-weight:300;
+}
+.hero-ctas{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;}
+
+.btn{
+  border:none; border-radius:999px; padding:15px 30px; font-size:14.5px;
+  letter-spacing:.05em; font-weight:600; position:relative;
+  transition:transform .25s cubic-bezier(.34,1.56,.64,1), box-shadow .25s ease;
+}
+.btn-primary{
+  background:linear-gradient(160deg,#5df0dc,#279488);
+  color:#03181a;
+  box-shadow:0 0 0 1px rgba(77,232,212,.4), 0 8px 30px rgba(77,232,212,.25), inset 0 1px 0 rgba(255,255,255,.5);
+}
+.btn-primary:hover{transform:translateY(-3px) scale(1.02); box-shadow:0 0 0 1px rgba(77,232,212,.6), 0 14px 40px rgba(77,232,212,.4);}
+.btn-ghost{
+  background:rgba(15,32,41,.6); color:var(--foam); border:1px solid var(--line);
+  backdrop-filter:blur(6px);
+}
+.btn-ghost:hover{transform:translateY(-3px); border-color:var(--cyan); box-shadow:0 8px 24px rgba(0,0,0,.4);}
+
+.scroll-cue{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);z-index:4;display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--foam-dim);font-family:var(--mono);font-size:10px;letter-spacing:.2em;}
+.scroll-cue .line{width:1px;height:34px;background:linear-gradient(var(--cyan),transparent);animation:scrollpulse 2s ease-in-out infinite;}
+@keyframes scrollpulse{0%,100%{opacity:.2;}50%{opacity:1;}}
+
+/* ============================================================
+   FIELD GUIDE
+   ============================================================ */
+#guide{
+  position:relative;
+  background:linear-gradient(180deg,#03060a,#060d14 12%,#060d14 88%,#03060a);
+  padding:90px 24px 100px;
+  border-top:1px solid var(--line);
+}
+.guide-head{max-width:720px;margin:0 auto 56px;text-align:center;}
+.guide-head .eyebrow{color:var(--amber);}
+.guide-head h2{font-family:var(--display);font-variant:small-caps;font-size:clamp(30px,4vw,44px);margin:10px 0 14px;}
+.guide-head p{color:var(--foam-dim);font-size:15.5px;line-height:1.7;font-weight:300;}
+
+.guide-grid{max-width:1080px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:22px;}
+.guide-card{
+  background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:24px;
+  display:flex; flex-direction:column; gap:14px;
+}
+.guide-card h3{margin:0;font-family:var(--display);font-size:19px;letter-spacing:.02em;color:var(--cyan);}
+.guide-card p{margin:0;font-size:13.5px;line-height:1.6;color:var(--foam-dim);font-weight:300;}
+.demo-box{
+  height:74px;border-radius:12px;background:radial-gradient(ellipse at 50% 120%,rgba(77,232,212,.12),transparent 70%),var(--current-teal);
+  position:relative;overflow:hidden;border:1px solid rgba(77,232,212,.15);
+}
+.demo-orb{
+  position:absolute; top:50%; left:12%; width:20px;height:20px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#eafffb,var(--cyan) 55%,var(--cyan-dim));
+  box-shadow:0 0 16px rgba(77,232,212,.9);
+  transform:translateY(-50%);
+}
+/* field guide concept demos */
+.demo-keyframes .demo-orb{animation:demoKF 2.2s linear infinite;}
+@keyframes demoKF{0%{left:12%;opacity:.35;transform:translateY(-50%) scale(.7);}50%{left:48%;opacity:1;transform:translateY(-50%) scale(1.25);}100%{left:84%;opacity:.35;transform:translateY(-50%) scale(.7);}}
+
+.demo-easing .demo-orb.e1{animation:demoTravel 2.4s linear infinite;}
+.demo-easing .demo-orb.e2{animation:demoTravel 2.4s cubic-bezier(.65,0,.35,1) infinite; top:66%;}
+@keyframes demoTravel{0%{left:8%;}100%{left:82%;}}
+
+.demo-duration .demo-orb.d1{animation:demoTravel 1s ease-in-out infinite; top:34%;}
+.demo-duration .demo-orb.d2{animation:demoTravel 3.4s ease-in-out infinite; top:66%;}
+
+.demo-fill .demo-orb{left:44%; animation:demoRise 1.8s ease-out 1; animation-fill-mode:forwards; animation-iteration-count:1;}
+.demo-fill{cursor:pointer;}
+@keyframes demoRise{0%{top:80%;opacity:0;transform:translateY(-50%) scale(.4);}100%{top:20%;opacity:1;transform:translateY(-50%) scale(1.3);}}
+
+.mini-label{font-family:var(--mono);font-size:10px;color:var(--foam-dim);letter-spacing:.08em;display:flex;justify-content:space-between;}
+.mini-label b{color:var(--cyan);font-weight:600;}
+
+/* ============================================================
+   GAME
+   ============================================================ */
+#game{
+  min-height:100vh;
+  background:
+    radial-gradient(ellipse at 50% 0%, #0c2029 0%, transparent 60%),
+    linear-gradient(180deg,#03060a,#04090f);
+  padding:34px 20px 90px 100px; /* added 100px left padding for the sidebar */
+}
+@media(max-width: 920px) {
+  #game { padding-left: 70px; }
+}
+
+.game-topbar{
+  max-width:1180px;margin:0 auto 26px;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;
+}
+.level-chip{
+  font-family:var(--mono); font-size:11px; letter-spacing:.14em; color:var(--foam-dim);
+  border:1px solid var(--line); padding:8px 16px; border-radius:999px; display:flex; gap:10px; align-items:center;
+}
+.level-chip b{color:var(--amber);font-size:13px;}
+
+.oxygen-wrap{display:flex; align-items:center; gap:12px;}
+.oxygen-label{font-family:var(--mono);font-size:10px;color:var(--foam-dim);letter-spacing:.14em;text-align:right;}
+.oxygen-label b{display:block;font-size:16px;color:var(--cyan);font-weight:700;}
+.oxygen-tube{
+  width:160px; height:14px; border-radius:999px; background:#050d12; border:1px solid var(--line);
+  overflow:hidden; position:relative;
+}
+.oxygen-fill{
+  height:100%; width:100%; border-radius:999px;
+  background:linear-gradient(90deg,#2a8a80,#4de8d4);
+  transition:width .3s ease, background .4s ease;
+}
+.oxygen-fill.warn{background:linear-gradient(90deg,#b98a2f,#ffb454);}
+.oxygen-fill.crit{background:linear-gradient(90deg,#8a2a2a,#ff5c5c); animation:critblink 1s ease-in-out infinite;}
+@keyframes critblink{0%,100%{opacity:1;}50%{opacity:.5;}}
+
+.narrative{max-width:1180px;margin:0 auto 24px;padding:18px 22px;background:var(--panel);border:1px solid var(--line);border-radius:14px;}
+.narrative h3{margin:0 0 4px;font-family:var(--display);font-size:20px;color:var(--foam);}
+.narrative p{margin:0;font-size:13.5px;color:var(--foam-dim);font-weight:300;line-height:1.6;}
+
+.game-grid{max-width:1180px;margin:0 auto;display:grid;grid-template-columns:1.05fr 1.3fr;gap:24px;}
+@media(max-width:920px){.game-grid{grid-template-columns:1fr;}}
+
+.stage{
+  background:radial-gradient(ellipse at 50% 30%, #0d2e35 0%, #041017 75%);
+  border:1px solid var(--line); border-radius:20px; position:relative; overflow:hidden;
+  min-height:420px; display:flex; align-items:center; justify-content:center;
+}
+.stage-caustics{position:absolute;inset:0;opacity:.35;mix-blend-mode:screen;}
+.stage-status{
+  position:absolute; top:16px; left:16px; font-family:var(--mono); font-size:10px; letter-spacing:.12em; color:var(--foam-dim);
+  background:rgba(3,10,15,.5); padding:6px 12px; border-radius:999px; border:1px solid var(--line);
+}
+.stage-status b{color:var(--cyan);}
+.stage-status.synced b{color:#7dffcf; text-shadow:0 0 8px rgba(125,255,207,.8);}
+
+.panel{
+  background:var(--panel); border:1px solid var(--line); border-radius:20px; padding:22px 22px 26px;
+  display:flex; flex-direction:column; gap:20px;
+}
+.panel h4{margin:0;font-family:var(--display);font-size:16px;letter-spacing:.03em;color:var(--cyan);display:flex;align-items:center;gap:8px;}
+.panel h4 .n{font-family:var(--mono);font-size:10px;color:var(--foam-dim);border:1px solid var(--line);border-radius:6px;padding:2px 6px;}
+
+/* timeline / buoy builder */
+.timeline-wrap{position:relative;}
+.timeline-track{
+  position:relative; height:150px; border-radius:14px;
+  background:linear-gradient(180deg, rgba(77,232,212,.05), transparent 40%), #071119;
+  border:1px solid var(--line); overflow:visible;
+}
+.timeline-track .gridline{position:absolute; top:0; bottom:0; width:1px; background:rgba(77,232,212,.08);}
+.timeline-track .gridlabel{position:absolute; bottom:-20px; font-family:var(--mono); font-size:9px; color:var(--foam-dim); transform:translateX(-50%);}
+.buoy{
+  position:absolute; width:26px; height:26px; border-radius:50%; transform:translate(-50%,-50%);
+  background:radial-gradient(circle at 35% 30%, #eafffb, var(--cyan) 55%, var(--cyan-dim));
+  box-shadow:0 0 14px rgba(77,232,212,.85), 0 0 0 2px rgba(3,10,15,.8);
+  cursor:grab; touch-action:none; z-index:2;
+}
+.buoy.locked{cursor:ns-resize;}
+.buoy.selected{box-shadow:0 0 0 3px var(--amber), 0 0 18px rgba(255,180,84,.9);}
+.buoy:active{cursor:grabbing;}
+.buoy-line{position:absolute; width:2px; background:rgba(77,232,212,.25); left:0; bottom:0; transform:translateX(-50%);}
+
+.inspector{
+  background:#071119; border:1px solid var(--line); border-radius:12px; padding:14px 16px;
+  display:flex; flex-direction:column; gap:10px;
+}
+.inspector .row{display:flex; align-items:center; gap:12px;}
+.inspector label{font-family:var(--mono); font-size:10px; color:var(--foam-dim); width:76px; letter-spacing:.06em;}
+.inspector .val{font-family:var(--mono); font-size:11px; color:var(--cyan); width:44px; text-align:right;}
+.hint-text { color: var(--amber); font-size: 9px; font-style: normal; letter-spacing: 0.1em; opacity: 0.9; margin-left: 6px; font-family: var(--mono); text-shadow: 0 0 4px rgba(255,180,84,0.4); }
+input[type=range]{
+  -webkit-appearance:none; flex:1; height:4px; border-radius:4px; background:rgba(77,232,212,.18); outline:none;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none; width:16px; height:16px; border-radius:50%; background:var(--cyan);
+  box-shadow:0 0 8px rgba(77,232,212,.9); cursor:pointer; border:2px solid #03181a;
+}
+
+.control-row{display:flex; flex-direction:column; gap:8px;}
+.control-row .row-label{font-family:var(--mono); font-size:10px; color:var(--foam-dim); letter-spacing:.1em; display:flex; justify-content:space-between;}
+.control-row .row-label b{color:var(--foam);font-size:11px;}
+
+.easing-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px;}
+.easing-opt{
+  background:#071119; border:1px solid var(--line); border-radius:10px; padding:8px; text-align:center;
+  display:flex; flex-direction:column; align-items:center; gap:6px; transition:border-color .2s ease, transform .2s ease;
+}
+.easing-opt:hover{transform:translateY(-2px);}
+.easing-opt.active{border-color:var(--amber); box-shadow:0 0 0 1px var(--amber);}
+.easing-opt .track{position:relative; width:100%; height:26px; background:#040b10; border-radius:6px; overflow:hidden;}
+.easing-opt .dot{position:absolute; top:50%; width:10px; height:10px; border-radius:50%; background:var(--cyan); box-shadow:0 0 8px rgba(77,232,212,.9); transform:translateY(-50%); left:6%;}
+.easing-opt span{font-family:var(--mono); font-size:9px; color:var(--foam-dim); letter-spacing:.05em;}
+.e-linear .dot{animation:eLinear 1.6s linear infinite;}
+.e-ease .dot{animation:eEase 1.6s ease infinite;}
+.e-in .dot{animation:eIn 1.6s ease-in infinite;}
+.e-out .dot{animation:eOut 1.6s ease-out infinite;}
+.e-inout .dot{animation:eInOut 1.6s ease-in-out infinite;}
+.e-back .dot{animation:eBack 1.6s cubic-bezier(.34,1.56,.64,1) infinite;}
+@keyframes eLinear{0%{left:6%;}100%{left:88%;}}
+@keyframes eEase{0%{left:6%;}100%{left:88%;}}
+@keyframes eIn{0%{left:6%;}100%{left:88%;}}
+@keyframes eOut{0%{left:6%;}100%{left:88%;}}
+@keyframes eInOut{0%{left:6%;}100%{left:88%;}}
+@keyframes eBack{0%{left:6%;}100%{left:88%;}}
+
+.fillmode-row, .duration-row{display:flex; gap:8px;}
+.pill-opt{
+  flex:1; background:#071119; border:1px solid var(--line); border-radius:999px; padding:8px 4px;
+  font-family:var(--mono); font-size:10px; color:var(--foam-dim); text-align:center; letter-spacing:.05em;
+}
+.pill-opt.active{border-color:var(--cyan); color:var(--cyan); box-shadow:0 0 0 1px var(--cyan);}
+
+.dive-btn{
+  margin-top:6px; background:linear-gradient(160deg,#5df0dc,#279488); color:#03181a; border:none;
+  border-radius:12px; padding:14px; font-weight:700; letter-spacing:.06em; font-size:14px;
+  box-shadow:0 6px 20px rgba(77,232,212,.25);
+}
+.dive-btn:active{transform:scale(.98);}
+
+.next-btn{
+  background:linear-gradient(160deg,#ffd08a,#e08a2f); color:#241203; border:none; border-radius:12px;
+  padding:14px; font-weight:700; letter-spacing:.06em; font-size:14px; box-shadow:0 6px 20px rgba(255,180,84,.3);
+}
+
+.progress-ring-wrap{display:flex; align-items:center; gap:10px; font-family:var(--mono); font-size:10px; color:var(--foam-dim);}
+
+/* success overlay */
+#successOverlay{
+  position:fixed; inset:0; z-index:50; background:rgba(2,6,10,.82); display:flex; align-items:center; justify-content:center;
+  backdrop-filter:blur(4px);
+}
+.success-card{
+  background:var(--panel); border:1px solid var(--cyan); border-radius:22px; padding:44px 40px; text-align:center; max-width:420px;
+  box-shadow:0 0 60px rgba(77,232,212,.25);
+}
+.success-card h2{font-family:var(--display);font-variant:small-caps;font-size:30px;color:var(--cyan);margin:12px 0 8px;text-shadow:0 0 16px rgba(77,232,212,.5);}
+.success-card p{color:var(--foam-dim); font-size:14px; line-height:1.6; margin:0 0 22px; font-weight:300;}
+
+.creature-mini{position:absolute; pointer-events:none;}
+
+footer{text-align:center; padding:40px 20px; font-family:var(--mono); font-size:11px; color:var(--foam-dim); letter-spacing:.1em;}
+
+@media(prefers-reduced-motion: reduce){
+  *{animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important;}
+}
+</style>
+</head>
+<body>
+
+<canvas id="particulate"></canvas>
+
+<svg width="0" height="0" style="position:absolute">
+<defs>
+<symbol id="jellyfish" viewBox="0 0 160 200">
+  <radialGradient id="jellyBell" cx="50%" cy="20%" r="80%">
+    <stop offset="0%" stop-color="#eafcff" stop-opacity="0.95"/>
+    <stop offset="45%" stop-color="#8de3e0" stop-opacity="0.55"/>
+    <stop offset="100%" stop-color="#2f8f8c" stop-opacity="0.12"/>
+  </radialGradient>
+  <path d="M20,90 C20,35 55,8 80,8 C105,8 140,35 140,90 C140,105 128,108 118,100 C112,113 100,116 92,104 C86,116 74,116 68,104 C60,116 48,113 42,100 C32,108 20,105 20,90 Z" fill="url(#jellyBell)" stroke="#bdf5f0" stroke-width="1" stroke-opacity=".5">
+    <animate attributeName="d" dur="3.2s" repeatCount="indefinite"
+      values="M20,90 C20,35 55,8 80,8 C105,8 140,35 140,90 C140,105 128,108 118,100 C112,113 100,116 92,104 C86,116 74,116 68,104 C60,116 48,113 42,100 C32,108 20,105 20,90 Z;
+      M20,96 C20,40 55,14 80,14 C105,14 140,40 140,96 C140,110 128,112 118,104 C112,117 100,119 92,107 C86,119 74,119 68,107 C60,119 48,117 42,104 C32,112 20,110 20,96 Z;
+      M20,90 C20,35 55,8 80,8 C105,8 140,35 140,90 C140,105 128,108 118,100 C112,113 100,116 92,104 C86,116 74,116 68,104 C60,116 48,113 42,100 C32,108 20,105 20,90 Z"/>
+  </path>
+  <g stroke="#7fe9e2" stroke-width="2.4" fill="none" stroke-linecap="round" opacity=".8">
+    <path d="M50,100 C46,130 60,150 52,178"><animate attributeName="d" dur="2.6s" repeatCount="indefinite" values="M50,100 C46,130 60,150 52,178;M50,100 C58,128 40,152 56,178;M50,100 C46,130 60,150 52,178"/></path>
+    <path d="M70,108 C68,140 80,158 72,188"><animate attributeName="d" dur="2.9s" repeatCount="indefinite" values="M70,108 C68,140 80,158 72,188;M70,108 C78,138 62,160 76,188;M70,108 C68,140 80,158 72,188"/></path>
+    <path d="M90,108 C92,140 80,158 88,188"><animate attributeName="d" dur="2.7s" repeatCount="indefinite" values="M90,108 C92,140 80,158 88,188;M90,108 C82,138 98,160 84,188;M90,108 C92,140 80,158 88,188"/></path>
+    <path d="M110,100 C114,130 100,150 108,178"><animate attributeName="d" dur="3.1s" repeatCount="indefinite" values="M110,100 C114,130 100,150 108,178;M110,100 C102,128 120,152 104,178;M110,100 C114,130 100,150 108,178"/></path>
+  </g>
+  <ellipse cx="80" cy="55" rx="30" ry="16" fill="#ffffff" opacity=".25"/>
+</symbol>
+<symbol id="anglerfish" viewBox="0 0 220 140">
+  <linearGradient id="anglerBody" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#2b2f3d"/>
+    <stop offset="100%" stop-color="#0c0e15"/>
+  </linearGradient>
+  <path d="M20,70 C25,35 60,18 105,20 C150,22 185,40 200,62 C185,58 172,64 170,72 C172,80 185,86 200,80 C185,102 150,118 105,120 C60,122 25,105 20,70 Z" fill="url(#anglerBody)" stroke="#3a3f52" stroke-width="1.5"/>
+  <path d="M35,58 Q20,55 10,64 Q20,66 35,70 Z" fill="#1a1c26"/>
+  <circle cx="70" cy="62" r="4.4" fill="#eafcff"/>
+  <path d="M78,42 C70,20 55,6 44,8" stroke="#4a4f63" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <circle cx="42" cy="8" r="7" fill="#fff2c9">
+    <animate attributeName="r" dur="1.8s" repeatCount="indefinite" values="7;9.5;7"/>
+    <animate attributeName="opacity" dur="1.8s" repeatCount="indefinite" values=".55;1;.55"/>
+  </circle>
+  <circle cx="42" cy="8" r="16" fill="#ffe9a8" opacity=".18">
+    <animate attributeName="r" dur="1.8s" repeatCount="indefinite" values="16;22;16"/>
+    <animate attributeName="opacity" dur="1.8s" repeatCount="indefinite" values=".1;.28;.1"/>
+  </circle>
+  <path d="M100,25 C112,10 130,8 140,18 C128,20 116,28 108,38 Z" fill="#232733" opacity=".9"/>
+  <path d="M100,115 C112,130 130,132 140,122 C128,120 116,112 108,102 Z" fill="#232733" opacity=".9"/>
+</symbol>
+<symbol id="seahorse" viewBox="0 0 100 200">
+  <linearGradient id="seahorseGrad" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#ffd7a8"/>
+    <stop offset="100%" stop-color="#e0894a"/>
+  </linearGradient>
+  <path d="M52,10 C70,10 78,26 74,42 C70,56 56,58 56,72 C56,86 78,88 80,108 C82,130 62,144 60,162 C58,178 68,184 62,196 C46,198 34,182 38,166 C30,168 18,158 22,144 C10,140 6,120 18,108 C10,100 10,84 22,76 C14,68 16,52 30,46 C24,34 32,14 52,10 Z"
+    fill="url(#seahorseGrad)" stroke="#c46a2e" stroke-width="1.3">
+    <animateTransform attributeName="transform" type="rotate" dur="3.6s" repeatCount="indefinite" values="-4 50 100;4 50 100;-4 50 100"/>
+  </path>
+  <circle cx="60" cy="28" r="3.6" fill="#2a1408"/>
+  <path d="M40,58 C34,60 30,66 32,72" stroke="#c46a2e" stroke-width="2" fill="none" stroke-linecap="round" opacity=".7"/>
+  <path d="M18,110 C6,116 4,132 16,140 C10,128 14,118 22,114 Z" fill="#ffe3bd" opacity=".85">
+     <animateTransform attributeName="transform" type="rotate" dur="1.6s" repeatCount="indefinite" values="0 18 120;18 18 120;0 18 120"/>
+  </path>
+</symbol>
+<symbol id="octopus" viewBox="0 0 220 200">
+  <radialGradient id="octoGrad" cx="40%" cy="25%" r="70%">
+    <stop offset="0%" stop-color="#c98cff"/>
+    <stop offset="100%" stop-color="#5c2f8a"/>
+  </radialGradient>
+  <ellipse cx="110" cy="60" rx="56" ry="46" fill="url(#octoGrad)"/>
+  <circle cx="92" cy="52" r="7" fill="#150a24"/>
+  <circle cx="130" cy="52" r="7" fill="#150a24"/>
+  <circle cx="94" cy="50" r="2.4" fill="#eafcff"/>
+  <circle cx="132" cy="50" r="2.4" fill="#eafcff"/>
+  <g fill="none" stroke="#7c3fb8" stroke-width="9" stroke-linecap="round" opacity=".9">
+    <path d="M70,90 C50,120 40,150 46,180"><animate attributeName="d" dur="3.4s" repeatCount="indefinite" values="M70,90 C50,120 40,150 46,180;M70,90 C40,110 58,150 40,180;M70,90 C50,120 40,150 46,180"/></path>
+    <path d="M90,96 C78,130 84,160 70,186"><animate attributeName="d" dur="3.1s" repeatCount="indefinite" values="M90,96 C78,130 84,160 70,186;M90,96 C70,124 100,158 82,186;M90,96 C78,130 84,160 70,186"/></path>
+    <path d="M112,98 C112,132 112,160 112,190"><animate attributeName="d" dur="3.7s" repeatCount="indefinite" values="M112,98 C112,132 112,160 112,190;M112,98 C130,128 96,158 112,190;M112,98 C112,132 112,160 112,190"/></path>
+    <path d="M132,96 C144,130 138,160 152,186"><animate attributeName="d" dur="3.3s" repeatCount="indefinite" values="M132,96 C144,130 138,160 152,186;M132,96 C154,124 122,158 140,186;M132,96 C144,130 138,160 152,186"/></path>
+    <path d="M150,90 C170,120 180,150 174,180"><animate attributeName="d" dur="3.0s" repeatCount="indefinite" values="M150,90 C170,120 180,150 174,180;M150,90 C180,110 162,150 180,180;M150,90 C170,120 180,150 174,180"/></path>
+  </g>
+</symbol>
+<symbol id="plankton" viewBox="0 0 40 40">
+  <circle cx="20" cy="20" r="5" fill="#eafcff"/>
+  <circle cx="20" cy="20" r="12" fill="#4de8d4" opacity=".22"/>
+  <g stroke="#4de8d4" stroke-width="1" opacity=".5">
+    <line x1="20" y1="4" x2="20" y2="12"/>
+    <line x1="20" y1="28" x2="20" y2="36"/>
+    <line x1="4" y1="20" x2="12" y2="20"/>
+    <line x1="28" y1="20" x2="36" y2="20"/>
+  </g>
+</symbol>
+<symbol id="coral" viewBox="0 0 200 160">
+  <g fill="none" stroke="#2f8f8c" stroke-width="5" stroke-linecap="round" opacity=".55">
+    <path d="M100,160 C100,120 80,110 70,80 M100,120 C100,100 120,90 130,60 M100,140 C100,110 60,100 40,70 M100,130 C100,100 140,95 160,70"/>
+  </g>
+</symbol>
+<symbol id="submarine" viewBox="0 0 260 140">
+  <linearGradient id="subBody" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#3a4552"/>
+    <stop offset="100%" stop-color="#14181f"/>
+  </linearGradient>
+  <ellipse cx="130" cy="76" rx="110" ry="38" fill="url(#subBody)" stroke="#4d5a6b" stroke-width="2"/>
+  <rect x="60" y="40" width="70" height="30" rx="15" fill="#1c2129" stroke="#4d5a6b" stroke-width="1.5"/>
+  <circle cx="95" cy="55" r="11" fill="#0a2f33" stroke="#4de8d4" stroke-width="2"/>
+  <circle cx="95" cy="55" r="5" fill="#bdf7f0"/>
+  <rect x="150" y="66" width="46" height="10" rx="5" fill="#232935"/>
+  <circle cx="230" cy="76" r="7" fill="#0a2f33" stroke="#4de8d4" stroke-width="1.5" id="subGlow"/>
+  <path d="M40,76 L10,60 L10,92 Z" fill="#1c2129" stroke="#4d5a6b" stroke-width="1.5"/>
+  <path d="M120,38 L150,14 L168,20 L146,44 Z" fill="#2a323e" stroke="#4d5a6b" stroke-width="1.5"/>
+</symbol>
+</defs>
+</svg>
+
+<div id="landing-view">
+  <section id="hero">
+    <div class="depth-rule" id="depthRule"></div>
+    <div class="creature-field" id="creatureField"></div>
+
+    <div class="hero-inner">
+      <div class="eyebrow">A learn-by-piloting descent · css keyframes · easing · timing</div>
+      <h1 class="title">Abyssal Current<span>light the dark by hand</span></h1>
+      <p class="subtitle">Pilot a glowing submersible through pitch-black trenches. There are no bulbs down here — only the animations you wire yourself. Get the keyframes, the timing, the easing wrong, and the light gutters out.</p>
+      <div class="hero-ctas">
+        <button class="btn btn-primary" onclick="startDive()">Begin the Dive ↓</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('guide').scrollIntoView({behavior:'smooth'})">Open the Field Guide</button>
+      </div>
+    </div>
+
+    <div class="scroll-cue"><span>DRIFT</span><div class="line"></div></div>
+  </section>
+
+  <section id="guide">
+    <div class="guide-head">
+      <div class="eyebrow">Field Guide</div>
+      <h2>What the current teaches</h2>
+      <p>Four ideas run every animation you'll wire below. Watch each one move before you touch a single control — the water tells you more than any label could.</p>
+    </div>
+    <div class="guide-grid">
+
+      <div class="guide-card">
+        <h3>Keyframes</h3>
+        <p>A keyframe is a state at a moment in time — 0%, 50%, 100%. The browser draws everything in between for you. Watch the orb swell as it passes the 50% buoy.</p>
+        <div class="demo-box demo-keyframes"><div class="demo-orb"></div></div>
+        <div class="mini-label"><span>0%</span><span>50% <b>peak</b></span><span>100%</span></div>
+      </div>
+
+      <div class="guide-card">
+        <h3>Easing = current shape</h3>
+        <p>Linear cuts straight across, no push or pull. Ease-in-out swells and settles like a real current. Same distance, same duration — different feeling entirely.</p>
+        <div class="demo-box demo-easing"><div class="demo-orb e1"></div><div class="demo-orb e2" style="background:radial-gradient(circle at 35% 30%,#fff3d6,var(--amber) 55%,#a56c1f)"></div></div>
+        <div class="mini-label"><span>linear</span><span style="color:var(--amber)">ease-in-out</span></div>
+      </div>
+
+      <div class="guide-card">
+        <h3>Duration</h3>
+        <p>Duration is how long one full pass takes. Too short and a glow reads as a nervous flicker. Too long and it reads as barely alive. Compare the two speeds.</p>
+        <div class="demo-box demo-duration"><div class="demo-orb d1"></div><div class="demo-orb d2" style="background:radial-gradient(circle at 35% 30%,#fff3d6,var(--amber) 55%,#a56c1f)"></div></div>
+        <div class="mini-label"><span>1.0s</span><span style="color:var(--amber)">3.4s</span></div>
+      </div>
+
+      <div class="guide-card">
+        <h3>Fill-mode</h3>
+        <p>When an animation finishes, does it snap back to its starting state, or hold its final pose? <b style="color:var(--amber)">forwards</b> keeps the last keyframe. Click to replay.</p>
+        <div class="demo-box demo-fill" onclick="this.querySelector('.demo-orb').style.animation='none';void this.offsetWidth;this.querySelector('.demo-orb').style.animation='demoRise 1.8s ease-out 1 forwards';"><div class="demo-orb"></div></div>
+        <div class="mini-label"><span>click to replay</span><span style="color:var(--amber)">fill-mode: forwards</span></div>
+      </div>
+
+    </div>
+  </section>
+  <footer>ABYSSAL CURRENT — every glow on this page is a css animation you can inspect</footer>
+</div>
+
+
+<div id="game-view">
+  <div id="game-sidebar">
+    <div class="sidebar-line"></div>
+    <div class="sidebar-node" id="node-0" data-depth="–120m"></div>
+    <div class="sidebar-node" id="node-1" data-depth="–260m"></div>
+    <div class="sidebar-node" id="node-2" data-depth="–410m"></div>
+    <div class="sidebar-node" id="node-3" data-depth="–560m"></div>
+    <div class="sidebar-node" id="node-4" data-depth="–920m"></div>
+  </div>
+
+  <section id="game">
+    <div class="game-topbar">
+      <div class="level-chip">DEPTH <b id="depthLabel">–120m</b> &nbsp;·&nbsp; LEVEL <b id="levelLabel">1 / 5</b></div>
+      <div class="oxygen-wrap">
+        <div class="oxygen-label">OXYGEN<b id="oxygenNum">100%</b></div>
+        <div class="oxygen-tube"><div class="oxygen-fill" id="oxygenFill"></div></div>
+      </div>
+    </div>
+
+    <div id="level-content">
+      <div class="narrative" id="narrativeBox">
+        <h3 id="narrativeTitle">Loading trench data…</h3>
+        <p id="narrativeText"></p>
+      </div>
+
+      <div class="game-grid">
+        <div class="stage" id="stage">
+          <svg class="stage-caustics" viewBox="0 0 400 400" preserveAspectRatio="none">
+            <defs><linearGradient id="caustic1" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#4de8d4" stop-opacity="0"/>
+              <stop offset="50%" stop-color="#4de8d4" stop-opacity=".15"/>
+              <stop offset="100%" stop-color="#4de8d4" stop-opacity="0"/>
+            </linearGradient></defs>
+            <rect x="-50" y="0" width="150" height="400" fill="url(#caustic1)" transform="rotate(20 200 200)">
+              <animateTransform attributeName="transform" type="translate" dur="6s" repeatCount="indefinite" values="-100 0;500 0;-100 0" additive="sum"/>
+            </rect>
+          </svg>
+          <div class="stage-status" id="stageStatus">READING CURRENT… <b id="syncLabel">0%</b></div>
+          <svg id="subSvg" viewBox="0 0 260 140" style="width:70%;max-width:340px;">
+            <use href="#submarine"/>
+          </svg>
+          <svg id="creature1" viewBox="0 0 160 200" style="position:absolute;width:110px;left:6%;bottom:8%;opacity:.9"><use href="#jellyfish"/></svg>
+          <svg id="creature2" viewBox="0 0 220 200" style="position:absolute;width:90px;right:5%;top:10%;opacity:.85"><use href="#octopus"/></svg>
+          <svg id="creature3" viewBox="0 0 40 40" style="position:absolute;width:34px;left:16%;top:20%;"><use href="#plankton"/></svg>
+          <svg id="creature4" viewBox="0 0 40 40" style="position:absolute;width:24px;right:22%;bottom:22%;"><use href="#plankton"/></svg>
+        </div>
+
+        <div class="panel">
+          <h4><span class="n">01</span>Timeline reel — drag the buoys</h4>
+          <div class="timeline-wrap">
+            <div class="timeline-track" id="track"></div>
+          </div>
+          <div class="inspector" id="inspector">
+            <div class="row"><label>SELECTED</label><div class="val" id="selName" style="flex:1;text-align:left;">buoy 1</div><div class="hint-text" id="targetInfo"></div></div>
+            <div class="row"><label>time %</label><input type="range" id="timeSlider" min="0" max="100" step="1"><div class="val" id="timeVal">0</div></div>
+            <div class="row"><label>glow</label><input type="range" id="glowSlider" min="0" max="100" step="1"><div class="val" id="glowVal">0</div></div>
+            <div class="row hidden" id="scaleRow"><label>scale</label><input type="range" id="scaleSlider" min="60" max="160" step="1"><div class="val" id="scaleVal">100</div></div>
+            <div class="row hidden" id="hueRow"><label>hue</label><input type="range" id="hueSlider" min="0" max="360" step="1"><div class="val" id="hueVal">0</div></div>
+          </div>
+
+          <div class="control-row hidden" id="easingRow">
+            <div class="row-label"><span>Easing — current shape <em class="hint-text" id="easeHint"></em></span><b id="easingActiveLabel">linear</b></div>
+            <div class="easing-grid" id="easingGrid"></div>
+          </div>
+
+          <div class="control-row hidden" id="durationRow">
+            <div class="row-label"><span>Duration <em class="hint-text" id="durHint"></em></span><b id="durationVal">2.0s</b></div>
+            <input type="range" id="durationSlider" min="400" max="4000" step="50">
+          </div>
+
+          <div class="control-row hidden" id="fillRow">
+            <div class="row-label"><span>Fill-mode <em class="hint-text" id="fillHint"></em></span><b id="fillActiveLabel">none</b></div>
+            <div class="fillmode-row" id="fillGrid"></div>
+          </div>
+
+          <div class="control-row hidden" id="delayRow">
+            <div class="row-label"><span>Swarm stagger <em class="hint-text" id="delayHint"></em></span><b id="delayVal">0ms</b></div>
+            <input type="range" id="delaySlider" min="0" max="600" step="20">
+          </div>
+
+          <button class="dive-btn" onclick="testDive()">▶ Test the current</button>
+          <div class="progress-ring-wrap">
+            <span id="feedbackText">Adjust the reel, then test the current.</span>
+          </div>
+          <button class="next-btn hidden" id="nextBtn" onclick="nextLevel()">Descend to next depth ↓</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="successOverlay" class="hidden">
+  <div class="success-card">
+    <svg width="64" height="64" viewBox="0 0 40 40" style="margin:0 auto"><use href="#plankton"/></svg>
+    <h2 id="successTitle">Current Stabilized</h2>
+    <p id="successText">The lure holds a steady bioluminescent pulse.</p>
+    <button class="btn btn-primary" onclick="closeSuccess()">Continue the dive</button>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   BACKGROUND PARTICULATE
+============================================================= */
+(function(){
+  const c = document.getElementById('particulate');
+  const ctx = c.getContext('2d');
+  let w,h,particles=[];
+  function resize(){w=c.width=window.innerWidth;h=c.height=document.documentElement.scrollHeight;}
+  window.addEventListener('resize',resize);
+  resize();
+  for(let i=0;i<90;i++){
+    particles.push({x:Math.random()*w,y:Math.random()*h,r:Math.random()*1.6+.3,s:Math.random()*.3+.05,o:Math.random()*.5+.1});
+  }
+  function tick(){
+    ctx.clearRect(0,0,w,h);
+    ctx.fillStyle='rgba(77,232,212,';
+    particles.forEach(p=>{
+      p.y-=p.s; if(p.y<-10){p.y=h+10; p.x=Math.random()*w;}
+      ctx.beginPath();
+      ctx.fillStyle=`rgba(77,232,212,${p.o})`;
+      ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      ctx.fill();
+    });
+    requestAnimationFrame(tick);
+  }
+  tick();
+})();
+
+/* ============================================================
+   HERO — depth rule + scattered creature field
+============================================================= */
+(function(){
+  const rule = document.getElementById('depthRule');
+  const depths = [0,50,100,150,200,250,300,350,400,450];
+  depths.forEach((d,i)=>{
+    const t = document.createElement('div');
+    t.className='tick';
+    t.style.top = (i*11+4)+'%';
+    t.innerHTML = `<b>${d}</b><span style="opacity:.4">m</span>`;
+    rule.appendChild(t);
+  });
+
+  const field = document.getElementById('creatureField');
+  const layout = [
+    {sym:'jellyfish', top:'8%', left:'12%', w:120, dur:'7s', blur:0, op:.9, rot:0},
+    {sym:'jellyfish', top:'58%', left:'82%', w:90, dur:'9s', blur:1, op:.55, rot:8},
+    {sym:'anglerfish', top:'34%', left:'70%', w:150, dur:'11s', blur:0, op:.95, rot:-4},
+    {sym:'octopus', top:'70%', left:'8%', w:150, dur:'10s', blur:.5, op:.8, rot:0},
+    {sym:'seahorse', top:'14%', left:'55%', w:70, dur:'6.5s', blur:1.2, op:.5, rot:0},
+    {sym:'seahorse', top:'80%', left:'46%', w:56, dur:'8s', blur:1.6, op:.35, rot:6},
+    {sym:'plankton', top:'22%', left:'30%', w:26, dur:'5s', blur:0, op:.8, rot:0},
+    {sym:'plankton', top:'44%', left:'88%', w:20, dur:'6s', blur:0, op:.6, rot:0},
+    {sym:'plankton', top:'66%', left:'64%', w:18, dur:'4.5s', blur:0, op:.7, rot:0},
+    {sym:'plankton', top:'12%', left:'80%', w:16, dur:'5.5s', blur:.4, op:.5, rot:0},
+    {sym:'coral', top:'86%', left:'20%', w:170, dur:'0s', blur:0, op:.5, rot:0},
+    {sym:'coral', top:'88%', left:'74%', w:140, dur:'0s', blur:.3, op:.35, rot:8},
+  ];
+  layout.forEach((l,i)=>{
+    const el = document.createElementNS('http://www.w3.org/2000/svg','svg');
+    el.setAttribute('viewBox', l.sym==='plankton'?'0 0 40 40': l.sym==='coral'?'0 0 200 160': l.sym==='seahorse'?'0 0 100 200': l.sym==='octopus'?'0 0 220 200': l.sym==='anglerfish'?'0 0 220 140':'0 0 160 200');
+    el.style.top=l.top; el.style.left=l.left; el.style.width=l.w+'px';
+    el.style.opacity=l.op;
+    el.style.filter = (l.blur? `blur(${l.blur}px) `:'') + 'drop-shadow(0 0 10px rgba(77,232,212,.25))';
+    el.style.transform = `rotate(${l.rot}deg)`;
+    el.style.animation = l.dur!=='0s' ? `floaty ${l.dur} ease-in-out infinite` : 'none';
+    el.style.animationDelay = (i*0.4)+'s';
+    const use = document.createElementNS('http://www.w3.org/2000/svg','use');
+    use.setAttribute('href','#'+l.sym);
+    el.appendChild(use);
+    field.appendChild(el);
+  });
+  const styleTag = document.createElement('style');
+  styleTag.textContent = `@keyframes floaty{0%,100%{transform:translateY(0) rotate(var(--r,0deg));}50%{transform:translateY(-18px) rotate(var(--r,0deg));}}`;
+  document.head.appendChild(styleTag);
+})();
+
+/* ============================================================
+   VIEW TRANSITION (Smooth Descent)
+============================================================= */
+function startDive() {
+  const landing = document.getElementById('landing-view');
+  const gameView = document.getElementById('game-view');
+  
+  landing.classList.add('fade-up-out');
+  
+  setTimeout(() => {
+    landing.style.display = 'none';
+    gameView.style.display = 'block';
+    gameView.classList.add('descend-in');
+    window.scrollTo(0, 0);
+    initLevel(0);
+    
+    setTimeout(() => gameView.classList.remove('descend-in'), 1000);
+  }, 600);
+}
+
+/* ============================================================
+   GAME ENGINE
+============================================================= */
+const LEVELS = [
+  {
+    title:"The Anglerfish Lure",
+    text:"A lure hangs in the black, waiting for a heartbeat. Drag the middle buoy to shape a glow that swells and fades — dim at the edges, brightest at the centre.",
+    creatureFocus:'creature2',
+    properties:['glow'],
+    stops:[
+      {time:0, glow:15, locked:true},
+      {time:50, glow:50, locked:false},
+      {time:100, glow:15, locked:true},
+    ],
+    target:{stops:[{time:0,glow:15},{time:50,glow:95},{time:100,glow:15}], duration:2000, easing:'linear', fill:'none', delay:0},
+    unlock:{time:false, easing:false, duration:false, fill:false, delay:false, scale:false, hue:false},
+    depth:'–120m'
+  },
+  {
+    title:"Jellyfish Current",
+    text:"Linear light reads as mechanical down here — the jellyfish only answers to a current that swells and settles. Pick the easing that matches a real swimming pulse.",
+    creatureFocus:'creature1',
+    properties:['glow'],
+    stops:[
+      {time:0, glow:20, locked:true},
+      {time:50, glow:90, locked:false},
+      {time:100, glow:20, locked:true},
+    ],
+    target:{stops:[{time:0,glow:20},{time:50,glow:90},{time:100,glow:20}], duration:2200, easing:'ease-in-out', fill:'none', delay:0},
+    unlock:{time:false, easing:true, duration:true, fill:false, delay:false, scale:false, hue:false},
+    depth:'–260m'
+  },
+  {
+    title:"Octopus Shimmer",
+    text:"Its tentacles shimmer in a four-beat ripple, not a single pulse. Reposition all five buoys — timing and brightness both — to trace the pattern, then breathe it with a scale swell.",
+    creatureFocus:'creature2',
+    properties:['glow','scale'],
+    stops:[
+      {time:0, glow:20, scale:100, locked:false},
+      {time:25, glow:40, scale:100, locked:false},
+      {time:50, glow:95, scale:130, locked:false},
+      {time:75, glow:40, scale:100, locked:false},
+      {time:100, glow:20, scale:100, locked:false},
+    ],
+    target:{stops:[{time:0,glow:15,scale:95},{time:25,glow:35,scale:100},{time:60,glow:100,scale:135},{time:80,glow:45,scale:105},{time:100,glow:15,scale:95}], duration:2600, easing:'ease-in-out', fill:'none', delay:0},
+    unlock:{time:true, easing:true, duration:true, fill:false, delay:false, scale:true, hue:false},
+    depth:'–410m'
+  },
+  {
+    title:"Plankton Swarm",
+    text:"A swarm only reads as alive when each speck lights a beat after the last, then holds its glow instead of snapping back to black. Set the stagger and lock the fill-mode.",
+    creatureFocus:'creature3',
+    properties:['glow'],
+    stops:[
+      {time:0, glow:10, locked:true},
+      {time:100, glow:95, locked:true},
+    ],
+    target:{stops:[{time:0,glow:10},{time:100,glow:95}], duration:900, easing:'ease-out', fill:'forwards', delay:260},
+    unlock:{time:false, easing:true, duration:true, fill:true, delay:true, scale:false, hue:false},
+    depth:'–560m'
+  },
+  {
+    title:"The Leviathan's Signal",
+    text:"Full depth. Colour, size and light must move together in a slow bioluminescent broadcast that holds its final glow. Everything you've learned, at once.",
+    creatureFocus:'creature1',
+    properties:['glow','scale','hue'],
+    stops:[
+      {time:0, glow:15, scale:95, hue:170, locked:false},
+      {time:40, glow:60, scale:110, hue:170, locked:false},
+      {time:100, glow:100, scale:140, hue:170, locked:false},
+    ],
+    target:{stops:[{time:0,glow:10,scale:90,hue:190},{time:45,glow:55,scale:112,hue:80},{time:100,glow:100,scale:145,hue:35}], duration:3200, easing:'ease-in-out', fill:'forwards', delay:0},
+    unlock:{time:true, easing:true, duration:true, fill:true, delay:false, scale:true, hue:true},
+    depth:'–920m'
+  }
+];
+
+const EASINGS = [
+  {id:'linear', label:'linear', css:'linear', cls:'e-linear'},
+  {id:'ease', label:'ease', css:'ease', cls:'e-ease'},
+  {id:'ease-in', label:'ease-in', css:'ease-in', cls:'e-in'},
+  {id:'ease-out', label:'ease-out', css:'ease-out', cls:'e-out'},
+  {id:'ease-in-out', label:'ease-in-out', css:'ease-in-out', cls:'e-inout'},
+  {id:'back', label:'overshoot', css:'cubic-bezier(.34,1.56,.64,1)', cls:'e-back'},
+];
+const FILLMODES = ['none','forwards','backwards','both'];
+
+let levelIndex = 0;
+let oxygen = 100;
+let userConfig = null;
+let selectedStop = 0;
+let oxygenTimer = null;
+let stableSince = null;
+let dragging = null;
+
+function cloneLevelState(lvl){
+  return {
+    stops: lvl.stops.map(s=>({...s})),
+    easing: lvl.unlock.easing ? 'linear' : lvl.target.easing,
+    duration: lvl.unlock.duration ? (lvl.target.duration >= 2000 ? 1200 : lvl.target.duration + 500) : lvl.target.duration,
+    fill: lvl.unlock.fill ? 'none' : lvl.target.fill,
+    delay: lvl.unlock.delay ? 0 : lvl.target.delay
+  };
+}
+
+function initLevel(i){
+  const lvl = LEVELS[i];
+  userConfig = cloneLevelState(lvl);
+  selectedStop = 0;
+  stableSince = null;
+
+  // Sidebar Depth UI Update
+  document.querySelectorAll('.sidebar-node').forEach((node, idx) => {
+    if(idx === i) {
+      node.classList.add('active');
+      node.classList.remove('passed');
+    } else if (idx < i) {
+      node.classList.remove('active');
+      node.classList.add('passed');
+    } else {
+      node.classList.remove('active', 'passed');
+    }
+  });
+
+  document.getElementById('levelLabel').textContent = (i+1)+' / '+LEVELS.length;
+  document.getElementById('depthLabel').textContent = lvl.depth;
+  document.getElementById('narrativeTitle').textContent = lvl.title;
+  document.getElementById('narrativeText').textContent = lvl.text;
+  document.getElementById('nextBtn').classList.add('hidden');
+  document.getElementById('feedbackText').textContent = 'Adjust the reel, then test the current.';
+  document.getElementById('stageStatus').classList.remove('synced');
+
+  document.getElementById('scaleRow').classList.toggle('hidden', !lvl.unlock.scale);
+  document.getElementById('hueRow').classList.toggle('hidden', !lvl.unlock.hue);
+  document.getElementById('easingRow').classList.toggle('hidden', !lvl.unlock.easing);
+  document.getElementById('durationRow').classList.toggle('hidden', !lvl.unlock.duration);
+  document.getElementById('fillRow').classList.toggle('hidden', !lvl.unlock.fill);
+  document.getElementById('delayRow').classList.toggle('hidden', !lvl.unlock.delay);
+
+  buildEasingGrid(lvl);
+  buildFillGrid(lvl);
+  document.getElementById('durationSlider').value = userConfig.duration;
+  document.getElementById('durationVal').textContent = (userConfig.duration/1000).toFixed(1)+'s';
+  document.getElementById('delaySlider').value = userConfig.delay;
+  document.getElementById('delayVal').textContent = userConfig.delay+'ms';
+
+  // Apply Global Hints
+  document.getElementById('easeHint').textContent = lvl.unlock.easing ? `(TARGET: ${lvl.target.easing})` : '';
+  document.getElementById('durHint').textContent = lvl.unlock.duration ? `(TARGET: ${(lvl.target.duration/1000).toFixed(1)}s)` : '';
+  document.getElementById('fillHint').textContent = lvl.unlock.fill ? `(TARGET: ${lvl.target.fill})` : '';
+  document.getElementById('delayHint').textContent = lvl.unlock.delay ? `(TARGET: ${lvl.target.delay}ms)` : '';
+
+  oxygen = 100;
+  updateOxygenUI();
+  renderTrack(lvl);
+  selectStop(0);
+  applyLivePreview();
+
+  if(oxygenTimer) clearInterval(oxygenTimer);
+  oxygenTimer = setInterval(oxygenTick, 220);
+}
+
+function buildEasingGrid(lvl){
+  const grid = document.getElementById('easingGrid');
+  grid.innerHTML='';
+  EASINGS.forEach(e=>{
+    const div = document.createElement('div');
+    div.className = 'easing-opt '+e.cls+(userConfig.easing===e.id?' active':'');
+    div.innerHTML = `<div class="track"><div class="dot"></div></div><span>${e.label}</span>`;
+    div.onclick = ()=>{
+      userConfig.easing = e.id;
+      document.getElementById('easingActiveLabel').textContent = e.label;
+      [...grid.children].forEach(c=>c.classList.remove('active'));
+      div.classList.add('active');
+      applyLivePreview();
+    };
+    grid.appendChild(div);
+  });
+  document.getElementById('easingActiveLabel').textContent = EASINGS.find(e=>e.id===userConfig.easing).label;
+}
+
+function buildFillGrid(lvl){
+  const grid = document.getElementById('fillGrid');
+  grid.innerHTML='';
+  FILLMODES.forEach(f=>{
+    const div = document.createElement('div');
+    div.className='pill-opt'+(userConfig.fill===f?' active':'');
+    div.textContent=f;
+    div.onclick=()=>{
+      userConfig.fill=f;
+      document.getElementById('fillActiveLabel').textContent=f;
+      [...grid.children].forEach(c=>c.classList.remove('active'));
+      div.classList.add('active');
+      applyLivePreview();
+    };
+    grid.appendChild(div);
+  });
+  document.getElementById('fillActiveLabel').textContent = userConfig.fill;
+}
+
+function renderTrack(lvl){
+  const track = document.getElementById('track');
+  track.innerHTML='';
+  [0,25,50,75,100].forEach(p=>{
+    const g = document.createElement('div');
+    g.className='gridline'; g.style.left=p+'%';
+    track.appendChild(g);
+    const lab = document.createElement('div');
+    lab.className='gridlabel'; lab.style.left=p+'%'; lab.textContent=p+'%';
+    track.appendChild(lab);
+  });
+  
+  // Ghost hints for target values
+  lvl.target.stops.forEach((ts, idx) => {
+    const gl = document.createElement('div');
+    gl.className = 'ghost-line';
+    gl.id = 'ghost-line'+idx;
+    track.appendChild(gl);
+    const gb = document.createElement('div');
+    gb.className = 'ghost-buoy';
+    gb.id = 'ghost-buoy'+idx;
+    track.appendChild(gb);
+  });
+
+  userConfig.stops.forEach((s,idx)=>{
+    const line = document.createElement('div');
+    line.className='buoy-line';
+    line.id='line'+idx;
+    track.appendChild(line);
+  });
+  userConfig.stops.forEach((s,idx)=>{
+    const b = document.createElement('div');
+    b.className='buoy'+(s.locked?' locked':'');
+    b.id='buoy'+idx;
+    b.title='keyframe '+s.time+'%';
+    b.addEventListener('mousedown', e=>startDrag(e, idx, false));
+    b.addEventListener('touchstart', e=>startDrag(e, idx, true), {passive:false});
+    b.addEventListener('click', ()=>selectStop(idx));
+    track.appendChild(b);
+  });
+  positionBuoys();
+}
+
+function positionBuoys(){
+  const track = document.getElementById('track');
+  const rect = track.getBoundingClientRect();
+  const lvl = LEVELS[levelIndex];
+  
+  // Position ghosts
+  lvl.target.stops.forEach((ts, idx)=>{
+    const gb = document.getElementById('ghost-buoy'+idx);
+    const gl = document.getElementById('ghost-line'+idx);
+    if(gb && gl) {
+      const x = (ts.time/100)*rect.width;
+      const y = rect.height - (ts.glow/100)*rect.height;
+      gb.style.left = x+'px';
+      gb.style.top = y+'px';
+      gl.style.left = x+'px';
+      gl.style.height = (rect.height-y)+'px';
+    }
+  });
+
+  userConfig.stops.forEach((s,idx)=>{
+    const b = document.getElementById('buoy'+idx);
+    const line = document.getElementById('line'+idx);
+    const x = (s.time/100)*rect.width;
+    const y = rect.height - (s.glow/100)*rect.height;
+    b.style.left = x+'px';
+    b.style.top = y+'px';
+    if(idx===selectedStop) b.classList.add('selected'); else b.classList.remove('selected');
+    line.style.left = x+'px';
+    line.style.height = (rect.height-y)+'px';
+  });
+}
+
+function startDrag(e, idx, touch){
+  e.preventDefault();
+  const stop = userConfig.stops[idx];
+  dragging = {idx, canMoveTime: !stop.locked && LEVELS[levelIndex].unlock.time};
+  selectStop(idx);
+  const move = (ev)=>{
+    const track = document.getElementById('track');
+    const rect = track.getBoundingClientRect();
+    const point = touch ? (ev.touches?ev.touches[0]:ev.changedTouches[0]) : ev;
+    let x = point.clientX - rect.left;
+    let y = point.clientY - rect.top;
+    x = Math.max(0, Math.min(rect.width, x));
+    y = Math.max(0, Math.min(rect.height, y));
+    const glow = Math.round((1 - y/rect.height)*100);
+    userConfig.stops[idx].glow = Math.max(0, Math.min(100, glow));
+    if(dragging.canMoveTime){
+      let t = Math.round((x/rect.width)*100);
+      userConfig.stops[idx].time = Math.max(0, Math.min(100, t));
+    }
+    positionBuoys();
+    syncInspector();
+    applyLivePreview();
+  };
+  const up = ()=>{
+    document.removeEventListener('mousemove', move);
+    document.removeEventListener('mouseup', up);
+    document.removeEventListener('touchmove', move);
+    document.removeEventListener('touchend', up);
+    dragging=null;
+  };
+  document.addEventListener('mousemove', move);
+  document.addEventListener('mouseup', up);
+  document.addEventListener('touchmove', move, {passive:false});
+  document.addEventListener('touchend', up);
+}
+
+function selectStop(idx){
+  selectedStop = idx;
+  positionBuoys();
+  syncInspector();
+}
+
+function syncInspector(){
+  const s = userConfig.stops[selectedStop];
+  const lvl = LEVELS[levelIndex];
+  
+  // Set Buoy-Specific Target Hints
+  const tStop = lvl.target.stops[selectedStop] || lvl.target.stops[0];
+  let targetHints = `TARGETS -> TIME:${tStop.time}% | GLOW:${tStop.glow}`;
+  if(lvl.unlock.scale) targetHints += ` | SCL:${tStop.scale}`;
+  if(lvl.unlock.hue) targetHints += ` | HUE:${tStop.hue}`;
+  document.getElementById('targetInfo').textContent = targetHints;
+
+  document.getElementById('selName').textContent = 'buoy '+(selectedStop+1);
+  document.getElementById('timeSlider').value = s.time;
+  document.getElementById('timeVal').textContent = s.time;
+  document.getElementById('timeSlider').disabled = s.locked || !lvl.unlock.time;
+  document.getElementById('glowSlider').value = s.glow;
+  document.getElementById('glowVal').textContent = s.glow;
+  if(lvl.unlock.scale){
+    document.getElementById('scaleSlider').value = s.scale ?? 100;
+    document.getElementById('scaleVal').textContent = s.scale ?? 100;
+  }
+  if(lvl.unlock.hue){
+    document.getElementById('hueSlider').value = s.hue ?? 0;
+    document.getElementById('hueVal').textContent = s.hue ?? 0;
+  }
+}
+
+document.getElementById('timeSlider').addEventListener('input', e=>{
+  userConfig.stops[selectedStop].time = +e.target.value;
+  document.getElementById('timeVal').textContent = e.target.value;
+  positionBuoys(); applyLivePreview();
+});
+document.getElementById('glowSlider').addEventListener('input', e=>{
+  userConfig.stops[selectedStop].glow = +e.target.value;
+  document.getElementById('glowVal').textContent = e.target.value;
+  positionBuoys(); applyLivePreview();
+});
+document.getElementById('scaleSlider').addEventListener('input', e=>{
+  userConfig.stops[selectedStop].scale = +e.target.value;
+  document.getElementById('scaleVal').textContent = e.target.value;
+  applyLivePreview();
+});
+document.getElementById('hueSlider').addEventListener('input', e=>{
+  userConfig.stops[selectedStop].hue = +e.target.value;
+  document.getElementById('hueVal').textContent = e.target.value;
+  applyLivePreview();
+});
+document.getElementById('durationSlider').addEventListener('input', e=>{
+  userConfig.duration = +e.target.value;
+  document.getElementById('durationVal').textContent = (userConfig.duration/1000).toFixed(1)+'s';
+  applyLivePreview();
+});
+document.getElementById('delaySlider').addEventListener('input', e=>{
+  userConfig.delay = +e.target.value;
+  document.getElementById('delayVal').textContent = userConfig.delay+'ms';
+  applyLivePreview();
+});
+
+let ruleTag = null;
+function applyLivePreview(){
+  if(!ruleTag){
+    ruleTag = document.createElement('style');
+    ruleTag.id='liveKF';
+    document.head.appendChild(ruleTag);
+  }
+  const lvl = LEVELS[levelIndex];
+  const sorted = [...userConfig.stops].sort((a,b)=>a.time-b.time);
+  let frames = sorted.map(s=>{
+    let props = `filter: drop-shadow(0 0 ${2+(s.glow/100)*22}px rgba(77,232,212,${0.15+(s.glow/100)*0.85})) brightness(${0.6+(s.glow/100)*0.9});`;
+    if(lvl.unlock.scale) props += ` transform: scale(${(s.scale ?? 100)/100});`;
+    if(lvl.unlock.hue) props += ` filter: drop-shadow(0 0 ${2+(s.glow/100)*22}px hsl(${s.hue??170},90%,65%)) hue-rotate(${(s.hue??170)-170}deg) brightness(${0.6+(s.glow/100)*0.9});`;
+    return `${s.time}% { ${props} }`;
+  }).join('\n');
+
+  ruleTag.textContent = `
+    @keyframes liveGlow { ${frames} }
+    .live-anim {
+      animation-name: liveGlow;
+      animation-duration: ${userConfig.duration}ms;
+      animation-timing-function: ${EASINGS.find(e=>e.id===userConfig.easing).css};
+      animation-iteration-count: infinite;
+      animation-fill-mode: ${userConfig.fill};
+      transform-origin: center;
+    }
+    .live-anim.swarm-a{animation-delay:0ms;}
+    .live-anim.swarm-b{animation-delay:${userConfig.delay}ms;}
+    .live-anim.swarm-c{animation-delay:${userConfig.delay*2}ms;}
+  `;
+
+  const focus = document.getElementById(lvl.creatureFocus);
+  [focus, document.getElementById('creature3'), document.getElementById('creature4')].forEach(el=>{
+    if(el) el.classList.add('live-anim');
+  });
+  focus.classList.add('swarm-a');
+  document.getElementById('creature3').classList.add('swarm-b');
+  document.getElementById('creature4').classList.add('swarm-c');
+
+  document.getElementById('subSvg').classList.add('live-anim');
+  document.getElementById('subSvg').classList.remove('swarm-b','swarm-c');
+  document.getElementById('subSvg').classList.add('swarm-a');
+}
+
+/* ============================================================
+   EVALUATION / OXYGEN / SYNC
+============================================================= */
+function evaluateSync(){
+  const lvl = LEVELS[levelIndex];
+  const target = lvl.target;
+  const userSorted = [...userConfig.stops].sort((a,b)=>a.time-b.time);
+  const targetSorted = [...target.stops].sort((a,b)=>a.time-b.time);
+
+  let diffTotal = 0, samples = 0;
+  function sampleAt(stops, t, key){
+    if(t<=stops[0].time) return stops[0][key];
+    if(t>=stops[stops.length-1].time) return stops[stops.length-1][key];
+    for(let i=0;i<stops.length-1;i++){
+      const a=stops[i], b=stops[i+1];
+      if(t>=a.time && t<=b.time){
+        const localT = (t-a.time)/((b.time-a.time)||1);
+        return a[key] + (b[key]-a[key])*localT;
+      }
+    }
+    return stops[stops.length-1][key];
+  }
+  for(let t=0;t<=100;t+=5){
+    const uGlow = sampleAt(userSorted, t, 'glow');
+    const tGlow = sampleAt(targetSorted, t, 'glow');
+    diffTotal += Math.abs(uGlow-tGlow)/100;
+    samples++;
+    if(lvl.unlock.scale){
+      const uS = sampleAt(userSorted, t, 'scale') ?? 100;
+      const tS = sampleAt(targetSorted, t, 'scale') ?? 100;
+      diffTotal += Math.abs(uS-tS)/100;
+      samples++;
+    }
+    if(lvl.unlock.hue){
+      const uH = sampleAt(userSorted, t, 'hue') ?? 0;
+      const tH = sampleAt(targetSorted, t, 'hue') ?? 0;
+      let d = Math.abs(uH-tH); d = Math.min(d, 360-d);
+      diffTotal += d/180;
+      samples++;
+    }
+  }
+  let curveScore = 1 - (diffTotal/samples);
+
+  let totalScore = curveScore * 1.0;
+  let totalWeight = 1.0;
+
+  if(lvl.unlock.duration){
+    const durDiff = Math.abs(userConfig.duration - target.duration) / target.duration;
+    totalScore += Math.max(0, 1 - durDiff) * 0.5;
+    totalWeight += 0.5;
+  }
+  if(lvl.unlock.easing){
+    const easeScore = (userConfig.easing === target.easing) ? 1 : 0;
+    totalScore += easeScore * 0.5;
+    totalWeight += 0.5;
+  }
+  if(lvl.unlock.fill){
+    totalScore += (userConfig.fill === target.fill ? 1 : 0) * 0.5;
+    totalWeight += 0.5;
+  }
+  if(lvl.unlock.delay){
+    const delayDiff = Math.abs(userConfig.delay - target.delay)/Math.max(target.delay,1);
+    totalScore += Math.max(0, 1 - delayDiff) * 0.5;
+    totalWeight += 0.5;
+  }
+
+  return Math.max(0, Math.min(1, totalScore / totalWeight));
+}
+
+function oxygenTick(){
+  const quality = evaluateSync();
+  const syncPct = Math.round(quality*100);
+  document.getElementById('syncLabel').textContent = syncPct+'%';
+  const statusEl = document.getElementById('stageStatus');
+
+  const PASS_THRESHOLD = 0.85; // Less strict, combined with Ghost Buoys
+
+  if(quality >= PASS_THRESHOLD){
+    statusEl.classList.add('synced');
+    statusEl.firstChild.textContent = 'CURRENT SYNCED ';
+    oxygen = Math.min(100, oxygen + 1.5);
+    if(!stableSince) stableSince = Date.now();
+    if(Date.now() - stableSince > 2000){
+      passLevel();
+    }
+  } else {
+    statusEl.classList.remove('synced');
+    statusEl.firstChild.textContent = 'READING CURRENT… ';
+    stableSince = null;
+    const drain = 0.3 + (1-quality)*1.2; // Softer oxygen drain
+    oxygen = Math.max(0, oxygen - drain);
+  }
+  updateOxygenUI();
+
+  document.getElementById('feedbackText').textContent =
+    quality >= PASS_THRESHOLD ? 'Holding steady — the trench glows in rhythm.' :
+    quality > 0.65 ? 'Close. Match the ghost outlines on the timeline.' :
+    quality > 0.4 ? 'Flickering badly — the current fights your timing.' :
+    'Dark. Nothing down here recognises this signal.';
+
+  if(oxygen<=0){
+    oxygen=0; updateOxygenUI();
+    document.getElementById('feedbackText').textContent = 'Oxygen critical — follow the ghost guidelines and try again.';
+  }
+}
+
+function updateOxygenUI(){
+  const fill = document.getElementById('oxygenFill');
+  fill.style.width = oxygen+'%';
+  fill.classList.toggle('warn', oxygen<55 && oxygen>=25);
+  fill.classList.toggle('crit', oxygen<25);
+  document.getElementById('oxygenNum').textContent = Math.round(oxygen)+'%';
+}
+
+function testDive(){
+  applyLivePreview();
+  document.getElementById('feedbackText').textContent = 'Current running — watch the stage.';
+}
+
+function passLevel(){
+  clearInterval(oxygenTimer);
+  document.getElementById('nextBtn').classList.remove('hidden');
+  document.getElementById('successOverlay').classList.remove('hidden');
+  
+  const successBtn = document.querySelector('#successOverlay .btn-primary');
+  const nextBtn = document.getElementById('nextBtn');
+
+  if(levelIndex < LEVELS.length-1){
+    document.getElementById('successTitle').textContent = LEVELS[levelIndex].title + ' — Stabilized';
+    document.getElementById('successText').textContent = 'The signal holds. The trench opens deeper.';
+    successBtn.textContent = 'Continue the dive';
+    nextBtn.textContent = 'Descend to next depth ↓';
+  } else {
+    document.getElementById('successTitle').textContent = 'TRENCH CONQUERED';
+    document.getElementById('successText').textContent = 'Every current on this dive answers to your hand now. The abyss is lit. You have mastered the CSS Tidal Zone.';
+    successBtn.textContent = 'Complete Journey';
+    nextBtn.textContent = 'Surface (Play Again) ↑';
+  }
+}
+
+function closeSuccess(){
+  document.getElementById('successOverlay').classList.add('hidden');
+}
+
+function nextLevel(){
+  document.getElementById('successOverlay').classList.add('hidden');
+  const content = document.getElementById('level-content');
+  
+  if(levelIndex < LEVELS.length-1){
+    levelIndex++;
+    
+    // Smooth Descent Animation Trigger
+    content.classList.remove('descend-in');
+    content.classList.add('descend-out');
+    
+    setTimeout(() => {
+      initLevel(levelIndex);
+      content.classList.remove('descend-out');
+      content.classList.add('descend-in');
+    }, 850);
+  } else {
+    // End of game -> Surface / Restart
+    content.classList.remove('descend-in');
+    content.classList.add('descend-out');
+    
+    setTimeout(() => {
+      levelIndex = 0;
+      initLevel(0);
+      content.classList.remove('descend-out');
+      
+      // Return to landing page
+      document.getElementById('game-view').style.display = 'none';
+      const landing = document.getElementById('landing-view');
+      landing.style.display = 'block';
+      landing.classList.remove('fade-up-out');
+      window.scrollTo(0, 0);
+    }, 850);
+  }
+}
+
+window.addEventListener('resize', ()=>{ if(userConfig) positionBuoys(); });
+</script>
+</body>
+</html>
