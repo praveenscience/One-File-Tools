@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Git Quest: Branch Navigator — One File Tools</title>
+    <meta name="description" content="Navigate a commit graph using git commands in an interactive terminal.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Overpass+Mono:wght@700&family=Titillium+Web:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-bg: #1a1a1a;
+            --color-text: #ffffff;
+            --color-primary: #7ad3ff;
+            --color-secondary: #ffaa00;
+            --color-accent: #00ffaa;
+            --color-error: #ff4444;
+            --color-surface: #2a2a2a;
+            --color-border: #444;
+            --font-mono: 'SF Mono', 'Consolas', 'Menlo', monospace;
+            --font-sans: 'Titillium Web', sans-serif;
+            --font-heading: 'Overpass Mono', monospace;
+        }
+
+        html[data-theme='light'] {
+            --color-bg: #f0f0f0;
+            --color-text: #1a1a1a;
+            --color-surface: #ffffff;
+            --color-border: #ccc;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: var(--font-sans);
+            background-color: var(--color-bg);
+            color: var(--color-text);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 2rem;
+            background-color: var(--color-surface);
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        header h1 { font-size: calc(1.2rem + 4px); }
+        .quest-title-prefix {
+            color: var(--color-accent);
+        }
+
+        #level-indicator {
+            font-family: var(--font-mono);
+            font-size: 20px;
+            color: var(--color-accent);
+            font-weight: bold;
+        }
+
+        #level-indicator .level-dash {
+            color: #ffffff;
+        }
+
+        main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .quest-panel {
+            flex: 1;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--color-border);
+        }
+
+        header h1, .quest-panel h2, .modal-content h2 {
+            font-family: var(--font-heading);
+        }
+
+        .quest-panel h2 { 
+            margin-bottom: 0.5rem;
+            color: var(--color-primary);
+        }
+
+        #goal + h2 {
+            margin-top: 1rem;
+        }
+
+        #goal {
+            background-color: var(--color-surface);
+            padding: 0.75rem;
+            border-radius: 4px;
+            margin-bottom: 1.4rem;
+            font-family: var(--font-sans);
+            font-size: 1.2rem;
+        }
+
+        #graph-container {
+            flex: 1;
+            display: flex;
+            align-items: flex-start; /* Align to the top of the container */
+            padding-top: 80px;       /* Push the graph down a bit */
+            margin-left: 100px;
+        }
+
+        #graph-svg {
+            /* Let the SVG be sized by its content, which is then centered by the flex container. */
+            overflow: visible;
+            transform: scale(1.3);
+        }
+
+        #graph-svg circle {
+            /* The filter is now handled by the animation */
+        }
+
+        @keyframes pulse-white-shadow {
+            0%, 100% {
+                filter: drop-shadow(0 0 4px var(--color-secondary));
+            }
+            50% {
+                filter: drop-shadow(0 0 8px #ffffff);
+            }
+        }
+
+        .terminal-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: #111;
+            background-image: repeating-linear-gradient(
+                to bottom,
+                transparent,
+                transparent 5px,
+                rgba(255, 255, 255, 0.03) 6px,
+                rgba(255, 255, 255, 0.03) 7px
+            );
+            background-size: 100% 7px;
+            animation: scanlines 6s linear infinite alternate;
+        }
+
+        @keyframes scanlines {
+            from { background-position: 0 0; }
+            to { background-position: 0 40px; }
+        }
+
+        #terminal-output {
+            flex: 1;
+            padding: 2rem;
+            font-family: var(--font-mono);
+            font-size: 1rem;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .terminal-line { margin-bottom: 0.5em; }
+        .prompt-line {
+            display: flex;
+            align-items: center;
+            background-color: var(--color-surface);
+            padding: 0.85rem 1rem;
+            border-radius: 4px;
+            flex: 1;
+        }
+        .prompt-symbol {
+            color: var(--color-primary);
+            margin-right: 0.5em;
+            font-size: 1.2rem;
+            line-height: 1;
+        }
+        .command-output { color: #bbb; }
+        .command-output .commit { color: var(--color-secondary); }
+        .command-output .branch { color: var(--color-accent); }
+        .command-output .error { color: var(--color-error); }
+
+        /* Make terminal prose text consistent */
+        
+        .command-output.prose {
+            font-family: var(--font-mono);
+            color: #2ea8ff;
+            font-size: 1.1rem;
+            padding-bottom: 0.5rem;
+        }
+
+
+        #terminal-input-form {
+            display: flex;
+            /* Match terminal output padding */
+            padding: 0 2rem 2rem;
+            margin-top: 0.5rem;
+        }
+
+        #terminal-input {
+            flex: 1;
+            border: none;
+            background: transparent;
+            color: var(--color-text);
+            font-family: var(--font-mono);
+            font-size: 1rem;
+            outline: none;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0; top: 0;
+            width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: var(--color-surface);
+            padding: 2rem;
+            border-radius: 8px;
+            text-align: center;
+            max-width: 400px;
+        }
+
+        .modal-content h2 { color: var(--color-accent); margin-bottom: 1rem; }
+        #completion-message { font-size: 1.1rem; }
+        .modal-content button {
+            background-color: var(--color-primary);
+            color: #000000;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: var(--font-sans);
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-top: 1rem;
+            box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .modal-content button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+        }
+
+        #back-btn {
+            margin-top: 1rem;
+            align-self: flex-start;
+            background-color: var(--color-primary);
+            color: #000000;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: var(--font-sans);
+            font-weight: 600;
+            font-size: 1.1rem;
+            box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        #back-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+        }
+
+        @media (max-width: 768px) {
+            main { flex-direction: column; }
+            .quest-panel { border-right: none; border-bottom: 1px solid var(--color-border); }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🎋 <span class="quest-title-prefix">Git Quest:</span> Branch Navigator</h1>
+        <div id="level-indicator">Level 1</div>
+    </header>
+
+    <main>
+        <div class="quest-panel">
+            <h2>🎯 Goal</h2>
+            <div id="goal"></div>
+            <h2>Commit Graph</h2>
+            <div id="graph-container">
+                <svg id="graph-svg"></svg>
+            </div>
+            <button id="back-btn" style="display: none;">&lt; Back to Previous Level</button>
+        </div>
+        <div class="terminal-panel">
+            <div id="terminal-output"></div>
+            <form id="terminal-input-form">
+                <div class="prompt-line">
+                    <span class="prompt-symbol">❯</span>
+                    <input type="text" id="terminal-input" autocomplete="off" autofocus>
+                </div>
+            </form>
+        </div>
+    </main>
+
+    <div id="completion-modal" class="modal">
+        <div class="modal-content">
+            <h2 id="completion-title">🏆 Level Complete!</h2>
+            <p id="completion-message"></p>
+            <button id="next-level-btn">Next Level</button>
+        </div>
+    </div>
+
+    <script>
+    // --- DOM Elements ---
+    const levelIndicator = document.getElementById('level-indicator');
+    const goalEl = document.getElementById('goal');
+    const graphSvg = document.getElementById('graph-svg');
+    const terminalOutput = document.getElementById('terminal-output');
+    const terminalInputForm = document.getElementById('terminal-input-form');
+    const terminalInput = document.getElementById('terminal-input');
+    const completionModal = document.getElementById('completion-modal');
+    const completionTitle = document.getElementById('completion-title');
+    const completionMessage = document.getElementById('completion-message');
+    const nextLevelBtn = document.getElementById('next-level-btn');
+
+    // --- Game Data ---
+    const levels = [
+        {
+            name: "The First Step",
+            goal: "You're at the newest commit. Travel back in time to the very first commit. Checkout commit `a1a2`.",
+            targetCommit: 'a1a2',
+            graph: {
+                commits: {
+'c3d4': { msg: 'feat: Add user authentication', parent: 'b2b3', x: 90, y: 50 },
+                    'b2b3': { msg: 'refactor: Improve database schema', parent: 'a1a2', x: 90, y: 120 },
+                    'a1a2': { msg: 'Initial commit', parent: null, x: 90, y: 190 },
+                },
+branches: { 'main': 'c3d4' },
+                head: 'main'
+            }
+        },
+        {
+            name: "A Fork in the Road",
+            goal: "A new feature was developed on a separate branch. Find the `new-feature` branch and check it out.",
+            targetBranch: 'new-feature',
+            graph: {
+                commits: {
+                    'c4d5e6f': { msg: 'feat: Add settings page', parent: 'b2b3', x: 190, y: 120 },
+                    'c3d4e5a': { msg: 'fix: Correct login bug', parent: 'b2b3', x: 90, y: 50 },
+                    'b2b3': { msg: 'refactor: Improve database schema', parent: 'a1a2', x: 140, y: 190 },
+                    'a1a2': { msg: 'Initial commit', parent: null, x: 140, y: 260 },
+                },
+                branches: { 'main': 'c3d4e5a', 'new-feature': 'c4d5e6f' },
+                head: 'main'
+            }
+        },
+        {
+            name: "Detached HEAD",
+            goal: "Sometimes you need to inspect a commit that isn't at the tip of a branch. Checkout commit `b2b3` directly by its hash to enter a 'detached HEAD' state.",
+            targetCommit: 'b2b3',
+            graph: {
+                commits: {
+                    'c4d5e6f': { msg: 'feat: Add settings page', parent: 'b2b3', x: 190, y: 120 },
+                    'c3d4e5a': { msg: 'fix: Correct login bug', parent: 'b2b3', x: 90, y: 50 },
+                    'b2b3': { msg: 'refactor: Improve database schema', parent: 'a1a2', x: 140, y: 190 },
+                    'a1a2': { msg: 'Initial commit', parent: null, x: 140, y: 260 },
+                },
+                branches: { 'main': 'c3d4e5a', 'new-feature': 'c4d5e6f' },
+                head: 'main'
+            }
+        }
+    ];
+
+    // --- Game State ---
+    let state = {
+        currentLevel: 0,
+        history: [],
+        commandHistory: [],
+        commandHistoryIndex: -1,
+        git: {}
+    };
+
+    const STORAGE_KEY = 'one-file-tools-branch-navigator-progress';
+
+    // --- Core Functions ---
+
+    function saveProgress() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ level: state.currentLevel }));
+    }
+
+    function loadProgress() {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            return JSON.parse(saved).level || 0;
+        }
+        return 0;
+    }
+
+    function initLevel(levelIndex) {
+        state.currentLevel = levelIndex;
+        const level = levels[levelIndex];
+        
+        // Deep copy of graph data to avoid mutation across levels/resets
+        state.git = JSON.parse(JSON.stringify(level.graph));
+
+        levelIndicator.innerHTML = `Level ${levelIndex + 1} <span class="level-dash">—</span> ${level.name}`;
+        goalEl.textContent = level.goal;
+
+        terminalOutput.innerHTML = '';
+        printToTerminal("<strong>Available commands:</strong> <span style=\"color: #ffffff;\">`git log`, `git branch`, `git checkout <target>`, `help`, `reset`, `clear`.</span>", 'prose');
+
+        const backBtn = document.getElementById('back-btn');
+        if (levelIndex > 0) {
+            backBtn.style.display = 'inline-block';
+            backBtn.onclick = () => initLevel(levelIndex - 1);
+        } else {
+            backBtn.style.display = 'none';
+        }
+
+        drawGraph();
+        saveProgress();
+    }
+
+    function drawGraph() {
+        graphSvg.innerHTML = '';
+        const { commits, branches, head } = state.git;
+        const commitRadius = 18;
+
+        // Draw edges
+        Object.values(commits).forEach(commit => {
+            if (commit.parent && commits[commit.parent]) {
+                const parentCommit = commits[commit.parent];
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', commit.x);
+                line.setAttribute('y1', commit.y);
+                line.setAttribute('x2', parentCommit.x);
+                line.setAttribute('y2', parentCommit.y);
+                line.setAttribute('stroke', 'var(--color-border)');
+                line.setAttribute('stroke-width', 2);
+                graphSvg.appendChild(line);
+            }
+        });
+
+        // Draw commits
+        Object.entries(commits).forEach(([hash, commit]) => {
+            const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('cx', commit.x);
+            circle.setAttribute('cy', commit.y);
+            circle.setAttribute('r', commitRadius);
+            circle.setAttribute('fill', 'var(--color-surface)');
+            circle.setAttribute('stroke', 'var(--color-secondary)');
+            circle.setAttribute('stroke-width', 2);
+            group.appendChild(circle);
+
+            const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            text.setAttribute('x', commit.x + commitRadius + 12);
+            text.setAttribute('y', commit.y + 5);
+            text.setAttribute('fill', 'var(--color-text)');
+            text.setAttribute('font-family', 'var(--font-mono)');
+            text.setAttribute('font-size', '0.9rem');
+            text.textContent = `${hash.substring(0, 7)} - ${commit.msg}`;
+            group.appendChild(text);
+
+            graphSvg.appendChild(group);
+        });
+
+        const circles = Array.from(graphSvg.querySelectorAll('circle'));
+        circles.sort((a, b) => parseFloat(a.getAttribute('cy')) - parseFloat(b.getAttribute('cy')));
+
+        circles.forEach((circle, index) => {
+            // Stagger the animation for each circle, from top to bottom
+            circle.style.animation = `pulse-white-shadow 3.5s ease-in-out infinite`;
+            circle.style.animationDelay = `${index * 0.5}s`;
+        });
+
+        // Draw branch labels
+        Object.entries(branches).forEach(([name, hash]) => {
+            const commit = commits[hash];
+            if (!commit) return;
+
+            const branchTag = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            branchTag.setAttribute('x', commit.x);
+            branchTag.setAttribute('y', commit.y - commitRadius - 8);
+            branchTag.setAttribute('text-anchor', 'middle');
+            branchTag.setAttribute('fill', 'var(--color-accent)');
+            branchTag.setAttribute('font-family', 'var(--font-heading)');
+            branchTag.setAttribute('font-size', '16px');
+            branchTag.setAttribute('font-weight', 'bold');
+            branchTag.textContent = `[${name}]`;
+            graphSvg.appendChild(branchTag);
+        });
+
+        // Draw HEAD
+        let headCommitHash;
+        if (branches[head]) {
+            headCommitHash = branches[head];
+        } else {
+            headCommitHash = head;
+        }
+        const headCommit = commits[headCommitHash];
+        if (headCommit) {
+            const headTag = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            headTag.setAttribute('x', headCommit.x - commitRadius - 80);
+            headTag.setAttribute('y', headCommit.y + 5);
+            headTag.setAttribute('fill', 'var(--color-primary)');
+            headTag.setAttribute('font-family', 'var(--font-heading)');
+            headTag.setAttribute('font-size', '16px');
+            headTag.setAttribute('font-weight', 'bold');
+            headTag.textContent = 'HEAD ->';
+            graphSvg.appendChild(headTag);
+        }
+    }
+
+    function checkCompletion() {
+        const level = levels[state.currentLevel];
+        let completed = false;
+
+        // Completion logic:
+        // - targetCommit means the user must check out the commit hash (detached HEAD or branch-less head)
+        // - targetBranch means the user must end with head pointing to that branch name
+        // Note: In this quest simulator, checkout sets `state.git.head` to the argument.
+        // For a commit target, allow completion when head is either exactly the hash OR
+        // when it matches a branch that points to that commit.
+        if (level.targetCommit) {
+            // In this quest, `git checkout <hash>` sets head to the hash directly.
+            // Also treat success if the head is a branch name that points at the target commit.
+            if (state.git.head === level.targetCommit) {
+                completed = true;
+            } else {
+                completed = state.git && state.git.branches
+                    ? Object.values(state.git.branches).includes(level.targetCommit)
+                      && state.git.head in state.git.branches
+                      && state.git.branches[state.git.head] === level.targetCommit
+                    : false;
+            }
+        } else if (level.targetBranch) {
+            // Completion for branch targets should also allow completing via detached HEAD
+            // when the user checks out the commit that the target branch points to.
+            const targetCommitHash = state.git.branches?.[level.targetBranch];
+            completed = (
+                state.git.head === level.targetBranch ||
+                (targetCommitHash && state.git.head === targetCommitHash)
+            );
+        }
+
+
+
+
+        if (completed) {
+            if (state.currentLevel < levels.length - 1) {
+                completionTitle.textContent = '🏆 Level Complete!';
+                completionMessage.textContent = `Great job! You've mastered '${level.name}'. Ready for the next challenge?`;
+                nextLevelBtn.textContent = 'Next Level';
+                nextLevelBtn.onclick = () => {
+                    completionModal.style.display = 'none';
+                    initLevel(state.currentLevel + 1);
+                };
+            } else {
+                completionTitle.textContent = '🏆 Quest Complete!';
+                completionMessage.textContent = 'Congratulations, Branch Navigator! You have mastered the art of navigating the Git timeline.';
+                nextLevelBtn.textContent = 'Restart';
+                nextLevelBtn.onclick = () => {
+                    completionModal.style.display = 'none';
+                    initLevel(0);
+                };
+            }
+            completionModal.style.display = 'flex';
+        }
+    }
+
+    // --- Terminal & Command Functions ---
+
+    function printToTerminal(text, type = 'info') {
+        const line = document.createElement('div');
+        line.className = `terminal-line command-output ${type}`;
+
+        // Allow a limited subset of markup when explicitly passed as HTML.
+        // (Used by the initial “Available commands” line.)
+        if (typeof text === 'string' && (text.includes('<strong>') || text.includes('<span'))) {
+            line.innerHTML = text;
+        } else {
+            line.textContent = text;
+        }
+
+        terminalOutput.appendChild(line);
+        terminalOutput.scrollTop = terminalOutput.scrollHeight;
+    }
+
+
+    function handleCommand(commandStr) {
+        const [command, ...args] = commandStr.trim().split(/\s+/).filter(Boolean);
+        
+        const line = document.createElement('div');
+        line.className = 'terminal-line';
+        line.innerHTML = `<span class="prompt-symbol">❯</span> ${commandStr}`;
+        terminalOutput.appendChild(line);
+
+        if (command) {
+            state.commandHistory.unshift(commandStr);
+            state.commandHistoryIndex = -1;
+        }
+
+        switch (command) {
+            case 'help':
+                if (args.length > 0) {
+                    printToTerminal('Please use one of the available commands.', 'error');
+                    return;
+                }
+                printToTerminal("Available commands:\n`git log` - Show commit history\n`git branch` - List all branches\n`git checkout <target>` - Switch to a branch or commit\n`reset` - Reset the current level\n`clear` - Clear the terminal");
+                break;
+            case 'git':
+                handleGitCommand(args[0], args.slice(1));
+                break;
+            case 'reset':
+                if (args.length > 0) {
+                    printToTerminal('Please use one of the available commands.', 'error');
+                    return;
+                }
+                printToTerminal("Resetting level...");
+                initLevel(state.currentLevel);
+                break;
+            case 'clear':
+                if (args.length > 0) {
+                    printToTerminal('Please use one of the available commands.', 'error');
+                    return;
+                }
+                const linesToRemove = terminalOutput.querySelectorAll('.terminal-line:not(.prose)');
+                linesToRemove.forEach(line => line.remove());
+                break;
+            case undefined:
+                break; // Handle empty input
+            default:
+                printToTerminal('Please use one of the available commands.', 'error');
+        }
+        terminalOutput.scrollTop = terminalOutput.scrollHeight;
+    }
+
+    function handleGitCommand(subcommand, args) {
+        const { commits, branches } = state.git;
+        switch (subcommand) {
+            case 'log':
+                if (args.length > 0) {
+                    printToTerminal(`error: 'git log' does not take any arguments in this quest.`, 'error');
+                    return;
+                }
+
+                let currentHash;
+                if (branches[state.git.head]) {
+                    currentHash = branches[state.git.head];
+                } else {
+                    currentHash = state.git.head;
+                }
+                
+                let logOutput = '';
+                let count = 0;
+                while (currentHash && count < 10) {
+                    const commit = commits[currentHash];
+                    logOutput += `commit <span class="commit">${currentHash}</span>\n`;
+                    logOutput += `Message: ${commit.msg}\n\n`;
+                    currentHash = commit.parent;
+                    count++;
+                }
+                const logLine = document.createElement('div');
+                logLine.className = 'terminal-line command-output';
+                logLine.innerHTML = logOutput || 'No commits to show.';
+                terminalOutput.appendChild(logLine);
+                break;
+
+            case 'branch':
+                if (args.length > 0) {
+                    printToTerminal(`error: 'git branch' does not take any arguments in this quest.`, 'error');
+                    return;
+                }
+
+                let branchOutput = '';
+                const onBranch = Object.keys(branches).includes(state.git.head);
+
+                if (onBranch) {
+                    Object.keys(branches).forEach(name => {
+                        if (name === state.git.head) {
+                            branchOutput += `* <span class="branch">${name}</span>\n`;
+                        } else {
+                            branchOutput += `  ${name}\n`;
+                        }
+                    });
+                } else { // Detached HEAD
+                    if (commits[state.git.head]) {
+                        branchOutput += `* (HEAD detached at <span class="commit">${state.git.head.substring(0, 7)}</span>)\n`;
+                    }
+                    Object.keys(branches).forEach(name => {
+                        branchOutput += `  ${name}\n`;
+                    });
+                }
+                const branchLine = document.createElement('div');
+                branchLine.className = 'terminal-line command-output';
+                branchLine.innerHTML = branchOutput.trim() || 'No branches exist.';
+                terminalOutput.appendChild(branchLine);
+                break;
+
+            case 'checkout':
+                if (args.length !== 1) {
+                    printToTerminal(`error: 'git checkout' requires exactly one argument (a branch name or commit hash).`, 'error');
+                    return;
+                }
+
+                const rawTarget = args[0];
+                const target = rawTarget.trim();
+
+                // Resolve abbreviated commit hashes (e.g. c4d5e6f -> full hash)
+                const resolveCommitHash = (maybeAbbrev) => {
+                    if (Object.prototype.hasOwnProperty.call(commits, maybeAbbrev)) return maybeAbbrev;
+                    const matches = Object.keys(commits).filter((h) => h.startsWith(maybeAbbrev));
+                    return matches.length === 1 ? matches[0] : null;
+                };
+
+                if (branches[target]) {
+                    state.git.head = target;
+                    printToTerminal(`Switched to branch '<span class="branch">${target}</span>'`);
+                } else if (Object.keys(commits).includes(target)) {
+                    state.git.head = target;
+                    printToTerminal(`Note: switching to '${target}'.\nYou are in 'detached HEAD' state.`, 'info');
+                } else {
+                    printToTerminal(`Error: pathspec '${target}' did not match any file(s) known to git.`, 'error');
+                    return;
+                }
+                drawGraph();
+                checkCompletion();
+                break;
+
+            default:
+                printToTerminal('Please use one of the available commands.', 'error');
+        }
+    }
+
+    // --- Event Listeners ---
+
+    terminalInputForm.addEventListener('submit', e => {
+        e.preventDefault();
+        const command = terminalInput.value;
+        handleCommand(command);
+        terminalInput.value = '';
+    });
+
+    terminalInput.addEventListener('keydown', e => {
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (state.commandHistoryIndex < state.commandHistory.length - 1) {
+                state.commandHistoryIndex++;
+                terminalInput.value = state.commandHistory[state.commandHistoryIndex];
+            }
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (state.commandHistoryIndex > 0) {
+                state.commandHistoryIndex--;
+                terminalInput.value = state.commandHistory[state.commandHistoryIndex];
+            } else {
+                state.commandHistoryIndex = -1;
+                terminalInput.value = '';
+            }
+        }
+    });
+
+    // --- Initialization ---
+    
+    function initialize() {
+        // Theme detection
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+
+        const startLevel = loadProgress();
+        initLevel(startLevel);
+    }
+
+    initialize();
+
+    </script>
+</body>
+</html>
