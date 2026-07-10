@@ -1,0 +1,666 @@
+<!--
+Heading Structure Visualizer
+Single-file client-side tool to visualize the heading hierarchy (h1-h6) of
+pasted HTML or a fetched URL, flagging skipped levels and other common
+accessibility issues.
+Built for One File Tools.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Heading Structure Visualizer - One File Tools</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <style>
+      :root {
+        --bg: #030712;
+        --grid-line: #111827;
+        --panel: rgba(17, 24, 39, 0.7);
+        --panel-border: #1f2937;
+        --accent: #a3e635;
+        --accent-hover: #84cc16;
+        --accent-glow: rgba(163, 230, 53, 0.15);
+        --text: #f9fafb;
+        --text-muted: #9ca3af;
+        --text-dim: #4b5563;
+        --radius-sm: 12px;
+        --radius-md: 20px;
+        --font-sans: "Inter", system-ui, sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+        --font-display: "Space Grotesk", sans-serif;
+        --color-weak: #ef4444;
+        --color-fair: #f59e0b;
+        --color-strong: #10b981;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg);
+        background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+        background-size: 32px 32px;
+        color: var(--text);
+        padding: 48px 20px 80px;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+      }
+
+      .app {
+        width: 100%;
+        max-width: 900px;
+      }
+
+      .hero {
+        text-align: center;
+        margin-bottom: 28px;
+      }
+
+      .eyebrow {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        letter-spacing: 0.2em;
+        color: var(--accent);
+        text-transform: uppercase;
+        margin-bottom: 12px;
+        font-weight: 500;
+      }
+
+      .wordmark {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: clamp(26px, 5vw, 38px);
+        letter-spacing: -0.02em;
+        margin-bottom: 12px;
+      }
+
+      .tagline {
+        color: var(--text-muted);
+        font-size: 15px;
+        line-height: 1.5;
+        max-width: 600px;
+        margin: 0 auto;
+      }
+
+      .studio {
+        background: var(--panel);
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-md);
+        padding: 24px;
+        box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.5);
+        margin-bottom: 24px;
+      }
+
+      .mode-tabs {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 18px;
+      }
+
+      .mode-tab {
+        flex: 1;
+        background: rgba(31, 41, 55, 0.5);
+        border: 1px solid var(--panel-border);
+        color: var(--text-muted);
+        border-radius: 8px;
+        padding: 10px 14px;
+        font-family: var(--font-sans);
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .mode-tab.active {
+        background: var(--accent);
+        color: #030712;
+        border-color: var(--accent);
+      }
+
+      .mode-tab:hover:not(.active) {
+        background: rgba(55, 65, 81, 0.7);
+      }
+
+      .mode-tab:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      textarea {
+        width: 100%;
+        background: rgba(17, 24, 39, 0.8);
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 13px;
+        padding: 12px 14px;
+        resize: vertical;
+        min-height: 160px;
+        line-height: 1.6;
+      }
+
+      textarea:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-glow);
+      }
+
+      .url-row {
+        display: flex;
+        gap: 10px;
+      }
+
+      .url-row input {
+        flex: 1;
+        background: rgba(17, 24, 39, 0.8);
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 14px;
+        padding: 10px 12px;
+      }
+
+      .url-row input:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-glow);
+      }
+
+      .btn {
+        background: var(--accent);
+        color: #030712;
+        border: none;
+        border-radius: 8px;
+        padding: 11px 18px;
+        font-family: var(--font-sans);
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+
+      .btn:hover {
+        background: var(--accent-hover);
+      }
+
+      .btn:focus-visible,
+      .btn-ghost:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      .btn-ghost {
+        background: rgba(31, 41, 55, 0.6);
+        border: 1px solid var(--panel-border);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 11px 16px;
+        font-family: var(--font-sans);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .btn-ghost:hover {
+        background: rgba(55, 65, 81, 0.8);
+      }
+
+      .actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 14px;
+        flex-wrap: wrap;
+      }
+
+      .note {
+        margin-top: 14px;
+        font-size: 13px;
+        color: var(--text-muted);
+        line-height: 1.6;
+        background: rgba(163, 230, 53, 0.07);
+        border: 1px solid rgba(163, 230, 53, 0.25);
+        border-radius: var(--radius-sm);
+        padding: 12px 14px;
+      }
+
+      .field-error {
+        font-size: 13px;
+        color: var(--color-weak);
+        margin-top: 10px;
+      }
+
+      .stats-row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+      }
+
+      .stat-pill {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        font-weight: 600;
+        padding: 6px 12px;
+        border-radius: 99px;
+        border: 1px solid var(--panel-border);
+        background: rgba(3, 7, 18, 0.5);
+        color: var(--text-muted);
+      }
+
+      .issues-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+
+      .issue-item {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        padding: 10px 14px;
+        border-radius: var(--radius-sm);
+        border: 1px solid rgba(245, 158, 11, 0.35);
+        background: rgba(245, 158, 11, 0.06);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      .issue-item.error {
+        border-color: rgba(239, 68, 68, 0.35);
+        background: rgba(239, 68, 68, 0.06);
+      }
+
+      .outline-list {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .outline-item {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: rgba(3, 7, 18, 0.4);
+        font-family: var(--font-mono);
+        font-size: 13px;
+      }
+
+      .outline-item.skipped {
+        border: 1px solid rgba(239, 68, 68, 0.4);
+        background: rgba(239, 68, 68, 0.06);
+      }
+
+      .outline-tag {
+        font-weight: 700;
+        color: var(--accent);
+        flex-shrink: 0;
+        min-width: 32px;
+      }
+
+      .outline-text {
+        color: var(--text);
+        word-break: break-word;
+      }
+
+      .empty-state {
+        color: var(--text-dim);
+        font-size: 14px;
+        text-align: center;
+        padding: 20px 0;
+      }
+
+      .footer-note {
+        text-align: center;
+        color: var(--text-dim);
+        font-size: 13px;
+        margin-top: 8px;
+      }
+
+      .footer-note a {
+        color: var(--text-muted);
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background: var(--text);
+        color: var(--bg);
+        padding: 12px 22px;
+        border-radius: 99px;
+        font-family: var(--font-sans);
+        font-weight: 600;
+        font-size: 14px;
+        opacity: 0;
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        z-index: 100;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      }
+
+      .toast.show {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+      }
+
+      @media (max-width: 640px) {
+        .studio {
+          padding: 18px;
+        }
+        .url-row {
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="hero">
+        <div class="eyebrow">Accessibility</div>
+        <h1 class="wordmark">Heading Structure Visualizer</h1>
+        <p class="tagline">Paste HTML or load a URL to visualize its heading hierarchy and catch skipped levels, missing or duplicate H1s, and other structural issues.</p>
+      </header>
+
+      <main class="studio">
+        <div class="mode-tabs" role="tablist">
+          <button class="mode-tab active" id="tabPaste" type="button" role="tab" aria-selected="true">Paste HTML</button>
+          <button class="mode-tab" id="tabUrl" type="button" role="tab" aria-selected="false">Load from URL</button>
+        </div>
+
+        <div id="pasteMode">
+          <textarea id="htmlInput" spellcheck="false" placeholder="Paste HTML markup here…">
+&lt;h1&gt;Page Title&lt;/h1&gt;
+&lt;h2&gt;Section One&lt;/h2&gt;
+&lt;h3&gt;Subsection&lt;/h3&gt;
+&lt;h2&gt;Section Two&lt;/h2&gt;
+&lt;h4&gt;Skipped level example&lt;/h4&gt;</textarea>
+        </div>
+
+        <div id="urlMode" style="display: none">
+          <div class="url-row">
+            <input type="text" id="urlInput" placeholder="https://example.com" spellcheck="false" />
+            <button class="btn" id="btnLoadUrl" type="button">Fetch & analyze</button>
+          </div>
+          <div class="note">Loading a URL requires the target site to allow cross-origin requests (CORS). Many sites block this by default — if fetching fails, copy the page's HTML source and use "Paste HTML" instead.</div>
+        </div>
+
+        <div class="actions">
+          <button class="btn" id="btnAnalyze" type="button">Analyze</button>
+          <button class="btn-ghost" id="btnClear" type="button">Clear</button>
+        </div>
+        <div class="field-error" id="analyzeError"></div>
+      </main>
+
+      <main class="studio">
+        <div class="stats-row" id="statsRow"></div>
+        <div class="issues-list" id="issuesList"></div>
+        <div class="outline-list" id="outlineList"></div>
+        <p class="empty-state" id="emptyState">Paste HTML or load a URL, then click Analyze to see the heading outline here.</p>
+
+        <div class="actions">
+          <button class="btn-ghost" id="btnCopyOutline" type="button">Copy outline</button>
+        </div>
+      </main>
+
+      <p class="footer-note">Part of <a href="https://github.com/praveenscience/One-File-Tools">One File Tools</a>. Parsing happens entirely in your browser.</p>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script>
+      /* ==========================================================
+         Heading Structure Visualizer
+         Vanilla JS, no dependencies. Uses DOMParser to build a
+         detached document from the HTML string, so no markup is
+         ever rendered live on the page (avoids executing scripts
+         or loading remote resources from pasted/fetched HTML).
+         ========================================================== */
+
+      const tabPaste = document.getElementById("tabPaste");
+      const tabUrl = document.getElementById("tabUrl");
+      const pasteMode = document.getElementById("pasteMode");
+      const urlMode = document.getElementById("urlMode");
+      const htmlInput = document.getElementById("htmlInput");
+      const urlInput = document.getElementById("urlInput");
+      const btnLoadUrl = document.getElementById("btnLoadUrl");
+      const btnAnalyze = document.getElementById("btnAnalyze");
+      const btnClear = document.getElementById("btnClear");
+      const analyzeError = document.getElementById("analyzeError");
+      const statsRow = document.getElementById("statsRow");
+      const issuesList = document.getElementById("issuesList");
+      const outlineList = document.getElementById("outlineList");
+      const emptyState = document.getElementById("emptyState");
+      const btnCopyOutline = document.getElementById("btnCopyOutline");
+      const toast = document.getElementById("toast");
+
+      let lastOutlineText = "";
+
+      function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add("show");
+        setTimeout(() => toast.classList.remove("show"), 2000);
+      }
+
+      function setMode(mode) {
+        const isPaste = mode === "paste";
+        tabPaste.classList.toggle("active", isPaste);
+        tabUrl.classList.toggle("active", !isPaste);
+        tabPaste.setAttribute("aria-selected", String(isPaste));
+        tabUrl.setAttribute("aria-selected", String(!isPaste));
+        pasteMode.style.display = isPaste ? "block" : "none";
+        urlMode.style.display = isPaste ? "none" : "block";
+      }
+
+      tabPaste.addEventListener("click", () => setMode("paste"));
+      tabUrl.addEventListener("click", () => setMode("url"));
+
+      /**
+       * Fetches a URL directly with fetch() and returns its HTML text. This
+       * only succeeds when the target server allows cross-origin requests;
+       * otherwise the browser blocks the response before JS ever sees it,
+       * which we surface as a clear error rather than a silent failure.
+       */
+      async function fetchUrlHtml(url) {
+        const response = await fetch(url, { mode: "cors" });
+        if (!response.ok) throw new Error("Server responded with status " + response.status);
+        return await response.text();
+      }
+
+      /**
+       * Parses an HTML string into a detached Document via DOMParser (never
+       * inserted into the live page), extracts all h1-h6 elements in source
+       * order, and analyzes the resulting outline for common issues.
+       */
+      function analyzeHeadings(htmlString) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(htmlString, "text/html");
+        const headingEls = Array.from(doc.querySelectorAll("h1, h2, h3, h4, h5, h6"));
+
+        const headings = headingEls.map((el) => ({
+          level: Number(el.tagName.slice(1)),
+          text: el.textContent.trim().replace(/\s+/g, " ") || "(empty heading)"
+        }));
+
+        const issues = [];
+        const counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+        headings.forEach((h) => (counts[h.level] += 1));
+
+        if (headings.length === 0) {
+          issues.push({ level: "error", message: "No headings (h1–h6) were found in this content." });
+        }
+        if (counts[1] === 0 && headings.length > 0) {
+          issues.push({ level: "error", message: "No <h1> found. Every page should have exactly one primary heading." });
+        }
+        if (counts[1] > 1) {
+          issues.push({ level: "warn", message: "Multiple <h1> elements found (" + counts[1] + "). Most guidance recommends exactly one per page." });
+        }
+
+        // Detect skipped levels: a heading whose level is more than 1 greater
+        // than the previous heading's level (e.g. h2 -> h4 skips h3).
+        let previousLevel = null;
+        headings.forEach((h, index) => {
+          if (previousLevel !== null && h.level > previousLevel + 1) {
+            issues.push({
+              level: "error",
+              message: "Heading level skipped: went from h" + previousLevel + " to h" + h.level + ' at "' + h.text + '" (position ' + (index + 1) + ").",
+              headingIndex: index
+            });
+          }
+          previousLevel = h.level;
+        });
+
+        return { headings, issues, counts };
+      }
+
+      /** Renders the summary stat pills. */
+      function renderStats(headings, counts) {
+        statsRow.innerHTML = "";
+        const total = document.createElement("span");
+        total.className = "stat-pill";
+        total.textContent = headings.length + " heading" + (headings.length === 1 ? "" : "s") + " total";
+        statsRow.appendChild(total);
+
+        for (let level = 1; level <= 6; level++) {
+          if (counts[level] > 0) {
+            const pill = document.createElement("span");
+            pill.className = "stat-pill";
+            pill.textContent = "h" + level + ": " + counts[level];
+            statsRow.appendChild(pill);
+          }
+        }
+      }
+
+      /** Renders the issues list, or nothing when there are none. */
+      function renderIssues(issues) {
+        issuesList.innerHTML = "";
+        issues.forEach((issue) => {
+          const div = document.createElement("div");
+          div.className = "issue-item" + (issue.level === "error" ? " error" : "");
+          div.textContent = (issue.level === "error" ? "❌ " : "⚠️ ") + issue.message;
+          issuesList.appendChild(div);
+        });
+      }
+
+      /** Renders the indented outline, highlighting rows that caused a skipped-level issue. */
+      function renderOutline(headings, issues) {
+        const skippedIndexes = new Set(issues.filter((i) => i.headingIndex !== undefined).map((i) => i.headingIndex));
+
+        outlineList.innerHTML = "";
+        const lines = [];
+
+        headings.forEach((h, index) => {
+          const item = document.createElement("div");
+          item.className = "outline-item" + (skippedIndexes.has(index) ? " skipped" : "");
+          item.style.marginLeft = (h.level - 1) * 20 + "px";
+
+          const tag = document.createElement("span");
+          tag.className = "outline-tag";
+          tag.textContent = "H" + h.level;
+
+          const text = document.createElement("span");
+          text.className = "outline-text";
+          text.textContent = h.text;
+
+          item.appendChild(tag);
+          item.appendChild(text);
+          outlineList.appendChild(item);
+
+          lines.push("  ".repeat(h.level - 1) + "H" + h.level + ": " + h.text);
+        });
+
+        lastOutlineText = lines.join("\n");
+      }
+
+      /** Runs the full analysis pipeline on an HTML string and renders results. */
+      function runAnalysis(htmlString) {
+        analyzeError.textContent = "";
+        const { headings, issues, counts } = analyzeHeadings(htmlString);
+
+        if (headings.length === 0 && issues.length === 0) {
+          emptyState.hidden = false;
+          statsRow.innerHTML = "";
+          issuesList.innerHTML = "";
+          outlineList.innerHTML = "";
+          return;
+        }
+        emptyState.hidden = true;
+
+        renderStats(headings, counts);
+        renderIssues(issues);
+        renderOutline(headings, issues);
+      }
+
+      btnAnalyze.addEventListener("click", () => {
+        if (tabPaste.classList.contains("active")) {
+          runAnalysis(htmlInput.value);
+        } else {
+          showToast('Use "Fetch & analyze" to load and analyze a URL');
+        }
+      });
+
+      btnLoadUrl.addEventListener("click", async () => {
+        const url = urlInput.value.trim();
+        if (!url) {
+          analyzeError.textContent = "Enter a URL first.";
+          return;
+        }
+        analyzeError.textContent = "";
+        btnLoadUrl.disabled = true;
+        btnLoadUrl.textContent = "Loading…";
+        try {
+          const html = await fetchUrlHtml(url);
+          runAnalysis(html);
+          showToast("Loaded and analyzed!");
+        } catch (err) {
+          analyzeError.textContent = "Could not load that URL — likely blocked by CORS, or the site is unreachable. Try pasting the page's HTML source instead. (" + err.message + ")";
+        } finally {
+          btnLoadUrl.disabled = false;
+          btnLoadUrl.textContent = "Fetch & analyze";
+        }
+      });
+
+      btnClear.addEventListener("click", () => {
+        htmlInput.value = "";
+        urlInput.value = "";
+        analyzeError.textContent = "";
+        statsRow.innerHTML = "";
+        issuesList.innerHTML = "";
+        outlineList.innerHTML = "";
+        lastOutlineText = "";
+        emptyState.hidden = false;
+      });
+
+      btnCopyOutline.addEventListener("click", () => {
+        if (!lastOutlineText) {
+          showToast("Nothing to copy yet");
+          return;
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard
+            .writeText(lastOutlineText)
+            .then(() => showToast("Outline copied!"))
+            .catch(() => showToast("Copy failed"));
+        } else {
+          showToast("Clipboard unavailable");
+        }
+      });
+
+      // Analyze the sample content on load so the tool is immediately useful.
+      runAnalysis(htmlInput.value);
+    </script>
+  </body>
+</html>

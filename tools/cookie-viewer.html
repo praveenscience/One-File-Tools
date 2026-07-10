@@ -1,0 +1,631 @@
+<!--
+Cookie Viewer
+Single-file client-side tool to inspect, create, edit, delete, and search
+cookies for the current origin.
+Built for One File Tools.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cookie Viewer - One File Tools</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <style>
+      :root {
+        --bg: #030712;
+        --grid-line: #111827;
+        --panel: rgba(17, 24, 39, 0.7);
+        --panel-border: #1f2937;
+        --accent: #fb7185;
+        --accent-hover: #f43f5e;
+        --accent-glow: rgba(251, 113, 133, 0.15);
+        --text: #f9fafb;
+        --text-muted: #9ca3af;
+        --text-dim: #4b5563;
+        --radius-sm: 12px;
+        --radius-md: 20px;
+        --font-sans: "Inter", system-ui, sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+        --font-display: "Space Grotesk", sans-serif;
+        --color-weak: #ef4444;
+        --color-strong: #10b981;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg);
+        background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+        background-size: 32px 32px;
+        color: var(--text);
+        padding: 48px 20px 80px;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+      }
+
+      .app {
+        width: 100%;
+        max-width: 900px;
+      }
+
+      .hero {
+        text-align: center;
+        margin-bottom: 24px;
+      }
+
+      .eyebrow {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        letter-spacing: 0.2em;
+        color: var(--accent);
+        text-transform: uppercase;
+        margin-bottom: 12px;
+        font-weight: 500;
+      }
+
+      .wordmark {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: clamp(26px, 5vw, 38px);
+        letter-spacing: -0.02em;
+        margin-bottom: 12px;
+      }
+
+      .tagline {
+        color: var(--text-muted);
+        font-size: 15px;
+        line-height: 1.5;
+        max-width: 600px;
+        margin: 0 auto;
+      }
+
+      .origin-note {
+        max-width: 700px;
+        margin: 16px auto 0;
+        font-size: 13px;
+        color: var(--text-muted);
+        line-height: 1.6;
+        background: rgba(251, 113, 133, 0.07);
+        border: 1px solid rgba(251, 113, 133, 0.25);
+        border-radius: var(--radius-sm);
+        padding: 12px 14px;
+        text-align: left;
+      }
+
+      .origin-note code {
+        color: var(--text);
+        font-family: var(--font-mono);
+      }
+
+      .studio {
+        background: var(--panel);
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-md);
+        padding: 24px;
+        box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.5);
+        margin-bottom: 24px;
+      }
+
+      .toolbar {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+        margin-bottom: 16px;
+      }
+
+      .search-input {
+        flex: 1;
+        min-width: 180px;
+        background: rgba(17, 24, 39, 0.8);
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 14px;
+        padding: 10px 12px;
+      }
+
+      .search-input:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-glow);
+      }
+
+      .btn {
+        background: var(--accent);
+        color: #030712;
+        border: none;
+        border-radius: 8px;
+        padding: 10px 16px;
+        font-family: var(--font-sans);
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+
+      .btn:hover {
+        background: var(--accent-hover);
+      }
+
+      .btn:focus-visible,
+      .btn-ghost:focus-visible,
+      .btn-danger:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      .btn-ghost {
+        background: rgba(31, 41, 55, 0.6);
+        border: 1px solid var(--panel-border);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 10px 16px;
+        font-family: var(--font-sans);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+
+      .btn-ghost:hover {
+        background: rgba(55, 65, 81, 0.8);
+      }
+
+      .btn-danger {
+        background: rgba(239, 68, 68, 0.1);
+        color: #fca5a5;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        border-radius: 8px;
+        padding: 10px 16px;
+        font-family: var(--font-sans);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+
+      .btn-danger:hover {
+        background: rgba(239, 68, 68, 0.18);
+      }
+
+      .cookie-count {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-bottom: 14px;
+      }
+
+      .cookie-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-height: 460px;
+        overflow-y: auto;
+      }
+
+      .cookie-row {
+        background: rgba(3, 7, 18, 0.5);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 12px 14px;
+      }
+
+      .cookie-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+
+      .cookie-name {
+        font-family: var(--font-mono);
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--accent);
+        flex: 1;
+        word-break: break-all;
+      }
+
+      .cookie-value-input {
+        width: 100%;
+        background: rgba(17, 24, 39, 0.8);
+        border: 1px solid var(--panel-border);
+        border-radius: 6px;
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 13px;
+        padding: 8px 10px;
+      }
+
+      .cookie-value-input:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-glow);
+      }
+
+      .cookie-meta {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 8px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-dim);
+      }
+
+      .cookie-actions {
+        display: flex;
+        gap: 6px;
+        margin-top: 8px;
+        flex-wrap: wrap;
+      }
+
+      .icon-btn-sm {
+        background: rgba(31, 41, 55, 0.6);
+        border: 1px solid var(--panel-border);
+        color: var(--text-muted);
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-size: 11px;
+        font-family: var(--font-sans);
+        cursor: pointer;
+      }
+
+      .icon-btn-sm:hover {
+        background: rgba(55, 65, 81, 0.9);
+        color: var(--text);
+      }
+
+      .icon-btn-sm.save {
+        color: var(--color-strong);
+        border-color: rgba(16, 185, 129, 0.35);
+      }
+
+      .icon-btn-sm.delete {
+        color: #fca5a5;
+        border-color: rgba(239, 68, 68, 0.3);
+      }
+
+      .empty-state {
+        color: var(--text-dim);
+        font-size: 14px;
+        text-align: center;
+        padding: 24px 0;
+      }
+
+      .add-form {
+        display: grid;
+        grid-template-columns: 1fr 1fr 100px 100px auto;
+        gap: 8px;
+        margin-top: 16px;
+      }
+
+      .add-form input,
+      .add-form select {
+        background: rgba(17, 24, 39, 0.8);
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 13px;
+        padding: 9px 10px;
+      }
+
+      .field-error {
+        font-size: 12px;
+        color: var(--color-weak);
+        margin-top: 8px;
+      }
+
+      .footer-note {
+        text-align: center;
+        color: var(--text-dim);
+        font-size: 13px;
+        margin-top: 8px;
+      }
+
+      .footer-note a {
+        color: var(--text-muted);
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background: var(--text);
+        color: var(--bg);
+        padding: 12px 22px;
+        border-radius: 99px;
+        font-family: var(--font-sans);
+        font-weight: 600;
+        font-size: 14px;
+        opacity: 0;
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        z-index: 100;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      }
+
+      .toast.show {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+      }
+
+      @media (max-width: 640px) {
+        .studio {
+          padding: 18px;
+        }
+        .add-form {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="hero">
+        <div class="eyebrow">Browser & Network</div>
+        <h1 class="wordmark">Cookie Viewer</h1>
+        <p class="tagline">Inspect, create, edit, delete, and search cookies for the current site — no dev tools required.</p>
+        <div class="origin-note"><strong>Note:</strong> this page can only see cookies readable from JavaScript on <code id="currentOrigin"></code>. <strong>HttpOnly</strong> cookies are deliberately invisible to scripts (a security feature), so they won't appear here even though the server sees them. New cookies are also scoped to this page's own path/domain — you can't create or edit cookies belonging to a different site.</div>
+      </header>
+
+      <main class="studio">
+        <div class="toolbar">
+          <input type="text" id="searchInput" class="search-input" placeholder="Search by name or value…" autocomplete="off" spellcheck="false" />
+          <button class="btn" id="btnRefresh" type="button">Refresh</button>
+          <button class="btn-danger" id="btnClearAll" type="button">Clear all</button>
+        </div>
+
+        <div class="cookie-count" id="cookieCount"></div>
+
+        <div class="cookie-list" id="cookieList"></div>
+        <p class="empty-state" id="emptyState">No cookies found for this page.</p>
+
+        <div class="add-form">
+          <input type="text" id="newName" placeholder="name" spellcheck="false" />
+          <input type="text" id="newValue" placeholder="value" spellcheck="false" />
+          <input type="number" id="newMaxAge" placeholder="max-age (s)" min="1" />
+          <select id="newSameSite">
+            <option value="Lax">SameSite=Lax</option>
+            <option value="Strict">SameSite=Strict</option>
+            <option value="None">SameSite=None</option>
+          </select>
+          <button class="btn" id="btnAddCookie" type="button">Add cookie</button>
+        </div>
+        <div class="field-error" id="addError"></div>
+      </main>
+
+      <p class="footer-note">Part of <a href="https://github.com/praveenscience/One-File-Tools">One File Tools</a>. Runs entirely in your browser.</p>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script>
+      /* ==========================================================
+         Cookie Viewer
+         Vanilla JS, no dependencies. Operates only on cookies
+         readable via document.cookie for this page's own origin —
+         HttpOnly cookies are invisible to JavaScript by design.
+         ========================================================== */
+
+      const currentOrigin = document.getElementById("currentOrigin");
+      const searchInput = document.getElementById("searchInput");
+      const btnRefresh = document.getElementById("btnRefresh");
+      const btnClearAll = document.getElementById("btnClearAll");
+      const cookieCount = document.getElementById("cookieCount");
+      const cookieList = document.getElementById("cookieList");
+      const emptyState = document.getElementById("emptyState");
+      const newName = document.getElementById("newName");
+      const newValue = document.getElementById("newValue");
+      const newMaxAge = document.getElementById("newMaxAge");
+      const newSameSite = document.getElementById("newSameSite");
+      const btnAddCookie = document.getElementById("btnAddCookie");
+      const addError = document.getElementById("addError");
+      const toast = document.getElementById("toast");
+
+      currentOrigin.textContent = window.location.origin;
+
+      function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add("show");
+        setTimeout(() => toast.classList.remove("show"), 2000);
+      }
+
+      function copyText(text, message) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard
+            .writeText(text)
+            .then(() => showToast(message))
+            .catch(() => showToast("Copy failed"));
+        } else {
+          showToast("Clipboard unavailable");
+        }
+      }
+
+      /** Parses document.cookie into an array of { name, value }, decoded. */
+      function readAllCookies() {
+        if (!document.cookie) return [];
+        return document.cookie
+          .split(";")
+          .map((pair) => pair.trim())
+          .filter(Boolean)
+          .map((pair) => {
+            const eqIndex = pair.indexOf("=");
+            const name = eqIndex === -1 ? pair : pair.slice(0, eqIndex);
+            const value = eqIndex === -1 ? "" : pair.slice(eqIndex + 1);
+            let decodedValue = value;
+            try {
+              decodedValue = decodeURIComponent(value);
+            } catch (err) {
+              /* Leave as-is if it isn't valid percent-encoding. */
+            }
+            let decodedName = name;
+            try {
+              decodedName = decodeURIComponent(name);
+            } catch (e) {
+              /* leave as-is */
+            }
+            return { name: decodedName, value: decodedValue };
+          })
+          .sort((a, b) => a.name.localeCompare(b.name));
+      }
+
+      /** Writes (creates or updates) a cookie with the given attributes. */
+      function writeCookie(name, value, options) {
+        options = options || {};
+        let str = encodeURIComponent(name) + "=" + encodeURIComponent(value);
+        str += "; path=" + (options.path || "/");
+        if (options.maxAge) str += "; max-age=" + options.maxAge;
+        str += "; SameSite=" + (options.sameSite || "Lax");
+        if (options.sameSite === "None" || location.protocol === "https:") str += "; Secure";
+        document.cookie = str;
+      }
+
+      /** Deletes a cookie by name (writes it with an expiry in the past). */
+      function deleteCookie(name) {
+        document.cookie = encodeURIComponent(name) + "=; path=/; max-age=0";
+      }
+
+      /** Builds a single cookie row with editable value, save/delete/copy actions. */
+      function buildCookieRow(cookie) {
+        const row = document.createElement("div");
+        row.className = "cookie-row";
+
+        const header = document.createElement("div");
+        header.className = "cookie-header";
+        const nameSpan = document.createElement("span");
+        nameSpan.className = "cookie-name";
+        nameSpan.textContent = cookie.name;
+        header.appendChild(nameSpan);
+
+        const valueInput = document.createElement("input");
+        valueInput.type = "text";
+        valueInput.className = "cookie-value-input";
+        valueInput.value = cookie.value;
+        valueInput.spellcheck = false;
+
+        const meta = document.createElement("div");
+        meta.className = "cookie-meta";
+        meta.innerHTML = "<span>path: " + "/" + "</span><span>domain: " + window.location.hostname + "</span><span>Secure: " + (location.protocol === "https:" ? "yes" : "no (http)") + "</span>";
+        // Note: document.cookie never exposes original expiration, HttpOnly, or
+        // SameSite values for existing cookies — only name/value are readable.
+        // We show what we *can* determine (current page's path/domain/protocol)
+        // rather than fabricate values we don't actually have.
+
+        const actions = document.createElement("div");
+        actions.className = "cookie-actions";
+
+        const saveBtn = document.createElement("button");
+        saveBtn.type = "button";
+        saveBtn.className = "icon-btn-sm save";
+        saveBtn.textContent = "Save value";
+        saveBtn.addEventListener("click", () => {
+          writeCookie(cookie.name, valueInput.value, {});
+          showToast("Saved " + cookie.name);
+          refresh();
+        });
+
+        const copyNameBtn = document.createElement("button");
+        copyNameBtn.type = "button";
+        copyNameBtn.className = "icon-btn-sm";
+        copyNameBtn.textContent = "Copy name";
+        copyNameBtn.addEventListener("click", () => copyText(cookie.name, "Name copied!"));
+
+        const copyValueBtn = document.createElement("button");
+        copyValueBtn.type = "button";
+        copyValueBtn.className = "icon-btn-sm";
+        copyValueBtn.textContent = "Copy value";
+        copyValueBtn.addEventListener("click", () => copyText(valueInput.value, "Value copied!"));
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.className = "icon-btn-sm delete";
+        deleteBtn.textContent = "Delete";
+        deleteBtn.addEventListener("click", () => {
+          if (!confirm('Delete cookie "' + cookie.name + '"?')) return;
+          deleteCookie(cookie.name);
+          showToast("Deleted " + cookie.name);
+          refresh();
+        });
+
+        actions.appendChild(saveBtn);
+        actions.appendChild(copyNameBtn);
+        actions.appendChild(copyValueBtn);
+        actions.appendChild(deleteBtn);
+
+        row.appendChild(header);
+        row.appendChild(valueInput);
+        row.appendChild(meta);
+        row.appendChild(actions);
+        return row;
+      }
+
+      /** Re-reads cookies and re-renders the filtered list + count. */
+      function refresh() {
+        const allCookies = readAllCookies();
+        const query = searchInput.value.trim().toLowerCase();
+        const filtered = query ? allCookies.filter((c) => c.name.toLowerCase().includes(query) || c.value.toLowerCase().includes(query)) : allCookies;
+
+        cookieCount.textContent = allCookies.length + " cookie" + (allCookies.length === 1 ? "" : "s") + " readable from this page";
+
+        cookieList.innerHTML = "";
+        if (filtered.length === 0) {
+          emptyState.hidden = false;
+          emptyState.textContent = allCookies.length === 0 ? "No cookies found for this page." : "No cookies match your search.";
+          return;
+        }
+        emptyState.hidden = true;
+        filtered.forEach((cookie) => cookieList.appendChild(buildCookieRow(cookie)));
+      }
+
+      // ---- Events ----
+
+      searchInput.addEventListener("input", refresh);
+      btnRefresh.addEventListener("click", refresh);
+
+      btnAddCookie.addEventListener("click", () => {
+        addError.textContent = "";
+        const name = newName.value.trim();
+        if (!name) {
+          addError.textContent = "Enter a cookie name.";
+          return;
+        }
+        const maxAge = newMaxAge.value ? parseInt(newMaxAge.value, 10) : undefined;
+        writeCookie(name, newValue.value, { maxAge, sameSite: newSameSite.value });
+        newName.value = "";
+        newValue.value = "";
+        newMaxAge.value = "";
+        showToast("Added " + name);
+        refresh();
+      });
+
+      btnClearAll.addEventListener("click", () => {
+        const cookies = readAllCookies();
+        if (cookies.length === 0) {
+          showToast("Nothing to clear");
+          return;
+        }
+        if (!confirm("Delete all " + cookies.length + " cookies readable from this page? This cannot be undone.")) return;
+        cookies.forEach((c) => deleteCookie(c.name));
+        showToast("Cleared all cookies");
+        refresh();
+      });
+
+      refresh();
+    </script>
+  </body>
+</html>
