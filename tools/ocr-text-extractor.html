@@ -451,12 +451,43 @@
 
         currentFile = file;
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
           previewImage.src = e.target.result;
           previewImage.style.display = 'block';
-          processImage(e.target.result);
+          
+          const enhancedImageData = await preprocessImage(e.target.result);
+          processImage(enhancedImageData);
         };
         reader.readAsDataURL(file);
+      }
+
+      // Pre-process image to drastically improve OCR accuracy
+      function preprocessImage(dataUrl) {
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            
+            // Upscale small images (Tesseract prefers larger text, ~20-30px high)
+            let scale = 1;
+            const minDimension = Math.min(img.width, img.height);
+            if (minDimension > 0 && minDimension < 1200) {
+              scale = 1200 / minDimension;
+              if (scale > 3) scale = 3; // Cap scale to prevent memory crashes
+            }
+            
+            canvas.width = img.width * scale;
+            canvas.height = img.height * scale;
+            
+            const ctx = canvas.getContext('2d');
+            // Apply grayscale and a slight contrast bump natively
+            ctx.filter = 'contrast(120%) grayscale(100%)';
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            
+            resolve(canvas.toDataURL('image/jpeg', 0.9));
+          };
+          img.src = dataUrl;
+        });
       }
 
       // OCR Processing with Tesseract.js
