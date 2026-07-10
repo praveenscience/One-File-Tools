@@ -1,0 +1,2151 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Validate Open Graph and Twitter Card tags. Compare expected schemas vs provided meta tags, inspect conflicts, and preview social card mockups in real-time." />
+    <title>Open Graph Debugger & Meta Diff — One File Tools</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+
+    <style>
+      /* ========================================
+       Reset & Design Tokens
+       ======================================== */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --bg-dark: #090a10;
+        --bg-gradient: radial-gradient(circle at 50% 0%, rgba(139, 92, 246, 0.15) 0%, rgba(9, 10, 16, 0) 75%), linear-gradient(135deg, #090a10 0%, #0d0f1c 100%);
+        --panel-bg: rgba(17, 24, 39, 0.6);
+        --panel-border: rgba(255, 255, 255, 0.08);
+        --panel-border-strong: rgba(255, 255, 255, 0.16);
+        --panel-soft: rgba(255, 255, 255, 0.03);
+
+        --text-main: #f3f4f6;
+        --text-muted: #9ca3af;
+        --text-subtle: #6b7280;
+
+        --color-primary: #a78bfa; /* Violet */
+        --color-primary-hover: #8b5cf6;
+        --color-primary-glow: rgba(139, 92, 246, 0.25);
+
+        --color-success: #10b981;
+        --color-success-bg: rgba(16, 185, 129, 0.1);
+        --color-success-glow: rgba(16, 185, 129, 0.2);
+
+        --color-warning: #f59e0b;
+        --color-warning-bg: rgba(245, 158, 11, 0.1);
+        --color-warning-glow: rgba(245, 158, 11, 0.2);
+
+        --color-danger: #ef4444;
+        --color-danger-bg: rgba(239, 68, 68, 0.1);
+        --color-danger-glow: rgba(239, 68, 68, 0.2);
+
+        --color-info: #06b6d4; /* Cyan */
+
+        --shadow-glow: 0 0 20px rgba(139, 92, 246, 0.15);
+        --radius: 12px;
+        --mono: "JetBrains Mono", monospace;
+        --sans: "Plus Jakarta Sans", sans-serif;
+      }
+
+      body {
+        background: var(--bg-dark);
+        background-image: var(--bg-gradient);
+        background-attachment: fixed;
+        color: var(--text-main);
+        font-family: var(--sans);
+        line-height: 1.6;
+        min-height: 100vh;
+        padding: 2rem;
+      }
+
+      header {
+        max-width: 1400px;
+        margin: 0 auto 2rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+
+      .header-title-area {
+        max-width: 800px;
+      }
+
+      .eyebrow {
+        color: var(--color-primary);
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        font-weight: 800;
+        letter-spacing: 0.15em;
+        margin-bottom: 0.5rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      h1 {
+        font-size: clamp(1.8rem, 4vw, 2.8rem);
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        line-height: 1.1;
+        margin-bottom: 0.5rem;
+        background: linear-gradient(to right, #ffffff 40%, #ddd6fe 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      header p {
+        color: var(--text-muted);
+        font-size: 1.05rem;
+      }
+
+      .privacy-badge {
+        background: rgba(139, 92, 246, 0.08);
+        border: 1px solid rgba(139, 92, 246, 0.25);
+        border-radius: var(--radius);
+        padding: 0.6rem 1rem;
+        color: #ddd6fe;
+        font-weight: 600;
+        font-size: 0.85rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 0 4px 12px rgba(139, 92, 246, 0.05);
+      }
+
+      .privacy-badge svg {
+        width: 16px;
+        height: 16px;
+        fill: currentColor;
+      }
+
+      main {
+        max-width: 1400px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+        gap: 24px;
+      }
+
+      @media (max-width: 1024px) {
+        main {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* ========================================
+       UI Panels / Glassmorphism
+       ======================================== */
+      .panel {
+        background: var(--panel-bg);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .panel-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--panel-border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .panel-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .panel-title svg {
+        width: 18px;
+        height: 18px;
+        color: var(--color-primary);
+      }
+
+      .panel-body {
+        padding: 20px;
+        flex: 1;
+      }
+
+      /* ========================================
+       Toolbar Actions
+       ======================================== */
+      .toolbar {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+      }
+
+      button,
+      .file-upload-label {
+        background: var(--panel-soft);
+        border: 1px solid var(--panel-border);
+        color: var(--text-main);
+        font-family: var(--sans);
+        font-weight: 600;
+        font-size: 0.88rem;
+        padding: 0.55rem 1rem;
+        border-radius: 8px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        user-select: none;
+      }
+
+      button:hover,
+      .file-upload-label:hover {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: var(--panel-border-strong);
+        transform: translateY(-1px);
+      }
+
+      button:active,
+      .file-upload-label:active {
+        transform: translateY(0);
+      }
+
+      button.primary {
+        background: var(--color-primary);
+        border-color: transparent;
+      }
+
+      button.primary:hover {
+        background: var(--color-primary-hover);
+        box-shadow: 0 0 15px var(--color-primary-glow);
+      }
+
+      .select-wrapper {
+        position: relative;
+        display: inline-block;
+      }
+
+      select {
+        background: rgba(15, 23, 42, 0.8);
+        border: 1px solid var(--panel-border);
+        color: var(--text-main);
+        font-family: var(--sans);
+        font-size: 0.88rem;
+        font-weight: 600;
+        padding: 0.55rem 2.2rem 0.55rem 1rem;
+        border-radius: 8px;
+        cursor: pointer;
+        outline: none;
+        appearance: none;
+        transition: all 0.2s;
+      }
+
+      select:hover {
+        border-color: var(--panel-border-strong);
+        background: rgba(30, 41, 59, 0.8);
+      }
+
+      .select-wrapper::after {
+        content: "▼";
+        font-size: 0.65rem;
+        color: var(--text-muted);
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        pointer-events: none;
+      }
+
+      .toolbar-spacer {
+        flex-grow: 1;
+      }
+
+      /* ========================================
+       Editor & Config section
+       ======================================== */
+      .editor-area {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .editor-label {
+        font-size: 0.85rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        letter-spacing: 0.05em;
+        margin-bottom: -8px;
+      }
+
+      .html-textarea {
+        width: 100%;
+        height: 280px;
+        background: rgba(6, 8, 15, 0.7);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius);
+        padding: 16px;
+        color: #c0caf5;
+        font-family: var(--mono);
+        font-size: 13px;
+        line-height: 20px;
+        resize: vertical;
+        outline: none;
+        transition: border-color 0.2s;
+        box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.5);
+      }
+
+      .html-textarea:focus {
+        border-color: rgba(139, 92, 246, 0.5);
+        box-shadow:
+          0 0 0 1px rgba(139, 92, 246, 0.5),
+          inset 0 2px 8px rgba(0, 0, 0, 0.5);
+      }
+
+      .profile-selector-panel {
+        background: rgba(15, 23, 42, 0.3);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius);
+        padding: 16px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+
+      .profile-info {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .profile-info span {
+        font-weight: 700;
+        font-size: 0.92rem;
+      }
+
+      .profile-info small {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+      }
+
+      /* ========================================
+       Dashboard Stat Grid
+       ======================================== */
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        margin-bottom: 20px;
+      }
+
+      @media (max-width: 640px) {
+        .stats-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+
+      .stat-card {
+        background: rgba(17, 24, 39, 0.4);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius);
+        padding: 16px;
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .stat-card:hover {
+        border-color: rgba(255, 255, 255, 0.12);
+        transform: translateY(-2px);
+      }
+
+      .stat-card.card-err:hover {
+        box-shadow: var(--shadow-danger);
+        border-color: rgba(239, 68, 68, 0.25);
+      }
+
+      .stat-card.card-warn:hover {
+        box-shadow: var(--shadow-warning);
+        border-color: rgba(245, 158, 11, 0.25);
+      }
+
+      .stat-card.card-ok:hover {
+        box-shadow: var(--shadow-success);
+        border-color: rgba(16, 185, 129, 0.25);
+      }
+
+      .stat-label {
+        font-size: 0.72rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-muted);
+        display: block;
+        margin-bottom: 6px;
+      }
+
+      .stat-value {
+        font-size: 1.7rem;
+        font-weight: 800;
+        line-height: 1;
+        font-family: var(--mono);
+      }
+
+      .stat-card.card-err .stat-value {
+        color: var(--color-danger);
+      }
+      .stat-card.card-warn .stat-value {
+        color: var(--color-warning);
+      }
+      .stat-card.card-ok .stat-value {
+        color: var(--color-success);
+      }
+
+      .stat-indicator-bar {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 3px;
+        background: transparent;
+      }
+
+      .stat-card.card-err .stat-indicator-bar {
+        background: var(--color-danger);
+      }
+      .stat-card.card-warn .stat-indicator-bar {
+        background: var(--color-warning);
+      }
+      .stat-card.card-ok .stat-indicator-bar {
+        background: var(--color-success);
+      }
+      .stat-card.card-neutral .stat-indicator-bar {
+        background: var(--color-primary);
+      }
+
+      /* ========================================
+       Tab Controls
+       ======================================== */
+      .tabs-container {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+      }
+
+      .tabs-header {
+        display: flex;
+        border-bottom: 1px solid var(--panel-border);
+        background: rgba(10, 15, 26, 0.6);
+        padding: 0 10px;
+        gap: 6px;
+      }
+
+      .tab-btn {
+        background: transparent;
+        border: none;
+        border-bottom: 2px solid transparent;
+        color: var(--text-muted);
+        font-weight: 700;
+        font-size: 0.88rem;
+        padding: 14px 16px;
+        border-radius: 0;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s;
+      }
+
+      .tab-btn:hover {
+        color: var(--text-main);
+        background: rgba(255, 255, 255, 0.02);
+        transform: none;
+      }
+
+      .tab-btn.active {
+        color: var(--color-primary);
+        border-bottom-color: var(--color-primary);
+        background: transparent;
+      }
+
+      .tab-badge {
+        font-size: 0.72rem;
+        padding: 1px 6px;
+        border-radius: 10px;
+        font-weight: 800;
+        color: white;
+      }
+
+      .bg-danger {
+        background: var(--color-danger);
+      }
+      .bg-warning {
+        background: var(--color-warning);
+        color: #000;
+      }
+
+      .tab-panel {
+        display: none;
+        padding: 20px;
+        flex: 1;
+      }
+
+      .tab-panel.active {
+        display: block;
+      }
+
+      /* ========================================
+       Tab 1: Expected vs Provided Diff Grid
+       ======================================== */
+      .diff-grid-wrap {
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .diff-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+      }
+
+      .diff-table th {
+        background: rgba(11, 15, 27, 0.9);
+        color: var(--text-muted);
+        font-weight: 700;
+        text-align: left;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--panel-border);
+      }
+
+      .diff-table td {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--panel-border);
+        vertical-align: top;
+      }
+
+      .diff-table tr:last-child td {
+        border-bottom: none;
+      }
+
+      .diff-table tr:hover {
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      .tag-property-cell {
+        font-family: var(--mono);
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .tag-property-cell.required::after {
+        content: "*";
+        color: var(--color-danger);
+        margin-left: 2px;
+      }
+
+      .badge-status {
+        font-size: 0.72rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        padding: 2px 6px;
+        border-radius: 4px;
+        display: inline-block;
+      }
+
+      .badge-status.found {
+        background: var(--color-success-bg);
+        color: #a7f3d0;
+        border: 1px solid rgba(16, 185, 129, 0.2);
+      }
+      .badge-status.missing-req {
+        background: var(--color-danger-bg);
+        color: #fecdd3;
+        border: 1px solid rgba(239, 68, 68, 0.2);
+      }
+      .badge-status.missing-opt {
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text-muted);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
+
+      .tag-val-cell {
+        font-family: var(--mono);
+        word-break: break-all;
+        color: var(--text-main);
+      }
+
+      .tag-validation-cell {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+      }
+
+      .tag-validation-cell.ok {
+        color: var(--color-success);
+      }
+      .tag-validation-cell.warn {
+        color: var(--color-warning);
+      }
+      .tag-validation-cell.err {
+        color: var(--color-danger);
+      }
+
+      /* ========================================
+       Tab 2: Platform Checklist & Social previews
+       ======================================== */
+      .audit-section {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .conflicts-card {
+        border: 1px solid rgba(239, 68, 68, 0.2);
+        background: rgba(239, 68, 68, 0.04);
+        border-radius: 8px;
+        padding: 14px;
+      }
+
+      .conflicts-card h4 {
+        color: #fecdd3;
+        font-size: 0.9rem;
+        font-weight: 700;
+        margin-bottom: 6px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .conflicts-list {
+        list-style: none;
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .conflicts-list li::before {
+        content: "⚠️ ";
+      }
+
+      .checklist-card {
+        border: 1px solid var(--panel-border);
+        background: rgba(13, 17, 28, 0.3);
+        border-radius: 8px;
+        padding: 14px;
+      }
+
+      .checklist-card h4 {
+        font-size: 0.9rem;
+        font-weight: 700;
+        margin-bottom: 8px;
+      }
+
+      .checklist-items {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .check-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.82rem;
+        color: var(--text-muted);
+      }
+
+      .check-item.done {
+        color: var(--text-main);
+      }
+      .check-item.done svg {
+        color: var(--color-success);
+      }
+      .check-item svg {
+        width: 14px;
+        height: 14px;
+        color: var(--text-subtle);
+        flex-shrink: 0;
+      }
+
+      .previews-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 16px;
+        margin-top: 10px;
+      }
+
+      .preview-mock-title {
+        font-size: 0.75rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        letter-spacing: 0.08em;
+        margin-bottom: 6px;
+      }
+
+      /* Facebook Card mock */
+      .mock-fb-card {
+        background: #18191a;
+        border: 1px solid #3e4042;
+        border-radius: 0;
+        overflow: hidden;
+        font-family: Helvetica, Arial, sans-serif;
+        color: #e4e6eb;
+        max-width: 420px;
+      }
+
+      .mock-fb-image {
+        width: 100%;
+        height: 180px;
+        background: #242526;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color: #8a8d91;
+        font-size: 0.85rem;
+        background-size: cover;
+        background-position: center;
+      }
+
+      .mock-fb-text {
+        padding: 12px;
+        border-top: 1px solid #3e4042;
+      }
+
+      .mock-fb-domain {
+        font-size: 11px;
+        text-transform: uppercase;
+        color: #b0b3b8;
+        margin-bottom: 2px;
+      }
+
+      .mock-fb-title {
+        font-weight: 600;
+        font-size: 14px;
+        line-height: 1.2;
+        margin-bottom: 4px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .mock-fb-desc {
+        font-size: 12px;
+        color: #b0b3b8;
+        line-height: 1.3;
+        height: 32px;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+      }
+
+      /* Twitter Summary Large Image Card mock */
+      .mock-tw-card {
+        background: #15181c;
+        border: 1px solid #2f3336;
+        border-radius: 12px;
+        overflow: hidden;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto;
+        color: #e7e9ea;
+        max-width: 420px;
+      }
+
+      .mock-tw-image {
+        width: 100%;
+        height: 180px;
+        background: #202327;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color: #71767b;
+        font-size: 0.85rem;
+        background-size: cover;
+        background-position: center;
+      }
+
+      .mock-tw-text {
+        padding: 12px;
+        border-top: 1px solid #2f3336;
+      }
+
+      .mock-tw-domain {
+        font-size: 12px;
+        color: #71767b;
+        margin-bottom: 2px;
+      }
+
+      .mock-tw-title {
+        font-size: 13px;
+        font-weight: 400;
+        line-height: 1.25;
+        margin-bottom: 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .mock-tw-desc {
+        font-size: 12px;
+        color: #71767b;
+        line-height: 1.3;
+        height: 32px;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+      }
+
+      /* ========================================
+       Tab 3: Code Output
+       ======================================== */
+      .code-preview-container {
+        position: relative;
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        background: #06080f;
+        overflow: hidden;
+      }
+
+      .code-preview-header {
+        padding: 10px 16px;
+        background: rgba(11, 15, 27, 0.9);
+        border-bottom: 1px solid var(--panel-border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .code-preview-title {
+        font-size: 0.75rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        letter-spacing: 0.08em;
+      }
+
+      .preview-code {
+        margin: 0;
+        padding: 16px;
+        font-family: var(--mono);
+        font-size: 13px;
+        line-height: 20px;
+        color: #a9b1d6;
+        height: 380px;
+        overflow-y: auto;
+        white-space: pre;
+        tab-size: 4;
+      }
+
+      /* Highlight styling */
+      .hl-tag {
+        color: #f7768e;
+        font-weight: 600;
+      }
+      .hl-attr-name {
+        color: #89ddff;
+      }
+      .hl-attr-val {
+        color: #9ece6a;
+      }
+      .hl-comment {
+        color: #565f89;
+        font-style: italic;
+      }
+
+      .preview-actions {
+        display: flex;
+        gap: 8px;
+      }
+
+      .btn-sm {
+        padding: 4px 10px;
+        font-size: 0.78rem;
+        border-radius: 6px;
+      }
+
+      .export-options-bar {
+        background: rgba(2, 4, 8, 0.2);
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 12px;
+        display: flex;
+        gap: 16px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      .checkbox-control {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        color: var(--text-muted);
+        user-select: none;
+      }
+
+      .checkbox-control:hover {
+        color: var(--text-main);
+      }
+
+      .checkbox-control input {
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        border: 1px solid var(--panel-border-strong);
+        border-radius: 4px;
+        outline: none;
+        cursor: pointer;
+        position: relative;
+        background: #101524;
+        transition: all 0.2s;
+      }
+
+      .checkbox-control input:checked {
+        background: var(--color-primary);
+        border-color: transparent;
+      }
+
+      .checkbox-control input:checked::after {
+        content: "✓";
+        color: white;
+        font-size: 11px;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-weight: bold;
+      }
+
+      /* Toast Notification */
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        background: rgba(9, 13, 22, 0.95);
+        border: 1px solid var(--color-primary);
+        border-radius: 8px;
+        padding: 12px 20px;
+        color: #fff;
+        font-weight: 600;
+        font-size: 0.88rem;
+        box-shadow:
+          0 10px 30px rgba(0, 0, 0, 0.5),
+          0 0 15px rgba(139, 92, 246, 0.2);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        z-index: 1000;
+        transform: translateY(100px);
+        opacity: 0;
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      }
+
+      .toast.show {
+        transform: translateY(0);
+        opacity: 1;
+      }
+
+      .toast-success {
+        border-color: var(--color-success);
+        box-shadow:
+          0 10px 30px rgba(0, 0, 0, 0.5),
+          0 0 15px rgba(16, 185, 129, 0.2);
+      }
+      .toast-success svg {
+        color: var(--color-success);
+      }
+
+      /* ========================================
+       Footer Styling
+       ======================================== */
+      footer {
+        max-width: 1400px;
+        margin: 3rem auto 0;
+        text-align: center;
+        border-top: 1px solid var(--panel-border);
+        padding-top: 1.5rem;
+        color: var(--text-subtle);
+        font-size: 0.85rem;
+      }
+
+      footer a {
+        color: var(--text-muted);
+        text-decoration: none;
+        font-weight: 600;
+        transition: color 0.2s;
+      }
+
+      footer a:hover {
+        color: var(--color-primary);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          transition: none !important;
+          animation: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="header-title-area">
+        <div class="eyebrow">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 16v-4M12 8h.01" />
+          </svg>
+          Web & SEO Utilities
+        </div>
+        <h1>Open Graph Debugger & Meta Diff</h1>
+        <p>Audit Open Graph tags against schemas. Detect required fields, length limits, canonical conflicts, and check social layout checklist configurations.</p>
+      </div>
+      <div class="privacy-badge">
+        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM12 6a3 3 0 1 1 0 6 3 3 0 0 1 0-6zm-4 9c0-2.67 5.33-4 8-4s8 1.33 8 4v2H8v-2z" /></svg>
+        Local Processing • Zero Data Uploads
+      </div>
+    </header>
+
+    <main>
+      <!-- Left Column: Source Input -->
+      <section class="panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+            HTML Metadata Source
+          </div>
+          <div class="toolbar-spacer"></div>
+          <div class="select-wrapper">
+            <select id="preset-selector" aria-label="Load metadata template">
+              <option value="" disabled selected>Load Demo Template</option>
+              <option value="clean-article">Valid Article Set (Clean)</option>
+              <option value="missing-og">Broken OG Set (No Title/Image)</option>
+              <option value="conflict-sets">Twitter vs OG Conflict Set</option>
+              <option value="empty">Clear Input</option>
+            </select>
+          </div>
+        </div>
+        <div class="panel-body editor-area">
+          <div class="profile-selector-panel">
+            <div class="profile-info">
+              <span>Target Schema Profile</span>
+              <small>Validates tags against matching standards</small>
+            </div>
+            <div class="select-wrapper">
+              <select id="profile-selector" aria-label="Select target profile">
+                <option value="basic">Basic Open Graph Set</option>
+                <option value="article" selected>Rich Article / News Profile</option>
+                <option value="product">Product / E-Commerce Profile</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <span class="editor-label">Paste Head Meta block</span>
+            <div class="toolbar-spacer"></div>
+            <button type="button" id="btn-format-source" title="Prettify meta tags block in editor">Prettify Code Block</button>
+            <button type="button" id="btn-clear" title="Clear all text fields">Clear</button>
+          </div>
+
+          <textarea class="html-textarea" id="html-input" spellcheck="false" placeholder='&lt;!-- Paste your HTML metadata &lt;head&gt; tags here --&gt;&#10;&lt;meta property="og:title" content="Hello World"&gt;&#10;&lt;meta property="og:description" content="A quick sample description"&gt;&#10;&lt;meta property="og:image" content="https://example.com/logo.png"&gt;&#10;&lt;meta property="og:url" content="https://example.com"&gt;&#10;&lt;link rel="canonical" href="https://example.com"&gt;'></textarea>
+        </div>
+      </section>
+
+      <!-- Right Column: Audit Dashboard -->
+      <section class="panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+              <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+            Metadata Schema Audit
+          </div>
+        </div>
+        <div class="panel-body" style="padding: 0; display: flex; flex-direction: column">
+          <!-- Stat Dashboard Cards -->
+          <div style="padding: 20px 20px 0">
+            <div class="stats-grid">
+              <div class="stat-card card-neutral">
+                <span class="stat-label">Tags Found</span>
+                <span class="stat-value" id="stat-tags-found">0</span>
+                <div class="stat-indicator-bar"></div>
+              </div>
+              <div class="stat-card card-ok">
+                <span class="stat-label">Valid Fields</span>
+                <span class="stat-value" id="stat-valid-fields">0</span>
+                <div class="stat-indicator-bar"></div>
+              </div>
+              <div class="stat-card card-warn">
+                <span class="stat-label">Warnings</span>
+                <span class="stat-value" id="stat-warnings">0</span>
+                <div class="stat-indicator-bar"></div>
+              </div>
+              <div class="stat-card card-err">
+                <span class="stat-label">Errors</span>
+                <span class="stat-value" id="stat-errors">0</span>
+                <div class="stat-indicator-bar"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab Controls -->
+          <div class="tabs-container">
+            <div class="tabs-header">
+              <button type="button" class="tab-btn active" data-tab="tab-diff" id="btn-tab-diff">Schema Diff</button>
+              <button type="button" class="tab-btn" data-tab="tab-audit" id="btn-tab-audit">
+                Audit Warnings
+                <span class="tab-badge bg-danger" id="badge-tab-audit">0</span>
+              </button>
+              <button type="button" class="tab-btn" data-tab="tab-previews" id="btn-tab-previews">Social Previews</button>
+              <button type="button" class="tab-btn" data-tab="tab-export" id="btn-tab-export">Clean Block Export</button>
+            </div>
+
+            <!-- Tab 1: Schema Diff Grid -->
+            <div id="tab-diff" class="tab-panel active">
+              <div class="diff-grid-wrap">
+                <table class="diff-table">
+                  <thead>
+                    <tr>
+                      <th>Expected Property</th>
+                      <th>Status</th>
+                      <th>Parsed value</th>
+                      <th>Validation Hint</th>
+                    </tr>
+                  </thead>
+                  <tbody id="diff-table-body">
+                    <!-- Populated dynamically -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Tab 2: Audit Warnings list -->
+            <div id="tab-audit" class="tab-panel">
+              <div class="audit-section">
+                <!-- Conflicts warning card -->
+                <div class="conflicts-card" id="conflicts-card" style="display: none">
+                  <h4>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                      <line x1="12" y1="9" x2="12" y2="13" />
+                      <line x1="12" y1="17" x2="12.01" y2="17" />
+                    </svg>
+                    Critical Casing & Canonical Conflicts
+                  </h4>
+                  <ul class="conflicts-list" id="conflicts-list">
+                    <!-- Dynamic conflict lists -->
+                  </ul>
+                </div>
+
+                <!-- Checklist Card -->
+                <div class="checklist-card">
+                  <h4>Optimized Checklist For Social Sharing</h4>
+                  <div class="checklist-items" id="platform-checklist">
+                    <!-- Dynamic Checklist items -->
+                  </div>
+                </div>
+
+                <div class="issues-scroller" id="issues-list" style="margin-top: 10px">
+                  <!-- Dynamic general warnings list -->
+                </div>
+              </div>
+              <div class="no-issues-placeholder" id="no-issues-card" style="display: none">
+                <svg class="no-issues-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                  <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+                <h3>All Checks Passed</h3>
+                <p>Your meta elements match perfectly with the expected profile schema layout.</p>
+              </div>
+            </div>
+
+            <!-- Tab 3: Mockup Previews -->
+            <div id="tab-previews" class="tab-panel">
+              <div class="previews-grid">
+                <div>
+                  <div class="preview-mock-title">Facebook Share Card (1.91:1)</div>
+                  <div class="mock-fb-card">
+                    <div class="mock-fb-image" id="mock-fb-img-div">Image Placeholder</div>
+                    <div class="mock-fb-text">
+                      <div class="mock-fb-domain" id="mock-fb-domain">EXAMPLE.COM</div>
+                      <div class="mock-fb-title" id="mock-fb-title">Title Placeholder</div>
+                      <div class="mock-fb-desc" id="mock-fb-desc">Description placeholder content</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div class="preview-mock-title">Twitter Summary Large Image Card</div>
+                  <div class="mock-tw-card">
+                    <div class="mock-tw-image" id="mock-tw-img-div">Image Placeholder</div>
+                    <div class="mock-tw-text">
+                      <div class="mock-tw-domain" id="mock-tw-domain">example.com</div>
+                      <div class="mock-tw-title" id="mock-tw-title">Title Placeholder</div>
+                      <div class="mock-tw-desc" id="mock-tw-desc">Description placeholder content</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tab 4: Clean Block Export -->
+            <div id="tab-export" class="tab-panel">
+              <div class="export-options-bar">
+                <label class="checkbox-control">
+                  <input type="checkbox" id="opt-twitter-fallbacks" checked />
+                  Include Twitter Fallbacks
+                </label>
+                <label class="checkbox-control">
+                  <input type="checkbox" id="opt-canonical" checked />
+                  Include Canonical URL Link
+                </label>
+                <label class="checkbox-control">
+                  <input type="checkbox" id="opt-xhtml" />
+                  Use XHTML Self-Closing Tags (&lt;meta ... /&gt;)
+                </label>
+              </div>
+
+              <div class="code-preview-container">
+                <div class="code-preview-header">
+                  <span class="code-preview-title">Optimized HTML Head Block</span>
+                  <div class="preview-actions">
+                    <button type="button" class="btn-sm primary" id="btn-copy-export">Copy Block</button>
+                  </div>
+                </div>
+                <pre class="preview-code" id="export-preview-code"></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Toast Notification -->
+    <div id="toast-notify" class="toast">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" id="toast-icon">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+        <polyline points="22 4 12 14.01 9 11.01" />
+      </svg>
+      <span id="toast-message">Action completed successfully!</span>
+    </div>
+
+    <footer>
+      <p>Part of <a href="https://github.com/praveenscience/One-File-Tools">One File Tools</a> • Strict compliance debugger for Open Graph and Twitter Card tags.</p>
+    </footer>
+
+    <!-- ========================================
+     Application Code & Parser Engine
+     ======================================== -->
+    <script>
+      // Demo templates
+      const DEMO_TEMPLATES = {
+        "clean-article": `<!-- Clean Article Meta elements -->
+<meta property="og:title" content="Deep Dive into Web Component Architectures" />
+<meta property="og:type" content="article" />
+<meta property="og:image" content="https://images.unsplash.com/photo-1517694712202-14dd9538aa97" />
+<meta property="og:url" content="https://dev-journal.io/web-components-architecture" />
+<meta property="og:description" content="An in-depth study of micro-frontends using raw web components, custom templates, shadow DOM boundaries, and standard slots encapsulation." />
+<meta property="og:site_name" content="Developer Journal" />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="canonical" href="https://dev-journal.io/web-components-architecture" />
+<meta property="article:published_time" content="2026-07-10T10:45:00Z" />
+`,
+        "missing-og": `<!-- Malformed & missing OG variables -->
+<meta property="og:type" content="website" />
+<meta property="og:url" content="http://localhost:3000/articles/css-grids" />
+<!-- Casing Typo -->
+<meta property="og:Description" content="A short guide to CSS Grid layout variables." />
+`,
+        "conflict-sets": `<!-- Conflicting tags values -->
+<meta property="og:title" content="Responsive design with CSS grids" />
+<meta name="twitter:title" content="CSS Grids Guide (Highly Conflicting Title!)" />
+<meta property="og:type" content="article" />
+<meta property="og:image" content="https://example.com/logo.png" />
+<meta name="twitter:image" content="https://twitter-assets.com/feature-card.png" />
+<meta property="og:url" content="https://example.com/grids" />
+<link rel="canonical" href="https://example.com/canonical-grids-location" />
+`,
+        empty: ""
+      };
+
+      // Profiles metadata definition
+      const PROFILES = {
+        basic: {
+          name: "Basic Open Graph Set",
+          desc: "Basic attributes required for standard website sharing.",
+          tags: [
+            { key: "og:title", required: true, type: "string", desc: "Title representing the entity." },
+            { key: "og:type", required: true, type: "type", desc: "Standard OG type category." },
+            { key: "og:image", required: true, type: "url", desc: "Cover image URL." },
+            { key: "og:url", required: true, type: "url", desc: "Canonical URL." },
+            { key: "og:description", required: false, type: "string", desc: "Brief snippet description." },
+            { key: "og:site_name", required: false, type: "string", desc: "Name of the website brand." }
+          ]
+        },
+        article: {
+          name: "Rich Article / News Profile",
+          desc: "Extended properties for articles, blog posts, and news feeds.",
+          tags: [
+            { key: "og:title", required: true, type: "string", desc: "Title representing the article." },
+            { key: "og:type", required: true, type: "type", desc: 'Must be set to "article".' },
+            { key: "og:image", required: true, type: "url", desc: "Feature thumbnail image URL." },
+            { key: "og:url", required: true, type: "url", desc: "Canonical URL location." },
+            { key: "og:description", required: true, type: "string", desc: "Sync synopsis of the article." },
+            { key: "article:published_time", required: true, type: "date", desc: "ISO 8601 publication timestamp." },
+            { key: "article:modified_time", required: false, type: "date", desc: "ISO 8601 modification timestamp." },
+            { key: "article:author", required: false, type: "string", desc: "Author name or profile link." },
+            { key: "article:tag", required: false, type: "string", desc: "Keywords/tags categorizing article." },
+            { key: "og:site_name", required: false, type: "string", desc: "Website portal name." }
+          ]
+        },
+        product: {
+          name: "Product / E-Commerce Profile",
+          desc: "Target tags matching standard product detail pages.",
+          tags: [
+            { key: "og:title", required: true, type: "string", desc: "Product name identifier." },
+            { key: "og:type", required: true, type: "type", desc: 'Must be "product" or "product.item".' },
+            { key: "og:image", required: true, type: "url", desc: "Main product showcase image." },
+            { key: "og:url", required: true, type: "url", desc: "Canonical purchase link." },
+            { key: "og:description", required: true, type: "string", desc: "Product summary." },
+            { key: "product:price:amount", required: true, type: "number", desc: "Price value amount." },
+            { key: "product:price:currency", required: true, type: "currency", desc: "ISO 4217 currency acronym." },
+            { key: "og:availability", required: false, type: "availability", desc: "Availability state." },
+            { key: "og:site_name", required: false, type: "string", desc: "Store/Brand name." }
+          ]
+        }
+      };
+
+      // Standard types list
+      const STANDARD_OG_TYPES = ["website", "article", "book", "profile", "music.song", "music.album", "music.playlist", "music.radio_station", "video.movie", "video.episode", "video.tv_show", "video.other", "product", "product.item"];
+
+      // DOM Elements
+      const htmlInput = document.getElementById("html-input");
+      const presetSelector = document.getElementById("preset-selector");
+      const profileSelector = document.getElementById("profile-selector");
+      const btnFormatSource = document.getElementById("btn-format-source");
+      const btnClear = document.getElementById("btn-clear");
+
+      // Stats
+      const statTagsFound = document.getElementById("stat-tags-found");
+      const statValidFields = document.getElementById("stat-valid-fields");
+      const statWarnings = document.getElementById("stat-warnings");
+      const statErrors = document.getElementById("stat-errors");
+
+      // Tabs & Audits
+      const tabButtons = document.querySelectorAll(".tab-btn");
+      const tabPanels = document.querySelectorAll(".tab-panel");
+      const diffTableBody = document.getElementById("diff-table-body");
+      const conflictsCard = document.getElementById("conflicts-card");
+      const conflictsList = document.getElementById("conflicts-list");
+      const platformChecklist = document.getElementById("platform-checklist");
+      const issuesList = document.getElementById("issues-list");
+      const noIssuesCard = document.getElementById("no-issues-card");
+      const badgeTabAudit = document.getElementById("badge-tab-audit");
+
+      // Previews
+      const mockFbImgDiv = document.getElementById("mock-fb-img-div");
+      const mockFbDomain = document.getElementById("mock-fb-domain");
+      const mockFbTitle = document.getElementById("mock-fb-title");
+      const mockFbDesc = document.getElementById("mock-fb-desc");
+
+      const mockTwImgDiv = document.getElementById("mock-tw-img-div");
+      const mockTwDomain = document.getElementById("mock-tw-domain");
+      const mockTwTitle = document.getElementById("mock-tw-title");
+      const mockTwDesc = document.getElementById("mock-tw-desc");
+
+      // Exports
+      const optTwitterFallbacks = document.getElementById("opt-twitter-fallbacks");
+      const optCanonical = document.getElementById("opt-canonical");
+      const optXhtml = document.getElementById("opt-xhtml");
+      const exportPreviewCode = document.getElementById("export-preview-code");
+      const btnCopyExport = document.getElementById("btn-copy-export");
+
+      // Toast Notifications
+      const toastNotify = document.getElementById("toast-notify");
+      const toastMessage = document.getElementById("toast-message");
+      const toastIcon = document.getElementById("toast-icon");
+
+      // State variable
+      let parsedData = { og: {}, twitter: {}, other: {}, canonical: "" };
+      let lowercaseCasingMap = {}; // lowercase key -> raw parsed casing key
+
+      window.addEventListener("DOMContentLoaded", () => {
+        // Tab hooks
+        tabButtons.forEach((btn) => {
+          btn.addEventListener("click", () => {
+            tabButtons.forEach((b) => b.classList.remove("active"));
+            tabPanels.forEach((p) => p.classList.remove("active"));
+            btn.classList.add("active");
+            document.getElementById(btn.getAttribute("data-tab")).classList.add("active");
+          });
+        });
+
+        // Event hooks
+        htmlInput.addEventListener("input", () => {
+          runAuditSequence();
+        });
+
+        profileSelector.addEventListener("change", () => {
+          runAuditSequence();
+        });
+
+        presetSelector.addEventListener("change", (e) => {
+          const val = e.target.value;
+          if (val === "empty") {
+            htmlInput.value = "";
+            runAuditSequence();
+            showToast("Input cleared.", "neutral");
+          } else {
+            const tmpl = DEMO_TEMPLATES[val];
+            if (tmpl !== undefined) {
+              htmlInput.value = tmpl;
+              runAuditSequence();
+              showToast("Demo template loaded.", "success");
+            }
+          }
+          presetSelector.value = "";
+        });
+
+        btnClear.addEventListener("click", () => {
+          htmlInput.value = "";
+          runAuditSequence();
+          showToast("Editor cleared.", "neutral");
+        });
+
+        btnFormatSource.addEventListener("click", () => {
+          prettifySourceCodeInEditor();
+        });
+
+        // Export config listeners
+        [optTwitterFallbacks, optCanonical, optXhtml].forEach((el) => {
+          el.addEventListener("change", () => {
+            renderExportCodeOutput();
+          });
+        });
+
+        btnCopyExport.addEventListener("click", () => {
+          const blockText = generateCleanCodeBlock();
+          if (!blockText.trim()) {
+            showToast("Nothing to export!", "error");
+            return;
+          }
+          navigator.clipboard
+            .writeText(blockText)
+            .then(() => {
+              showToast("Optimized head block copied!", "success");
+            })
+            .catch(() => {
+              showToast("Failed to copy. Copy manually.", "error");
+            });
+        });
+
+        // Load default content
+        htmlInput.value = DEMO_TEMPLATES["clean-article"];
+        runAuditSequence();
+      });
+
+      // Parse pasted tags
+      function parseHTMLHead(html) {
+        const parsed = { og: {}, twitter: {}, other: {}, canonical: "" };
+        lowercaseCasingMap = {};
+
+        // Parse meta tags
+        const metaRegex = /<meta\s+([^>]*?)>/gi;
+        let match;
+        while ((match = metaRegex.exec(html)) !== null) {
+          const attrs = parseTagAttributes(match[1]);
+          const keyName = attrs.property || attrs.name;
+          const val = attrs.content;
+
+          if (keyName && val !== undefined) {
+            const trimmedKey = keyName.trim();
+            const trimmedVal = val.trim();
+            const lowerKey = trimmedKey.toLowerCase();
+
+            lowercaseCasingMap[lowerKey] = trimmedKey;
+
+            if (lowerKey.startsWith("og:")) {
+              parsed.og[lowerKey] = trimmedVal;
+            } else if (lowerKey.startsWith("twitter:")) {
+              parsed.twitter[lowerKey] = trimmedVal;
+            } else {
+              parsed.other[lowerKey] = trimmedVal;
+            }
+          }
+        }
+
+        // Parse canonical link
+        const linkRegex = /<link\s+([^>]*?)>/gi;
+        while ((match = linkRegex.exec(html)) !== null) {
+          const attrs = parseTagAttributes(match[1]);
+          if (attrs.rel === "canonical" && attrs.href) {
+            parsed.canonical = attrs.href.trim();
+          }
+        }
+
+        return parsed;
+      }
+
+      function parseTagAttributes(str) {
+        const attrs = {};
+        const attrRegex = /([a-zA-Z0-9\-:]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi;
+        let match;
+        while ((match = attrRegex.exec(str)) !== null) {
+          const key = match[1].toLowerCase();
+          const val = match[2] || match[3] || match[4] || "";
+          attrs[key] = val;
+        }
+        return attrs;
+      }
+
+      // Prettify input HTML
+      function prettifySourceCodeInEditor() {
+        const parsed = parseHTMLHead(htmlInput.value);
+        const activeProfile = PROFILES[profileSelector.value];
+        const lines = [];
+
+        lines.push("<!-- Clean Head Metadata Optimized -->");
+
+        // 1. Canonical Link
+        if (parsed.canonical) {
+          lines.push(`<link rel="canonical" href="${parsed.canonical}" />`);
+        }
+
+        // 2. Open Graph tags (sorted according to active profile expected rules first, then other parsed og keys)
+        const profileKeys = activeProfile.tags.map((t) => t.key);
+        const writtenKeys = new Set();
+
+        profileKeys.forEach((key) => {
+          const val = parsed.og[key.toLowerCase()];
+          if (val !== undefined) {
+            lines.push(`<meta property="${key}" content="${val}" />`);
+            writtenKeys.add(key.toLowerCase());
+          }
+        });
+
+        Object.keys(parsed.og).forEach((lowerKey) => {
+          if (!writtenKeys.has(lowerKey)) {
+            const rawKey = lowercaseCasingMap[lowerKey] || lowerKey;
+            lines.push(`<meta property="${rawKey}" content="${parsed.og[lowerKey]}" />`);
+          }
+        });
+
+        // 3. Twitter Card tags
+        Object.keys(parsed.twitter).forEach((lowerKey) => {
+          const rawKey = lowercaseCasingMap[lowerKey] || lowerKey;
+          lines.push(`<meta name="${rawKey}" content="${parsed.twitter[lowerKey]}" />`);
+        });
+
+        // 4. Other tags
+        Object.keys(parsed.other).forEach((lowerKey) => {
+          const rawKey = lowercaseCasingMap[lowerKey] || lowerKey;
+          lines.push(`<meta name="${rawKey}" content="${parsed.other[lowerKey]}" />`);
+        });
+
+        htmlInput.value = lines.join("\n");
+        runAuditSequence();
+        showToast("Source code formatted.", "success");
+      }
+
+      // Main sequence coordinator
+      function runAuditSequence() {
+        const html = htmlInput.value;
+        parsedData = parseHTMLHead(html);
+
+        const activeProfile = PROFILES[profileSelector.value];
+
+        // Stats calculations
+        let totalFound = Object.keys(parsedData.og).length + Object.keys(parsedData.twitter).length + (parsedData.canonical ? 1 : 0);
+        let errorCount = 0;
+        let warningCount = 0;
+        let validFields = 0;
+
+        const auditGeneralList = [];
+        const conflictIssues = [];
+        const schemaDiffRows = [];
+
+        // Track validation checklist
+        const checklist = {
+          ogTitle: false,
+          ogDesc: false,
+          ogImage: false,
+          ogUrl: false,
+          twitterCard: false,
+          canonicalUrl: false
+        };
+
+        // 1. Process Diff Grid according to active profile expected tags list
+        activeProfile.tags.forEach((expected) => {
+          const lowerKey = expected.key.toLowerCase();
+          const parsedVal = parsedData.og[lowerKey];
+
+          let statusHtml = "";
+          let validationMsg = "Recommended optional field.";
+          let valClass = "";
+
+          if (parsedVal !== undefined) {
+            validFields++;
+
+            // Check status checklist
+            if (lowerKey === "og:title") checklist.ogTitle = true;
+            if (lowerKey === "og:description") checklist.ogDesc = true;
+            if (lowerKey === "og:image") checklist.ogImage = true;
+            if (lowerKey === "og:url") checklist.ogUrl = true;
+
+            statusHtml = `<span class="badge-status found">Found</span>`;
+
+            // Run specific variable validation routines
+            const auditResult = validateFieldValue(expected.key, parsedVal);
+            if (auditResult.type === "Error") {
+              errorCount++;
+              validFields--;
+              validationMsg = auditResult.msg;
+              valClass = "err";
+            } else if (auditResult.type === "Warning") {
+              warningCount++;
+              validationMsg = auditResult.msg;
+              valClass = "warn";
+            } else {
+              validationMsg = "Valid format.";
+              valClass = "ok";
+            }
+          } else {
+            // Missing tag
+            if (expected.required) {
+              errorCount++;
+              statusHtml = `<span class="badge-status missing-req">Missing</span>`;
+              validationMsg = `Required Schema tag: ${expected.desc}`;
+              valClass = "err";
+
+              auditGeneralList.push({
+                severity: "Error",
+                code: "MISSING_REQUIRED",
+                message: `Required Schema tag "${expected.key}" is missing from head meta metadata.`,
+                fix: { type: "add_tag", key: expected.key }
+              });
+            } else {
+              statusHtml = `<span class="badge-status missing-opt">Optional</span>`;
+              validationMsg = `Missing optional: ${expected.desc}`;
+              valClass = "";
+            }
+          }
+
+          // Case matching verification check
+          const rawCasingKey = lowercaseCasingMap[lowerKey];
+          if (rawCasingKey && rawCasingKey !== expected.key) {
+            warningCount++;
+            conflictIssues.push(`Casing Typos: Property "${rawCasingKey}" should be cased exactly as "${expected.key}".`);
+          }
+
+          schemaDiffRows.push({
+            key: expected.key,
+            required: expected.required,
+            statusHtml: statusHtml,
+            value: parsedVal || "",
+            validationMsg: validationMsg,
+            valClass: valClass
+          });
+        });
+
+        // 2. Perform extended checks (Twitter Card, Canonical URLs conflicts, localhost links)
+
+        // Canonical conflict check
+        const parsedUrl = parsedData.og["og:url"];
+        if (parsedUrl && parsedData.canonical) {
+          checklist.canonicalUrl = true;
+          if (parsedUrl !== parsedData.canonical) {
+            errorCount++;
+            conflictIssues.push(`Canonical Conflict: "og:url" (${parsedUrl}) does not match canonical href (${parsedData.canonical}). This splits ranking weights across engines.`);
+          }
+        } else if (parsedData.canonical) {
+          checklist.canonicalUrl = true;
+        }
+
+        // Host check for localhost in links
+        ["og:url", "og:image"].forEach((k) => {
+          const val = parsedData.og[k];
+          if (val) {
+            if (val.includes("localhost") || val.includes("127.0.0.1")) {
+              warningCount++;
+              auditGeneralList.push({
+                severity: "Warning",
+                code: "LOCALHOST_URL",
+                message: `Localhost warning: "${k}" contains a local address (${val}). Social networks cannot scrape local servers.`,
+                fix: null
+              });
+            }
+          }
+        });
+
+        // Twitter tags audit
+        const twCard = parsedData.twitter["twitter:card"];
+        if (twCard) {
+          checklist.twitterCard = true;
+          if (twCard !== "summary" && twCard !== "summary_large_image" && twCard !== "app" && twCard !== "player") {
+            warningCount++;
+            auditGeneralList.push({
+              severity: "Warning",
+              code: "INVALID_TWITTER_CARD",
+              message: `Unknown twitter:card layout: "${twCard}". Standard types are summary, summary_large_image, app, player.`,
+              fix: { type: "set_twitter_large_card" }
+            });
+          }
+        }
+
+        // Title and Image comparison conflict values (OG vs Twitter)
+        const ogTitleVal = parsedData.og["og:title"];
+        const twTitleVal = parsedData.twitter["twitter:title"];
+        if (ogTitleVal && twTitleVal && ogTitleVal !== twTitleVal) {
+          warningCount++;
+          auditGeneralList.push({
+            severity: "Warning",
+            code: "TITLE_CONFLICT",
+            message: `Title Mismatch: "og:title" values differ from "twitter:title". Keep them synced unless intentional.`,
+            fix: { type: "sync_titles" }
+          });
+        }
+
+        const ogImgVal = parsedData.og["og:image"];
+        const twImgVal = parsedData.twitter["twitter:image"];
+        if (ogImgVal && twImgVal && ogImgVal !== twImgVal) {
+          warningCount++;
+          auditGeneralList.push({
+            severity: "Warning",
+            code: "IMAGE_CONFLICT",
+            message: `Image Mismatch: "og:image" differs from "twitter:image". Keep them synced unless intentional.`,
+            fix: { type: "sync_images" }
+          });
+        }
+
+        // Calculate final Valid count
+        statTagsFound.textContent = totalFound;
+        statValidFields.textContent = validFields;
+        statWarnings.textContent = warningCount;
+        statErrors.textContent = errorCount;
+
+        // Render Diff Grid
+        renderDiffTable(schemaDiffRows);
+
+        // Render platform conflicts list
+        renderConflictsCard(conflictIssues);
+
+        // Render Platform Optimization Checklist
+        renderChecklist(checklist);
+
+        // Render General Issue list
+        renderGeneralIssuesList(auditGeneralList, errorCount + warningCount + conflictIssues.length);
+
+        // Render Social previews
+        updateSocialPreviews(ogTitleVal, parsedData.og["og:description"], ogImgVal, parsedUrl);
+
+        // Render Export optimized head code
+        renderExportCodeOutput();
+      }
+
+      // Check format rules for common OG values
+      function validateFieldValue(key, val) {
+        if (!val || val.trim() === "") {
+          return { type: "Warning", msg: "Value is empty." };
+        }
+
+        const clean = val.trim();
+
+        if (key === "og:type") {
+          if (!STANDARD_OG_TYPES.includes(clean)) {
+            return { type: "Warning", msg: `Non-standard og:type value: "${val}".` };
+          }
+        } else if (key === "og:image") {
+          if (!clean.startsWith("http://") && !clean.startsWith("https://")) {
+            return { type: "Error", msg: "Image URL must be absolute (start with http:// or https://)." };
+          }
+        } else if (key === "og:url") {
+          if (!clean.startsWith("http://") && !clean.startsWith("https://")) {
+            return { type: "Error", msg: "Canonical URL must be absolute (start with http:// or https://)." };
+          }
+        } else if (key === "og:title") {
+          if (clean.length > 95) {
+            return { type: "Warning", msg: `Title is too long (${clean.length} chars). Keep under 60-90.` };
+          }
+          if (clean.length < 15) {
+            return { type: "Warning", msg: `Title is short (${clean.length} chars). Add more descriptive details.` };
+          }
+        } else if (key === "og:description") {
+          if (clean.length > 200) {
+            return { type: "Warning", msg: `Description is too long (${clean.length} chars). Keep under 150-160.` };
+          }
+          if (clean.length < 30) {
+            return { type: "Warning", msg: `Description is short (${clean.length} chars). Add detailed snippet description.` };
+          }
+        } else if (key === "product:price:amount") {
+          if (isNaN(clean)) {
+            return { type: "Error", msg: "Price must be a valid number." };
+          }
+        } else if (key === "product:price:currency") {
+          if (clean.length !== 3 || !/^[A-Z]{3}$/.test(clean)) {
+            return { type: "Error", msg: "Currency must be a valid 3-letter ISO 4217 code (e.g. USD)." };
+          }
+        }
+
+        return { type: "Valid", msg: "" };
+      }
+
+      // Render Diff Grid Rows
+      function renderDiffTable(rows) {
+        let html = "";
+        rows.forEach((r) => {
+          html += `
+            <tr>
+              <td class="tag-property-cell ${r.required ? "required" : ""}">${escapeHtml(r.key)}</td>
+              <td>${r.statusHtml}</td>
+              <td class="tag-val-cell">${escapeHtml(r.value)}</td>
+              <td class="tag-validation-cell ${r.valClass}">${escapeHtml(r.validationMsg)}</td>
+            </tr>
+          `;
+        });
+        diffTableBody.innerHTML = html;
+      }
+
+      // Render Conflict warning lists
+      function renderConflictsCard(issues) {
+        if (issues.length === 0) {
+          conflictsCard.style.display = "none";
+          return;
+        }
+
+        conflictsCard.style.display = "block";
+        let html = "";
+        issues.forEach((i) => {
+          html += `<li>${escapeHtml(i)}</li>`;
+        });
+        conflictsList.innerHTML = html;
+      }
+
+      // Render Checklist
+      function renderChecklist(chk) {
+        const items = [
+          { status: chk.ogTitle, label: "Open Graph Title declared" },
+          { status: chk.ogDesc, label: "Open Graph Description declared" },
+          { status: chk.ogImage, label: "Open Graph Image (absolute path) declared" },
+          { status: chk.ogUrl, label: "Open Graph URL link declared" },
+          { status: chk.twitterCard, label: "Twitter Card type parameter declared" },
+          { status: chk.canonicalUrl, label: "Canonical link tag configured" }
+        ];
+
+        let html = "";
+        items.forEach((i) => {
+          const icon = i.status ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>` : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+
+          html += `
+            <div class="check-item ${i.status ? "done" : ""}">
+              ${icon}
+              <span>${i.label}</span>
+            </div>
+          `;
+        });
+        platformChecklist.innerHTML = html;
+      }
+
+      // Render General Issues list
+      function renderGeneralIssuesList(list, totalCount) {
+        badgeTabAudit.textContent = totalCount;
+        if (totalCount === 0) {
+          issuesList.style.display = "none";
+          noIssuesCard.style.display = "flex";
+          badgeTabAudit.style.display = "none";
+          return;
+        }
+
+        issuesList.style.display = "flex";
+        noIssuesCard.style.display = "none";
+        badgeTabAudit.style.display = "inline-block";
+
+        if (list.length === 0) {
+          // If conflicts exist but no general warning items
+          issuesList.innerHTML = "";
+          return;
+        }
+
+        let html = "";
+        list.forEach((issue, idx) => {
+          const sevClass = issue.severity.toLowerCase() === "error" ? "err" : "warn";
+          const btnHtml = issue.fix ? `<div class="issue-fix-area"><button class="fix-btn" onclick="applyQuickFix('${issue.fix.type}', '${issue.key || ""}')">${issue.fix.label}</button></div>` : "";
+
+          html += `
+            <div class="issue-item ${sevClass}">
+              <div class="issue-meta">
+                <div class="issue-header">
+                  <span class="issue-type-badge">${issue.severity}</span>
+                  <span style="font-family: var(--mono); font-size: 0.72rem; color: var(--text-subtle);">${issue.code}</span>
+                </div>
+                <div class="issue-message">${escapeHtml(issue.message)}</div>
+              </div>
+              ${btnHtml}
+            </div>
+          `;
+        });
+        issuesList.innerHTML = html;
+      }
+
+      // Quick Fix handler
+      window.applyQuickFix = function (type, key) {
+        if (type === "add_tag") {
+          // Add default tag at bottom of head block
+          let defaultVal = "Placeholders";
+          if (key === "og:image") defaultVal = "https://example.com/placeholder.png";
+          if (key === "og:url") defaultVal = "https://example.com/canonical-path";
+          if (key === "article:published_time") defaultVal = new Date().toISOString();
+
+          htmlInput.value += `\n<meta property="${key}" content="${defaultVal}" />`;
+        } else if (type === "set_twitter_large_card") {
+          // Replace or add
+          if (htmlInput.value.includes("twitter:card")) {
+            htmlInput.value = htmlInput.value.replace(/name="twitter:card"\s+content="[^"]*"/gi, 'name="twitter:card" content="summary_large_image"');
+          } else {
+            htmlInput.value += `\n<meta name="twitter:card" content="summary_large_image" />`;
+          }
+        } else if (type === "sync_titles") {
+          const ogVal = parsedData.og["og:title"] || "";
+          if (htmlInput.value.includes("twitter:title")) {
+            htmlInput.value = htmlInput.value.replace(/name="twitter:title"\s+content="[^"]*"/gi, `name="twitter:title" content="${ogVal}"`);
+          } else {
+            htmlInput.value += `\n<meta name="twitter:title" content="${ogVal}" />`;
+          }
+        } else if (type === "sync_images") {
+          const ogVal = parsedData.og["og:image"] || "";
+          if (htmlInput.value.includes("twitter:image")) {
+            htmlInput.value = htmlInput.value.replace(/name="twitter:image"\s+content="[^"]*"/gi, `name="twitter:image" content="${ogVal}"`);
+          } else {
+            htmlInput.value += `\n<meta name="twitter:image" content="${ogVal}" />`;
+          }
+        }
+
+        runAuditSequence();
+        showToast("Audit fix applied to source.", "success");
+      };
+
+      // Update Social previews
+      function updateSocialPreviews(title, desc, image, url) {
+        // Facebook fallback
+        const fbTitle = title || "Title Placeholder";
+        const fbDesc = desc || "Description placeholder. Add an og:description to customize this text block.";
+        const fbDomain = url ? extractDomain(url).toUpperCase() : "EXAMPLE.COM";
+
+        mockFbTitle.textContent = fbTitle;
+        mockFbDesc.textContent = fbDesc;
+        mockFbDomain.textContent = fbDomain;
+
+        if (image && image.startsWith("http")) {
+          mockFbImgDiv.style.backgroundImage = `url('${image}')`;
+          mockFbImgDiv.textContent = "";
+        } else {
+          mockFbImgDiv.style.backgroundImage = "none";
+          mockFbImgDiv.textContent = "Image URL missing or local";
+        }
+
+        // Twitter fallback
+        const twCardType = parsedData.twitter["twitter:card"] || "summary_large_image";
+        const twTitle = parsedData.twitter["twitter:title"] || fbTitle;
+        const twDesc = parsedData.twitter["twitter:description"] || fbDesc;
+        const twDomain = url ? extractDomain(url).toLowerCase() : "example.com";
+        const twImage = parsedData.twitter["twitter:image"] || image;
+
+        mockTwTitle.textContent = twTitle;
+        mockTwDesc.textContent = twDesc;
+        mockTwDomain.textContent = twDomain;
+
+        if (twImage && twImage.startsWith("http")) {
+          mockTwImgDiv.style.backgroundImage = `url('${twImage}')`;
+          mockTwImgDiv.textContent = "";
+        } else {
+          mockTwImgDiv.style.backgroundImage = "none";
+          mockTwImgDiv.textContent = "Image URL missing or local";
+        }
+      }
+
+      function extractDomain(url) {
+        try {
+          const parsed = new URL(url);
+          return parsed.hostname;
+        } catch {
+          // raw extract
+          const match = url.match(/^(?:https?:\/\/)?(?:www\.)?([^\/]+)/);
+          return match ? match[1] : url;
+        }
+      }
+
+      // Generate optimized block
+      function generateCleanCodeBlock() {
+        const optionTwitter = optTwitterFallbacks.checked;
+        const optionCanonical = optCanonical.checked;
+        const optionXhtml = optXhtml.checked;
+
+        const closeSymbol = optionXhtml ? " />" : ">";
+        const lines = [];
+
+        lines.push("<!-- Open Graph Metadata Generated -->");
+
+        // Canonical
+        if (optionCanonical) {
+          const href = parsedData.canonical || parsedData.og["og:url"] || "https://example.com";
+          lines.push(`<link rel="canonical" href="${href}"${closeSymbol}`);
+        }
+
+        // Main OG keys
+        const activeProfile = PROFILES[profileSelector.value];
+        const writtenKeys = new Set();
+
+        activeProfile.tags.forEach((expected) => {
+          const lowerKey = expected.key.toLowerCase();
+          const val = parsedData.og[lowerKey];
+          if (val !== undefined) {
+            lines.push(`<meta property="${expected.key}" content="${val}"${closeSymbol}`);
+            writtenKeys.add(lowerKey);
+          }
+        });
+
+        // Add residual OG tags parsed
+        Object.keys(parsedData.og).forEach((lowerKey) => {
+          if (!writtenKeys.has(lowerKey)) {
+            const rawKey = lowercaseCasingMap[lowerKey] || lowerKey;
+            lines.push(`<meta property="${rawKey}" content="${parsedData.og[lowerKey]}"${closeSymbol}`);
+          }
+        });
+
+        // Twitter Section
+        if (optionTwitter) {
+          lines.push("");
+          lines.push("<!-- Twitter Cards Fallbacks -->");
+
+          // Card type check
+          const cardVal = parsedData.twitter["twitter:card"] || "summary_large_image";
+          lines.push(`<meta name="twitter:card" content="${cardVal}"${closeSymbol}`);
+
+          // title
+          const titleVal = parsedData.twitter["twitter:title"] || parsedData.og["og:title"];
+          if (titleVal) lines.push(`<meta name="twitter:title" content="${titleVal}"${closeSymbol}`);
+
+          // desc
+          const descVal = parsedData.twitter["twitter:description"] || parsedData.og["og:description"];
+          if (descVal) lines.push(`<meta name="twitter:description" content="${descVal}"${closeSymbol}`);
+
+          // image
+          const imgVal = parsedData.twitter["twitter:image"] || parsedData.og["og:image"];
+          if (imgVal) lines.push(`<meta name="twitter:image" content="${imgVal}"${closeSymbol}`);
+        }
+
+        return lines.join("\n");
+      }
+
+      // Update Export Code Display
+      function renderExportCodeOutput() {
+        const text = generateCleanCodeBlock();
+        if (!text.trim()) {
+          exportPreviewCode.innerHTML = '<span style="color: var(--text-subtle); font-style: italic;">No meta block generated yet.</span>';
+          return;
+        }
+
+        // Highlight HTML tags syntax
+        exportPreviewCode.innerHTML = highlightHtmlMetadata(text);
+      }
+
+      // Simple HTML highlighter
+      function highlightHtmlMetadata(text) {
+        const lines = text.split("\n");
+        const highlighted = lines.map((line) => {
+          const trimmed = line.trim();
+          if (trimmed === "") return "";
+          if (trimmed.startsWith("<!--")) return `<span class="hl-comment">${escapeHtml(line)}</span>`;
+
+          // highlight tags: e.g. <meta property="og:title" content="Hello" />
+          // we match tag name, attribute keys, and attribute values
+          const parts = line.split(/(<meta|<link|\/>|>)/g);
+          const formatted = parts.map((part) => {
+            if (part === "<meta" || part === "<link") {
+              return `<span class="hl-tag">${part}</span>`;
+            }
+            if (part === ">" || part === "/>") {
+              return `<span class="hl-tag">${part}</span>`;
+            }
+            // attribute contents
+            return part.replace(/([a-zA-Z\-:]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/gi, (m, key, valDouble, valSingle) => {
+              const val = valDouble || valSingle || "";
+              return `<span class="hl-attr-name">${key}</span>=<span class="hl-attr-val">"${escapeHtml(val)}"</span>`;
+            });
+          });
+
+          return formatted.join("");
+        });
+
+        return highlighted.join("\n");
+      }
+
+      // Show toast
+      function showToast(message, type = "success") {
+        toastMessage.textContent = message;
+        toastNotify.className = "toast"; // reset
+
+        if (type === "success") {
+          toastNotify.classList.add("toast-success");
+          toastIcon.style.display = "block";
+        } else if (type === "error") {
+          toastNotify.style.borderColor = "var(--color-danger)";
+          toastNotify.style.boxShadow = "0 10px 30px rgba(0,0,0,0.5), 0 0 15px rgba(239, 68, 68, 0.2)";
+          toastIcon.style.display = "none";
+        } else {
+          toastNotify.style.borderColor = "var(--color-primary)";
+          toastIcon.style.display = "none";
+        }
+
+        toastNotify.classList.add("show");
+
+        if (window.toastTimeout) {
+          clearTimeout(window.toastTimeout);
+        }
+        window.toastTimeout = setTimeout(() => {
+          toastNotify.classList.remove("show");
+        }, 3200);
+      }
+
+      // Escape Helper
+      function escapeHtml(str) {
+        if (!str) return "";
+        return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+      }
+    </script>
+  </body>
+</html>
