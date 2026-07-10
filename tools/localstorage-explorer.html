@@ -1,0 +1,717 @@
+<!--
+LocalStorage Explorer
+Single-file client-side tool to browse, search, edit, import, and export
+localStorage entries for the current origin.
+Built for One File Tools.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LocalStorage Explorer - One File Tools</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <style>
+      :root {
+        --bg: #030712;
+        --grid-line: #111827;
+        --panel: rgba(17, 24, 39, 0.7);
+        --panel-border: #1f2937;
+        --accent: #a78bfa;
+        --accent-hover: #8b5cf6;
+        --accent-glow: rgba(167, 139, 250, 0.15);
+        --text: #f9fafb;
+        --text-muted: #9ca3af;
+        --text-dim: #4b5563;
+        --radius-sm: 12px;
+        --radius-md: 20px;
+        --font-sans: "Inter", system-ui, sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+        --font-display: "Space Grotesk", sans-serif;
+        --color-weak: #ef4444;
+        --color-strong: #10b981;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg);
+        background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+        background-size: 32px 32px;
+        color: var(--text);
+        padding: 48px 20px 80px;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+      }
+
+      .app {
+        width: 100%;
+        max-width: 960px;
+      }
+
+      .hero {
+        text-align: center;
+        margin-bottom: 24px;
+      }
+
+      .eyebrow {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        letter-spacing: 0.2em;
+        color: var(--accent);
+        text-transform: uppercase;
+        margin-bottom: 12px;
+        font-weight: 500;
+      }
+
+      .wordmark {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: clamp(26px, 5vw, 38px);
+        letter-spacing: -0.02em;
+        margin-bottom: 12px;
+      }
+
+      .tagline {
+        color: var(--text-muted);
+        font-size: 15px;
+        line-height: 1.5;
+        max-width: 600px;
+        margin: 0 auto;
+      }
+
+      .origin-note {
+        max-width: 700px;
+        margin: 16px auto 0;
+        font-size: 13px;
+        color: var(--text-muted);
+        line-height: 1.6;
+        background: rgba(167, 139, 250, 0.07);
+        border: 1px solid rgba(167, 139, 250, 0.25);
+        border-radius: var(--radius-sm);
+        padding: 12px 14px;
+        text-align: left;
+      }
+
+      .origin-note code {
+        color: var(--text);
+        font-family: var(--font-mono);
+      }
+
+      .studio {
+        background: var(--panel);
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-md);
+        padding: 24px;
+        box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.5);
+        margin-bottom: 24px;
+      }
+
+      .toolbar {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+        margin-bottom: 16px;
+      }
+
+      .search-input {
+        flex: 1;
+        min-width: 180px;
+        background: rgba(17, 24, 39, 0.8);
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 14px;
+        padding: 10px 12px;
+      }
+
+      .search-input:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-glow);
+      }
+
+      .btn {
+        background: var(--accent);
+        color: #030712;
+        border: none;
+        border-radius: 8px;
+        padding: 10px 16px;
+        font-family: var(--font-sans);
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+
+      .btn:hover {
+        background: var(--accent-hover);
+      }
+
+      .btn:focus-visible,
+      .btn-ghost:focus-visible,
+      .btn-danger:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      .btn-ghost {
+        background: rgba(31, 41, 55, 0.6);
+        border: 1px solid var(--panel-border);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 10px 16px;
+        font-family: var(--font-sans);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+
+      .btn-ghost:hover {
+        background: rgba(55, 65, 81, 0.8);
+      }
+
+      .btn-danger {
+        background: rgba(239, 68, 68, 0.1);
+        color: #fca5a5;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        border-radius: 8px;
+        padding: 10px 16px;
+        font-family: var(--font-sans);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+
+      .btn-danger:hover {
+        background: rgba(239, 68, 68, 0.18);
+      }
+
+      .stats-row {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-bottom: 16px;
+      }
+
+      .entries-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-height: 480px;
+        overflow-y: auto;
+      }
+
+      .entry-row {
+        background: rgba(3, 7, 18, 0.5);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 12px 14px;
+      }
+
+      .entry-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+
+      .entry-key {
+        font-family: var(--font-mono);
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--accent);
+        flex: 1;
+        word-break: break-all;
+      }
+
+      .json-badge {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        color: var(--color-strong);
+        border: 1px solid rgba(16, 185, 129, 0.35);
+        border-radius: 99px;
+        padding: 2px 8px;
+        text-transform: uppercase;
+      }
+
+      .entry-size {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-dim);
+      }
+
+      .entry-value {
+        width: 100%;
+        background: rgba(17, 24, 39, 0.8);
+        border: 1px solid var(--panel-border);
+        border-radius: 6px;
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 12px;
+        padding: 8px 10px;
+        resize: vertical;
+        min-height: 40px;
+        line-height: 1.5;
+      }
+
+      .entry-value:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-glow);
+      }
+
+      .entry-actions {
+        display: flex;
+        gap: 6px;
+        margin-top: 8px;
+        flex-wrap: wrap;
+      }
+
+      .icon-btn-sm {
+        background: rgba(31, 41, 55, 0.6);
+        border: 1px solid var(--panel-border);
+        color: var(--text-muted);
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-size: 11px;
+        font-family: var(--font-sans);
+        cursor: pointer;
+      }
+
+      .icon-btn-sm:hover {
+        background: rgba(55, 65, 81, 0.9);
+        color: var(--text);
+      }
+
+      .icon-btn-sm.save {
+        color: var(--color-strong);
+        border-color: rgba(16, 185, 129, 0.35);
+      }
+
+      .icon-btn-sm.delete {
+        color: #fca5a5;
+        border-color: rgba(239, 68, 68, 0.3);
+      }
+
+      .empty-state {
+        color: var(--text-dim);
+        font-size: 14px;
+        text-align: center;
+        padding: 24px 0;
+      }
+
+      .add-form {
+        display: flex;
+        gap: 8px;
+        margin-top: 16px;
+        flex-wrap: wrap;
+      }
+
+      .add-form input {
+        background: rgba(17, 24, 39, 0.8);
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 13px;
+        padding: 9px 11px;
+      }
+
+      .add-form input[name="newKey"] {
+        flex: 0 0 200px;
+      }
+
+      .add-form input[name="newValue"] {
+        flex: 1;
+        min-width: 160px;
+      }
+
+      .field-error {
+        font-size: 12px;
+        color: var(--color-weak);
+        margin-top: 8px;
+      }
+
+      .footer-note {
+        text-align: center;
+        color: var(--text-dim);
+        font-size: 13px;
+        margin-top: 8px;
+      }
+
+      .footer-note a {
+        color: var(--text-muted);
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background: var(--text);
+        color: var(--bg);
+        padding: 12px 22px;
+        border-radius: 99px;
+        font-family: var(--font-sans);
+        font-weight: 600;
+        font-size: 14px;
+        opacity: 0;
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        z-index: 100;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      }
+
+      .toast.show {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+      }
+
+      @media (max-width: 640px) {
+        .studio {
+          padding: 18px;
+        }
+        .add-form input[name="newKey"] {
+          flex: 1 1 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="hero">
+        <div class="eyebrow">Browser & Network</div>
+        <h1 class="wordmark">LocalStorage Explorer</h1>
+        <p class="tagline">Browse, search, edit, import, and export localStorage entries — right in your browser.</p>
+        <div class="origin-note">
+          <strong>Note:</strong> browsers isolate storage per origin, so this page can only read and edit <code id="currentOrigin"></code>'s own localStorage — the same boundary that keeps one website from reading another's data. It cannot inspect localStorage belonging to a different site; for that, use your browser's DevTools "Application" panel while on that site.
+        </div>
+      </header>
+
+      <main class="studio">
+        <div class="toolbar">
+          <input type="text" id="searchInput" class="search-input" placeholder="Search by key or value…" autocomplete="off" spellcheck="false" />
+          <button class="btn" id="btnRefresh" type="button">Refresh</button>
+          <button class="btn-ghost" id="btnExport" type="button">Export JSON</button>
+          <button class="btn-ghost" id="btnImport" type="button">Import JSON</button>
+          <button class="btn-danger" id="btnClearAll" type="button">Clear all</button>
+        </div>
+        <input type="file" id="importFile" accept="application/json" style="position: absolute; width: 1px; height: 1px; opacity: 0" />
+
+        <div class="stats-row" id="statsRow"></div>
+
+        <div class="entries-list" id="entriesList"></div>
+        <p class="empty-state" id="emptyState">No localStorage entries for this origin yet.</p>
+
+        <div class="add-form">
+          <input type="text" name="newKey" id="newKeyInput" placeholder="key" spellcheck="false" />
+          <input type="text" name="newValue" id="newValueInput" placeholder="value" spellcheck="false" />
+          <button class="btn" id="btnAddEntry" type="button">Add entry</button>
+        </div>
+        <div class="field-error" id="addError"></div>
+      </main>
+
+      <p class="footer-note">Part of <a href="https://github.com/praveenscience/One-File-Tools">One File Tools</a>. Runs entirely in your browser.</p>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script>
+      /* ==========================================================
+         LocalStorage Explorer
+         Vanilla JS, no dependencies. Operates only on this page's
+         own origin's localStorage (Same-Origin Policy).
+         ========================================================== */
+
+      const currentOrigin = document.getElementById("currentOrigin");
+      const searchInput = document.getElementById("searchInput");
+      const btnRefresh = document.getElementById("btnRefresh");
+      const btnExport = document.getElementById("btnExport");
+      const btnImport = document.getElementById("btnImport");
+      const importFile = document.getElementById("importFile");
+      const btnClearAll = document.getElementById("btnClearAll");
+      const statsRow = document.getElementById("statsRow");
+      const entriesList = document.getElementById("entriesList");
+      const emptyState = document.getElementById("emptyState");
+      const newKeyInput = document.getElementById("newKeyInput");
+      const newValueInput = document.getElementById("newValueInput");
+      const btnAddEntry = document.getElementById("btnAddEntry");
+      const addError = document.getElementById("addError");
+      const toast = document.getElementById("toast");
+
+      currentOrigin.textContent = window.location.origin;
+
+      function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add("show");
+        setTimeout(() => toast.classList.remove("show"), 2000);
+      }
+
+      function copyText(text, message) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard
+            .writeText(text)
+            .then(() => showToast(message))
+            .catch(() => showToast("Copy failed"));
+        } else {
+          showToast("Clipboard unavailable");
+        }
+      }
+
+      /** Attempts to detect and pretty-print a JSON value; returns null if not JSON. */
+      function tryPrettyJson(raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (typeof parsed === "object" && parsed !== null) {
+            return JSON.stringify(parsed, null, 2);
+          }
+          return null;
+        } catch (err) {
+          return null;
+        }
+      }
+
+      /** Reads all localStorage entries into a plain array of { key, value }. */
+      function readAllEntries() {
+        const entries = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          entries.push({ key, value: localStorage.getItem(key) });
+        }
+        return entries.sort((a, b) => a.key.localeCompare(b.key));
+      }
+
+      /** Formats a byte count as a human-readable string. */
+      function formatBytes(bytes) {
+        if (bytes < 1024) return bytes + " B";
+        return (bytes / 1024).toFixed(1) + " KB";
+      }
+
+      /** Renders the stats line (entry count + estimated total size). */
+      function renderStats(entries) {
+        const totalBytes = entries.reduce((sum, e) => sum + e.key.length + e.value.length, 0);
+        statsRow.innerHTML = "";
+        const countSpan = document.createElement("span");
+        countSpan.textContent = entries.length + " entr" + (entries.length === 1 ? "y" : "ies");
+        const sizeSpan = document.createElement("span");
+        sizeSpan.textContent = "~" + formatBytes(totalBytes) + " total (UTF-16 char count estimate)";
+        statsRow.appendChild(countSpan);
+        statsRow.appendChild(sizeSpan);
+      }
+
+      /** Builds a single entry row with editable value, save/delete/copy actions. */
+      function buildEntryRow(entry) {
+        const row = document.createElement("div");
+        row.className = "entry-row";
+
+        const header = document.createElement("div");
+        header.className = "entry-header";
+
+        const keySpan = document.createElement("span");
+        keySpan.className = "entry-key";
+        keySpan.textContent = entry.key;
+        header.appendChild(keySpan);
+
+        const prettyJson = tryPrettyJson(entry.value);
+        if (prettyJson !== null) {
+          const badge = document.createElement("span");
+          badge.className = "json-badge";
+          badge.textContent = "JSON";
+          header.appendChild(badge);
+        }
+
+        const sizeSpan = document.createElement("span");
+        sizeSpan.className = "entry-size";
+        sizeSpan.textContent = formatBytes(entry.key.length + entry.value.length);
+        header.appendChild(sizeSpan);
+
+        const textarea = document.createElement("textarea");
+        textarea.className = "entry-value";
+        textarea.value = prettyJson !== null ? prettyJson : entry.value;
+        textarea.spellcheck = false;
+
+        const actions = document.createElement("div");
+        actions.className = "entry-actions";
+
+        const saveBtn = document.createElement("button");
+        saveBtn.type = "button";
+        saveBtn.className = "icon-btn-sm save";
+        saveBtn.textContent = "Save";
+        saveBtn.addEventListener("click", () => {
+          // If the original value was JSON, re-minify pretty-printed edits back
+          // to a single line before saving (matches how most apps store it).
+          let toSave = textarea.value;
+          if (prettyJson !== null) {
+            try {
+              toSave = JSON.stringify(JSON.parse(textarea.value));
+            } catch (err) {
+              addError.textContent = "";
+              showToast("Invalid JSON — saved as plain text instead");
+            }
+          }
+          try {
+            localStorage.setItem(entry.key, toSave);
+            showToast("Saved " + entry.key);
+            refresh();
+          } catch (err) {
+            showToast("Save failed: " + err.message);
+          }
+        });
+
+        const copyKeyBtn = document.createElement("button");
+        copyKeyBtn.type = "button";
+        copyKeyBtn.className = "icon-btn-sm";
+        copyKeyBtn.textContent = "Copy key";
+        copyKeyBtn.addEventListener("click", () => copyText(entry.key, "Key copied!"));
+
+        const copyValueBtn = document.createElement("button");
+        copyValueBtn.type = "button";
+        copyValueBtn.className = "icon-btn-sm";
+        copyValueBtn.textContent = "Copy value";
+        copyValueBtn.addEventListener("click", () => copyText(entry.value, "Value copied!"));
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.className = "icon-btn-sm delete";
+        deleteBtn.textContent = "Delete";
+        deleteBtn.addEventListener("click", () => {
+          if (!confirm('Delete "' + entry.key + '"? This cannot be undone.')) return;
+          localStorage.removeItem(entry.key);
+          showToast("Deleted " + entry.key);
+          refresh();
+        });
+
+        actions.appendChild(saveBtn);
+        actions.appendChild(copyKeyBtn);
+        actions.appendChild(copyValueBtn);
+        actions.appendChild(deleteBtn);
+
+        row.appendChild(header);
+        row.appendChild(textarea);
+        row.appendChild(actions);
+        return row;
+      }
+
+      /** Re-reads localStorage and re-renders the filtered list + stats. */
+      function refresh() {
+        const allEntries = readAllEntries();
+        const query = searchInput.value.trim().toLowerCase();
+        const filtered = query ? allEntries.filter((e) => e.key.toLowerCase().includes(query) || e.value.toLowerCase().includes(query)) : allEntries;
+
+        renderStats(allEntries);
+
+        entriesList.innerHTML = "";
+        if (filtered.length === 0) {
+          emptyState.hidden = false;
+          emptyState.textContent = allEntries.length === 0 ? "No localStorage entries for this origin yet." : "No entries match your search.";
+          return;
+        }
+        emptyState.hidden = true;
+        filtered.forEach((entry) => entriesList.appendChild(buildEntryRow(entry)));
+      }
+
+      // ---- Events ----
+
+      searchInput.addEventListener("input", refresh);
+      btnRefresh.addEventListener("click", refresh);
+
+      btnAddEntry.addEventListener("click", () => {
+        addError.textContent = "";
+        const key = newKeyInput.value.trim();
+        if (!key) {
+          addError.textContent = "Enter a key.";
+          return;
+        }
+        try {
+          localStorage.setItem(key, newValueInput.value);
+          newKeyInput.value = "";
+          newValueInput.value = "";
+          showToast("Added " + key);
+          refresh();
+        } catch (err) {
+          addError.textContent = "Could not save: " + err.message;
+        }
+      });
+
+      btnExport.addEventListener("click", () => {
+        const entries = readAllEntries();
+        if (entries.length === 0) {
+          showToast("Nothing to export");
+          return;
+        }
+        const data = {};
+        entries.forEach((e) => (data[e.key] = e.value));
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = "localstorage-export.json";
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+        showToast("Exported " + entries.length + " entries");
+      });
+
+      btnImport.addEventListener("click", () => importFile.click());
+
+      importFile.addEventListener("change", () => {
+        const file = importFile.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const data = JSON.parse(reader.result);
+            if (typeof data !== "object" || data === null || Array.isArray(data)) {
+              throw new Error("Expected a JSON object of key-value pairs.");
+            }
+            const keys = Object.keys(data);
+            keys.forEach((key) => {
+              const value = typeof data[key] === "string" ? data[key] : JSON.stringify(data[key]);
+              localStorage.setItem(key, value);
+            });
+            showToast("Imported " + keys.length + " entries");
+            refresh();
+          } catch (err) {
+            showToast("Import failed: " + err.message);
+          }
+        };
+        reader.onerror = () => showToast("Could not read that file");
+        reader.readAsText(file);
+        importFile.value = "";
+      });
+
+      btnClearAll.addEventListener("click", () => {
+        const count = localStorage.length;
+        if (count === 0) {
+          showToast("Nothing to clear");
+          return;
+        }
+        if (!confirm("Clear all " + count + " localStorage entries for " + window.location.origin + "? This cannot be undone.")) return;
+        localStorage.clear();
+        showToast("Cleared all entries");
+        refresh();
+      });
+
+      refresh();
+    </script>
+  </body>
+</html>
