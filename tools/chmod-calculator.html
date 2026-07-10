@@ -1,0 +1,630 @@
+<!--
+Chmod Calculator
+Single-file client-side tool to interactively build Unix/Linux file
+permissions and see the numeric (octal) and symbolic chmod representations.
+Built for One File Tools.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chmod Calculator - One File Tools</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <style>
+      :root {
+        --bg: #030712;
+        --grid-line: #111827;
+        --panel: rgba(17, 24, 39, 0.7);
+        --panel-border: #1f2937;
+        --accent: #4ade80;
+        --accent-hover: #22c55e;
+        --accent-glow: rgba(74, 222, 128, 0.15);
+        --text: #f9fafb;
+        --text-muted: #9ca3af;
+        --text-dim: #4b5563;
+        --radius-sm: 12px;
+        --radius-md: 20px;
+        --font-sans: "Inter", system-ui, sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+        --font-display: "Space Grotesk", sans-serif;
+        --color-fair: #f59e0b;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg);
+        background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+        background-size: 32px 32px;
+        color: var(--text);
+        padding: 48px 20px 80px;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+      }
+
+      .app {
+        width: 100%;
+        max-width: 860px;
+      }
+
+      .hero {
+        text-align: center;
+        margin-bottom: 28px;
+      }
+
+      .eyebrow {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        letter-spacing: 0.2em;
+        color: var(--accent);
+        text-transform: uppercase;
+        margin-bottom: 12px;
+        font-weight: 500;
+      }
+
+      .wordmark {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: clamp(26px, 5vw, 38px);
+        letter-spacing: -0.02em;
+        margin-bottom: 12px;
+      }
+
+      .tagline {
+        color: var(--text-muted);
+        font-size: 15px;
+        line-height: 1.5;
+        max-width: 580px;
+        margin: 0 auto;
+      }
+
+      .studio {
+        background: var(--panel);
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-md);
+        padding: 24px;
+        box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.5);
+        margin-bottom: 24px;
+      }
+
+      .section-label {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        display: block;
+        margin-bottom: 14px;
+      }
+
+      /* Permission matrix */
+      .matrix {
+        display: grid;
+        grid-template-columns: 90px 1fr 1fr 1fr;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .matrix .head {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        text-align: center;
+      }
+
+      .matrix .row-label {
+        font-family: var(--font-mono);
+        font-size: 13px;
+        color: var(--text-muted);
+        font-weight: 600;
+      }
+
+      .perm-cell {
+        display: flex;
+        justify-content: center;
+        gap: 6px;
+        background: rgba(3, 7, 18, 0.5);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 10px 6px;
+      }
+
+      .perm-toggle {
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        border: 1px solid var(--panel-border);
+        background: rgba(31, 41, 55, 0.5);
+        color: var(--text-dim);
+        font-family: var(--font-mono);
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .perm-toggle.active {
+        background: var(--accent);
+        color: #030712;
+        border-color: var(--accent);
+      }
+
+      .perm-toggle:hover:not(.active) {
+        background: rgba(55, 65, 81, 0.8);
+        color: var(--text);
+      }
+
+      .perm-toggle:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      .special-row {
+        display: flex;
+        gap: 10px;
+        margin-top: 16px;
+        flex-wrap: wrap;
+      }
+
+      .special-chip {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(3, 7, 18, 0.5);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 10px 14px;
+        font-size: 13px;
+        color: var(--text-muted);
+        cursor: pointer;
+      }
+
+      .special-chip input {
+        accent-color: var(--accent);
+      }
+
+      .presets-row {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-top: 16px;
+      }
+
+      .preset-btn {
+        background: rgba(31, 41, 55, 0.5);
+        border: 1px solid var(--panel-border);
+        color: var(--text-muted);
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      .preset-btn:hover {
+        background: rgba(55, 65, 81, 0.7);
+        color: var(--text);
+      }
+
+      .preset-btn:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      .output-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+      }
+
+      .output-card {
+        background: rgba(3, 7, 18, 0.5);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 14px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .output-card .label {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 4px;
+      }
+
+      .output-card .value {
+        font-family: var(--font-mono);
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--accent);
+      }
+
+      .copy-btn-sm {
+        background: rgba(31, 41, 55, 0.6);
+        border: 1px solid var(--panel-border);
+        color: var(--text-muted);
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-size: 11px;
+        font-family: var(--font-sans);
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+
+      .copy-btn-sm:hover {
+        background: rgba(55, 65, 81, 0.9);
+        color: var(--text);
+      }
+
+      .explain-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 4px;
+      }
+
+      .explain-item {
+        font-size: 13px;
+        color: var(--text-muted);
+        line-height: 1.5;
+      }
+
+      .explain-item strong {
+        color: var(--text);
+        font-family: var(--font-mono);
+      }
+
+      .footer-note {
+        text-align: center;
+        color: var(--text-dim);
+        font-size: 13px;
+        margin-top: 8px;
+      }
+
+      .footer-note a {
+        color: var(--text-muted);
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background: var(--text);
+        color: var(--bg);
+        padding: 12px 22px;
+        border-radius: 99px;
+        font-family: var(--font-sans);
+        font-weight: 600;
+        font-size: 14px;
+        opacity: 0;
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        z-index: 100;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      }
+
+      .toast.show {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+      }
+
+      @media (max-width: 640px) {
+        .studio {
+          padding: 18px;
+        }
+        .matrix {
+          grid-template-columns: 60px 1fr 1fr 1fr;
+        }
+        .perm-toggle {
+          width: 28px;
+          height: 28px;
+          font-size: 11px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="hero">
+        <div class="eyebrow">Developer Utilities</div>
+        <h1 class="wordmark">Chmod Calculator</h1>
+        <p class="tagline">Toggle read/write/execute permissions for owner, group, and others to instantly get the numeric and symbolic chmod values.</p>
+      </header>
+
+      <main class="studio">
+        <span class="section-label">Permissions</span>
+        <div class="matrix" id="permMatrix">
+          <div></div>
+          <div class="head">Read</div>
+          <div class="head">Write</div>
+          <div class="head">Execute</div>
+        </div>
+
+        <div class="special-row">
+          <label class="special-chip"><input type="checkbox" id="setuidToggle" /> SetUID</label>
+          <label class="special-chip"><input type="checkbox" id="setgidToggle" /> SetGID</label>
+          <label class="special-chip"><input type="checkbox" id="stickyToggle" /> Sticky bit</label>
+        </div>
+
+        <span class="section-label" style="margin-top: 18px">Presets</span>
+        <div class="presets-row" id="presetsRow"></div>
+      </main>
+
+      <main class="studio">
+        <span class="section-label">Result</span>
+        <div class="output-grid">
+          <div class="output-card">
+            <div>
+              <div class="label">Numeric (octal)</div>
+              <div class="value" id="octalOutput">644</div>
+            </div>
+            <button class="copy-btn-sm" id="btnCopyOctal" type="button">Copy</button>
+          </div>
+          <div class="output-card">
+            <div>
+              <div class="label">Symbolic</div>
+              <div class="value" id="symbolicOutput">-rw-r--r--</div>
+            </div>
+            <button class="copy-btn-sm" id="btnCopySymbolic" type="button">Copy</button>
+          </div>
+          <div class="output-card">
+            <div>
+              <div class="label">chmod command</div>
+              <div class="value" id="commandOutput" style="font-size: 15px">chmod 644 file</div>
+            </div>
+            <button class="copy-btn-sm" id="btnCopyCommand" type="button">Copy</button>
+          </div>
+        </div>
+
+        <div class="explain-list" id="explainList" style="margin-top: 16px"></div>
+      </main>
+
+      <p class="footer-note">Part of <a href="https://github.com/praveenscience/One-File-Tools">One File Tools</a>. Runs completely offline.</p>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script>
+      /* ==========================================================
+         Chmod Calculator
+         Vanilla JS, no dependencies.
+         ========================================================== */
+
+      const permMatrix = document.getElementById("permMatrix");
+      const setuidToggle = document.getElementById("setuidToggle");
+      const setgidToggle = document.getElementById("setgidToggle");
+      const stickyToggle = document.getElementById("stickyToggle");
+      const presetsRow = document.getElementById("presetsRow");
+      const octalOutput = document.getElementById("octalOutput");
+      const symbolicOutput = document.getElementById("symbolicOutput");
+      const commandOutput = document.getElementById("commandOutput");
+      const explainList = document.getElementById("explainList");
+      const btnCopyOctal = document.getElementById("btnCopyOctal");
+      const btnCopySymbolic = document.getElementById("btnCopySymbolic");
+      const btnCopyCommand = document.getElementById("btnCopyCommand");
+      const toast = document.getElementById("toast");
+
+      const GROUPS = ["owner", "group", "others"];
+      const PERMS = ["read", "write", "execute"];
+      const PERM_LETTER = { read: "r", write: "w", execute: "x" };
+      const PERM_BIT = { read: 4, write: 2, execute: 1 };
+
+      // state.owner.read/write/execute -> boolean
+      const state = {
+        owner: { read: true, write: true, execute: false },
+        group: { read: true, write: false, execute: false },
+        others: { read: true, write: false, execute: false }
+      };
+      let setuid = false;
+      let setgid = false;
+      let sticky = false;
+
+      const PRESETS = [
+        { label: "644", octal: "644" },
+        { label: "755", octal: "755" },
+        { label: "600", octal: "600" },
+        { label: "700", octal: "700" },
+        { label: "777", octal: "777" },
+        { label: "664", octal: "664" },
+        { label: "775", octal: "775" }
+      ];
+
+      function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add("show");
+        setTimeout(() => toast.classList.remove("show"), 1800);
+      }
+
+      function copyText(text, message) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard
+            .writeText(text)
+            .then(() => showToast(message))
+            .catch(() => showToast("Copy failed"));
+        } else {
+          showToast("Clipboard unavailable");
+        }
+      }
+
+      /** Builds the interactive owner/group/others x read/write/execute matrix. */
+      function renderMatrix() {
+        // Remove any existing rows (keep the header row, which is the first
+        // 4 children created in markup).
+        while (permMatrix.children.length > 4) {
+          permMatrix.removeChild(permMatrix.lastChild);
+        }
+
+        GROUPS.forEach((group) => {
+          const rowLabel = document.createElement("div");
+          rowLabel.className = "row-label";
+          rowLabel.textContent = group.charAt(0).toUpperCase() + group.slice(1);
+          permMatrix.appendChild(rowLabel);
+
+          PERMS.forEach((perm) => {
+            const cell = document.createElement("div");
+            cell.className = "perm-cell";
+
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "perm-toggle" + (state[group][perm] ? " active" : "");
+            btn.textContent = PERM_LETTER[perm];
+            btn.setAttribute("aria-pressed", String(state[group][perm]));
+            btn.setAttribute("aria-label", group + " " + perm);
+            btn.addEventListener("click", () => {
+              state[group][perm] = !state[group][perm];
+              render();
+            });
+
+            cell.appendChild(btn);
+            permMatrix.appendChild(cell);
+          });
+        });
+      }
+
+      /** Computes the octal digit (0-7) for a single group from its perm flags. */
+      function groupOctalDigit(group) {
+        return (state[group].read ? PERM_BIT.read : 0) + (state[group].write ? PERM_BIT.write : 0) + (state[group].execute ? PERM_BIT.execute : 0);
+      }
+
+      /** Computes the special-bits octal digit (0-7) from setuid/setgid/sticky. */
+      function specialOctalDigit() {
+        return (setuid ? 4 : 0) + (setgid ? 2 : 0) + (sticky ? 1 : 0);
+      }
+
+      /** Builds the 3 or 4 digit octal string, omitting the leading digit when it's 0. */
+      function buildOctal() {
+        const special = specialOctalDigit();
+        const base = GROUPS.map(groupOctalDigit).join("");
+        return special > 0 ? special + base : base;
+      }
+
+      /** Builds the 10-character symbolic string, e.g. "-rwxr-xr-x" (with s/t for special bits). */
+      function buildSymbolic() {
+        let result = "-";
+        GROUPS.forEach((group, index) => {
+          result += state[group].read ? "r" : "-";
+          result += state[group].write ? "w" : "-";
+
+          let execChar = state[group].execute ? "x" : "-";
+          if (index === 0 && setuid) execChar = state[group].execute ? "s" : "S";
+          if (index === 1 && setgid) execChar = state[group].execute ? "s" : "S";
+          if (index === 2 && sticky) execChar = state[group].execute ? "t" : "T";
+          result += execChar;
+        });
+        return result;
+      }
+
+      /** Applies an octal string (3 or 4 digits) to the permission state. */
+      function applyOctal(octalStr) {
+        const digits = octalStr.padStart(4, "0").split("").map(Number);
+        const [special, ownerD, groupD, othersD] = digits;
+
+        setuid = Boolean(special & 4);
+        setgid = Boolean(special & 2);
+        sticky = Boolean(special & 1);
+
+        [ownerD, groupD, othersD].forEach((digit, index) => {
+          const group = GROUPS[index];
+          state[group].read = Boolean(digit & 4);
+          state[group].write = Boolean(digit & 2);
+          state[group].execute = Boolean(digit & 1);
+        });
+      }
+
+      /** Builds plain-English explanations for the current permission set. */
+      function buildExplanations() {
+        const lines = [];
+        GROUPS.forEach((group) => {
+          const perms = PERMS.filter((p) => state[group][p]);
+          const label = group.charAt(0).toUpperCase() + group.slice(1);
+          if (perms.length === 0) {
+            lines.push(label + " has <strong>no permissions</strong>.");
+          } else {
+            lines.push(label + " can <strong>" + perms.join(", ") + "</strong>.");
+          }
+        });
+        if (setuid) lines.push("<strong>SetUID</strong>: the file runs with the file owner's privileges, regardless of who executes it.");
+        if (setgid) lines.push("<strong>SetGID</strong>: on a file, runs with the group's privileges; on a directory, new files inherit the directory's group.");
+        if (sticky) lines.push("<strong>Sticky bit</strong>: on a directory, only the file owner (or root) can delete or rename files inside it.");
+        return lines;
+      }
+
+      /** Recomputes and renders octal, symbolic, command, and explanations. */
+      function render() {
+        renderMatrix();
+        setuidToggle.checked = setuid;
+        setgidToggle.checked = setgid;
+        stickyToggle.checked = sticky;
+
+        const octal = buildOctal();
+        const symbolic = buildSymbolic();
+
+        octalOutput.textContent = octal;
+        symbolicOutput.textContent = symbolic;
+        commandOutput.textContent = "chmod " + octal + " file";
+
+        explainList.innerHTML = "";
+        buildExplanations().forEach((line) => {
+          const div = document.createElement("div");
+          div.className = "explain-item";
+          div.innerHTML = line;
+          explainList.appendChild(div);
+        });
+      }
+
+      /** Renders the quick-preset buttons. */
+      function renderPresets() {
+        presetsRow.innerHTML = "";
+        PRESETS.forEach((preset) => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "preset-btn";
+          btn.textContent = preset.label;
+          btn.addEventListener("click", () => {
+            applyOctal(preset.octal);
+            render();
+          });
+          presetsRow.appendChild(btn);
+        });
+      }
+
+      setuidToggle.addEventListener("change", () => {
+        setuid = setuidToggle.checked;
+        render();
+      });
+      setgidToggle.addEventListener("change", () => {
+        setgid = setgidToggle.checked;
+        render();
+      });
+      stickyToggle.addEventListener("change", () => {
+        sticky = stickyToggle.checked;
+        render();
+      });
+
+      btnCopyOctal.addEventListener("click", () => copyText(octalOutput.textContent, "Octal value copied!"));
+      btnCopySymbolic.addEventListener("click", () => copyText(symbolicOutput.textContent, "Symbolic value copied!"));
+      btnCopyCommand.addEventListener("click", () => copyText(commandOutput.textContent, "Command copied!"));
+
+      renderPresets();
+      render();
+    </script>
+  </body>
+</html>
