@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Terminal Speed Run — One File Tools</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Overpass+Mono:wght@700&family=Press+Start+2P&family=Titillium+Web:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ========================================
+       Reset & Base
+       ======================================== */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: "Titillium Web", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        line-height: 1.6;
+        background: #000;
+        color: #e5e5e5;
+        overflow: hidden;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        height: 100vh;
+        margin: 0;
+      }
+      /* ========================================
+       Scanlines & Theme
+       ======================================== */
+      body::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        background: linear-gradient(to bottom, rgba(0, 255, 0, 0.05) 50%, rgba(0, 0, 0, 0.2) 50%);
+        background-size: 100% 8px;
+        animation: scanlines 60s linear infinite;
+        opacity: 0.3;
+      }
+      @keyframes scanlines {
+        0% {
+          background-position: 0 0;
+        }
+        100% {
+          background-position: 0 100vh;
+        }
+      }
+      h1 {
+        font-family: "Overpass Mono", monospace;
+        font-weight: 700;
+        color: rgb(255, 255, 255);
+      }
+      h2,
+      h3 {
+        font-family: "Overpass Mono", monospace;
+        font-weight: 700;
+        color: #0f0;
+      }
+      /* ========================================
+       Header & Timer
+       ======================================== */
+      header {
+        text-align: center;
+        padding: 0.8rem;
+        border-bottom: 2px solid #0f0;
+        animation: flicker 3s infinite alternate;
+      }
+
+      .main-title {
+        font-family: "Press Start 2P", cursive;
+        font-size: 1.6rem;
+        text-shadow: 0 0 5px #0f0, 0 0 10px #0f0;
+        margin-bottom: 0.5rem;
+      }
+
+      .timer {
+        font-family: "Overpass Mono", monospace;
+        font-size: 1.2rem;
+        color: #fff;
+        background: #111;
+        display: inline-block;
+        padding: 0.25rem 1rem;
+        border: 1px solid #0f0;
+        border-radius: 4px;
+      }
+
+      @keyframes flicker {
+        0%,
+        18%,
+        22%,
+        25%,
+        53%,
+        57%,
+        100% {
+          text-shadow: 0 0 4px #0f0, 0 0 11px #0f0, 0 0 19px #0f0;
+          box-shadow: 0 0 5px #0f0;
+        }
+        20%,
+        24%,
+        55% {
+          text-shadow: none;
+          box-shadow: none;
+        }
+      }
+      /* ========================================
+       Main Layout
+       ======================================== */
+      .container {
+        display: flex;
+        padding: 1rem;
+        gap: 1rem;
+        overflow: hidden; /* Ensure flex children are contained */
+      }
+      
+      .tasks-panel {
+        width: calc(40% + 10px);
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      .tasks-half,
+      .commands-half {
+        border: 2px solid #0a0;
+        padding: 1rem;
+        background: rgba(0, 20, 0, 0.5);
+        overflow-y: auto;
+        min-height: 0;
+      }
+
+      .tasks-half {
+        flex: 1;
+      }
+      .commands-half {
+        flex: 1.8; /* A bit taller to prevent default scrollbar */
+      }
+      .terminal-panel {
+        border: 2px solid #0a0;
+        padding: 1rem;
+        background: rgba(0, 20, 0, 0.5);
+        width: calc(60% - 10px);
+        font-family: "Overpass Mono", monospace;
+        display: flex;
+        flex-direction: column;
+        min-height: 0; /* Prevent flex item from growing beyond its container */
+        font-size: 16px;
+      }
+      /* ========================================
+       Tasks Panel
+       ======================================== */
+      .tasks-half h2,
+      .commands-half h2 {
+        font-family: "Press Start 2P", cursive;
+        font-size: 1rem;
+        margin-bottom: 1rem;
+      }
+
+      #task-description {
+        margin-bottom: 1rem;
+      }
+
+      #task-list li {
+        list-style-type: none;
+        padding-left: 1.5rem;
+        position: relative;
+        font-size: 14.5px;
+      }
+
+      #task-list li::before {
+        content: "[ ]";
+        position: absolute;
+        left: 0;
+        color: #0f0;
+      }
+
+      #task-list li.completed::before {
+        content: "[✓]";
+      }
+      /* ========================================
+       Commands Panel
+       ======================================== */
+      .commands-grid {
+        display: flex;
+        gap: 1rem;
+      }
+
+      .commands-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+
+      .commands-table th,
+      .commands-table td {
+        padding: 0.5rem 0.25rem;
+        text-align: left;
+        border-bottom: 1px solid #0a0;
+        vertical-align: top;
+      }
+
+      .commands-table .command-name {
+        color: #f8b0ff;
+        font-weight: bold;
+        white-space: nowrap;
+      }
+      .commands-table .command-desc {
+        color: #fff;
+      }
+      /* ========================================
+       Terminal Panel
+       ======================================== */
+      #terminal-output {
+        flex-grow: 1;
+        white-space: pre-wrap;
+        word-break: break-all;
+        overflow-y: auto;
+      }
+      #terminal-output .command-output, /* For actual command outputs */
+      #terminal-output .terminal-error-wrapper, /* For error messages */
+      #terminal-output .system-message,
+      #terminal-output .command-echo {
+        margin-bottom: 0.8em;
+      }
+
+      .prompt-line {
+        display: flex;
+        align-items: center;
+        border-top: 1px solid #444; /* Light grey divider */
+        padding-top: 0.5rem;
+        margin-top: 0.5rem;
+      }
+
+      .prompt-line span {
+        color: #0f0;
+      }
+
+      #terminal-input {
+        background: transparent;
+        border: none;
+        color: #c792ea;
+        font-family: "Overpass Mono", monospace;
+        font-size: 1em;
+        caret-color: transparent;
+        margin-left: 0.25em;
+      }
+
+      #terminal-input:focus {
+        outline: none;
+      }
+
+      .text-purple {
+        color: #c792ea;
+      }
+      .terminal-error {
+        color: #ff4444; /* Bright Red */
+      }
+
+      .command-output {
+        color: #fff;
+      }
+
+      .cursor {
+        display: inline-block;
+        width: 0.5em;
+        height: 1.2em;
+        background: #fff;
+        animation: blink 1s step-end infinite;
+        vertical-align: bottom;
+        margin-left: 0.25em;
+      }
+
+      @keyframes blink {
+        50% {
+          background: transparent;
+        }
+      }
+
+      .text-green {
+        color: #0f0;
+      }
+
+      .level-heading-text {
+        font-family: "Press Start 2P", cursive;
+        font-size: 22px; /* ~2px smaller */
+      }
+
+      .welcome-text {
+        font-family: "Press Start 2P", cursive;
+        font-size: 20px;
+        text-align: center;
+        line-height: 1.5;
+        margin-bottom: 1rem;
+      }
+
+      /* ========================================
+       Modal / Popup
+       ======================================== */
+      .overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.7);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 50;
+      }
+
+      .overlay.show {
+        display: flex;
+      }
+
+      .popup {
+        background: #000;
+        border: 3px solid #0f0;
+        padding: 18px 20px;
+        width: min(520px, calc(100vw - 32px));
+        box-shadow: 0 0 24px rgba(0, 255, 0, 0.25);
+      }
+
+      .popup.red {
+        border-color: #f00;
+        box-shadow: 0 0 24px rgba(255, 0, 0, 0.25);
+      }
+
+      .popup h3 {
+        font-family: "Press Start 2P", cursive;
+        font-weight: 400;
+        color: #fff;
+        font-size: 14px;
+        margin-bottom: 14px;
+        line-height: 1.4;
+        text-align: center;
+      }
+
+      .popup .popup-body {
+        font-family: "Overpass Mono", monospace;
+        color: #fff;
+        font-size: 15px;
+        line-height: 1.45;
+        text-align: center;
+        margin-bottom: 16px;
+      }
+
+      .total-time-display {
+        font-weight: bold;
+        font-size: 17px;
+        margin-top: 1rem;
+      }
+
+      .popup .popup-actions {
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+      }
+
+      .btn-press {
+        font-family: "Press Start 2P", cursive;
+        font-size: 11px;
+        padding: 12px 18px;
+        border: 0;
+        cursor: pointer;
+        border-radius: 4px;
+      }
+
+      .btn-green {
+        background: #0f0;
+        color: #000;
+      }
+
+      .btn-red {
+        background: #f00;
+        color: #000;
+      }
+
+      .quit-level-btn {
+        position: absolute;
+        right: 1rem;
+        bottom: 0.75rem;
+        z-index: 10;
+        display: none;
+      }
+
+      .quit-level-btn.show {
+        display: block;
+      }
+
+      /* ========================================
+       Footer
+       ======================================== */
+      footer {
+        text-align: center;
+        padding: 1rem;
+        font-size: 0.8rem;
+        border-top: 2px solid #0f0;
+      }
+
+      footer a {
+        color: #0f0;
+        text-decoration: none;
+      }
+
+      footer a:hover {
+        text-decoration: underline;
+      }
+      /* ========================================
+       Responsive
+       ======================================== */
+      @media (max-width: 768px) {
+        .container {
+          flex-direction: column;
+        }
+        .tasks-panel,
+        .terminal-panel {
+          width: 100%;
+          height: 50%;
+        }
+        .main-title {
+          font-size: 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1 class="main-title">⚡ TERMINAL SPEED RUN</h1>
+      <div class="timer" id="timer">00:00</div>
+    </header>
+
+    <main class="container">
+      <div class="tasks-panel">
+        <div class="tasks-half">
+          <h2>🎯 Tasks</h2>
+          <p id="task-description">Your mission, should you choose to accept it...</p>
+          <ul id="task-list">
+            <!-- Tasks will be dynamically inserted here -->
+          </ul>
+        </div>
+        <div class="commands-half">
+          <h2>⚙️ Available Commands</h2>
+          <div class="commands-grid">
+            <table class="commands-table">
+              <tbody>
+                <tr><td class="command-name">ls</td><td class="command-desc">List current directory contents</td></tr>
+                <tr><td class="command-name">ls &lt;directory&gt</td><td class="command-desc">List specified directory contents</td></tr>
+                <tr><td class="command-name">ls -a</td><td class="command-desc">List all files, including hidden ones</td></tr>
+                <tr><td class="command-name">cd &lt;directory&gt;</td><td class="command-desc">Change directory / Go back home</td></tr>
+                <tr><td class="command-name">mkdir &lt;directory&gt;</td><td class="command-desc">Create a directory</td></tr>
+                <tr><td class="command-name">touch &lt;filename&gt;</td><td class="command-desc">Create an empty file</td></tr>
+                <tr><td class="command-name">cat &lt;filename&gt;</td><td class="command-desc">Display file contents</td></tr>
+                <tr><td class="command-name">echo "text" &gt; filename</td><td class="command-desc">Write to file</td></tr>
+                <tr><td class="command-name">mv &lt;source&gt; &lt;dest&gt;</td><td class="command-desc">Move or rename files</td></tr>
+                <tr><td class="command-name">rm &lt;file/dir&gt;</td><td class="command-desc">Remove files/directories</td></tr>
+              </tbody>
+            </table>
+            <table class="commands-table">
+              <tbody>
+                <tr><td class="command-name">pwd</td><td class="command-desc">Print working directory</td></tr>
+                <tr><td class="command-name">find . -name "*.txt"</td><td class="command-desc">Search for files</td></tr>
+                <tr><td class="command-name">grep text &lt;filename&gt;</td><td class="command-desc">Search for text in file</td></tr>
+                <tr><td class="command-name">ls -l &lt;filename&gt;</td><td class="command-desc">View long-listing details / permissions</td></tr>
+                <tr><td class="command-name">chmod +x &lt;filename&gt;</td><td class="command-desc">Make file executable</td></tr>
+                <tr><td class="command-name">./&lt;filename&gt;</td><td class="command-desc">Run file</td></tr>
+                <tr><td class="command-name">whoami</td><td class="command-desc">Print current user</td></tr>
+                <tr><td class="command-name">&&</td><td class="command-desc">Join commands - Ex: mkdir folder && cd folder</td></tr>
+                <tr><td class="command-name">clear</td><td class="command-desc">Clear the terminal</td></tr>
+                <tr><td class="command-name">help</td><td class="command-desc">Show this help message</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="terminal-panel">
+        <div id="terminal-output"></div>
+        <div class="prompt-line">
+          <span>user@speedrun:~$ </span>
+          <input type="text" id="terminal-input" autofocus />
+          <div class="cursor"></div>
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      <p>Part of <a href="https://github.com/praveenscience/One-File-Tools">One File Tools</a></p>
+    </footer>
+
+    <!-- Popup / Modal Overlay -->
+    <div class="overlay" id="overlay">
+      <div class="popup" id="popup" role="dialog" aria-modal="true">
+        <h3 id="popup-title">🏁 Level Complete</h3>
+        <div class="popup-body" id="popup-body"></div>
+        <div class="popup-actions" id="popup-actions"></div>
+      </div>
+    </div>
+
+    <button class="quit-level-btn btn-press btn-red" id="quitLevelBtn">QUIT</button>
+
+    <script>
+      // DOM Elements
+      const timerEl = document.getElementById("timer");
+      const taskListEl = document.getElementById("task-list");
+      const taskDescriptionEl = document.getElementById("task-description");
+      const terminalOutputEl = document.getElementById("terminal-output");
+      const terminalInputEl = document.getElementById("terminal-input");
+
+      const overlayEl = document.getElementById("overlay");
+      const popupEl = document.getElementById("popup");
+      const popupTitleEl = document.getElementById("popup-title");
+      const popupBodyEl = document.getElementById("popup-body");
+      const popupActionsEl = document.getElementById("popup-actions");
+      const quitLevelBtnEl = document.getElementById("quitLevelBtn");
+
+      // Game Configuration
+      const levels = [
+        {
+          name: "Level 1: Basic Navigation",
+          timeLimit: 240,
+          tasks: [
+            { description: "List files in the current directory.", command: "ls", output: "README.md  notes.txt  script.sh" },
+            { description: "Create a new directory named 'mission'.", command: "mkdir mission", output: "" },
+            { description: "List files again to see the new directory.", command: "ls", output: "README.md  mission/  notes.txt  script.sh" },
+            { description: "Navigate into the 'mission' directory.", command: "cd mission", output: "" },
+            { description: "Create an empty file named 'briefing.txt'.", command: "touch briefing.txt", output: "" },
+            { description: "List the contents to confirm file creation.", command: "ls", output: "briefing.txt" },
+          ],
+        },
+        {
+          name: "Level 2: File Operations",
+          timeLimit: 180,
+          tasks: [
+            { description: "Navigate back to the home directory.", command: "cd", output: "" },
+            { description: "Display the contents of 'notes.txt'.", command: "cat notes.txt", output: "The secret code is 1234." },
+            { description: 'Create a new file \'greeting.txt\' with content.', command: 'echo "Mission accepted" > greeting.txt', output: "" },
+            { description: "Verify the content of 'greeting.txt'.", command: "cat greeting.txt", output: "Mission accepted" },
+            { description: "Move 'greeting.txt' into the 'mission' directory.", command: "mv greeting.txt mission", output: "" },
+            { description: "List contents of 'mission' to verify the move.", command: "ls mission", output: "briefing.txt  greeting.txt" },
+          ],
+        },
+        {
+          name: "Level 3: Search & Find",
+          timeLimit: 120,
+          tasks: [
+            { description: "Find all files ending with '.txt'.", command: 'find . -name "*.txt"', output: "./notes.txt\n./mission/briefing.txt\n./mission/greeting.txt" },
+            { description: "Search for the word 'secret' in 'notes.txt'.", command: "grep secret notes.txt", output: "The secret code is 1234." },
+            { description: "List all files, including hidden ones.", command: "ls -a", output: ".  ..  .profile  README.md  mission/  notes.txt  script.sh" },
+            { description: "Print the current working directory.", command: "pwd", output: "/home/user" },
+          ],
+        },
+        {
+          name: "Level 4: Permissions & Chains",
+          timeLimit: 90,
+          tasks: [
+            { description: "View long-listing details for 'script.sh'.", command: "ls -l script.sh", output: "-rw-r--r-- 1 user user 26 Jul 11 06:48 script.sh" },
+            { description: "Make 'script.sh' executable.", command: "chmod +x script.sh", output: "" },
+            { description: "Verify the new permissions.", command: "ls -l script.sh", output: "-rwxr-xr-x 1 user user 26 Jul 11 06:48 script.sh" },
+            { description: "Run the script.", command: "./script.sh", output: "Running..." },
+            { description: "Create a 'temp' directory and navigate into it.", command: "mkdir temp && cd temp", output: "" },
+          ],
+        },
+        {
+          name: "Level 5: The Final Sprint",
+          timeLimit: 60,
+          tasks: [
+            { description: "Navigate back home.", command: "cd", output: "" },
+            { description: "Find out who you are.", command: "whoami", output: "speedrunner" },
+            { description: "Remove the 'mission' directory and its contents.", command: "rm mission", output: "" },
+            { description: "Remove the 'temp' directory.", command: "rm temp", output: "" },
+            { description: "List files to confirm cleanup.", command: "ls", output: "README.md  notes.txt  script.sh" },
+            { description: "Display the message inside the README.md file.", command: "cat README.md", output: "Congratulations, you completed the Terminal Speed Run!" },
+          ],
+        },
+      ];
+
+      // Game State
+      let currentLevelIndex = 0;
+      let currentTaskIndex = 0;
+      let timeLeft = 0;
+      let timerInterval;
+      let gameActive = false;
+      let totalTime = 0;
+      let greetingTxtContent = "Mission accepted"; // Default content
+
+      const escapeHtml = (unsafe) => {
+        return unsafe
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      };
+
+      function setPopupVariant(variant) {
+        // variant: 'green' | 'red'
+        popupEl.classList.toggle("red", variant === "red");
+      }
+
+      function showOverlay() {
+        overlayEl.classList.add("show");
+      }
+
+      function hideOverlay() {
+        overlayEl.classList.remove("show");
+      }
+
+      function showPopup({ variant, title, bodyHtml, actionsHtml, onAction }) {
+        setPopupVariant(variant);
+        popupTitleEl.textContent = title;
+        popupBodyEl.innerHTML = bodyHtml || "";
+        popupActionsEl.innerHTML = actionsHtml || "";
+        showOverlay();
+
+        if (onAction) {
+          const btn = popupActionsEl.querySelector("button[data-action]");
+          if (btn) {
+            btn.addEventListener("click", onAction, { once: true });
+          }
+        }
+      }
+
+      function showLevelCompleteModal() {
+        const isLastLevel = currentLevelIndex >= levels.length - 1;
+
+        if (isLastLevel) {
+          endGame(true);
+        } else {
+          showPopup({
+            variant: "green",
+            title: "🏁 Level Complete",
+            bodyHtml: "",
+            actionsHtml: `<button class="btn-press btn-green" data-action="next">Next Level ></button>`,
+            onAction: () => {
+              hideOverlay();
+              terminalOutputEl.innerHTML = "";
+              currentLevelIndex++;
+              startLevel();
+            },
+          });
+        }
+      }
+
+      function showQuitLevelModal() {
+        showPopup({
+          variant: "red",
+          title: "Quit",
+          bodyHtml: `Are you sure? You will lose all your progress.`,
+          actionsHtml: `<button class="btn-press btn-red" data-action="quitYes">YES</button><button class="btn-press btn-green" data-action="quitNo">NO</button>`,
+        });
+
+        const yesBtn = popupActionsEl.querySelector('[data-action="quitYes"]');
+        const noBtn = popupActionsEl.querySelector('[data-action="quitNo"]');
+
+        yesBtn.addEventListener(
+          "click",
+          () => {
+            hideOverlay();
+            clearInterval(timerInterval);
+            gameActive = false;
+            quitLevelBtnEl.classList.remove("show");
+            timerEl.textContent = "00:00";
+            timerEl.style.color = "#fff";
+            terminalOutputEl.innerHTML = "";
+            writeToTerminal(`<div class="welcome-text"><div>Welcome to Terminal Speed Run!</div><div class="system-message"><span class="text-green">Type 'start' and press Enter to begin.</span></div></div>`);
+            currentLevelIndex = 0;
+            currentTaskIndex = 0;
+            totalTime = 0;
+            greetingTxtContent = "Mission accepted";
+            taskListEl.innerHTML = "";
+            taskDescriptionEl.textContent = "Your mission, should you choose to accept it...";
+          },
+          { once: true }
+        );
+
+        noBtn.addEventListener(
+          "click",
+          () => {
+            hideOverlay();
+          },
+          { once: true }
+        );
+      }
+
+      function showTimeUpModal() {
+        showPopup({
+          variant: "red",
+          title: "🏳️ TIME'S UP! GAME OVER",
+          bodyHtml: "",
+          actionsHtml: `<button class="btn-press btn-green" data-action="restart">Restart Quest</button>`,
+          onAction: () => {
+            hideOverlay();
+            clearInterval(timerInterval);
+            gameActive = false;
+            terminalOutputEl.innerHTML = "";
+            currentLevelIndex = 0;
+            currentTaskIndex = 0;
+            totalTime = 0;
+            greetingTxtContent = "Mission accepted";
+            startGame();
+          },
+        });
+      }
+
+      function init() {
+        const terminalPanelEl = document.querySelector(".terminal-panel");
+
+        terminalInputEl.addEventListener("keydown", handleInput);
+        terminalInputEl.addEventListener("input", handleInputResize);
+        terminalInputEl.focus();
+        writeToTerminal(`<div class="welcome-text"><div>Race Against the Clock in this CLI Sprint!</div><div class="system-message"><span class="text-green">Type 'start' and press Enter to begin.</span></div></div>`);
+        handleInputResize();
+
+        // Make the entire terminal panel clickable to focus the input
+        terminalPanelEl.addEventListener("click", () => {
+          terminalInputEl.focus();
+        });
+
+        quitLevelBtnEl.addEventListener("click", () => {
+          if (!gameActive) return;
+          showQuitLevelModal();
+        });
+      }
+
+      function startGame() {
+        if (gameActive) return;
+        terminalOutputEl.innerHTML = "";
+        gameActive = true;
+        currentLevelIndex = 0;
+        currentTaskIndex = 0;
+        totalTime = 0;
+        greetingTxtContent = "Mission accepted";
+        startLevel();
+        quitLevelBtnEl.classList.add("show");
+      }
+
+      function formatLevelHeading(levelName) {
+        // levelName like: "Level 1: Basic Navigation"
+        const match = levelName.match(/^Level\s*(\d+)\s*:\s*(.*)$/i);
+        if (!match) return levelName;
+        const n = match[1];
+        const title = match[2];
+        return `-- Level ${n}: ${title}`;
+      }
+
+      function startLevel() {
+        if (currentLevelIndex >= levels.length) {
+          endGame(true);
+          return;
+        }
+
+        const level = levels[currentLevelIndex];
+        currentTaskIndex = 0;
+        timeLeft = level.timeLimit;
+
+        // Clear any terminal content between levels
+        terminalOutputEl.innerHTML = "";
+
+        writeToTerminal(`<div class="system-message level-heading-text">${escapeHtml(formatLevelHeading(level.name))}</div>`);
+        writeToTerminal(
+          `<div class="system-message">You have ${level.timeLimit / 60} min to complete ${level.tasks.length} tasks.</div>`
+        );
+
+        renderTasks();
+        startTimer();
+      }
+
+      function renderTasks() {
+        const level = levels[currentLevelIndex];
+        taskDescriptionEl.textContent = level.name;
+        taskListEl.innerHTML = level.tasks
+          .map((task, index) => {
+            const isCompleted = index < currentTaskIndex;
+            return `<li class="${isCompleted ? "completed" : ""}">${task.description}</li>`;
+          })
+          .join("");
+      }
+
+      function startTimer() {
+        if (timerInterval) clearInterval(timerInterval);
+        timerInterval = setInterval(updateTimer, 1000);
+        updateTimerDisplay();
+      }
+
+      function updateTimer() {
+        timeLeft--;
+        totalTime++;
+        updateTimerDisplay();
+
+        if (timeLeft <= 0) {
+          endGame(false);
+        }
+      }
+
+      function updateTimerDisplay() {
+        if (!gameActive) {
+          timerEl.textContent = "00:00";
+          timerEl.style.color = "#fff";
+          return;
+        }
+        const minutes = String(Math.floor(timeLeft / 60)).padStart(2, "0");
+        const seconds = String(timeLeft % 60).padStart(2, "0");
+        timerEl.textContent = `${minutes}:${seconds}`;
+
+        if (timeLeft <= 10) {
+          timerEl.style.color = "#ff9900";
+        } else {
+          timerEl.style.color = "#fff";
+        }
+      }
+
+      function handleInputResize() {
+        // Resize input to fit content.
+        terminalInputEl.style.width = terminalInputEl.value.length + "ch";
+      }
+
+      function handleInput(e) {
+        if (e.key !== "Enter") return;
+
+        const command = terminalInputEl.value.trim();
+        terminalInputEl.value = "";
+        handleInputResize(); // Reset width after submit
+        writeToTerminal(`<div><span class="text-green">user@speedrun:~$ </span><span class="text-purple">${escapeHtml(command)}</span></div>`);
+
+        // Handle meta commands first
+        if (command.toLowerCase() === "clear") {
+          terminalOutputEl.innerHTML = "";
+          if (!gameActive) {
+            writeToTerminal(`<div class="welcome-text"><div>Welcome to Terminal Speed Run!</div><div class="system-message"><span class="text-green">Type 'start' and press Enter to begin.</span></div></div>`);
+          }
+          return;
+        }
+        if (command.toLowerCase() === "help") {
+          const helpText =
+            `Available Commands:\n` +
+            `  ls, cd, mkdir, touch, cat, echo, mv, rm, find, grep, pwd, chmod, whoami, clear, help\n` +
+            `Type 'start' to begin a new run.`;
+          writeToTerminal(`<div class="system-message">${helpText}</div>`);
+          return;
+        }
+
+        if (!gameActive) {
+          if (command.toLowerCase() === "start") {
+            startGame();
+          } else {
+            writeToTerminal('<div class="system-message">Type \'start\' and press Enter to begin.</div>');
+          }
+          return;
+        }
+
+        const level = levels[currentLevelIndex];
+        const task = level.tasks[currentTaskIndex];
+
+        // Special cases for specific tasks
+        const isLvl2Task1 = currentLevelIndex === 1 && currentTaskIndex === 0;
+        const isLvl2Task3 = currentLevelIndex === 1 && currentTaskIndex === 2;
+        const isLvl2Task4 = currentLevelIndex === 1 && currentTaskIndex === 3;
+        const echoRegex = /^echo\s+"(.*)"\s*>\s*greeting\.txt$/;
+
+        const commandMatches =
+          command === task.command ||
+          (isLvl2Task1 && command === "cd") ||
+          (isLvl2Task3 && echoRegex.test(command));
+
+        if (commandMatches) {
+          // If it's the echo command, capture the content
+          if (isLvl2Task3 && echoRegex.test(command)) {
+            const match = command.match(echoRegex);
+            greetingTxtContent = match[1]; // Capture group 1 is the text in quotes
+          }
+
+          // If it's the cat command for greeting.txt, use the stored content
+          if (isLvl2Task4 && command === "cat greeting.txt") {
+            writeToTerminal(`<div class="command-output">${escapeHtml(greetingTxtContent)}</div>`);
+          } else if (task.output) {
+            writeToTerminal(`<div class="command-output">${escapeHtml(task.output)}</div>`);
+          }
+          currentTaskIndex++;
+          renderTasks();
+
+          if (currentTaskIndex >= level.tasks.length) {
+            clearInterval(timerInterval);
+            // Show level-complete modal; button will advance and clear the terminal
+            // Ensure quit button visible during active gameplay
+            showLevelCompleteModal();
+          }
+        } else {
+          writeToTerminal(`<div class="terminal-error-wrapper"><span class="terminal-error">Error: Incorrect command. Expected: "${task.description}"</span></div>`);
+        }
+      }
+
+      function endGame(isWin) {
+        clearInterval(timerInterval);
+        gameActive = false;
+        quitLevelBtnEl.classList.remove("show");
+        timerEl.textContent = "00:00";
+        timerEl.style.color = "#fff";
+
+        if (isWin) {
+          const minutes = String(Math.floor(totalTime / 60)).padStart(2, "0");
+          const seconds = String(totalTime % 60).padStart(2, "0");
+          showPopup({
+            variant: "green",
+            title: "🏆 You Passed All Levels!",
+            bodyHtml: `You're a true speedrunner. Well Done!<div class="total-time-display">Total Time: ${minutes}:${seconds}</div>`,
+            actionsHtml: `<button class="btn-press btn-green" data-action="restart">Restart Quest</button>`,
+            onAction: () => {
+              hideOverlay();
+              gameActive = false;
+              terminalOutputEl.innerHTML = "";
+              writeToTerminal(`<div class="welcome-text"><div>Race Against the Clock in this CLI Sprint!</div><div class="system-message"><span class="text-green">Type 'start' and press Enter to begin.</span></div></div>`);
+              currentLevelIndex = 0;
+              currentTaskIndex = 0;
+              totalTime = 0;
+              greetingTxtContent = "Mission accepted";
+              taskListEl.innerHTML = "";
+              taskDescriptionEl.textContent = "Your mission, should you choose to accept it...";
+            },
+          });
+          return;
+        }
+
+        // Time's up -> popup
+        showTimeUpModal();
+      }
+
+      function writeToTerminal(text) {
+        terminalOutputEl.innerHTML += text;
+        // Auto-scroll to bottom
+        terminalOutputEl.scrollTop = terminalOutputEl.scrollHeight;
+      }
+
+      init();
+    </script>
+  </body>
+</html>
