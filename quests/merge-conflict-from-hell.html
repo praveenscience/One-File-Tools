@@ -1,0 +1,1691 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Merge Conflict from Hell — a Git horror escape room</title>
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💀</text></svg>" />
+
+    <!-- ══════════════════════════════════════════════════════════════
+     CDN SUMMONING CIRCLE
+     React 18, ReactDOM 18, Framer Motion, Lucide (React build),
+     Tailwind 4 (browser build), Canvas Confetti, Babel Standalone.
+     No build step. One file. Open it and it plays.
+     ══════════════════════════════════════════════════════════════ -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=VT323&family=Creepster&family=Fira+Code:wght@400;600&display=swap"
+        rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script>
+      /* some UMD builds probe process.env — give them a safe one */ window.process = window.process || { env: { NODE_ENV: "production" } };
+    </script>
+    <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/framer-motion@10.16.4/dist/framer-motion.js"></script>
+    <script src="https://unpkg.com/lucide-react@0.263.1/dist/umd/lucide-react.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
+
+    <style>
+        /* ══════════════════════════════════════════════════════════════
+   THE HAUNTED STYLESHEET
+   Custom horror layer on top of Tailwind utilities.
+   ══════════════════════════════════════════════════════════════ */
+
+        :root {
+            --blood: #b11226;
+            --matrix: #39ff6a;
+            --void: #050505;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        body {
+            background: var(--void);
+            color: #c8ffc8;
+            font-family: "Fira Code", ui-monospace, monospace;
+            overflow: hidden;
+        }
+
+        ::selection {
+            background: #7f1d1d;
+            color: #fff;
+        }
+
+        .font-horror,
+        .horror-font {
+            font-family: "Creepster", cursive;
+            letter-spacing: 0.06em;
+        }
+
+        .font-crt {
+            font-family: "VT323", monospace;
+        }
+
+        /* Matrix-green helpers (custom color, so not a Tailwind default) */
+        .text-matrix {
+            color: var(--matrix);
+        }
+
+        .border-matrix {
+            border-color: var(--matrix);
+        }
+
+        /* Maze D-pad buttons */
+        .dpad {
+            width: 2.5rem;
+            height: 2.5rem;
+            border: 1px solid #3f3f46;
+            border-radius: 0.25rem;
+            background: #0a0a0a;
+            color: #a1a1aa;
+            font-family: "Fira Code", ui-monospace, monospace;
+            font-size: 1rem;
+            transition:
+                color 0.15s,
+                border-color 0.15s,
+                transform 0.05s,
+                background 0.15s;
+        }
+
+        .dpad:hover {
+            color: var(--matrix);
+            border-color: #166534;
+        }
+
+        .dpad:active {
+            transform: scale(0.94);
+            background: #052e16;
+        }
+
+        #root {
+            position: relative;
+            z-index: 10;
+            height: 100vh;
+        }
+
+        /* ── Static-noise canvas (driven by JS, opacity toggled per burst) ── */
+        #noise {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 40;
+            pointer-events: none;
+            opacity: 0;
+            image-rendering: pixelated;
+            transition: opacity 0.12s linear;
+        }
+
+        /* ── CRT scanlines ── */
+        .crt {
+            position: fixed;
+            inset: 0;
+            z-index: 50;
+            pointer-events: none;
+            background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0) 0px 2px, rgba(0, 0, 0, 0.26) 2px 4px);
+            mix-blend-mode: multiply;
+        }
+
+        .crt::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(rgba(18, 255, 120, 0.025), rgba(255, 0, 0, 0.02));
+        }
+
+        /* ── Heavy vignette — the dark closing in ── */
+        .vignette {
+            position: fixed;
+            inset: 0;
+            z-index: 51;
+            pointer-events: none;
+            background: radial-gradient(ellipse at center, transparent 42%, rgba(0, 0, 0, 0.88) 100%);
+        }
+
+        /* ── Fluorescent tube on its last legs ── */
+        .flicker-layer {
+            position: fixed;
+            inset: 0;
+            z-index: 52;
+            pointer-events: none;
+            background: rgba(255, 255, 255, 0.05);
+            opacity: 0;
+            animation: tube-flicker 5.5s infinite steps(1);
+        }
+
+        @keyframes tube-flicker {
+
+            0%,
+            96% {
+                opacity: 0;
+            }
+
+            96.5% {
+                opacity: 0.3;
+            }
+
+            97% {
+                opacity: 0.04;
+            }
+
+            97.6% {
+                opacity: 0.22;
+            }
+
+            98.2% {
+                opacity: 0;
+            }
+
+            99% {
+                opacity: 0.12;
+            }
+
+            100% {
+                opacity: 0;
+            }
+        }
+
+        /* ── Element-level flicker: for cursed files, phantom tiles, low HP bar ── */
+        .flicker-el {
+            animation: el-flicker 2.2s infinite steps(1);
+        }
+
+        @keyframes el-flicker {
+
+            0%,
+            87% {
+                opacity: 1;
+            }
+
+            88% {
+                opacity: 0.35;
+            }
+
+            90% {
+                opacity: 1;
+            }
+
+            93% {
+                opacity: 0.5;
+            }
+
+            95% {
+                opacity: 1;
+            }
+
+            97% {
+                opacity: 0.65;
+            }
+
+            98% {
+                opacity: 1;
+            }
+        }
+
+        /* ── Screen shake: one-shot on damage, looping at critical sanity ── */
+        @keyframes shake {
+
+            10%,
+            90% {
+                transform: translate(-2px, 1px);
+            }
+
+            20%,
+            80% {
+                transform: translate(3px, -1px);
+            }
+
+            30%,
+            70% {
+                transform: translate(-4px, 2px);
+            }
+
+            40%,
+            60% {
+                transform: translate(4px, -2px);
+            }
+
+            50% {
+                transform: translate(-3px, 2px) rotate(0.3deg);
+            }
+        }
+
+        .shake {
+            animation: shake 0.45s linear;
+        }
+
+        .shake-loop {
+            animation: shake 0.55s linear infinite;
+        }
+
+        /* ── RGB-split glitch text ── */
+        .glitch {
+            text-shadow:
+                1.5px 0 rgba(255, 0, 60, 0.75),
+                -1.5px 0 rgba(0, 255, 140, 0.65);
+            animation: glitch-shift 2.6s infinite steps(2);
+        }
+
+        @keyframes glitch-shift {
+
+            0%,
+            91% {
+                transform: none;
+            }
+
+            92% {
+                transform: translateX(2px) skewX(2deg);
+            }
+
+            95% {
+                transform: translateX(-3px);
+            }
+
+            97% {
+                transform: none;
+            }
+        }
+
+        /* ── Corrupted text: it does not sit still ── */
+        .zalgo {
+            color: #ff3b3b;
+            animation: zalgo-shift 1.1s infinite steps(3);
+        }
+
+        @keyframes zalgo-shift {
+            0% {
+                transform: translate(0, 0);
+            }
+
+            33% {
+                transform: translate(1px, -1px);
+            }
+
+            66% {
+                transform: translate(-1px, 1px);
+            }
+
+            100% {
+                transform: translate(0, 0);
+            }
+        }
+
+        /* ── Whole-page micro-glitch (class toggled by JS at random) ── */
+        .glitching {
+            animation: page-glitch 0.13s steps(2) 3;
+        }
+
+        @keyframes page-glitch {
+            0% {
+                transform: skewX(0);
+                filter: none;
+            }
+
+            50% {
+                transform: skewX(1.5deg) translateX(3px);
+                filter: hue-rotate(80deg) contrast(1.3);
+            }
+
+            100% {
+                transform: none;
+                filter: none;
+            }
+        }
+
+        /* ── Detached HEAD: the room rotates, colors lie to you ── */
+        .detached-view {
+            transform: rotate(180deg) scale(1.02);
+            filter: hue-rotate(140deg) saturate(2.2) contrast(1.15);
+        }
+
+        /* ── Blinking cursor / warning ── */
+        .blink {
+            animation: blink 1s steps(1) infinite;
+        }
+
+        @keyframes blink {
+            50% {
+                opacity: 0;
+            }
+        }
+
+        /* ── Terminal scrollbar that matches the theme ── */
+        .term-scroll::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .term-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .term-scroll::-webkit-scrollbar-thumb {
+            background: #123c1c;
+            border-radius: 4px;
+        }
+
+        /* ── Reduced motion: kill the theatrics, keep the game ── */
+        @media (prefers-reduced-motion: reduce) {
+
+            .shake,
+            .shake-loop,
+            .glitch,
+            .zalgo,
+            .glitching,
+            .flicker-layer,
+            .flicker-el,
+            .blink {
+                animation: none !important;
+            }
+
+            .detached-view {
+                transform: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- React mount point. If the CDNs fail, this fallback stays visible. -->
+    <div id="root">
+        <div
+            style="height: 100vh; display: flex; align-items: center; justify-content: center; color: #7f1d1d; font-family: monospace; text-align: center; padding: 2rem">
+            ☠ summoning the repository…<br /><small style="color: #555">(loading CDN scripts — an internet connection is
+                required for the first rite)</small></div>
+    </div>
+
+    <!-- Full-screen effect layers (outside React — always present) -->
+    <canvas id="noise"></canvas>
+    <div class="crt"></div>
+    <div class="vignette"></div>
+    <div class="flicker-layer"></div>
+
+    <script type="text/babel" data-presets="react">
+        /* ══════════════════════════════════════════════════════════════════
+     THE MERGE CONFLICT FROM HELL — game engine
+     A horror escape room that teaches real Git, React state mechanics,
+     and Web Audio / Canvas tricks. Everything below runs through Babel
+     Standalone in the browser: no build step, one file, four levels.
+     ══════════════════════════════════════════════════════════════════ */
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        /* ── Library guards: the game degrades gracefully if a CDN dies ── */
+        const FM = window.Motion || {};
+        const FM_ONLY_PROPS = ["initial", "animate", "exit", "transition", "whileHover", "whileTap", "variants", "layout"];
+        const motion =
+            FM.motion ||
+            new Proxy(
+                {},
+                {
+                    // Fallback: plain elements with the motion-only props stripped out.
+                    get:
+                        (_, tag) =>
+                            ({ children, ...props }) => {
+                                FM_ONLY_PROPS.forEach((k) => delete props[k]);
+                                return React.createElement(tag, props, children);
+                            }
+                }
+            );
+        const AnimatePresence = FM.AnimatePresence || (({ children }) => <React.Fragment>{children}</React.Fragment>);
+
+        const LR = window.LucideReact || null;
+        function Icon({ name, fallback, ...rest }) {
+            const C = LR && LR[name];
+            if (C) return <C {...rest} />;
+            return <span {...rest}>{fallback || "✦"}</span>;
+        }
+
+        /* ══════════════════════════════════════════════════════════════════
+     AUDIO ENGINE — 100% synthetic Web Audio. No files, only fear.
+     Every sound is an oscillator envelope or a filtered noise buffer.
+     ══════════════════════════════════════════════════════════════════ */
+        const AudioFX = (() => {
+            let ctx = null;
+            let humNodes = null;
+
+            const ac = () => {
+                if (!ctx) {
+                    const AC = window.AudioContext || window.webkitAudioContext;
+                    if (!AC) return null;
+                    ctx = new AC();
+                }
+                if (ctx.state === "suspended") ctx.resume();
+                return ctx;
+            };
+
+            // Exponential attack/decay envelope on a gain node.
+            const env = (g, t0, attack, peak, decay) => {
+                g.gain.setValueAtTime(0.0001, t0);
+                g.gain.exponentialRampToValueAtTime(peak, t0 + attack);
+                g.gain.exponentialRampToValueAtTime(0.0001, t0 + attack + decay);
+            };
+
+            // One-shot oscillator with optional pitch sweep.
+            const osc = (type, f0, f1, dur, peak) => {
+                const c = ac();
+                if (!c) return;
+                const o = c.createOscillator();
+                const g = c.createGain();
+                o.type = type;
+                o.frequency.setValueAtTime(f0, c.currentTime);
+                if (f1) o.frequency.exponentialRampToValueAtTime(f1, c.currentTime + dur);
+                env(g, c.currentTime, 0.005, peak || 0.15, dur);
+                o.connect(g);
+                g.connect(c.destination);
+                o.start();
+                o.stop(c.currentTime + dur + 0.05);
+            };
+
+            // Band-passed white-noise burst (static, screech texture, explosions).
+            const noiseBurst = (dur, peak, freq) => {
+                const c = ac();
+                if (!c) return;
+                const b = c.createBuffer(1, Math.floor(c.sampleRate * dur), c.sampleRate);
+                const d = b.getChannelData(0);
+                for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+                const s = c.createBufferSource();
+                s.buffer = b;
+                const f = c.createBiquadFilter();
+                f.type = "bandpass";
+                f.frequency.value = freq || 800;
+                const g = c.createGain();
+                env(g, c.currentTime, 0.01, peak || 0.2, dur);
+                s.connect(f);
+                f.connect(g);
+                g.connect(c.destination);
+                s.start();
+            };
+
+            return {
+                unlock() {
+                    ac();
+                }, // must be called from a user gesture
+
+                /* Looping low white-noise hum with a slow LFO breathing on its gain —
+             the sound of a server room that is watching you. */
+                startHum() {
+                    const c = ac();
+                    if (!c || humNodes) return;
+                    const b = c.createBuffer(1, c.sampleRate * 2, c.sampleRate);
+                    const d = b.getChannelData(0);
+                    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+                    const s = c.createBufferSource();
+                    s.buffer = b;
+                    s.loop = true;
+                    const f = c.createBiquadFilter();
+                    f.type = "lowpass";
+                    f.frequency.value = 110;
+                    const g = c.createGain();
+                    g.gain.value = 0.05;
+                    const lfo = c.createOscillator();
+                    lfo.frequency.value = 0.13;
+                    const lg = c.createGain();
+                    lg.gain.value = 0.02;
+                    lfo.connect(lg);
+                    lg.connect(g.gain);
+                    s.connect(f);
+                    f.connect(g);
+                    g.connect(c.destination);
+                    s.start();
+                    lfo.start();
+                    humNodes = { s, lfo, g };
+                },
+                stopHum() {
+                    if (!humNodes) return;
+                    try {
+                        humNodes.g.gain.value = 0;
+                        humNodes.s.stop();
+                        humNodes.lfo.stop();
+                    } catch (e) { }
+                    humNodes = null;
+                },
+
+                key() {
+                    osc("square", 1400 + Math.random() * 300, null, 0.015, 0.02);
+                },
+                blip() {
+                    osc("triangle", 700, 900, 0.06, 0.05);
+                },
+                thud() {
+                    osc("sine", 90, 45, 0.15, 0.3);
+                },
+                error() {
+                    osc("sawtooth", 220, 90, 0.25, 0.12);
+                },
+                tick() {
+                    osc("square", 1100, null, 0.03, 0.06);
+                },
+                success() {
+                    osc("sine", 392, null, 0.18, 0.08);
+                    setTimeout(() => osc("sine", 466, null, 0.18, 0.08), 120);
+                    setTimeout(() => osc("sine", 587, null, 0.3, 0.09), 240);
+                },
+                heartbeat() {
+                    osc("sine", 55, 40, 0.1, 0.35);
+                    setTimeout(() => osc("sine", 50, 38, 0.12, 0.28), 180);
+                },
+                screech() {
+                    osc("sawtooth", 250, 1900, 0.5, 0.22);
+                    noiseBurst(0.5, 0.18, 2400);
+                },
+                explosion() {
+                    noiseBurst(1.2, 0.4, 200);
+                    osc("sine", 80, 25, 1.0, 0.4);
+                },
+                victory() {
+                    [392, 494, 587, 784].forEach((f, i) => setTimeout(() => osc("sine", f, null, 0.35, 0.1), i * 140));
+                }
+            };
+        })();
+
+        /* ══════════════════════════════════════════════════════════════════
+     STATIC NOISE — a small canvas of red-tinted analogue snow,
+     scaled up by CSS (image-rendering: pixelated) and shown in bursts.
+     ══════════════════════════════════════════════════════════════════ */
+        const Noise = (() => {
+            let cv = null,
+                cx = null,
+                running = false,
+                hideTimer = 0;
+            const W = 200,
+                H = 120;
+
+            const init = () => {
+                cv = document.getElementById("noise");
+                if (!cv) return false;
+                cv.width = W;
+                cv.height = H;
+                cx = cv.getContext("2d");
+                return true;
+            };
+
+            const frame = () => {
+                if (!running || !cx) return;
+                const img = cx.createImageData(W, H);
+                const d = img.data;
+                for (let i = 0; i < d.length; i += 4) {
+                    const v = Math.random() * 255;
+                    d[i] = v;
+                    d[i + 1] = v * 0.35;
+                    d[i + 2] = v * 0.35;
+                    d[i + 3] = 255;
+                }
+                cx.putImageData(img, 0, 0);
+                requestAnimationFrame(frame);
+            };
+
+            return {
+                burst(ms, opacity) {
+                    if (!cv && !init()) return;
+                    cv.style.opacity = String(opacity == null ? 0.5 : opacity);
+                    if (!running) {
+                        running = true;
+                        frame();
+                    }
+                    clearTimeout(hideTimer);
+                    hideTimer = setTimeout(() => {
+                        cv.style.opacity = "0";
+                        running = false;
+                    }, ms || 400);
+                }
+            };
+        })();
+
+        /* ══════════════════════════════════════════════════════════════════
+     GAME DATA — the four corrupted branches
+     ══════════════════════════════════════════════════════════════════ */
+
+        // LEVEL 1 · the haunted component tree
+        const L1_FILES = [
+            { name: "Header.jsx", clean: true, node: "<Header />" },
+            { name: "Button.jsx", clean: true, node: "<Button />" },
+            { name: "Footer.jsx", clean: true, node: "<Footer />" },
+            { name: "Sp3cter.jsx", clean: false, node: "S̷p̶3̶c̶t̶e̶r̶" },
+            { name: "wraith.tmp", clean: false, node: "w̸r̸a̸i̸t̸h̸" }
+        ];
+        const CLEAN_FILES = L1_FILES.filter((f) => f.clean).map((f) => f.name);
+
+        // LEVEL 2 · 5×5 maze. S start, E exit, # dead code, ~ phantom commit.
+        // A safe long route exists down the left side; the short route is cursed.
+        const MAZE = ["S.#..", "#.#.#", "..~..", ".##~#", "....E"];
+        const DIRS = { north: [-1, 0], south: [1, 0], west: [0, -1], east: [0, 1] };
+        const INV_DIR = { north: "south", south: "north", east: "west", west: "east" };
+
+        // LEVEL 3 · three conflict hunks. Incoming is always the cure —
+        // but the corruption is written to look almost plausible.
+        const HUNKS = [
+            { id: "h1", file: "reality.config.js", head: ['export const LIGHTS = "f̶l̶i̶c̶k̶e̶r̶i̶n̶g̶";', "summon(D3T4CH3D_H34D);"], incoming: ['export const LIGHTS = "on";', "render(<Sanctuary />);"] },
+            { id: "h2", file: "reality.config.js", head: ["useEffect(() => scream(), [you]);", "// d̷o̷ ̷n̷o̷t̷ ̷l̷o̷o̷k̷ ̷b̷e̷h̷i̷n̷d̷ ̷y̷o̷u̷"], incoming: ["useEffect(() => breathe(), []);", "// deps are stable. you are safe."] },
+            { id: "h3", file: "reality.config.js", head: ["door.locked = t̸r̸u̸e̸;", "while (true) { feed(soul); }"], incoming: ["door.locked = false;", "return <Exit onUnlock={live} />;"] }
+        ];
+
+        // LEVEL 4 · the four rites, typed in order against the clock.
+        const L4_STEPS = [
+            { label: "Cure staged", cmd: "git add cure.payload", re: /^git add (cure\.payload|\.)$/i },
+            { label: "Antidote committed", cmd: 'git commit -m "antidote"', re: /^git commit -m ["'].+["']$/i },
+            { label: "History rewritten", cmd: "git rebase main", re: /^git rebase main$/i },
+            { label: "FORCE PUSHED", cmd: "git push --force origin main", re: /^git push (--force|-f) origin main$/i }
+        ];
+
+        const LEVELS = [
+            { name: "LEVEL 1 · The Ghost in the Index", hint: 'git add Header.jsx → git add Button.jsx → git add Footer.jsx → git commit -m "cleanse". NEVER add the flickering files. "git status" tells the truth in this room.', intro: ["── LEVEL 1 · THE GHOST IN THE INDEX ──", "Three modules are stable. Two are… not. Stage the living, one by one. Commit. Do not touch the dead."] },
+            { name: "LEVEL 2 · The Detached HEAD", hint: 'Move with arrow keys, the D-pad, or "go north". Shimmering tiles are phantom commits: they detach HEAD, flip the room and invert your controls — fix it with "git checkout master". Reach the door, then "git checkout -b escape".', intro: ["── LEVEL 2 · THE DETACHED HEAD ──", "A maze of dead corridors. The shimmering tiles are phantom commits. Step on one and you will stop trusting your own eyes."] },
+            { name: "LEVEL 3 · The Merge Conflict", hint: 'For every conflict block, click "Accept Incoming" — keep the code that is NOT screaming. Then "git add ." and finally git commit -m "exorcised".', intro: ["── LEVEL 3 · THE MERGE CONFLICT ──", "reality.config.js is at war with itself. Resolve all three hunks. Choose wrong, and it chooses you back."] },
+            { name: "LEVEL 4 · The Force Push", hint: 'Type the four commands EXACTLY, in order, before the timer dies: git add cure.payload → git commit -m "antidote" → git rebase main → git push --force origin main', intro: ["── LEVEL 4 · THE FORCE PUSH ──", "💣 The server room is rigged. 60 seconds. Four rites. Zero typos. GO."] }
+        ];
+
+        const HELP = ["── SURVIVAL MANUAL ──", "  help                          this scroll", "  hint                          beg the darkness for guidance", "  clear                         wipe the terminal (not your sins)", "  ls / git status / git log     observe the horror", "  git add <file>                stage a file into the index", '  git commit -m "msg"           seal staged changes', "  git checkout master           reattach a detached HEAD (Level 2)", "  git checkout -b <name>        cut a new branch (opens doors)", "  git rebase main               rewrite history (Level 4)", "  git push --force origin main  the final rite (Level 4)", "  go north|south|east|west      move through the maze (Level 2)"];
+
+        const LINE_CLS = { in: "text-emerald-300", out: "text-zinc-300", err: "text-red-400", sys: "text-amber-300 italic" };
+
+        const fakeHash = () =>
+            Math.floor(Math.random() * 0xfffffff)
+                .toString(16)
+                .padStart(7, "0");
+
+        /* Digital blood splatter — canvas-confetti tuned crimson, fired downward. */
+        function bloodSplatter() {
+            if (typeof window.confetti !== "function") return;
+            const base = {
+                colors: ["#8a0303", "#b11226", "#5c0000", "#e01e37"],
+                shapes: ["circle"],
+                scalar: 1.5,
+                gravity: 1.6,
+                ticks: 240,
+                startVelocity: 45,
+                disableForReducedMotion: true
+            };
+            const shots = [
+                { particleCount: 140, spread: 100, angle: 270, origin: { x: 0.25, y: -0.05 } },
+                { particleCount: 140, spread: 100, angle: 270, origin: { x: 0.75, y: -0.05 } },
+                { particleCount: 90, spread: 360, origin: { x: 0.5, y: 0.4 } }
+            ];
+            shots.forEach((s, i) => setTimeout(() => window.confetti(Object.assign({}, base, s)), i * 300));
+            setTimeout(() => window.confetti(Object.assign({}, base, { particleCount: 200, spread: 160, angle: 270, origin: { x: 0.5, y: 0 } })), 1100);
+        }
+
+        /* One factory for pristine game state — used on boot and every restart. */
+        const freshState = () => ({
+            screen: "title", // title | play | over | win
+            level: 0, // 0..3
+            sanity: 100,
+            inventory: [],
+            shaking: false,
+            scare: null,
+            overReason: "",
+            history: [
+                { type: "sys", text: "Last login: Fri Jul 10 23:59:59 2026 on ttys666" },
+                { type: "sys", text: "⚠ WARNING: 4 corrupted branches detected. 1 soul uncommitted." },
+                { type: "out", text: 'Type "help" for commands. Type "hint" when the dark closes in.' }
+            ],
+            l1: { staged: [], committed: false },
+            l2: { pos: [0, 0], detached: false, reachedExit: false, trail: [] },
+            l3: { resolved: {}, staged: false },
+            l4: { step: 0, timeLeft: 60 }
+        });
+
+        /* ═══════════════════════════════════════════════════════════════════
+     UI COMPONENTS
+     ═══════════════════════════════════════════════════════════════════ */
+
+        /* Inventory chips map to a Lucide icon + emoji fallback. */
+        const ITEM_ICON = {
+            "Bronze Key": ["Key", "🔑"],
+            "SSH Key": ["Fingerprint", "🗝"],
+            "Cursed Shard": ["Gem", "💎"]
+        };
+
+        /* ── HUD: sanity bar, inventory, level name, L4 timer ─────────────── */
+        function HUD({ st }) {
+            const pct = Math.max(0, st.sanity);
+            const barColor = pct > 60 ? "#22c55e" : pct > 30 ? "#f59e0b" : "#ef4444";
+            return (
+                <div className="border border-red-900/50 bg-black/70 rounded-lg p-3 mb-3 backdrop-blur-sm">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <div className="flex items-center gap-2 min-w-[220px] flex-1">
+                            <Icon name="Brain" fallback="🧠" size={18} className="text-red-400 shrink-0" />
+                            <div className="flex-1 h-3 bg-zinc-900 border border-zinc-700 rounded overflow-hidden relative">
+                                <motion.div className={pct <= 30 ? "h-full flicker-el" : "h-full"} animate={{ width: pct + "%" }} transition={{ type: "spring", stiffness: 90, damping: 18 }} style={{ width: pct + "%", background: barColor, boxShadow: "0 0 12px " + barColor }} />
+                            </div>
+                            <span className="font-mono text-sm w-12 text-right" style={{ color: barColor }}>
+                                {pct}%
+                            </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            {st.inventory.length === 0 && <span className="text-zinc-600 text-xs font-mono italic">inventory: empty (like this room should be)</span>}
+                            {st.inventory.map((item) => {
+                                const [iconName, emoji] = ITEM_ICON[item] || ["Package", "📦"];
+                                return (
+                                    <motion.span key={item} initial={{ scale: 0, rotate: -30 }} animate={{ scale: 1, rotate: 0 }} className="flex items-center gap-1 text-xs font-mono px-2 py-1 rounded border border-emerald-800 bg-emerald-950/60 text-emerald-300">
+                                        <Icon name={iconName} fallback={emoji} size={12} /> {item}
+                                    </motion.span>
+                                );
+                            })}
+                        </div>
+
+                        {st.screen === "play" && st.level === 3 && (
+                            <div className={"font-mono text-lg font-bold " + (st.l4.timeLeft <= 10 ? "text-red-500 blink" : "text-amber-400")}>
+                                <Icon name="TimerReset" fallback="⏱" size={16} className="inline mr-1" />
+                                {String(Math.floor(st.l4.timeLeft / 60)).padStart(1, "0")}:{String(st.l4.timeLeft % 60).padStart(2, "0")}
+                            </div>
+                        )}
+                    </div>
+                    {st.screen === "play" && <div className="mt-2 text-red-400/90 text-xs tracking-widest font-bold horror-font">{LEVELS[st.level].name.toUpperCase()}</div>}
+                </div>
+            );
+        }
+
+        /* ── Jumpscare overlay ────────────────────────────────────────────── */
+        function Scare({ scare }) {
+            if (!scare) return null;
+            return (
+                <motion.div initial={{ opacity: 0, scale: 1.6 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.08 }} className="fixed inset-0 z-[70] flex flex-col items-center justify-center bg-black/90 pointer-events-none">
+                    <div className="glitch text-red-600" data-text="☠">
+                        <Icon name="Skull" fallback="☠" size={140} strokeWidth={1} />
+                    </div>
+                    <div className="horror-font text-red-500 text-3xl md:text-5xl mt-4 glitch text-center px-4" data-text={scare.text}>
+                        {scare.text}
+                    </div>
+                </motion.div>
+            );
+        }
+
+        /* ── LEVEL 1 view: the haunted component tree ─────────────────────── */
+        function L1View({ st }) {
+            return (
+                <div>
+                    <p className="text-zinc-400 text-sm mb-3 font-mono">The component tree renders only what you stage. Two of these files scream when the lights flicker.</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
+                        {L1_FILES.map((f) => {
+                            const staged = st.l1.staged.includes(f.name);
+                            return (
+                                <div key={f.name} className={"border rounded p-2 font-mono text-sm flex items-center gap-2 transition-colors " + (staged ? "border-emerald-700 bg-emerald-950/40 text-emerald-300" : f.clean ? "border-zinc-700 bg-zinc-900/60 text-zinc-300" : "border-red-900 bg-red-950/30 text-red-400 flicker-el")}>
+                                    <Icon name={f.clean ? "FileCode2" : "FileWarning"} fallback={f.clean ? "📄" : "⚠"} size={14} />
+                                    <span className={f.clean ? "" : "zalgo"}>{f.name}</span>
+                                    {staged && <span className="ml-auto text-[10px] text-emerald-500">STAGED ✓</span>}
+                                    {!f.clean && <span className="ml-auto text-[10px] blink">D O N O T</span>}
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    <div className="border border-zinc-800 rounded p-3 bg-black/60">
+                        <div className="text-zinc-500 text-xs mb-2 font-mono">// live render of &lt;App /&gt;</div>
+                        <pre className="font-mono text-sm leading-6">
+                            <span className="text-matrix">&lt;App&gt;</span>
+                            {"\n"}
+                            {L1_FILES.filter((f) => f.clean).map((f) => (
+                                <span key={f.name} className={st.l1.staged.includes(f.name) ? "text-emerald-300" : "text-zinc-700 line-through"}>
+                                    {"  "}
+                                    {f.node}
+                                    {"\n"}
+                                </span>
+                            ))}
+                            {L1_FILES.filter((f) => !f.clean).map((f) => (
+                                <span key={f.name} className={st.l1.staged.includes(f.name) ? "text-red-500 zalgo" : "text-red-900/60 zalgo"}>
+                                    {"  "}
+                                    {f.node}
+                                    {"\n"}
+                                </span>
+                            ))}
+                            <span className="text-matrix">&lt;/App&gt;</span>
+                        </pre>
+                    </div>
+                </div>
+            );
+        }
+
+        /* ── LEVEL 2 view: the maze of the Detached HEAD ──────────────────── */
+        function L2View({ st, onMove }) {
+            const [pr, pc] = st.l2.pos;
+            return (
+                <div>
+                    <p className="text-zinc-400 text-sm mb-3 font-mono">
+                        Arrow keys / D-pad / <span className="text-emerald-400">"go north"</span>. Shimmering tiles detach HEAD.
+                    </p>
+
+                    <div className={"inline-block p-2 border rounded bg-black/70 transition-all duration-700 " + (st.l2.detached ? "detached-view border-red-700" : "border-zinc-700")}>
+                        {MAZE.map((row, r) => (
+                            <div key={r} className="flex">
+                                {row.split("").map((cell, c) => {
+                                    const here = r === pr && c === pc;
+                                    let cls = "w-10 h-10 md:w-12 md:h-12 flex items-center justify-center font-mono text-lg border border-zinc-900 ";
+                                    let glyph = "";
+                                    if (cell === "#") {
+                                        cls += "bg-zinc-800 text-zinc-600";
+                                        glyph = "▓";
+                                    } else if (cell === "~") {
+                                        cls += "bg-purple-950/70 text-purple-400 flicker-el";
+                                        glyph = "◈";
+                                    } else if (cell === "E") {
+                                        cls += "bg-emerald-950 text-emerald-400";
+                                        glyph = "⎋";
+                                    } else {
+                                        cls += "bg-zinc-950 text-zinc-800";
+                                        glyph = "·";
+                                    }
+                                    return (
+                                        <div key={c} className={cls}>
+                                            {here ? (
+                                                <motion.span layout className="text-red-500 text-xl" animate={{ scale: [1, 1.15, 1] }} transition={{ repeat: Infinity, duration: 1.4 }}>
+                                                    ☺
+                                                </motion.span>
+                                            ) : (
+                                                glyph
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="mt-3 flex items-center gap-4 flex-wrap">
+                        <div className="grid grid-cols-3 gap-1 w-fit">
+                            <span></span>
+                            <button onClick={() => onMove("north")} className="dpad">
+                                ↑
+                            </button>
+                            <span></span>
+                            <button onClick={() => onMove("west")} className="dpad">
+                                ←
+                            </button>
+                            <button onClick={() => onMove("south")} className="dpad">
+                                ↓
+                            </button>
+                            <button onClick={() => onMove("east")} className="dpad">
+                                →
+                            </button>
+                        </div>
+                        <div className="font-mono text-xs">{st.l2.detached ? <span className="text-red-500 blink">HEAD detached at {fakeHash()} — reality inverted. git checkout master!</span> : st.l2.reachedExit ? <span className="text-emerald-400">Door found. Cut a branch to open it: git checkout -b escape</span> : <span className="text-zinc-500">HEAD → master (for now)</span>}</div>
+                    </div>
+                </div>
+            );
+        }
+
+        /* ── LEVEL 3 view: the merge conflict hunks ───────────────────────── */
+        function L3View({ st, onResolve }) {
+            return (
+                <div>
+                    <p className="text-zinc-400 text-sm mb-3 font-mono">
+                        <span className="text-red-400">reality.config.js</span> — 3 conflicts. Keep the code that is not screaming.
+                    </p>
+                    <div className="space-y-3 max-h-[46vh] overflow-y-auto term-scroll pr-1">
+                        {HUNKS.map((h, i) => {
+                            const choice = st.l3.resolved[h.id]; // "incoming" | undefined
+                            return (
+                                <div key={h.id} className="border border-zinc-800 rounded bg-black/60 font-mono text-xs md:text-sm overflow-hidden">
+                                    <div className="px-2 py-1 bg-zinc-900/80 text-zinc-500 flex justify-between">
+                                        <span>@@ hunk {i + 1}/3 @@</span>
+                                        {choice === "incoming" && <span className="text-emerald-400">RESOLVED ✓</span>}
+                                    </div>
+
+                                    {choice !== "incoming" && (
+                                        <div className="p-2 border-b border-red-950 bg-red-950/20">
+                                            <div className="text-red-500 mb-1">&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD (t̸h̸e̸ ̸h̸o̸u̸s̸e̸ ̸v̸e̸r̸s̸i̸o̸n̸)</div>
+                                            {h.head.map((ln, j) => (
+                                                <div key={j} className="text-red-400 zalgo pl-3">
+                                                    {ln}
+                                                </div>
+                                            ))}
+                                            <button onClick={() => onResolve(h.id, "head")} className="mt-2 text-[11px] px-2 py-1 border border-red-800 rounded text-red-400 hover:bg-red-950/60">
+                                                Keep Current (HEAD)
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    <div className="p-2">
+                                        {choice !== "incoming" && <div className="text-zinc-600 mb-1">=======</div>}
+                                        {h.incoming.map((ln, j) => (
+                                            <div key={j} className="text-emerald-300 pl-3">
+                                                {ln}
+                                            </div>
+                                        ))}
+                                        {choice !== "incoming" ? (
+                                            <div>
+                                                <div className="text-zinc-600 mt-1">&gt;&gt;&gt;&gt;&gt;&gt;&gt; incoming/the-cure</div>
+                                                <button onClick={() => onResolve(h.id, "incoming")} className="mt-2 text-[11px] px-2 py-1 border border-emerald-800 rounded text-emerald-300 hover:bg-emerald-950/60">
+                                                    Accept Incoming ✓
+                                                </button>
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    <div className="mt-2 font-mono text-xs text-zinc-500">
+                        {Object.values(st.l3.resolved).filter((v) => v === "incoming").length}/3 resolved
+                        {Object.values(st.l3.resolved).filter((v) => v === "incoming").length === 3 && !st.l3.staged && <span className="text-amber-400"> — now: git add .</span>}
+                        {st.l3.staged && <span className="text-emerald-400"> — staged. Seal it: git commit -m "exorcised"</span>}
+                    </div>
+                </div>
+            );
+        }
+
+        /* ── LEVEL 4 view: the countdown ──────────────────────────────────── */
+        function L4View({ st }) {
+            const t = st.l4.timeLeft;
+            return (
+                <div className="text-center">
+                    <div className={"font-mono font-bold text-6xl md:text-7xl my-4 " + (t <= 10 ? "text-red-500 blink" : t <= 25 ? "text-amber-400" : "text-matrix")} style={{ textShadow: "0 0 24px currentColor" }}>
+                        {String(Math.floor(t / 60))}:{String(t % 60).padStart(2, "0")}
+                    </div>
+                    <p className="text-zinc-400 text-sm font-mono mb-4">Four rites. In order. In the terminal. NOW.</p>
+                    <div className="space-y-2 max-w-md mx-auto text-left">
+                        {L4_STEPS.map((s, i) => {
+                            const done = i < st.l4.step;
+                            const current = i === st.l4.step;
+                            return (
+                                <div key={s.label} className={"border rounded px-3 py-2 font-mono text-sm flex items-center gap-2 " + (done ? "border-emerald-800 bg-emerald-950/40 text-emerald-300" : current ? "border-amber-700 bg-amber-950/30 text-amber-300 flicker-el" : "border-zinc-800 bg-zinc-950 text-zinc-600")}>
+                                    <Icon name={done ? "CheckCircle2" : current ? "ChevronRight" : "Circle"} fallback={done ? "✓" : current ? "➤" : "○"} size={14} />
+                                    <span>{s.label}</span>
+                                    {current && <code className="ml-auto text-[10px] text-zinc-500 hidden md:inline">{s.cmd}</code>}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        }
+
+        /* ── Terminal: the possessed shell ────────────────────────────────── */
+        function Terminal({ st, onCommand }) {
+            const [input, setInput] = useState("");
+            const [histIdx, setHistIdx] = useState(-1);
+            const scrollRef = useRef(null);
+            const inputRef = useRef(null);
+            const cmdHistory = useMemo(() => st.history.filter((l) => l.type === "in").map((l) => l.text.replace(/^\$\s*/, "")), [st.history]);
+
+            useEffect(() => {
+                if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+            }, [st.history]);
+
+            const submit = () => {
+                const v = input.trim();
+                if (!v) return;
+                onCommand(v);
+                setInput("");
+                setHistIdx(-1);
+            };
+
+            const onKeyDown = (e) => {
+                AudioFX.key();
+                if (e.key === "Enter") {
+                    submit();
+                    return;
+                }
+                // On Level 2 arrows move the player (handled globally) — keep recall off.
+                if (st.screen === "play" && st.level === 1) return;
+                if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    if (!cmdHistory.length) return;
+                    const ni = histIdx < 0 ? cmdHistory.length - 1 : Math.max(0, histIdx - 1);
+                    setHistIdx(ni);
+                    setInput(cmdHistory[ni]);
+                } else if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    if (histIdx < 0) return;
+                    const ni = histIdx + 1;
+                    if (ni >= cmdHistory.length) {
+                        setHistIdx(-1);
+                        setInput("");
+                    } else {
+                        setHistIdx(ni);
+                        setInput(cmdHistory[ni]);
+                    }
+                }
+            };
+
+            return (
+                <div className="flex flex-col h-full border border-zinc-800 rounded-lg bg-black/80 overflow-hidden" onClick={() => inputRef.current && inputRef.current.focus()}>
+                    <div className="px-3 py-1.5 bg-zinc-900/90 border-b border-zinc-800 flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-red-600"></span>
+                        <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+                        <span className="ml-2 font-mono text-xs text-zinc-500">bash — 80×666 — /repo (possessed)</span>
+                    </div>
+
+                    <div ref={scrollRef} className="flex-1 overflow-y-auto term-scroll p-3 font-mono text-[13px] leading-5 min-h-[180px]">
+                        {st.history.map((l, i) => (
+                            <div key={i} className={LINE_CLS[l.type] || "text-zinc-300"} style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                                {l.text}
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="flex items-center gap-2 px-3 py-2 border-t border-zinc-800 bg-zinc-950/80">
+                        <span className="font-mono text-xs text-emerald-400 whitespace-nowrap">dev@hell:~/repo$</span>
+                        <input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={onKeyDown} className="flex-1 bg-transparent outline-none font-mono text-sm text-emerald-200 caret-red-500" placeholder="type a git command…" autoFocus spellCheck={false} autoComplete="off" />
+                        <button onClick={submit} className="text-xs font-mono text-zinc-500 border border-zinc-700 rounded px-2 py-0.5 hover:text-emerald-300 hover:border-emerald-700">
+                            ↵
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        /* ── Title / Game Over / Win screens ──────────────────────────────── */
+        function Title({ onStart }) {
+            return (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1.2 }} className="min-h-screen flex flex-col items-center justify-center text-center px-6 relative z-10">
+                    <div className="glitch horror-font text-red-600 text-5xl md:text-7xl leading-tight" data-text="THE MERGE CONFLICT">
+                        THE MERGE CONFLICT
+                    </div>
+                    <div className="glitch horror-font text-red-800 text-4xl md:text-6xl mb-8" data-text="FROM HELL">
+                        FROM HELL
+                    </div>
+
+                    <div className="max-w-xl font-mono text-sm text-zinc-400 space-y-3 mb-8 leading-6">
+                        <p>
+                            Midnight. The server room door just locked itself. The air smells of burnt capacitors and <span className="text-red-400">unresolved conflicts</span>.
+                        </p>
+                        <p>
+                            The spirit of a corrupted Senior Developer — <span className="text-red-500 zalgo">The Detached HEAD</span> — has trapped your soul in a dirty working tree.
+                        </p>
+                        <p>
+                            Resolve <span className="text-matrix">4 corrupted branches</span> to escape. If your sanity hits 0, you are hard-deleted from <code className="text-red-400">main</code>. Forever.
+                        </p>
+                    </div>
+
+                    <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.96 }} onClick={onStart} className="font-mono text-lg px-8 py-3 border-2 border-matrix text-matrix rounded hover:bg-emerald-950/50 transition-colors" style={{ textShadow: "0 0 12px #00ff41", boxShadow: "0 0 24px rgba(0,255,65,.25)" }}>
+                        ▶ git init --escape
+                    </motion.button>
+
+                    <p className="mt-6 text-[11px] font-mono text-zinc-600">🎧 headphones recommended · ⚠ contains flashing lights, sudden sounds & questionable git advice</p>
+                </motion.div>
+            );
+        }
+
+        function GameOver({ st, onRetry }) {
+            return (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen flex flex-col items-center justify-center text-center px-6 relative z-10">
+                    <Icon name="Skull" fallback="☠" size={110} className="text-red-700 mb-6" strokeWidth={1} />
+                    <div className="glitch horror-font text-red-600 text-5xl md:text-6xl mb-4" data-text="SOUL DELETED">
+                        SOUL DELETED
+                    </div>
+                    <p className="font-mono text-zinc-400 max-w-md mb-2">{st.overReason}</p>
+                    <p className="font-mono text-xs text-zinc-600 mb-8">fatal: your soul was removed from 'main' — this operation cannot be undone*</p>
+                    <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.96 }} onClick={onRetry} className="font-mono px-6 py-3 border-2 border-red-700 text-red-400 rounded hover:bg-red-950/40">
+                        ☠ git reflog — claw your way back
+                    </motion.button>
+                    <p className="mt-4 text-[10px] font-mono text-zinc-700">*it can. reflog remembers everything. that's the lesson.</p>
+                </motion.div>
+            );
+        }
+
+        function Win({ st, onRestart, elapsed }) {
+            useEffect(() => {
+                bloodSplatter();
+                AudioFX.victory();
+                AudioFX.stopHum();
+            }, []);
+            return (
+                <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="min-h-screen flex flex-col items-center justify-center text-center px-6 relative z-10">
+                    <Icon name="GitMerge" fallback="⎇" size={90} className="text-matrix mb-6" strokeWidth={1.2} />
+                    <div className="glitch horror-font text-matrix text-5xl md:text-6xl mb-3" data-text="MERGED & ALIVE">
+                        MERGED &amp; ALIVE
+                    </div>
+                    <p className="font-mono text-zinc-300 max-w-lg mb-1">The force push lands. The Detached HEAD shrieks, fast-forwards into the void, and the door swings open.</p>
+                    <p className="font-mono text-zinc-500 text-sm mb-6">
+                        You walk out of the server room. You never use <code>--force</code> on shared branches again.
+                    </p>
+                    <div className="font-mono text-sm text-zinc-400 border border-zinc-800 rounded p-4 bg-black/60 mb-8">
+                        <div>
+                            sanity preserved: <span className="text-matrix">{Math.max(0, st.sanity)}%</span>
+                        </div>
+                        <div>
+                            time survived: <span className="text-matrix">{elapsed}</span>
+                        </div>
+                        <div>
+                            branches exorcised: <span className="text-matrix">4/4</span>
+                        </div>
+                    </div>
+                    <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.96 }} onClick={onRestart} className="font-mono px-6 py-3 border-2 border-matrix text-matrix rounded hover:bg-emerald-950/40">
+                        ⟲ haunt it again
+                    </motion.button>
+                </motion.div>
+            );
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+     APP — game brain: state, command parser, effect loops
+     ═══════════════════════════════════════════════════════════════════ */
+        function App() {
+            const [st, setSt] = useState(freshState);
+            const stRef = useRef(st);
+            stRef.current = st; // always-fresh mirror for timers
+            const startTimeRef = useRef(null);
+            const [elapsed, setElapsed] = useState("--:--");
+
+            /* ── tiny helpers ── */
+            const doShake = () => {
+                setSt((s) => ({ ...s, shaking: true }));
+                setTimeout(() => setSt((s) => ({ ...s, shaking: false })), 500);
+            };
+
+            const SCARE_LINES = ["HE SEES YOUR UNCOMMITTED CHANGES", "Y̸O̸U̸R̸ ̸B̸L̸A̸M̸E̸ ̸I̸S̸ ̸M̸I̸N̸E̸", "segmentation fault (soul dumped)", "DID YOU HEAR THAT?", "n̷e̷v̷e̷r̷ ̷p̷u̷s̷h̷ ̷o̷n̷ ̷F̷r̷i̷d̷a̷y̷"];
+
+            const triggerScare = (dmg) => {
+                const text = SCARE_LINES[Math.floor(Math.random() * SCARE_LINES.length)];
+                AudioFX.screech();
+                Noise.burst(700, 0.65);
+                setSt((s) => {
+                    const sanity = s.sanity - dmg;
+                    if (sanity <= 0 && s.screen === "play") {
+                        AudioFX.stopHum();
+                        return { ...s, sanity: 0, screen: "over", scare: null, overReason: "The scares were too much. Your mind fragmented into orphaned commits." };
+                    }
+                    return { ...s, scare: { text }, sanity };
+                });
+                setTimeout(() => setSt((s) => ({ ...s, scare: null })), 780);
+            };
+
+            /* ── lifecycle: start / restart ── */
+            const start = () => {
+                AudioFX.unlock();
+                AudioFX.startHum();
+                startTimeRef.current = Date.now();
+                setSt((s) => ({
+                    ...s,
+                    screen: "play",
+                    history: [...s.history, ...LEVELS[0].intro.map((t) => ({ type: "sys", text: t }))]
+                }));
+            };
+            const restart = () => {
+                AudioFX.stopHum();
+                startTimeRef.current = null;
+                setSt(freshState());
+            };
+
+            /* ── shared line pusher used by the parser ── */
+            const line = (type, text) => ({ type, text });
+
+            /* ── LEVEL 2: movement ── */
+            const movePlayer = (dirIn) => {
+                const s = stRef.current;
+                if (s.screen !== "play" || s.level !== 1) return;
+                const dir = s.l2.detached ? INV_DIR[dirIn] : dirIn; // detached = inverted
+                const [dr, dc] = DIRS[dir];
+                const [r, c] = s.l2.pos;
+                const nr = r + dr,
+                    nc = c + dc;
+
+                // Walls & edges: a dull thud in the dark.
+                if (nr < 0 || nr >= MAZE.length || nc < 0 || nc >= MAZE[0].length || MAZE[nr][nc] === "#") {
+                    AudioFX.thud();
+                    doShake();
+                    return;
+                }
+
+                const cell = MAZE[nr][nc];
+                setSt((prev) => {
+                    const trail = [...prev.l2.trail, fakeHash()].slice(-8);
+                    let next = { ...prev, l2: { ...prev.l2, pos: [nr, nc], trail } };
+
+                    if (cell === "~" && !prev.l2.detached) {
+                        // Phantom commit: HEAD detaches, world flips, sanity bleeds.
+                        next.l2.detached = true;
+                        next.sanity = prev.sanity - 10;
+                        next.history = [...prev.history, line("err", "☠ You stepped on a phantom commit " + fakeHash() + " — HEAD is now DETACHED."), line("sys", "The room rotates. Your controls are inverted. git checkout master to reattach.")];
+                        if (next.sanity <= 0) {
+                            AudioFX.stopHum();
+                            return { ...next, sanity: 0, screen: "over", overReason: "You wandered detached from reality until nothing pointed at you anymore." };
+                        }
+                    } else if (cell === "E") {
+                        next.l2.reachedExit = true;
+                        if (!prev.inventory.includes("SSH Key")) {
+                            next.inventory = [...prev.inventory, "SSH Key"];
+                            next.history = [...prev.history, line("out", "🗝 You found an SSH Key wedged under the exit door."), line("sys", "The door wants a fresh branch. Try: git checkout -b escape")];
+                        }
+                    }
+                    return next;
+                });
+
+                if (cell === "~" && !s.l2.detached) {
+                    AudioFX.screech();
+                    Noise.burst(600, 0.6);
+                    doShake();
+                } else AudioFX.blip();
+            };
+
+            /* ── LEVEL 3: hunk resolution ── */
+            const resolveHunk = (id, choice) => {
+                const s = stRef.current;
+                if (s.screen !== "play" || s.level !== 2) return;
+                if (s.l3.resolved[id] === "incoming") return;
+
+                if (choice === "head") {
+                    // Feeding the corruption. It notices.
+                    AudioFX.error();
+                    doShake();
+                    Noise.burst(450, 0.5);
+                    setSt((prev) => {
+                        const sanity = prev.sanity - 10;
+                        const history = [...prev.history, line("err", "✖ You kept the HEAD hunk. It whispers your name. (-10 sanity)")];
+                        if (sanity <= 0) {
+                            AudioFX.stopHum();
+                            return { ...prev, sanity: 0, screen: "over", history, overReason: "You accepted the house's version of reality. The house accepted you." };
+                        }
+                        return { ...prev, sanity, history };
+                    });
+                } else {
+                    AudioFX.blip();
+                    setSt((prev) => {
+                        const resolved = { ...prev.l3.resolved, [id]: "incoming" };
+                        const all = HUNKS.every((h) => resolved[h.id] === "incoming");
+                        const history = all ? [...prev.history, line("out", "✓ All 3 hunks resolved with the cure. Stage it: git add .")] : prev.history;
+                        return { ...prev, l3: { ...prev.l3, resolved }, history };
+                    });
+                }
+            };
+
+            /* ═════════════════════════════════════════════════════════════════
+         THE PARSER — every keystroke of hope goes through here
+         ═════════════════════════════════════════════════════════════════ */
+            const execute = (raw) => {
+                const cmd = raw.trim();
+                const lc = cmd.toLowerCase();
+                const s = stRef.current;
+                if (s.screen !== "play") return;
+
+                // "clear" wipes history entirely — handle before the echo.
+                if (lc === "clear") {
+                    setSt((prev) => ({ ...prev, history: [line("sys", "terminal cleared. the room is still watching.")] }));
+                    AudioFX.blip();
+                    return;
+                }
+
+                const out = [line("in", "$ " + cmd)]; // echo the command
+                let damage = 0;
+                let advance = false; // move to next level after this?
+                let won = false;
+                let death = "";
+                let patch = null; // functional patch onto state
+
+                const lvl = s.level;
+
+                /* ── global, level-agnostic commands ── */
+                if (lc === "help") {
+                    HELP.forEach((h) => out.push(line("out", h)));
+                } else if (lc === "hint") {
+                    out.push(line("sys", "🕯 " + LEVELS[lvl].hint));
+                } else if (lc === "ls") {
+                    if (lvl === 0) out.push(line("out", L1_FILES.map((f) => f.name).join("   ")));
+                    else if (lvl === 1) out.push(line("out", "corridor_N/  corridor_S/  corridor_E/  corridor_W/  .git/  bones.log"));
+                    else if (lvl === 2) out.push(line("out", "reality.config.js   reality.config.js.orig   .git/"));
+                    else out.push(line("out", "cure.payload   detonator.sh   59_seconds_left.txt"));
+                } else if (lc === "git init") {
+                    out.push(line("out", "Reinitialized existing Git repository in /repo/.git/"));
+                    out.push(line("sys", "…it was never uninitialized. It has always been here."));
+                } else if (lc === "git blame") {
+                    out.push(line("err", fakeHash() + " (T̸h̸e̸ ̸D̸e̸t̸a̸c̸h̸e̸d̸ ̸H̸E̸A̸D̸ 1970-01-01 00:00:00) it was always you"));
+                } else if (lc.startsWith("sudo")) {
+                    out.push(line("err", "you are not in the sudoers file. this incident will be reported. to him."));
+                } else if (lc === "git log") {
+                    if (lvl === 1 && s.l2.trail.length) {
+                        s.l2.trail.forEach((h, i) => out.push(line("out", h + " step " + (i + 1) + " into the dark")));
+                    } else {
+                        out.push(line("out", fakeHash() + ' (HEAD) "fix: everything" — 66 years ago'));
+                        out.push(line("out", fakeHash() + ' "TODO: escape" — moments before the incident'));
+                    }
+                } else if (lc === "git status") {
+                    /* Teaching moment: status always tells the truth about this room. */
+                    if (lvl === 0) {
+                        out.push(line("out", "On branch haunted/index"));
+                        out.push(line("out", "Changes to be committed:  " + (s.l1.staged.join(", ") || "(none)")));
+                        out.push(line("out", "Untracked (safe):  " + CLEAN_FILES.filter((f) => !s.l1.staged.includes(f)).join(", ") || "(none)"));
+                        out.push(line("err", "Untracked (DO NOT ADD):  Sp3cter.jsx, wraith.tmp"));
+                    } else if (lvl === 1) {
+                        out.push(line("out", s.l2.detached ? "HEAD detached at " + fakeHash() : "On branch master — HEAD attached. For now."));
+                    } else if (lvl === 2) {
+                        const n = Object.values(s.l3.resolved).filter((v) => v === "incoming").length;
+                        out.push(line("out", "You have unmerged paths.  (" + n + "/3 hunks resolved)"));
+                        if (s.l3.staged) out.push(line("out", 'All conflicts fixed and staged. Run: git commit -m "exorcised"'));
+                    } else {
+                        out.push(line("err", "On branch doom — rite " + (s.l4.step + 1) + "/4 pending. " + s.l4.timeLeft + "s until detonation."));
+                    }
+                } else if (/^go (north|south|east|west)$/.test(lc)) {
+
+                    /* ── L2 movement typed into the terminal ── */
+                    if (lvl === 1) {
+                        setSt((prev) => ({ ...prev, history: [...prev.history, ...out] }));
+                        movePlayer(lc.split(" ")[1]);
+                        return;
+                    }
+                    out.push(line("err", "there is nowhere to go. only branches."));
+                    damage = 2;
+                } else if (lvl === 3 && lc.startsWith("git")) {
+
+                    /* ── L4 rapid-fire matcher (takes priority over generic git) ── */
+                    const step = L4_STEPS[s.l4.step];
+                    if (step && step.re.test(cmd)) {
+                        const nextStep = s.l4.step + 1;
+                        out.push(line("out", "✓ rite " + nextStep + "/4 — " + step.label));
+                        if (nextStep >= L4_STEPS.length) {
+                            out.push(line("sys", "remote: BEGONE. — force push accepted. HEAD reattached to nothing."));
+                            won = true;
+                        } else {
+                            patch = (prev) => ({ ...prev, l4: { ...prev.l4, step: nextStep } });
+                        }
+                    } else {
+                        out.push(line("err", "✖ WRONG RITE. The detonator laughs. (-8 sanity)"));
+                        damage = 8;
+                    }
+                } else if (lc.startsWith("git add")) {
+
+                    /* ── git add ── */
+                    const target = cmd.slice(7).trim();
+                    if (lvl === 0) {
+                        if (target === ".") {
+                            out.push(line("err", "✖ You staged EVERYTHING — including the dead. They noticed. (-10 sanity)"));
+                            out.push(line("sys", "The index vomits the corrupted files back out. Stage the living BY NAME."));
+                            damage = 10;
+                        } else {
+                            const file = L1_FILES.find((f) => f.name.toLowerCase() === target.toLowerCase());
+                            if (!file) {
+                                out.push(line("err", "fatal: pathspec '" + target + "' did not match any files (that you can see)"));
+                                damage = 2;
+                            } else if (!file.clean) {
+                                out.push(line("err", "✖ " + file.name + " GRABS YOUR HAND THROUGH THE KEYBOARD. (-15 sanity)"));
+                                damage = 15;
+                            } else if (s.l1.staged.includes(file.name)) {
+                                out.push(line("out", file.name + " is already staged. It hums contentedly."));
+                            } else {
+                                const staged = [...s.l1.staged, file.name];
+                                out.push(line("out", "✓ staged " + file.name + " (" + staged.length + "/" + CLEAN_FILES.length + ")"));
+                                if (staged.length === CLEAN_FILES.length) out.push(line("sys", 'The tree is whole. Seal it: git commit -m "cleanse"'));
+                                patch = (prev) => ({ ...prev, l1: { ...prev.l1, staged } });
+                            }
+                        }
+                    } else if (lvl === 2) {
+                        const all = HUNKS.every((h) => s.l3.resolved[h.id] === "incoming");
+                        if (!all) {
+                            out.push(line("err", "error: 'git add' cannot bless unresolved conflicts. Fix the hunks first."));
+                            damage = 2;
+                        } else if (target === "." || target.toLowerCase() === "reality.config.js") {
+                            out.push(line("out", "✓ reality.config.js staged. The screaming stops mid-syllable."));
+                            patch = (prev) => ({ ...prev, l3: { ...prev.l3, staged: true } });
+                        } else {
+                            out.push(line("err", "fatal: pathspec '" + target + "' did not match"));
+                            damage = 2;
+                        }
+                    } else {
+                        out.push(line("err", "nothing here wants to be staged."));
+                        damage = 2;
+                    }
+                } else if (/^git commit/.test(lc)) {
+
+                    /* ── git commit -m "…" ── */
+                    const m = cmd.match(/^git commit -m ["'](.{1,80})["']$/i);
+                    if (!m) {
+                        out.push(line("err", 'usage: git commit -m "message" — the dead insist on quotes.'));
+                        damage = 2;
+                    } else if (lvl === 0) {
+                        if (s.l1.staged.length !== CLEAN_FILES.length) {
+                            out.push(line("err", "✖ Commit rejected: the tree is incomplete (" + s.l1.staged.length + "/" + CLEAN_FILES.length + " staged)."));
+                            damage = 2;
+                        } else {
+                            out.push(line("out", "[haunted/index " + fakeHash() + "] " + m[1]));
+                            out.push(line("out", "🔑 A BRONZE KEY clatters out of the CD tray."));
+                            patch = (prev) => ({ ...prev, l1: { ...prev.l1, committed: true }, inventory: [...prev.inventory, "Bronze Key"] });
+                            advance = true;
+                        }
+                    } else if (lvl === 2) {
+                        if (!s.l3.staged) {
+                            out.push(line("err", "✖ nothing staged. git add . first."));
+                            damage = 2;
+                        } else {
+                            out.push(line("out", "[main " + fakeHash() + "] " + m[1] + " — merge conflict resolved."));
+                            out.push(line("out", "💎 A CURSED SHARD falls out of the merged file. It's warm. Gross."));
+                            patch = (prev) => ({ ...prev, inventory: [...prev.inventory, "Cursed Shard"] });
+                            advance = true;
+                        }
+                    } else {
+                        out.push(line("out", "[void " + fakeHash() + "] " + m[1] + " — committed to nothing in particular."));
+                    }
+                } else if (lc === "git checkout master" || lc === "git checkout main") {
+
+                    /* ── git checkout ── */
+                    if (lvl === 1 && s.l2.detached) {
+                        out.push(line("out", "✓ Switched to branch 'master'. HEAD reattached with a wet click."));
+                        out.push(line("sys", "The room rights itself. Your eyes are yours again."));
+                        patch = (prev) => ({ ...prev, l2: { ...prev.l2, detached: false } });
+                    } else {
+                        out.push(line("out", "Already on 'master'. Probably. Hard to tell in the dark."));
+                    }
+                } else if (/^git checkout -b\s+\S+/.test(lc)) {
+                    if (lvl === 1) {
+                        if (s.l2.reachedExit) {
+                            const bn = cmd.split(/\s+/)[3];
+                            out.push(line("out", "✓ Switched to a new branch '" + bn + "'"));
+                            out.push(line("out", "The exit door recognizes fresh history and grinds open."));
+                            advance = true;
+                        } else {
+                            out.push(line("err", "✖ You can't branch from the middle of a maze. Find the exit first."));
+                            damage = 2;
+                        }
+                    } else {
+                        out.push(line("out", "✓ Switched to a new branch. It leads nowhere useful. Yet."));
+                    }
+                } else if (/^git rebase/.test(lc)) {
+
+                    /* ── flavor for other real git verbs ── */
+                    out.push(line("err", "fatal: rewriting this history requires Level 4 clearance (and a death wish)."));
+                    damage = 2;
+                } else if (/^git push/.test(lc)) {
+                    out.push(line("err", "remote: rejected — the remote is not ready to receive you."));
+                    damage = 2;
+                } else if (/^git reset --hard/.test(lc)) {
+                    out.push(line("err", "✖ You tried to hard-reset. Something hard-reset BACK. (-5 sanity)"));
+                    damage = 5;
+                } else if (/^git\b/.test(lc)) {
+                    out.push(line("err", "git: '" + cmd.slice(4) + "' is not a git command the living should run. See 'help'."));
+                    damage = 2;
+                } else {
+
+                    /* ── unknown command ── */
+                    out.push(line("err", "bash: " + cmd.split(" ")[0] + ": command not found (it found you instead) (-2 sanity)"));
+                    damage = 2;
+                }
+
+                /* ── apply the whole turn in one state update ── */
+                setSt((prev) => {
+                    let next = patch ? patch(prev) : { ...prev };
+                    next.history = [...next.history, ...out];
+                    next.sanity = next.sanity - damage;
+
+                    if (won) {
+                        next.screen = "win";
+                        return next;
+                    }
+                    if (next.sanity <= 0) {
+                        next.sanity = 0;
+                        next.screen = "over";
+                        next.overReason = death || "Sanity reached zero. Your soul was hard-deleted from main. No PR can bring you back.";
+                        return next;
+                    }
+                    if (advance && prev.level < LEVELS.length - 1) {
+                        const nl = prev.level + 1;
+                        next.level = nl;
+                        next.sanity = Math.min(100, next.sanity + 10); // small mercy between rooms
+                        next.history = [...next.history, line("sys", "❤ +10 sanity — you breathe. Briefly."), ...LEVELS[nl].intro.map((t) => line("sys", t))];
+                    }
+                    return next;
+                });
+
+                /* ── post-turn audio & shakes (read fresh flags) ── */
+                if (won) {
+                    /* Win screen plays its own fanfare on mount */
+                } else if (damage >= 8) {
+                    AudioFX.error();
+                    doShake();
+                    triggerScareLite();
+                } else if (damage > 0) {
+                    AudioFX.error();
+                    doShake();
+                } else if (advance) {
+                    AudioFX.success();
+                } else {
+                    AudioFX.blip();
+                }
+            };
+
+            /* small static burst without a full jumpscare overlay */
+            const triggerScareLite = () => Noise.burst(420, 0.45);
+
+            /* ═════════════════════════════ EFFECT LOOPS ══════════════════════ */
+
+            /* L4 countdown — armed only while playing level index 3 */
+            useEffect(() => {
+                if (st.screen !== "play" || st.level !== 3) return;
+                const id = setInterval(() => {
+                    setSt((prev) => {
+                        if (prev.screen !== "play" || prev.level !== 3) return prev;
+                        const t = prev.l4.timeLeft - 1;
+                        if (t <= 0) {
+                            AudioFX.explosion();
+                            AudioFX.stopHum();
+                            Noise.burst(1400, 0.85);
+                            return { ...prev, l4: { ...prev.l4, timeLeft: 0 }, screen: "over", overReason: "The server room detonated. You were force-pushed into /dev/null." };
+                        }
+                        if (t <= 10) AudioFX.tick();
+                        return { ...prev, l4: { ...prev.l4, timeLeft: t } };
+                    });
+                }, 1000);
+                return () => clearInterval(id);
+            }, [st.screen, st.level]);
+
+            /* Heartbeat when sanity is low — tempo tracks how close death is */
+            useEffect(() => {
+                if (st.screen !== "play" || st.sanity >= 55) return;
+                let alive = true;
+                let timer;
+                const beat = () => {
+                    if (!alive) return;
+                    AudioFX.heartbeat();
+                    const period = 320 + (stRef.current.sanity / 55) * 900;
+                    timer = setTimeout(beat, period);
+                };
+                beat();
+                return () => {
+                    alive = false;
+                    clearTimeout(timer);
+                };
+            }, [st.screen, st.sanity < 55]);
+
+            /* Random jumpscares — the dark is on a schedule */
+            useEffect(() => {
+                if (st.screen !== "play") return;
+                let alive = true;
+                let timer;
+                const lurk = () => {
+                    if (!alive) return;
+                    timer = setTimeout(
+                        () => {
+                            if (!alive || stRef.current.screen !== "play") return;
+                            if (Math.random() < 0.6) triggerScare(3);
+                            lurk();
+                        },
+                        18000 + Math.random() * 22000
+                    );
+                };
+                lurk();
+                return () => {
+                    alive = false;
+                    clearTimeout(timer);
+                };
+            }, [st.screen]);
+
+            /* Ambient micro-glitches — the page itself twitches */
+            useEffect(() => {
+                if (st.screen !== "play") return;
+                const id = setInterval(() => {
+                    if (Math.random() < 0.5) {
+                        document.body.classList.add("glitching");
+                        Noise.burst(140, 0.25);
+                        setTimeout(() => document.body.classList.remove("glitching"), 420);
+                    }
+                }, 9000);
+                return () => clearInterval(id);
+            }, [st.screen]);
+
+            /* Arrow keys drive the maze on Level 2 */
+            useEffect(() => {
+                const onKey = (e) => {
+                    if (stRef.current.screen !== "play" || stRef.current.level !== 1) return;
+                    const map = { ArrowUp: "north", ArrowDown: "south", ArrowLeft: "west", ArrowRight: "east" };
+                    if (map[e.key]) {
+                        e.preventDefault();
+                        movePlayer(map[e.key]);
+                    }
+                };
+                window.addEventListener("keydown", onKey);
+                return () => window.removeEventListener("keydown", onKey);
+            }, []);
+
+            /* Win screen: freeze the survival time */
+            useEffect(() => {
+                if (st.screen === "win" && startTimeRef.current) {
+                    const ms = Date.now() - startTimeRef.current;
+                    const mm = Math.floor(ms / 60000),
+                        ss = Math.floor((ms % 60000) / 1000);
+                    setElapsed(mm + "m " + String(ss).padStart(2, "0") + "s");
+                }
+            }, [st.screen]);
+
+            /* ═════════════════════════════ RENDER ════════════════════════════ */
+            const shakeCls = st.shaking ? " shake" : st.screen === "play" && st.sanity <= 25 ? " shake-loop" : "";
+
+            if (st.screen === "title")
+                return (
+                    <div className={shakeCls}>
+                        <Title onStart={start} />
+                    </div>
+                );
+            if (st.screen === "over")
+                return (
+                    <div className={shakeCls}>
+                        <GameOver st={st} onRetry={restart} />
+                    </div>
+                );
+            if (st.screen === "win") return <Win st={st} onRestart={restart} elapsed={elapsed} />;
+
+            return (
+                <div className={"h-full flex flex-col p-3 md:p-5 max-w-6xl mx-auto relative z-10" + shakeCls}>
+                    <HUD st={st} />
+
+                    <div className="flex-1 flex flex-col md:flex-row gap-3 min-h-0">
+                        {/* Level panel */}
+                        <div className="md:flex-1 border border-red-950/60 rounded-lg bg-black/60 p-3 md:p-4 overflow-y-auto term-scroll backdrop-blur-sm">
+                            {st.level === 0 && <L1View st={st} />}
+                            {st.level === 1 && <L2View st={st} onMove={movePlayer} />}
+                            {st.level === 2 && <L3View st={st} onResolve={resolveHunk} />}
+                            {st.level === 3 && <L4View st={st} />}
+                        </div>
+
+                        {/* Terminal */}
+                        <div className="md:w-[44%] min-h-[240px] flex flex-col">
+                            <Terminal st={st} onCommand={execute} />
+                        </div>
+                    </div>
+
+                    <AnimatePresence>{st.scare && <Scare scare={st.scare} />}</AnimatePresence>
+                </div>
+            );
+        }
+
+        /* Mount. If React itself failed to load, the fallback text in #root stays. */
+        if (window.React && window.ReactDOM) {
+            ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+        }
+    </script>
+</body>
+
+</html>
