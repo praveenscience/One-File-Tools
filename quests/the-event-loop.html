@@ -1,0 +1,2055 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Event Loop — a JavaScript time-loop horror</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕒</text></svg>" />
+
+    <!-- ══════════════════════════════════════════════════════════════
+     THE EVENT LOOP
+     A time-loop horror that teaches the JavaScript event loop by
+     running your plan through the REAL browser scheduler.
+     Vanilla JS. One file. No frameworks. The browser is the engine.
+     ══════════════════════════════════════════════════════════════ -->
+    <link href="https://fonts.googleapis.com/css2?family=Rubik+Glitch&family=JetBrains+Mono:ital,wght@0,400;0,600;0,800;1,400&display=swap" rel="stylesheet" />
+
+    <style>
+      /* ══════════════════════════════════════════════════════════════
+   OFFICE AT 2:59 AM — the haunted stylesheet
+   Palette: midnight blue-black · monitor phosphor cyan ·
+   sodium-lamp amber · promise green (success only) ·
+   frost white (The Blocking Call) · alarm red.
+   ══════════════════════════════════════════════════════════════ */
+      :root {
+        --midnight: #060a14;
+        --panel: #0a1120;
+        --edge: #16233d;
+        --phosphor: #7dd6ff;
+        --phos-dim: #3b6a8a;
+        --sodium: #ffb454;
+        --resolved: #5ef29a;
+        --frost: #dfeaff;
+        --alarm: #ff5470;
+        --ink: #b8cbe4;
+        --ink-dim: #5b6f8e;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+
+      body {
+        background: radial-gradient(ellipse 120% 90% at 50% -10%, #0b1428 0%, transparent 55%), var(--midnight);
+        color: var(--ink);
+        font-family: "JetBrains Mono", ui-monospace, monospace;
+        overflow: hidden;
+        font-size: 14px;
+      }
+
+      ::selection {
+        background: #123a52;
+        color: var(--frost);
+      }
+
+      .glitch-font {
+        font-family: "Rubik Glitch", "JetBrains Mono", monospace;
+        font-weight: 400;
+      }
+
+      /* ── App frame ─────────────────────────────────────────────────── */
+      #app {
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        z-index: 10;
+      }
+
+      /* ── HUD: punch-clock, loop counter, level name ────────────────── */
+      #hud {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        padding: 8px 14px;
+        border-bottom: 1px solid var(--edge);
+        background: rgba(6, 10, 20, 0.85);
+        backdrop-filter: blur(3px);
+      }
+      #clock {
+        font-weight: 800;
+        font-size: 18px;
+        letter-spacing: 0.08em;
+        color: var(--phosphor);
+        text-shadow: 0 0 14px rgba(125, 214, 255, 0.55);
+        font-variant-numeric: tabular-nums;
+      }
+      #clock.warble {
+        animation: clock-warble 0.5s steps(3);
+        color: var(--alarm);
+      }
+      @keyframes clock-warble {
+        0% {
+          transform: translateX(0) skewX(0);
+        }
+        33% {
+          transform: translateX(-3px) skewX(-6deg);
+        }
+        66% {
+          transform: translateX(3px) skewX(6deg);
+        }
+        100% {
+          transform: none;
+        }
+      }
+      #clock.free {
+        color: var(--resolved);
+        text-shadow: 0 0 16px rgba(94, 242, 154, 0.6);
+      }
+      .hud-chip {
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        border: 1px solid var(--edge);
+        border-radius: 3px;
+        padding: 3px 8px;
+        color: var(--ink-dim);
+        background: var(--panel);
+      }
+      #loopChip {
+        color: var(--sodium);
+        border-color: #4a3818;
+      }
+      #levelChip {
+        color: var(--phosphor);
+        flex: 1;
+        text-align: right;
+        border: none;
+        background: none;
+      }
+
+      /* ── Stage: world panel + runtime board ────────────────────────── */
+      #stage {
+        flex: 1;
+        display: flex;
+        gap: 10px;
+        padding: 10px;
+        min-height: 0;
+      }
+      #world {
+        flex: 1.05;
+        min-width: 0;
+        border: 1px solid var(--edge);
+        border-radius: 6px;
+        background: linear-gradient(180deg, rgba(10, 17, 32, 0.9), rgba(7, 11, 22, 0.9));
+        padding: 14px;
+        overflow-y: auto;
+      }
+      #runtime {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        gap: 8px;
+        border: 1px solid var(--edge);
+        border-radius: 6px;
+        background: rgba(8, 13, 26, 0.92);
+        padding: 10px;
+      }
+
+      /* ── The Runtime Board (signature element) ─────────────────────── */
+      .board-label {
+        font-size: 10px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--ink-dim);
+        margin-bottom: 6px;
+        white-space: nowrap;
+      }
+
+      #stackCol {
+        width: 34%;
+        min-width: 118px;
+        display: flex;
+        flex-direction: column;
+      }
+      #stackWell {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        border: 1px dashed var(--phos-dim);
+        border-radius: 5px;
+        padding: 6px;
+        gap: 5px;
+        overflow-y: auto;
+        background: repeating-linear-gradient(to bottom, transparent 0 26px, rgba(125, 214, 255, 0.04) 26px 27px);
+        position: relative;
+      }
+      #stackLimit {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 6px;
+        border-top: 2px dashed var(--alarm);
+        font-size: 9px;
+        color: var(--alarm);
+        letter-spacing: 0.18em;
+        padding: 1px 4px;
+        opacity: 0.85;
+        pointer-events: none;
+      }
+      .frame {
+        border: 1px solid var(--phos-dim);
+        border-radius: 4px;
+        background: #0d1930;
+        color: var(--phosphor);
+        padding: 5px 8px;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+        animation: frame-in 0.22s ease-out;
+        flex-shrink: 0;
+      }
+      @keyframes frame-in {
+        from {
+          transform: translateY(-14px);
+          opacity: 0;
+        }
+      }
+      .frame.intrusive {
+        border-color: #5a3450;
+        color: #e9a0c8;
+        background: #1c0f1e;
+      }
+      .frame.exec {
+        border-color: var(--sodium);
+        color: var(--sodium);
+        background: #201708;
+      }
+      .frame.done {
+        border-color: var(--resolved);
+        color: var(--resolved);
+        background: #0a2014;
+      }
+      .frame .ret {
+        font: inherit;
+        font-size: 10px;
+        cursor: pointer;
+        border: 1px solid currentColor;
+        border-radius: 3px;
+        background: transparent;
+        color: inherit;
+        padding: 2px 6px;
+      }
+      .frame .ret:disabled {
+        opacity: 0.25;
+        cursor: not-allowed;
+      }
+      .frame .ret:hover:not(:disabled) {
+        background: rgba(125, 214, 255, 0.12);
+      }
+
+      #lanes {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        min-width: 0;
+      }
+      .lane {
+        flex: 1;
+        border: 1px solid var(--edge);
+        border-radius: 5px;
+        padding: 6px 8px;
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        min-height: 54px;
+      }
+      .lane .lane-track {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        flex-wrap: wrap;
+        flex: 1;
+      }
+      .lane-micro {
+        background: rgba(94, 242, 154, 0.03);
+      }
+      .lane-macro {
+        background: rgba(255, 180, 84, 0.03);
+      }
+      .lane-render {
+        background: rgba(125, 214, 255, 0.03);
+      }
+      .lane-micro .board-label {
+        color: #3e8f63;
+      }
+      .lane-macro .board-label {
+        color: #9a7333;
+      }
+      .lane-render .board-label {
+        color: var(--phos-dim);
+      }
+
+      .run-chip {
+        font-size: 11px;
+        padding: 3px 8px;
+        border-radius: 3px;
+        border: 1px solid var(--phos-dim);
+        color: var(--frost);
+        background: #0e1c33;
+        animation: chip-in 0.25s ease-out;
+        white-space: nowrap;
+      }
+      @keyframes chip-in {
+        from {
+          transform: translateX(-18px);
+          opacity: 0;
+        }
+      }
+
+      /* The paint pulse: a dot moved by a REAL requestAnimationFrame loop.
+   When the main thread blocks, this dot honestly freezes. */
+      #paintDot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--phosphor);
+        box-shadow: 0 0 10px var(--phosphor);
+        position: absolute;
+        bottom: 8px;
+        left: 8px;
+        will-change: transform;
+      }
+      #paintLabel {
+        position: absolute;
+        bottom: 7px;
+        right: 8px;
+        font-size: 9px;
+        color: var(--ink-dim);
+        letter-spacing: 0.14em;
+      }
+      .lane-render.starved {
+        border-color: var(--alarm);
+      }
+      .lane-render.starved #paintDot {
+        background: var(--alarm);
+        box-shadow: 0 0 10px var(--alarm);
+      }
+
+      /* ── Console panel ─────────────────────────────────────────────── */
+      #consolePanel {
+        height: 148px;
+        border-top: 1px solid var(--edge);
+        background: #050810;
+        display: flex;
+        flex-direction: column;
+      }
+      #consoleBar {
+        font-size: 10px;
+        letter-spacing: 0.2em;
+        color: var(--ink-dim);
+        padding: 4px 12px;
+        border-bottom: 1px solid var(--edge);
+        text-transform: uppercase;
+        display: flex;
+        justify-content: space-between;
+      }
+      #consoleOut {
+        flex: 1;
+        overflow-y: auto;
+        padding: 6px 12px;
+        font-size: 12px;
+        line-height: 1.55;
+      }
+      .c-log {
+        color: var(--ink);
+      }
+      .c-ok {
+        color: var(--resolved);
+      }
+      .c-warn {
+        color: var(--sodium);
+      }
+      .c-err {
+        color: var(--alarm);
+      }
+      .c-ghost {
+        color: #a9b9ff;
+        font-style: italic;
+        text-shadow: 0 0 8px rgba(160, 170, 255, 0.4);
+      }
+      .c-dim {
+        color: var(--ink-dim);
+      }
+
+      /* ── World contents: doors, plan builder, cards & chips ────────── */
+      .brief {
+        color: var(--ink);
+        line-height: 1.6;
+        font-size: 13px;
+        margin: 0 0 12px;
+      }
+      .brief b {
+        color: var(--phosphor);
+        font-weight: 600;
+      }
+      .brief .amber {
+        color: var(--sodium);
+      }
+
+      .doors {
+        display: flex;
+        gap: 12px;
+        margin: 10px 0 14px;
+        flex-wrap: wrap;
+      }
+      .door {
+        flex: 1;
+        min-width: 150px;
+        border: 1px solid var(--edge);
+        border-radius: 6px;
+        padding: 10px;
+        text-align: center;
+        background: #0a1322;
+        transition:
+          border-color 0.4s,
+          box-shadow 0.4s;
+      }
+      .door .door-glyph {
+        font-size: 34px;
+        display: block;
+        margin-bottom: 6px;
+        filter: grayscale(0.4) brightness(0.8);
+      }
+      .door .door-name {
+        font-size: 12px;
+        color: var(--frost);
+        font-weight: 600;
+      }
+      .door .door-rule {
+        font-size: 10.5px;
+        color: var(--ink-dim);
+        margin-top: 4px;
+        line-height: 1.5;
+      }
+      .door.open {
+        border-color: var(--resolved);
+        box-shadow: 0 0 18px rgba(94, 242, 154, 0.25);
+      }
+      .door.open .door-glyph {
+        filter: none;
+      }
+      .door.alarm {
+        border-color: var(--alarm);
+        box-shadow: 0 0 18px rgba(255, 84, 112, 0.3);
+        animation: alarm-flash 0.4s steps(2) 4;
+      }
+      @keyframes alarm-flash {
+        50% {
+          background: #2a0d16;
+        }
+      }
+
+      .action-card {
+        border: 1px solid var(--edge);
+        border-radius: 6px;
+        background: #0b1526;
+        padding: 9px 10px;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .action-card .a-label {
+        color: var(--frost);
+        font-weight: 600;
+        font-size: 13px;
+      }
+      .action-card .a-rule {
+        flex: 1 1 160px;
+        font-size: 11px;
+        color: var(--ink-dim);
+        line-height: 1.45;
+      }
+      .slot {
+        min-width: 150px;
+        text-align: center;
+        border: 1px dashed var(--phos-dim);
+        border-radius: 4px;
+        padding: 5px 8px;
+        font-size: 11.5px;
+        color: var(--ink-dim);
+        cursor: pointer;
+        background: rgba(125, 214, 255, 0.04);
+        transition:
+          border-color 0.15s,
+          color 0.15s;
+      }
+      .slot:hover {
+        border-color: var(--phosphor);
+        color: var(--phosphor);
+      }
+      .slot.filled {
+        border-style: solid;
+        color: var(--frost);
+        border-color: var(--phos-dim);
+        background: #10203a;
+      }
+      .slot.slot-hot {
+        border-color: var(--sodium);
+      }
+
+      #chipTray {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin: 12px 0;
+      }
+      .chip {
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+        border: 1px solid var(--phos-dim);
+        border-radius: 4px;
+        background: #0d1a30;
+        color: var(--phosphor);
+        padding: 6px 10px;
+        transition:
+          transform 0.08s,
+          box-shadow 0.15s,
+          border-color 0.15s;
+      }
+      .chip:hover {
+        transform: translateY(-1px);
+      }
+      .chip.selected {
+        border-color: var(--sodium);
+        color: var(--sodium);
+        box-shadow: 0 0 12px rgba(255, 180, 84, 0.35);
+      }
+      .chip small {
+        display: block;
+        font-size: 9px;
+        color: var(--ink-dim);
+        margin-top: 2px;
+        letter-spacing: 0.08em;
+      }
+
+      .btn {
+        font: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        border: 2px solid var(--phosphor);
+        border-radius: 4px;
+        background: transparent;
+        color: var(--phosphor);
+        padding: 9px 20px;
+        letter-spacing: 0.06em;
+        transition:
+          background 0.15s,
+          transform 0.08s,
+          opacity 0.2s;
+        text-shadow: 0 0 10px rgba(125, 214, 255, 0.4);
+      }
+      .btn:hover:not(:disabled) {
+        background: rgba(125, 214, 255, 0.1);
+      }
+      .btn:active:not(:disabled) {
+        transform: scale(0.97);
+      }
+      .btn:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+      }
+      .btn.green {
+        border-color: var(--resolved);
+        color: var(--resolved);
+        text-shadow: 0 0 10px rgba(94, 242, 154, 0.4);
+      }
+      .btn.green:hover:not(:disabled) {
+        background: rgba(94, 242, 154, 0.1);
+      }
+
+      /* Chain links (Level 3) */
+      #chainWrap {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        flex-wrap: wrap;
+        margin: 12px 0;
+      }
+      .link {
+        border: 1px solid #3e8f63;
+        border-radius: 4px;
+        background: #08160f;
+        color: var(--resolved);
+        font-size: 11px;
+        padding: 6px 8px;
+        animation: link-pulse 0.9s infinite steps(2);
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .link:hover {
+        border-color: var(--sodium);
+      }
+      .link.spliced {
+        border-color: var(--sodium);
+        color: var(--sodium);
+        background: #1d1506;
+        animation: none;
+      }
+      .link-arrow {
+        color: #2c5a41;
+        font-size: 12px;
+      }
+      .link-inf {
+        color: var(--alarm);
+        font-size: 16px;
+        animation: link-pulse 0.9s infinite steps(2);
+      }
+      @keyframes link-pulse {
+        50% {
+          opacity: 0.55;
+        }
+      }
+
+      /* The Blocking Call (Level 4 figure) */
+      #blockFigure {
+        text-align: center;
+        margin: 8px 0;
+        user-select: none;
+        transition:
+          transform 3.5s cubic-bezier(0.2, 0.8, 0.4, 1),
+          filter 3.5s;
+        transform: scale(0.55);
+        filter: blur(2px) brightness(0.55);
+      }
+      #blockFigure .bf-glyph {
+        font-size: 62px;
+        display: block;
+        color: var(--frost);
+        text-shadow: 0 0 26px rgba(223, 234, 255, 0.8);
+        font-family: "Rubik Glitch", monospace;
+      }
+      #blockFigure .bf-name {
+        font-size: 10px;
+        letter-spacing: 0.34em;
+        color: var(--frost);
+        opacity: 0.75;
+      }
+      #blockFigure.near {
+        transform: scale(0.85);
+        filter: blur(1px) brightness(0.8);
+      }
+      #blockFigure.imminent {
+        transform: scale(1.15);
+        filter: none;
+        animation: bf-twitch 0.6s infinite steps(3);
+      }
+      @keyframes bf-twitch {
+        33% {
+          transform: scale(1.15) translateX(-3px);
+        }
+        66% {
+          transform: scale(1.15) translateX(3px);
+        }
+      }
+      #blockFigure.shattered {
+        transform: scale(0.1) rotate(24deg);
+        filter: blur(6px) brightness(3);
+        opacity: 0;
+        transition: all 1.2s ease-in;
+      }
+
+      #countdown {
+        text-align: center;
+        font-size: 44px;
+        font-weight: 800;
+        color: var(--sodium);
+        font-variant-numeric: tabular-nums;
+        text-shadow: 0 0 18px rgba(255, 180, 84, 0.5);
+        margin: 2px 0 8px;
+      }
+      #countdown.critical {
+        color: var(--alarm);
+        text-shadow: 0 0 20px rgba(255, 84, 112, 0.6);
+        animation: link-pulse 0.5s infinite steps(2);
+      }
+
+      /* ── Overlays ──────────────────────────────────────────────────── */
+      .overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 60;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 24px;
+        background: rgba(4, 7, 14, 0.94);
+      }
+      .overlay h1 {
+        margin: 0 0 6px;
+      }
+      .title-main {
+        font-family: "Rubik Glitch", monospace;
+        font-weight: 400;
+        font-size: clamp(40px, 9vw, 88px);
+        color: var(--phosphor);
+        text-shadow:
+          0 0 30px rgba(125, 214, 255, 0.5),
+          3px 0 0 rgba(255, 84, 112, 0.5),
+          -3px 0 0 rgba(94, 242, 154, 0.4);
+        line-height: 1;
+      }
+      .title-sub {
+        font-size: 12px;
+        letter-spacing: 0.4em;
+        color: var(--ink-dim);
+        text-transform: uppercase;
+        margin: 10px 0 26px;
+      }
+      .story {
+        max-width: 620px;
+        font-size: 13.5px;
+        line-height: 1.75;
+        color: var(--ink);
+        margin: 0 auto 26px;
+        text-align: left;
+      }
+      .story b {
+        color: var(--phosphor);
+        font-weight: 600;
+      }
+      .story .frost-t {
+        color: var(--frost);
+        text-shadow: 0 0 10px rgba(223, 234, 255, 0.5);
+      }
+      .small-warning {
+        margin-top: 22px;
+        font-size: 10.5px;
+        color: var(--ink-dim);
+      }
+
+      .lvl-title {
+        font-family: "Rubik Glitch", monospace;
+        font-size: clamp(26px, 5vw, 46px);
+        color: var(--sodium);
+        text-shadow: 0 0 22px rgba(255, 180, 84, 0.4);
+      }
+      .lvl-brief {
+        max-width: 560px;
+        color: var(--ink);
+        font-size: 13px;
+        line-height: 1.7;
+        margin: 14px auto 26px;
+      }
+
+      #resetFlash {
+        position: fixed;
+        inset: 0;
+        z-index: 80;
+        pointer-events: none;
+        background: linear-gradient(to bottom, transparent 0%, rgba(223, 234, 255, 0.9) 50%, transparent 100%);
+        background-size: 100% 300%;
+        opacity: 0;
+      }
+      #resetFlash.run {
+        animation: vhs-rewind 0.7s linear;
+      }
+      @keyframes vhs-rewind {
+        0% {
+          opacity: 0.9;
+          background-position: 0 100%;
+        }
+        100% {
+          opacity: 0;
+          background-position: 0 -100%;
+        }
+      }
+
+      #freezeLayer {
+        position: fixed;
+        inset: 0;
+        z-index: 55;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.8s;
+        background: radial-gradient(ellipse at 20% 10%, rgba(223, 234, 255, 0.1), transparent 45%), radial-gradient(ellipse at 85% 90%, rgba(223, 234, 255, 0.08), transparent 45%);
+        backdrop-filter: saturate(0.55) brightness(0.9);
+      }
+      #freezeLayer.on {
+        opacity: 1;
+      }
+
+      /* CRT + vignette (lighter than a terminal game — this is an office) */
+      #scan {
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        pointer-events: none;
+        background: repeating-linear-gradient(to bottom, transparent 0 3px, rgba(0, 0, 0, 0.14) 3px 5px);
+      }
+      #vig {
+        position: fixed;
+        inset: 0;
+        z-index: 51;
+        pointer-events: none;
+        background: radial-gradient(ellipse at center, transparent 55%, rgba(2, 4, 9, 0.85) 100%);
+      }
+      #particles {
+        position: fixed;
+        inset: 0;
+        z-index: 65;
+        pointer-events: none;
+        width: 100%;
+        height: 100%;
+      }
+
+      /* Whole-page glitch (escalates with loop count) */
+      .glitching {
+        animation: page-glitch 0.14s steps(2) 3;
+      }
+      @keyframes page-glitch {
+        0% {
+          transform: none;
+          filter: none;
+        }
+        50% {
+          transform: skewX(1.2deg) translateX(-4px);
+          filter: hue-rotate(-40deg) contrast(1.25);
+        }
+        100% {
+          transform: none;
+          filter: none;
+        }
+      }
+      .shake {
+        animation: shake-kf 0.4s linear;
+      }
+      @keyframes shake-kf {
+        20% {
+          transform: translate(-3px, 2px);
+        }
+        40% {
+          transform: translate(4px, -2px);
+        }
+        60% {
+          transform: translate(-4px, 1px);
+        }
+        80% {
+          transform: translate(3px, -1px);
+        }
+      }
+
+      .term-scroll::-webkit-scrollbar {
+        width: 8px;
+      }
+      .term-scroll::-webkit-scrollbar-thumb {
+        background: #14273f;
+        border-radius: 4px;
+      }
+
+      /* ── Responsive ────────────────────────────────────────────────── */
+      @media (max-width: 860px) {
+        #stage {
+          flex-direction: column;
+          overflow-y: auto;
+        }
+        #runtime {
+          min-height: 300px;
+        }
+        #consolePanel {
+          height: 120px;
+        }
+        body {
+          font-size: 13px;
+        }
+      }
+
+      /* ── Reduced motion: kill the theatrics, keep the game ─────────── */
+      @media (prefers-reduced-motion: reduce) {
+        .glitching,
+        .shake,
+        .link,
+        .link-inf,
+        #clock.warble,
+        #blockFigure.imminent,
+        #countdown.critical,
+        .door.alarm {
+          animation: none !important;
+        }
+        #resetFlash.run {
+          animation: none !important;
+          opacity: 0;
+        }
+        #blockFigure,
+        .slot,
+        .chip,
+        .btn {
+          transition: none !important;
+        }
+      }
+      :focus-visible {
+        outline: 2px solid var(--sodium);
+        outline-offset: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <header id="hud">
+        <span id="clock">02:59:00 AM</span>
+        <span class="hud-chip" id="loopChip">LOOP #1</span>
+        <span class="hud-chip" id="levelChip"></span>
+      </header>
+
+      <main id="stage">
+        <section id="world" class="term-scroll" aria-live="polite"></section>
+        <section id="runtime" aria-label="JavaScript runtime board">
+          <div id="stackCol">
+            <div class="board-label">Call stack</div>
+            <div id="stackWell" class="term-scroll"></div>
+          </div>
+          <div id="lanes">
+            <div class="lane lane-micro">
+              <div class="board-label">Microtask queue</div>
+              <div class="lane-track" id="trackMicro"></div>
+            </div>
+            <div class="lane lane-macro">
+              <div class="board-label">Macrotask queue (timers)</div>
+              <div class="lane-track" id="trackMacro"></div>
+            </div>
+            <div class="lane lane-render" id="laneRender">
+              <div class="board-label">Render pipeline</div>
+              <div class="lane-track" id="trackRender"></div>
+              <div id="paintDot"></div>
+              <span id="paintLabel">PAINT</span>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer id="consolePanel">
+        <div id="consoleBar"><span>▸ console</span><span id="consoleHint"></span></div>
+        <div id="consoleOut" class="term-scroll"></div>
+      </footer>
+    </div>
+
+    <!-- Effect layers -->
+    <div id="scan"></div>
+    <div id="vig"></div>
+    <div id="freezeLayer"></div>
+    <div id="resetFlash"></div>
+    <canvas id="particles"></canvas>
+
+    <!-- Overlays are created by JS into this mount -->
+    <div id="overlayMount"></div>
+
+    <script>
+      /* ══════════════════════════════════════════════════════════════════
+   THE EVENT LOOP — engine
+   Part A: audio, console, effects, the honest scheduler, shared UI.
+   ══════════════════════════════════════════════════════════════════ */
+      "use strict";
+
+      /* ── tiny DOM helpers ─────────────────────────────────────────────── */
+      const $ = (sel) => document.querySelector(sel);
+      const el = (tag, cls, text) => {
+        const n = document.createElement(tag);
+        if (cls) n.className = cls;
+        if (text != null) n.textContent = text;
+        return n;
+      };
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const REDUCED = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+
+      /* ── AUDIO — 100% synthetic Web Audio. The clock-tick IS the loop. ── */
+      const AudioFX = (() => {
+        let ctx = null,
+          humNodes = null;
+        const ac = () => {
+          if (!ctx) {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (!AC) return null;
+            ctx = new AC();
+          }
+          if (ctx.state === "suspended") ctx.resume();
+          return ctx;
+        };
+        const env = (g, t0, a, peak, d) => {
+          g.gain.setValueAtTime(0.0001, t0);
+          g.gain.exponentialRampToValueAtTime(peak, t0 + a);
+          g.gain.exponentialRampToValueAtTime(0.0001, t0 + a + d);
+        };
+        const osc = (type, f0, f1, dur, peak) => {
+          const c = ac();
+          if (!c) return;
+          const o = c.createOscillator(),
+            g = c.createGain();
+          o.type = type;
+          o.frequency.setValueAtTime(f0, c.currentTime);
+          if (f1) o.frequency.exponentialRampToValueAtTime(f1, c.currentTime + dur);
+          env(g, c.currentTime, 0.006, peak || 0.12, dur);
+          o.connect(g);
+          g.connect(c.destination);
+          o.start();
+          o.stop(c.currentTime + dur + 0.05);
+        };
+        const noiseBurst = (dur, peak, freq) => {
+          const c = ac();
+          if (!c) return;
+          const b = c.createBuffer(1, Math.floor(c.sampleRate * dur), c.sampleRate);
+          const d = b.getChannelData(0);
+          for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+          const s = c.createBufferSource();
+          s.buffer = b;
+          const f = c.createBiquadFilter();
+          f.type = "bandpass";
+          f.frequency.value = freq || 900;
+          const g = c.createGain();
+          env(g, c.currentTime, 0.01, peak || 0.18, dur);
+          s.connect(f);
+          f.connect(g);
+          g.connect(c.destination);
+          s.start();
+        };
+        return {
+          unlock() {
+            ac();
+          },
+          /* Fluorescent office hum: filtered noise + faint 100 Hz electrical tone. */
+          startHum() {
+            const c = ac();
+            if (!c || humNodes) return;
+            const b = c.createBuffer(1, c.sampleRate * 2, c.sampleRate);
+            const d = b.getChannelData(0);
+            for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+            const s = c.createBufferSource();
+            s.buffer = b;
+            s.loop = true;
+            const f = c.createBiquadFilter();
+            f.type = "lowpass";
+            f.frequency.value = 160;
+            const g = c.createGain();
+            g.gain.value = 0.035;
+            const tone = c.createOscillator();
+            tone.type = "sine";
+            tone.frequency.value = 100;
+            const tg = c.createGain();
+            tg.gain.value = 0.012;
+            s.connect(f);
+            f.connect(g);
+            g.connect(c.destination);
+            tone.connect(tg);
+            tg.connect(c.destination);
+            s.start();
+            tone.start();
+            humNodes = { s, tone, g, tg };
+          },
+          stopHum() {
+            if (!humNodes) return;
+            try {
+              humNodes.g.gain.value = 0;
+              humNodes.tg.gain.value = 0;
+              humNodes.s.stop();
+              humNodes.tone.stop();
+            } catch (e) {}
+            humNodes = null;
+          },
+          tick() {
+            osc("square", 1350, null, 0.025, 0.045);
+          },
+          tock() {
+            osc("square", 1050, null, 0.03, 0.04);
+          },
+          whoosh() {
+            noiseBurst(0.12, 0.06, 2200);
+          },
+          pop() {
+            osc("triangle", 620, 880, 0.07, 0.07);
+          },
+          push() {
+            osc("triangle", 500, 340, 0.08, 0.06);
+          },
+          buzz() {
+            osc("sawtooth", 180, 90, 0.28, 0.11);
+          },
+          stinger() {
+            osc("sawtooth", 300, 1500, 0.4, 0.16);
+            noiseBurst(0.4, 0.14, 2600);
+          },
+          rewind() {
+            osc("sawtooth", 900, 120, 0.55, 0.1);
+            noiseBurst(0.55, 0.1, 700);
+          },
+          freezeSfx() {
+            osc("sine", 620, 70, 1.1, 0.14);
+          },
+          chord() {
+            [329.6, 415.3, 493.9, 659.3].forEach((f, i) => setTimeout(() => osc("sine", f, null, 0.4, 0.09), i * 130));
+          },
+          doorOpen() {
+            osc("sine", 220, 440, 0.35, 0.09);
+            setTimeout(() => osc("sine", 440, 660, 0.3, 0.08), 180);
+          }
+        };
+      })();
+
+      /* ── CONSOLE panel ────────────────────────────────────────────────── */
+      const Con = (() => {
+        const out = $("#consoleOut");
+        const push = (cls, text) => {
+          const l = el("div", cls, text);
+          out.appendChild(l);
+          out.scrollTop = out.scrollHeight;
+          while (out.children.length > 120) out.removeChild(out.firstChild);
+          return l;
+        };
+        return {
+          log: (t) => push("c-log", t),
+          ok: (t) => push("c-ok", "✓ " + t),
+          warn: (t) => push("c-warn", "⚠ console.warn: " + t),
+          err: (t) => push("c-err", "✖ " + t),
+          ghost: (t) => push("c-ghost", "» " + t),
+          dim: (t) => push("c-dim", t),
+          clear: () => {
+            out.innerHTML = "";
+          }
+        };
+      })();
+
+      /* ── GAME STATE ───────────────────────────────────────────────────── */
+      const G = {
+        level: 0, // 0..3
+        loop: 1, // which iteration of 2:59 AM this is
+        seconds: 0, // clock seconds within the trapped minute
+        won: false,
+        started: false,
+        startTime: null,
+        timers: [] // level-scoped timers, cleared on unmount/reset
+      };
+      const later = (fn, ms) => {
+        const id = setTimeout(fn, ms);
+        G.timers.push(id);
+        return id;
+      };
+      const every = (fn, ms) => {
+        const id = setInterval(fn, ms);
+        G.timers.push(id);
+        return id;
+      };
+      const clearLevelTimers = () => {
+        G.timers.forEach((id) => {
+          clearTimeout(id);
+          clearInterval(id);
+        });
+        G.timers = [];
+      };
+
+      /* ── THE CLOCK — stuck at 2:59 AM until you escape ────────────────── */
+      const Clock = (() => {
+        const elC = $("#clock");
+        let id = null;
+        const render = () => {
+          if (G.won) return;
+          elC.textContent = "02:59:" + String(G.seconds).padStart(2, "0") + " AM";
+        };
+        const tickOnce = () => {
+          if (G.won) return;
+          G.seconds++;
+          // Freeze ambience: the tick stutters when the world is "blocked".
+          if (!document.getElementById("freezeLayer").classList.contains("on") || Math.random() < 0.4) {
+            if (G.started) (G.seconds % 2 ? AudioFX.tick : AudioFX.tock)();
+          }
+          if (G.seconds >= 60) {
+            // The minute NEVER advances. That's the whole problem.
+            G.seconds = 0;
+            elC.classList.add("warble");
+            if (G.started) AudioFX.stinger();
+            Con.ghost("02:59 again. it is always 02:59.");
+            setTimeout(() => elC.classList.remove("warble"), 520);
+          }
+          render();
+        };
+        return {
+          start() {
+            if (!id) id = setInterval(tickOnce, 1000);
+            render();
+          },
+          rewindTo(sec) {
+            G.seconds = sec;
+            elC.classList.add("warble");
+            setTimeout(() => elC.classList.remove("warble"), 520);
+            render();
+          },
+          escape() {
+            // Victory: time finally moves.
+            G.won = true;
+            elC.classList.add("free");
+            let h = 3,
+              m = 0,
+              s = 0;
+            const adv = setInterval(() => {
+              s += 7;
+              if (s >= 60) {
+                s -= 60;
+                m++;
+              }
+              elC.textContent = "0" + h + ":" + String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0") + " AM";
+            }, 120);
+            setTimeout(() => clearInterval(adv), 4000);
+          }
+        };
+      })();
+
+      /* ── PAINT PULSE — the honesty dot.
+   Driven by a real requestAnimationFrame loop; if the main thread
+   blocks, this dot freezes because the browser itself froze. ─────── */
+      const Paint = (() => {
+        const dot = $("#paintDot");
+        const lane = $("#laneRender");
+        let t0 = performance.now();
+        let starvedVisual = false; // L3 ambience: pretend-freeze the dot only
+        const drive = (now) => {
+          if (!starvedVisual) {
+            const w = lane.clientWidth - 30;
+            const x = (Math.sin((now - t0) / 700) * 0.5 + 0.5) * Math.max(20, w);
+            dot.style.transform = "translateX(" + x + "px)";
+          }
+          requestAnimationFrame(drive);
+        };
+        requestAnimationFrame(drive);
+        return {
+          starve(on) {
+            starvedVisual = on;
+            lane.classList.toggle("starved", on);
+            $("#paintLabel").textContent = on ? "PAINT — STARVED" : "PAINT";
+          }
+        };
+      })();
+
+      /* ── EFFECTS: glitches, shakes, freeze, VHS reset ─────────────────── */
+      const FX = {
+        glitch() {
+          if (REDUCED) return;
+          document.body.classList.add("glitching");
+          setTimeout(() => document.body.classList.remove("glitching"), 430);
+        },
+        shake() {
+          if (REDUCED) return;
+          const app = $("#app");
+          app.classList.add("shake");
+          setTimeout(() => app.classList.remove("shake"), 420);
+        },
+        freeze(on) {
+          $("#freezeLayer").classList.toggle("on", on);
+        },
+        vhsReset() {
+          const f = $("#resetFlash");
+          f.classList.remove("run");
+          void f.offsetWidth; // restart the animation
+          f.classList.add("run");
+        }
+      };
+
+      /* Ambient glitch scheduler — escalates with the loop counter. */
+      setInterval(() => {
+        if (!G.started || G.won) return;
+        const chance = Math.min(0.12 + G.loop * 0.06, 0.55);
+        if (Math.random() < chance) {
+          FX.glitch();
+          if (Math.random() < 0.3) AudioFX.buzz();
+        }
+      }, 8000);
+
+      /* ── PARTICLES — green "resolved ✓" burst for the finale ──────────── */
+      const Particles = (() => {
+        const cv = $("#particles");
+        const cx = cv.getContext && cv.getContext("2d");
+        if (!cx) return { resolvedBurst() {} }; // no canvas → skip the fireworks, keep the win
+        let parts = [],
+          running = false;
+        const size = () => {
+          cv.width = innerWidth;
+          cv.height = innerHeight;
+        };
+        addEventListener("resize", size);
+        size();
+        const frame = () => {
+          if (!parts.length) {
+            running = false;
+            cx.clearRect(0, 0, cv.width, cv.height);
+            return;
+          }
+          cx.clearRect(0, 0, cv.width, cv.height);
+          parts = parts.filter((p) => p.life > 0);
+          for (const p of parts) {
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.06;
+            p.life -= 1;
+            p.rot += p.vr;
+            cx.save();
+            cx.globalAlpha = Math.min(1, p.life / 40);
+            cx.translate(p.x, p.y);
+            cx.rotate(p.rot);
+            cx.fillStyle = p.color;
+            if (p.glyph) {
+              cx.font = "bold " + p.s * 2.4 + "px 'JetBrains Mono', monospace";
+              cx.fillText("✓", -p.s, p.s);
+            } else {
+              cx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s);
+            }
+            cx.restore();
+          }
+          requestAnimationFrame(frame);
+        };
+        return {
+          resolvedBurst() {
+            if (REDUCED) return;
+            const colors = ["#5ef29a", "#2fd67d", "#a5f7c8", "#7dd6ff"];
+            for (let i = 0; i < 150; i++) {
+              parts.push({
+                x: innerWidth / 2 + (Math.random() - 0.5) * 160,
+                y: innerHeight * 0.62,
+                vx: (Math.random() - 0.5) * 9,
+                vy: -(4 + Math.random() * 8),
+                s: 4 + Math.random() * 6,
+                rot: Math.random() * 6.28,
+                vr: (Math.random() - 0.5) * 0.2,
+                life: 90 + Math.random() * 60,
+                color: colors[i % colors.length],
+                glyph: i % 5 === 0
+              });
+            }
+            if (!running) {
+              running = true;
+              frame();
+            }
+          }
+        };
+      })();
+
+      /* ══════════════════════════════════════════════════════════════════
+   THE HONEST SCHEDULER
+   The player's plan runs through REAL native scheduling. We record
+   the order the browser actually executed things in — no simulation.
+   A detector rAF is scheduled first, so "paintChance" marks the point
+   where the browser reached the render step of the loop.
+   ══════════════════════════════════════════════════════════════════ */
+      const MECH = {
+        sync: { label: "run now (synchronous)", code: "action();", lane: null },
+        micro: { label: "Promise.resolve().then", code: "Promise.resolve().then(action)", lane: "trackMicro" },
+        qmicro: { label: "queueMicrotask", code: "queueMicrotask(action)", lane: "trackMicro" },
+        macro: { label: "setTimeout(…, 0)", code: "setTimeout(action, 0)", lane: "trackMacro" },
+        raf: { label: "requestAnimationFrame", code: "requestAnimationFrame(action)", lane: "trackRender" }
+      };
+
+      function runPlan(cards, extra) {
+        /* cards: [{ id, label, mech }] — scheduled all at once, like one script tick.
+     extra: optional { preMicrotasks: n } to enqueue a burden chain first (L3).
+     Resolves with { log: [{id, seq, mech}], paintSeq } */
+        return new Promise((resolve) => {
+          const log = [];
+          let seq = 0;
+          let paintSeq = -1;
+          // Paint detector: first rAF fired ≈ the loop reached the render phase.
+          requestAnimationFrame(() => {
+            if (paintSeq < 0) paintSeq = seq;
+          });
+
+          if (extra && extra.preMicrotasks) {
+            // The possessed chain: N real chained microtasks, enqueued first.
+            let p = Promise.resolve();
+            for (let i = 0; i < extra.preMicrotasks; i++) {
+              p = p.then(() => {
+                log.push({ id: "__chain" + i, seq: seq++, mech: "micro" });
+              });
+            }
+          }
+
+          for (const card of cards) {
+            const record = () => log.push({ id: card.id, seq: seq++, mech: card.mech });
+            switch (card.mech) {
+              case "sync":
+                record();
+                break;
+              case "micro":
+                Promise.resolve().then(record);
+                break;
+              case "qmicro":
+                queueMicrotask(record);
+                break;
+              case "macro":
+                setTimeout(record, 0);
+                break;
+              case "raf":
+                requestAnimationFrame(record);
+                break;
+            }
+          }
+          // Settle: past microtasks, a paint, and the timer phase.
+          setTimeout(() => requestAnimationFrame(() => setTimeout(() => resolve({ log, paintSeq }), 40)), 40);
+        });
+      }
+
+      /* ── Replay: animate the observed order across the board ─────────── */
+      const stackWell = $("#stackWell");
+
+      async function replayLog(log, cardById, opts) {
+        const speed = opts && opts.fast ? 0.55 : 1;
+        const chainShown = { n: 0 };
+        for (const entry of log) {
+          if (entry.id.startsWith("__chain")) {
+            // Compress the burden chain visually: show a counter, not 60 chips.
+            chainShown.n++;
+            if (chainShown.n % 12 === 1) {
+              const chip = el("div", "run-chip", ".then(feed) ×" + chainShown.n);
+              $("#trackMicro").appendChild(chip);
+              AudioFX.whoosh();
+              await wait(90 * speed);
+              chip.remove();
+            }
+            continue;
+          }
+          const card = cardById[entry.id];
+          if (!card) continue;
+          const mech = MECH[entry.mech];
+          if (mech.lane) {
+            const chip = el("div", "run-chip", card.label + "()");
+            $("#" + mech.lane).appendChild(chip);
+            AudioFX.whoosh();
+            await wait(340 * speed);
+            chip.remove();
+          }
+          const frame = el("div", "frame exec", card.label + "()");
+          stackWell.prepend(frame);
+          AudioFX.push();
+          await wait(300 * speed);
+          frame.classList.remove("exec");
+          frame.classList.add("done");
+          AudioFX.pop();
+          Con.log("[" + entry.seq + "] " + card.label + "()  — via " + mech.code);
+          await wait(220 * speed);
+          frame.remove();
+        }
+      }
+
+      /* ── PLAN BUILDER UI (Levels 2 & 4): chips → slots → RUN ──────────── */
+      function buildPlanUI(mount, actions, chipMechs, onRun) {
+        let selected = null;
+        const chipEls = [];
+
+        const tray = el("div");
+        tray.id = "chipTray";
+        const trayLabel = el("div", "board-label", "Scheduling toolbox — pick a chip, then click a slot");
+        mount.appendChild(trayLabel);
+        chipMechs.forEach((mech) => {
+          const c = el("button", "chip");
+          c.appendChild(el("span", null, MECH[mech].code));
+          c.appendChild(el("small", null, mech === "micro" || mech === "qmicro" ? "microtask" : mech === "macro" ? "macrotask" : mech === "raf" ? "before next paint" : "this tick"));
+          c.addEventListener("click", () => {
+            selected = mech;
+            chipEls.forEach((x) => x.classList.remove("selected"));
+            c.classList.add("selected");
+            document.querySelectorAll(".slot").forEach((s) => s.classList.add("slot-hot"));
+            AudioFX.pop();
+          });
+          chipEls.push(c);
+          tray.appendChild(c);
+        });
+        mount.appendChild(tray);
+
+        const cardWrap = el("div");
+        actions.forEach((a) => {
+          const card = el("div", "action-card");
+          card.appendChild(el("span", "a-label", a.label + "()"));
+          card.appendChild(el("span", "a-rule", a.rule));
+          const slot = el("div", "slot", "⟨ assign scheduling ⟩");
+          slot.tabIndex = 0;
+          const assign = () => {
+            if (!selected) {
+              Con.dim("pick a scheduling chip first.");
+              return;
+            }
+            a.mech = selected;
+            slot.textContent = MECH[selected].code;
+            slot.classList.add("filled");
+            AudioFX.push();
+            runBtn.disabled = !actions.every((x) => x.mech);
+          };
+          slot.addEventListener("click", assign);
+          slot.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              assign();
+            }
+          });
+          card.appendChild(slot);
+          cardWrap.appendChild(card);
+        });
+        mount.appendChild(cardWrap);
+
+        const runBtn = el("button", "btn", "▶ run this tick");
+        runBtn.disabled = true;
+        runBtn.addEventListener("click", () => {
+          runBtn.disabled = true;
+          onRun(() => {
+            runBtn.disabled = false;
+          });
+        });
+        mount.appendChild(runBtn);
+        return { runBtn };
+      }
+    </script>
+
+    <script>
+      /* ══════════════════════════════════════════════════════════════════
+   Part B: the four loops (levels), the loop manager, title & finale.
+   ══════════════════════════════════════════════════════════════════ */
+      "use strict";
+
+      const world = $("#world");
+      const overlayMount = $("#overlayMount");
+
+      /* ── LOOP MANAGER ─────────────────────────────────────────────────── */
+      function setLevelChip() {
+        $("#levelChip").textContent = LEVELS[G.level].chip;
+        $("#loopChip").textContent = "LOOP #" + G.loop;
+      }
+
+      function resetLoop(reason) {
+        clearLevelTimers();
+        G.loop++;
+        AudioFX.rewind();
+        FX.vhsReset();
+        FX.glitch();
+        Paint.starve(false);
+        FX.freeze(false);
+        Con.err(reason);
+        Con.ghost("the minute rewinds. loop #" + G.loop + " begins. you remember everything.");
+        Clock.rewindTo(0);
+        setLevelChip();
+        setTimeout(() => LEVELS[G.level].mount(), REDUCED ? 60 : 720);
+      }
+
+      function levelClear(nextIntroDelay) {
+        clearLevelTimers();
+        AudioFX.doorOpen();
+        Con.ok("sector resolved. the loop lets you keep this one.");
+        setTimeout(() => {
+          G.level++;
+          if (G.level >= LEVELS.length) {
+            winGame();
+            return;
+          }
+          setLevelChip();
+          showIntro(LEVELS[G.level]);
+        }, nextIntroDelay || 1400);
+      }
+
+      function showIntro(level) {
+        const ov = el("div", "overlay");
+        ov.appendChild(el("div", "lvl-title glitch-font", level.title));
+        const brief = el("div", "lvl-brief");
+        brief.innerHTML = level.brief;
+        ov.appendChild(brief);
+        const go = el("button", "btn", "▶ enter the loop");
+        go.addEventListener("click", () => {
+          ov.remove();
+          level.mount();
+        });
+        ov.appendChild(go);
+        overlayMount.appendChild(ov);
+        go.focus();
+      }
+
+      /* ── shared: clear the board between mounts ───────────────────────── */
+      function clearBoard() {
+        world.innerHTML = "";
+        stackWell.innerHTML = "";
+        $("#trackMicro").innerHTML = "";
+        $("#trackMacro").innerHTML = "";
+        $("#trackRender").innerHTML = "";
+      }
+
+      /* ══════════════════════════════════════════════════════════════════
+   LOOP 1 · THE STACK OVERFLOW
+   Teach: the call stack is LIFO; unwind from the top; overflow kills.
+   ══════════════════════════════════════════════════════════════════ */
+      const L1 = {
+        chip: "LOOP 1 · THE STACK OVERFLOW",
+        title: "The Stack Overflow",
+        brief: "The door out of your cubicle is buried under <b>memories of this same minute</b> — " + "recursive calls to <code>remember()</code> that never returned.<br><br>" + "A call stack unwinds <b>from the top only</b> (last in, first out). " + "Click <b>return;</b> on the top frame to pop it. Clear the stack before it " + "hits the red line — the ghost keeps pushing <span style='color:#e9a0c8'>intrusive thoughts</span>.",
+        LIMIT: 9,
+        mount() {
+          clearBoard();
+          G.started = true;
+
+          // World: the blocked door + live explanation
+          const p = el("p", "brief");
+          p.innerHTML = "The exit is <b>right there</b>. But <code>remember(7)</code> called <code>remember(6)</code> " + "called <code>remember(5)</code>… and none of them ever returned. The stack must unwind " + "<b>top-first</b>. If it grows past the limit: <span class='amber'>RangeError</span>, and the minute resets.";
+          world.appendChild(p);
+
+          const doorWrap = el("div", "doors");
+          const door = el("div", "door");
+          door.id = "l1door";
+          door.appendChild(el("span", "door-glyph", "🚪"));
+          door.appendChild(el("div", "door-name", "Cubicle exit"));
+          const rule = el("div", "door-rule");
+          door.appendChild(rule);
+          doorWrap.appendChild(door);
+          world.appendChild(doorWrap);
+
+          const hint = el("p", "brief");
+          hint.innerHTML = "<span class='amber'>Why top-first?</span> Each frame is paused <i>inside</i> the one below it. " + "You can't return from <code>remember(5)</code> while <code>remember(4)</code> is still running on top of it.";
+          world.appendChild(hint);
+
+          // Stack: limit line + initial recursion frames
+          const limit = el("div", null, "STACK LIMIT");
+          limit.id = "stackLimit";
+          stackWell.appendChild(limit);
+
+          const frames = [];
+          const syncDoor = () => {
+            rule.textContent = frames.length === 0 ? "unlocked" : frames.length + " frame(s) burying the handle";
+            door.classList.toggle("open", frames.length === 0);
+          };
+
+          const pushFrame = (label, intrusive) => {
+            if (frames.length >= L1.LIMIT) {
+              Con.err("Uncaught RangeError: Maximum call stack size exceeded");
+              AudioFX.stinger();
+              FX.shake();
+              resetLoop("The stack overflowed. Your memories crushed you.");
+              return false;
+            }
+            const f = el("div", "frame" + (intrusive ? " intrusive" : ""));
+            f.appendChild(el("span", null, label));
+            const btn = el("button", "ret", "return;");
+            btn.addEventListener("click", () => {
+              if (stackWell.querySelector(".frame") !== f) {
+                FX.shake();
+                AudioFX.buzz();
+                Con.warn("you can only return from the TOP of the stack. LIFO is the law here.");
+                return;
+              }
+              f.remove();
+              frames.splice(frames.indexOf(f), 1);
+              AudioFX.pop();
+              Con.log("↩ " + label + " returned. stack: " + frames.length);
+              refreshButtons();
+              syncDoor();
+              if (frames.length === 0) {
+                Con.ok("stack empty — the door surfaces from under the memories.");
+                later(() => levelClear(), 900);
+              }
+            });
+            f.appendChild(btn);
+            // insert below the limit line, at the visual top of the stack
+            stackWell.insertBefore(f, stackWell.children[1] || null);
+            frames.unshift(f);
+            AudioFX.push();
+            refreshButtons();
+            syncDoor();
+            return true;
+          };
+
+          const refreshButtons = () => {
+            stackWell.querySelectorAll(".frame").forEach((f, i) => {
+              const b = f.querySelector(".ret");
+              if (b) b.disabled = i !== 0;
+            });
+          };
+
+          // The original recursion, pushed with a little theatre.
+          Con.dim("reconstructing the moment it happened…");
+          const seed = ["panic()", "remember(1)", "remember(2)", "remember(3)", "remember(4)", "remember(5)"];
+          seed.forEach((label, i) =>
+            later(
+              () => {
+                pushFrame(label, false);
+                if (i === seed.length - 1) Con.ghost("none of them returned. none of them ever return.");
+              },
+              380 * i + 300
+            )
+          );
+
+          // The ghost pushes intrusive thoughts on an interval.
+          later(
+            () => {
+              every(() => {
+                const thoughts = ["intrusiveThought()", "whatWasThatSound()", "didYouLockTheProd()", "itIsBehindYou()"];
+                Con.ghost("something pushes onto your stack.");
+                pushFrame(thoughts[Math.floor(Math.random() * thoughts.length)], true);
+              }, 6500);
+            },
+            seed.length * 380 + 1200
+          );
+        }
+      };
+
+      /* ══════════════════════════════════════════════════════════════════
+   LOOP 2 · MICRO VS MACRO
+   Teach: microtasks drain right after sync code, before any timer.
+   ══════════════════════════════════════════════════════════════════ */
+      const L2 = {
+        chip: "LOOP 2 · MICRO VS MACRO",
+        title: "Micro vs Macro",
+        brief: "Two doors out of the bullpen, and neither opens on a human schedule.<br><br>" + "The <b>security door</b> only accepts a signal in the <b>microtask window</b> — " + "immediately after the current code finishes, before any timer fires.<br>" + "The <b>fire exit</b> is alarmed until the <b>timer phase</b> — disarm it too early and the whole floor screams.<br><br>" + "Assign the right scheduling to each action. Then run the tick and watch " + "what the browser <i>actually</i> does.",
+        mount() {
+          clearBoard();
+          const p = el("p", "brief");
+          p.innerHTML = "One tick. Two actions. The browser drains queues in a fixed order: " + "<b>sync code → all microtasks → (render) → one macrotask</b>. Use that.";
+          world.appendChild(p);
+
+          const doors = el("div", "doors");
+          const doorA = el("div", "door");
+          doorA.id = "doorA";
+          doorA.appendChild(el("span", "door-glyph", "🔐"));
+          doorA.appendChild(el("div", "door-name", "Security door"));
+          doorA.appendChild(el("div", "door-rule", "sensor listens ONLY in the microtask window — after this code, before any timer"));
+          const doorB = el("div", "door");
+          doorB.id = "doorB";
+          doorB.appendChild(el("span", "door-glyph", "🧯"));
+          doorB.appendChild(el("div", "door-name", "Fire exit"));
+          doorB.appendChild(el("div", "door-rule", "alarm stays armed until the TIMER phase — disarm it there or wake the floor"));
+          doors.appendChild(doorA);
+          doors.appendChild(doorB);
+          world.appendChild(doors);
+
+          const actions = [
+            { id: "unlockA", label: "unlock_security", rule: "must land in the microtask window", mech: null },
+            { id: "disarmB", label: "disarm_fireExit", rule: "must land in the timer (macrotask) phase", mech: null }
+          ];
+          const cardById = {};
+          actions.forEach((a) => (cardById[a.id] = a));
+
+          buildPlanUI(world, actions, ["sync", "micro", "macro", "raf"], async (unlock) => {
+            Con.dim("— running one tick through the real scheduler —");
+            const { log } = await runPlan(actions);
+            await replayLog(log, cardById);
+
+            const aOk = actions[0].mech === "micro";
+            const bOk = actions[1].mech === "macro";
+
+            if (aOk) {
+              doorA.classList.add("open");
+              AudioFX.doorOpen();
+              Con.ok("security door clicks open — the signal landed in the microtask drain.");
+            } else if (actions[0].mech === "sync") {
+              Con.err("unlock_security ran DURING your code — the sensor wasn't listening yet. Microtasks run after sync completes.");
+              doorA.classList.add("alarm");
+            } else {
+              Con.err("unlock_security arrived too late — by the timer/paint phase the sensor had given up.");
+              doorA.classList.add("alarm");
+            }
+
+            if (bOk) {
+              doorB.classList.add("open");
+              Con.ok("fire exit disarmed in the timer phase. No alarm.");
+            } else {
+              Con.err("disarm_fireExit fired before the timer phase — ALARM. The whole floor heard that.");
+              doorB.classList.add("alarm");
+              AudioFX.stinger();
+            }
+
+            if (aOk && bOk) {
+              later(() => levelClear(), 1100);
+            } else {
+              FX.shake();
+              later(() => resetLoop("Wrong phase. The Blocking Call heard the alarm."), 1400);
+            }
+            unlock();
+          });
+        }
+      };
+
+      /* ══════════════════════════════════════════════════════════════════
+   LOOP 3 · THE STARVATION
+   Teach: an unbroken microtask chain starves rendering; yield with a
+   macrotask or rAF to let the browser paint.
+   ══════════════════════════════════════════════════════════════════ */
+      const L3 = {
+        chip: "LOOP 3 · THE STARVATION",
+        title: "The Starvation",
+        brief: "Something on this floor is feeding. A possessed promise chain — " + "<code>.then(feed).then(feed).then(feed)…</code> — never lets the microtask queue empty.<br><br>" + "The browser <b>cannot paint until the microtask queue drains</b>. " + "The render pipeline is starving. The screen is a corpse of the last frame.<br><br>" + "Splice ONE link of the chain with something that <b>yields</b> — " + "hands control back to the event loop long enough for a paint.",
+        mount() {
+          clearBoard();
+          Paint.starve(true);
+          FX.freeze(true);
+          AudioFX.freezeSfx();
+          Con.warn("render pipeline starved — 0 fps. the last frame is stuck to the glass.");
+
+          const p = el("p", "brief");
+          p.innerHTML = "The chain below is real: sixty chained microtasks will run when you hit RUN. " + "Pick a splice for the marked link. If your splice is <b>still a microtask</b>, the queue never empties " + "and the paint never comes. Choose something the loop treats as <b>later</b>.";
+          world.appendChild(p);
+
+          // The chain visualization
+          const chain = el("div");
+          chain.id = "chainWrap";
+          for (let i = 0; i < 5; i++) {
+            chain.appendChild(el("span", "link", ".then(feed)"));
+            chain.appendChild(el("span", "link-arrow", "→"));
+          }
+          const splice = el("span", "link spliced", "⟨ SPLICE POINT ⟩");
+          chain.appendChild(splice);
+          chain.appendChild(el("span", "link-arrow", "→"));
+          chain.appendChild(el("span", "link-inf", "∞"));
+          world.appendChild(chain);
+
+          const choices = [
+            { mech: "micro", wrongText: "Promise.then is a microtask — you fed the thing that is starving you." },
+            { mech: "qmicro", wrongText: "queueMicrotask joins the SAME queue. The chain thanks you for the snack." },
+            { mech: "macro", ok: true },
+            { mech: "raf", ok: true }
+          ];
+
+          const tray = el("div");
+          tray.id = "chipTray";
+          world.appendChild(el("div", "board-label", "Splice the chain with:"));
+          let picked = null;
+          const chipEls = [];
+          choices.forEach((ch) => {
+            const c = el("button", "chip");
+            c.appendChild(el("span", null, MECH[ch.mech].code));
+            c.appendChild(el("small", null, ch.mech === "macro" ? "macrotask — after paint" : ch.mech === "raf" ? "runs just before paint" : "microtask"));
+            c.addEventListener("click", () => {
+              picked = ch;
+              chipEls.forEach((x) => x.classList.remove("selected"));
+              c.classList.add("selected");
+              splice.textContent = MECH[ch.mech].code;
+              runBtn.disabled = false;
+              AudioFX.pop();
+            });
+            chipEls.push(c);
+            tray.appendChild(c);
+          });
+          world.appendChild(tray);
+
+          const runBtn = el("button", "btn", "▶ run the chain");
+          runBtn.disabled = true;
+          world.appendChild(runBtn);
+
+          runBtn.addEventListener("click", async () => {
+            runBtn.disabled = true;
+            Con.dim("— releasing 60 real chained microtasks + your splice —");
+            const CHAIN_N = 60;
+            const escapeCard = { id: "breakFree", label: "break_free", mech: picked.mech };
+            const { log, paintSeq } = await runPlan([escapeCard], { preMicrotasks: CHAIN_N });
+            await replayLog(log, { breakFree: escapeCard }, { fast: true });
+
+            const mine = log.find((e) => e.id === "breakFree");
+            /* The honest test: did the microtask queue fully DRAIN before you ran?
+         Micro/qmicro splices get interleaved INTO the drain (seq < 60) — the
+         queue never empties, so the browser never gets a render opportunity.
+         Macro & rAF splices run only after all 60 links finished (seq >= 60). */
+            const drained = mine && mine.seq >= CHAIN_N;
+
+            Con.dim("chain drained through seq " + (CHAIN_N - 1) + " · break_free() ran at seq " + (mine ? mine.seq : "—") + (paintSeq >= 0 ? " · render step reached at seq " + paintSeq : ""));
+            if (drained) {
+              Paint.starve(false);
+              FX.freeze(false);
+              Con.ok("the queue emptied before break_free() — a render opportunity opened, and a frame finally painted.");
+              Con.ok("Light moves for the first time in forever. The chain screams and lets go.");
+              AudioFX.chord();
+              later(() => levelClear(), 1300);
+            } else {
+              AudioFX.stinger();
+              FX.shake();
+              Con.err(picked.wrongText || "the queue never emptied. no paint. no escape.");
+              Con.dim("break_free() ran at seq " + mine.seq + " — INSIDE the drain, with " + (CHAIN_N - 1 - mine.seq) + "+ links still queued behind it.");
+              later(() => resetLoop("Starved. The last thing you saw was a frame from a minute ago."), 1500);
+            }
+          });
+        }
+      };
+
+      /* ══════════════════════════════════════════════════════════════════
+   LOOP 4 · THE BLOCKING CALL
+   Teach: a long sync task freezes EVERYTHING; schedule around it.
+   ══════════════════════════════════════════════════════════════════ */
+      const L4 = {
+        chip: "LOOP 4 · THE BLOCKING CALL",
+        title: "The Blocking Call",
+        brief: "It found you. <span class='frost-t' style='color:#dfeaff'>The Blocking Call</span> — a ten-second " + "synchronous while-loop wearing a dead developer's badge. When it lands on the stack, " + "<b>nothing else runs</b>: no clicks, no timers, no paint, no you.<br><br>" + "You have <b>45 seconds</b> to schedule three actions into the right phases of one final tick " + "and be gone before it executes.<br><br>" + "<span style='color:#ffb454'>Fail, and this page will genuinely freeze. That is not a metaphor.</span>",
+        TIME: 45,
+        mount() {
+          clearBoard();
+          let t = L4.TIME;
+          let done = false;
+
+          const figure = el("div");
+          figure.id = "blockFigure";
+          const glyph = el("span", "bf-glyph", "▓█▓");
+          figure.appendChild(glyph);
+          figure.appendChild(el("div", "bf-name", "THE BLOCKING CALL"));
+          world.appendChild(figure);
+
+          const cd = el("div", null, "0:45");
+          cd.id = "countdown";
+          world.appendChild(cd);
+
+          const actions = [
+            { id: "save", label: "save_work", rule: "must run in THIS tick's microtask drain — before anything yields", mech: null },
+            { id: "keycard", label: "grab_keycard", rule: "the scanner reads exactly once: just before the next paint", mech: null },
+            { id: "slide", label: "slide_under_door", rule: "the gap opens after that paint, in the timer phase", mech: null }
+          ];
+          const cardById = {};
+          actions.forEach((a) => (cardById[a.id] = a));
+          const WANT = { save: ["micro", "qmicro"], keycard: ["raf"], slide: ["macro"] };
+
+          buildPlanUI(world, actions, ["sync", "micro", "qmicro", "raf", "macro"], async (unlock) => {
+            if (done) return;
+            Con.dim("— final tick, running against the real scheduler —");
+            const { log } = await runPlan(actions);
+            await replayLog(log, cardById);
+            if (done) return;
+
+            const verdicts = actions.map((a) => ({ a, ok: WANT[a.id].includes(a.mech) }));
+            verdicts.forEach((v) => {
+              if (v.ok) Con.ok(v.a.label + "() landed in the right phase.");
+              else if (v.a.id === "save") Con.err("save_work() " + (v.a.mech === "sync" ? "ran mid-code — the save daemon only flushes between tasks, in the microtask drain." : "waited too long. The work was gone before the timers fired."));
+              else if (v.a.id === "keycard") Con.err("grab_keycard() missed the scan — only requestAnimationFrame runs in the slot just before paint.");
+              else Con.err("slide_under_door() — the gap only exists in the timer phase AFTER the paint. setTimeout is the only thing that waits that long.");
+            });
+
+            if (verdicts.every((v) => v.ok)) {
+              done = true;
+              clearLevelTimers();
+              figure.classList.add("shattered");
+              AudioFX.chord();
+              Con.ok("the tick completes. The Blocking Call grabs at the stack — and finds it EMPTY. You are already gone.");
+              later(() => winGame(), 1800);
+            } else {
+              t = Math.max(4, t - 10);
+              AudioFX.stinger();
+              FX.shake();
+              FX.glitch();
+              Con.warn("wrong phases. It is closer now. (-10 seconds)");
+              unlock();
+            }
+          });
+
+          // countdown + the figure's approach
+          every(() => {
+            if (done) return;
+            t--;
+            cd.textContent = "0:" + String(Math.max(0, t)).padStart(2, "0");
+            if (t <= 10) {
+              cd.classList.add("critical");
+              AudioFX.tick();
+            }
+            if (t === 30) {
+              figure.classList.add("near");
+              Con.ghost("it is in the corridor. the fluorescents die one by one.");
+            }
+            if (t === 15) {
+              figure.classList.add("imminent");
+              Con.ghost("it is at your cubicle. it smells like a stuck spinner.");
+            }
+            if (t <= 0) {
+              done = true;
+              clearLevelTimers();
+              Con.err("The Blocking Call lands on the stack.");
+              Con.err("(the page will now genuinely block — this frozen second is the lesson)");
+              // The honest freeze: a REAL synchronous busy-loop. Everything stops:
+              // the paint dot, the clock, this very console. That's the point.
+              setTimeout(() => {
+                if (!REDUCED) {
+                  const end = performance.now() + 900;
+                  while (performance.now() < end) {
+                    /* blocked */
+                  }
+                }
+                AudioFX.freezeSfx();
+                resetLoop("It ran for what felt like ten seconds. It was ten seconds. Nothing you scheduled mattered.");
+              }, 350);
+            }
+          }, 1000);
+        }
+      };
+
+      const LEVELS = [L1, L2, L3, L4];
+
+      /* ══════════════════════════════════════════════════════════════════
+   TITLE & FINALE
+   ══════════════════════════════════════════════════════════════════ */
+      function showTitle() {
+        const ov = el("div", "overlay");
+        ov.appendChild(el("h1", "title-main", "the event loop"));
+        ov.appendChild(el("div", "title-sub", "a javascript time-loop horror"));
+        const story = el("div", "story");
+        story.innerHTML = "<p>2:59 AM. Production is down and you are the only one left in the office. " + "You reach for your coffee — and the clock ticks back to <b>2:59:00</b>.</p>" + "<p>Again. <i>Again.</i> The same minute, forever. You are trapped in an event loop. Literally.</p>" + "<p>Something else is trapped in here with you: <span class='frost-t'>The Blocking Call</span>, " + "a frozen thing that stops clocks, clicks, and hearts. The only way out is to learn what it never did — " + "<b>how the loop actually schedules things</b> — and slip between its phases.</p>" + "<p>Four sectors. One runtime. The browser you are reading this in is the game engine, " + "and it will not lie to you.</p>";
+        ov.appendChild(story);
+        const go = el("button", "btn green", "▶ node reality.js");
+        go.addEventListener("click", () => {
+          AudioFX.unlock();
+          AudioFX.startHum();
+          G.started = true;
+          G.startTime = Date.now();
+          ov.remove();
+          Clock.start();
+          Con.log("reality v3.0.1 starting…");
+          Con.warn("temporal anomaly detected: the current task never completes.");
+          setLevelChip();
+          showIntro(LEVELS[0]);
+        });
+        ov.appendChild(go);
+        ov.appendChild(el("p", "small-warning", "🎧 headphones recommended · ⚠ flashing lights, sudden sounds, and one honest 0.9-second freeze"));
+        overlayMount.appendChild(ov);
+      }
+
+      function winGame() {
+        clearLevelTimers();
+        G.won = true;
+        Clock.escape();
+        AudioFX.stopHum();
+        Particles.resolvedBurst();
+        setTimeout(() => Particles.resolvedBurst(), 900);
+
+        const ms = Date.now() - (G.startTime || Date.now());
+        const mm = Math.floor(ms / 60000),
+          ss = Math.floor((ms % 60000) / 1000);
+
+        const ov = el("div", "overlay");
+        const h = el("h1", "title-main", "resolved");
+        h.style.color = "var(--resolved)";
+        h.style.textShadow = "0 0 30px rgba(94,242,154,.5)";
+        ov.appendChild(h);
+        ov.appendChild(el("div", "title-sub", "the promise settles · 3:00 AM arrives"));
+        const story = el("div", "story");
+        story.innerHTML = "<p>The minute hand moves. You hear it — an actual, physical <b>tick</b> — " + "and the office exhales around you.</p>" + "<p>Somewhere behind you, The Blocking Call reaches for a stack that is no longer there. " + "You scheduled yourself out of its reach: sync, then microtasks, then paint, then everything else. " + "<b>You know the order now. You will always know the order.</b></p>";
+        ov.appendChild(story);
+        const stats = el("div", "story");
+        stats.style.textAlign = "center";
+        stats.innerHTML = "loops survived: <b>" + G.loop + "</b> &nbsp;·&nbsp; time in the minute: <b>" + mm + "m " + String(ss).padStart(2, "0") + "s</b> &nbsp;·&nbsp; sectors resolved: <b>4/4</b>";
+        ov.appendChild(stats);
+        const again = el("button", "btn green", "⟲ await nextIncident()");
+        again.addEventListener("click", () => location.reload());
+        ov.appendChild(again);
+        overlayMount.appendChild(ov);
+      }
+
+      /* ── BOOT ─────────────────────────────────────────────────────────── */
+      Con.dim("// The runtime board on the right is live. The paint dot is a real requestAnimationFrame loop.");
+      Con.dim("// If it ever stops moving, the main thread is blocked. Remember that.");
+      showTitle();
+    </script>
+  </body>
+</html>
