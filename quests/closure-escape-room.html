@@ -1046,28 +1046,14 @@ soundToggle.addEventListener("click", function(){
 /* ============================================================
    Progress bar
    ============================================================ */
-function renderProgress(){
-  var solvedCount = 0;
-  for (var i=1;i<=MAIN_TOTAL;i++){ if (state.solved[i]) solvedCount++; }
-  progressValueEl.textContent = solvedCount + " / " + MAIN_TOTAL;
+function initSidebar(){
   progressTicksEl.innerHTML = "";
   for (var j=1;j<=MAIN_TOTAL;j++){
     var t = document.createElement("div");
-    t.className = "tick" + (state.solved[j] ? " filled" : "");
+    t.className = "tick";
     progressTicksEl.appendChild(t);
   }
-}
 
-/* ============================================================
-   Sidebar rendering
-   ============================================================ */
-function rankClass(rank){
-  if (rank === "FLAWLESS") return "flawless";
-  if (rank === "SHARP") return "sharp";
-  return "escaped";
-}
-function renderSidebar(){
-  renderProgress();
   roomMapEl.innerHTML = "";
   ROOMS.forEach(function(room){
     if (room.bonus){
@@ -1079,37 +1065,80 @@ function renderSidebar(){
     var li = document.createElement("li");
     var btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "door-btn" + (state.solved[room.id] ? " solved" : "") + (room.bonus ? " bonus" : "");
-    var locked = room.bonus ? !state.solved[MAIN_TOTAL] : room.id > state.unlocked;
-    btn.disabled = locked;
-    btn.setAttribute("aria-current", room.id === state.currentRoom ? "true" : "false");
-    var rank = state.ranks[room.id];
+    btn.dataset.roomId = room.id;
+    btn.className = "door-btn";
     btn.innerHTML =
-      '<span class="num">'+ (state.solved[room.id] ? "" : (room.bonus ? "\u2605" : room.id)) +'</span>' +
+      '<span class="num"></span>' +
       '<span class="label"><span class="t">'+escapeHtml(room.title)+'</span><span class="c">'+escapeHtml(room.concept)+'</span></span>' +
-      (rank ? '<span class="rank '+rankClass(rank)+'">'+rank+'</span>' : "");
-    btn.addEventListener("click", function(roomId){
-      return function(){
-        playClick();
-        state.currentRoom = roomId;
-        saveState();
-        renderAll();
-        roomViewEl.scrollIntoView({ behavior: "smooth", block: "start" });
-      };
-    }(room.id));
+      '<span class="rank-container"></span>';
+    btn.addEventListener("click", function(){
+      playClick();
+      state.currentRoom = room.id;
+      saveState();
+      renderAll();
+      roomViewEl.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
     li.appendChild(btn);
     roomMapEl.appendChild(li);
   });
 
   badgeShelfEl.innerHTML = "";
   ROOMS.forEach(function(room){
-    var earned = !!state.badges[room.id];
     var span = document.createElement("span");
-    span.className = "badge" + (earned ? " earned" : "");
-    span.title = earned ? (room.badge + " \u2014 earned") : (room.badge + " \u2014 locked");
-    span.textContent = earned ? "\u2605" : "\u2022";
+    span.className = "badge";
+    span.dataset.roomId = room.id;
     badgeShelfEl.appendChild(span);
   });
+}
+
+function updateSidebar(){
+  var solvedCount = 0;
+  for (var i=1;i<=MAIN_TOTAL;i++){ if (state.solved[i]) solvedCount++; }
+  progressValueEl.textContent = solvedCount + " / " + MAIN_TOTAL;
+  
+  var ticks = progressTicksEl.querySelectorAll(".tick");
+  for (var j=1;j<=MAIN_TOTAL;j++){
+    if (ticks[j-1]) {
+      ticks[j-1].className = "tick" + (state.solved[j] ? " filled" : "");
+    }
+  }
+
+  var roomBtns = roomMapEl.querySelectorAll(".door-btn");
+  for (var k=0; k<roomBtns.length; k++) {
+    var btn = roomBtns[k];
+    var roomId = parseInt(btn.dataset.roomId, 10);
+    var room = null;
+    for (var r=0; r<ROOMS.length; r++) { if (ROOMS[r].id === roomId) { room = ROOMS[r]; break; } }
+    var isSolved = state.solved[roomId];
+    
+    btn.className = "door-btn" + (isSolved ? " solved" : "") + (room.bonus ? " bonus" : "");
+    var locked = room.bonus ? !state.solved[MAIN_TOTAL] : roomId > state.unlocked;
+    btn.disabled = locked;
+    btn.setAttribute("aria-current", roomId === state.currentRoom ? "true" : "false");
+    
+    var rank = state.ranks[roomId];
+    var rankContainer = btn.querySelector(".rank-container");
+    if (rank) {
+      rankContainer.innerHTML = '<span class="rank '+rankClass(rank)+'">'+rank+'</span>';
+    } else {
+      rankContainer.innerHTML = '';
+    }
+    
+    var numSpan = btn.querySelector(".num");
+    numSpan.textContent = isSolved ? "" : (room.bonus ? "\u2605" : room.id);
+  }
+
+  var badges = badgeShelfEl.querySelectorAll(".badge");
+  for (var m=0; m<badges.length; m++) {
+    var span = badges[m];
+    var roomId2 = parseInt(span.dataset.roomId, 10);
+    var room2 = null;
+    for (var n=0; n<ROOMS.length; n++) { if (ROOMS[n].id === roomId2) { room2 = ROOMS[n]; break; } }
+    var earned = !!state.badges[roomId2];
+    span.className = "badge" + (earned ? " earned" : "");
+    span.title = earned ? (room2.badge + " \u2014 earned") : (room2.badge + " \u2014 locked");
+    span.textContent = earned ? "\u2605" : "\u2022";
+  }
 }
 
 /* ============================================================
@@ -1565,7 +1594,7 @@ function escapeHtml(s){
    Wiring
    ============================================================ */
 function renderAll(){
-  renderSidebar();
+  updateSidebar();
   renderSoundToggle();
   var room = ROOMS.filter(function(r){ return r.id === state.currentRoom; })[0] || ROOMS[0];
   renderRoom(room);
@@ -1595,6 +1624,7 @@ printBtn.addEventListener("click", function(){
 });
 
 initConfetti();
+initSidebar();
 renderAll();
 if (state.solved[MAIN_TOTAL]){
   renderFinale();
