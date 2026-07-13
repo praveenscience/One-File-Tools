@@ -290,7 +290,7 @@ function buildPillarCards() {
       id: "tools",
       title: "One File Tools",
       count: totalCount + " tools and counting",
-      desc: "CSS generators, JSON utilities, SEO helpers, and more.",
+      desc: "CSS generators, JSON utilities, SEO helpers, Developer tools, and more.",
       icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.1-.4-.4-2.1z"/></svg>'
     },
     {
@@ -304,21 +304,21 @@ function buildPillarCards() {
       id: "portfolio",
       title: "One File Portfolio",
       count: portfolioThemes.length + " theme" + (portfolioThemes.length === 1 ? "" : "s"),
-      desc: "Developer portfolio themes from a single JSON file. Dark/light, responsive.",
+      desc: "Developer portfolio themes from a single JSON file. Dark/light, compelling, responsive.",
       icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M7 6.5h.01M10 6.5h.01"/></svg>'
     },
     {
       id: "quests",
       title: "One File Quests",
       count: totalQuestCount + " quest" + (totalQuestCount === 1 ? "" : "s"),
-      desc: "Interactive, gamified lessons to learn Git, CSS, and JS by doing.",
+      desc: "Interactive, gamified lessons to learn General dev skills, Git, CSS, JS, and CLI workflows by doing.",
       icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z"/></svg>'
     },
     {
       id: "quizzes",
       title: "One File Quizzes",
       count: totalQuizCount + " quiz" + (totalQuizCount === 1 ? "" : "zes"),
-      desc: "Quick multiple-choice challenges to test your Git, CSS, and JS knowledge.",
+      desc: "Quick multiple-choice challenges to test your Git, CSS, JS, and general knowledge.",
       icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>'
     },
     {
@@ -575,4 +575,3 @@ console.log("  " + totalQuestCount + " quests across " + questCategories.length 
 console.log("  " + totalQuizCount + " quizzes across " + quizCategories.length + " categories");
 console.log("  Template: " + templatePath);
 console.log("  Output: " + outPath);
-
