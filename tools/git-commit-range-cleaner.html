@@ -1,0 +1,1272 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description"
+        content="Paste a git log history excerpt to plan interactive git rebases, automatically normalize messages to Conventional Commits standards, and generate git-rebase-todo plans." />
+    <title>Commit Message & Range Cleaner — One File Tools</title>
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap"
+        rel="stylesheet" />
+    <script src="https://unpkg.com/feather-icons"></script>
+
+    <style>
+        /* ========================================
+       Reset & Design Tokens
+       ======================================== */
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg-dark: #090d16;
+            --bg-gradient: radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.15) 0%, rgba(9, 13, 22, 0) 75%), linear-gradient(135deg, #090d16 0%, #0d1222 100%);
+            --panel-bg: rgba(17, 24, 39, 0.6);
+            --panel-border: rgba(255, 255, 255, 0.08);
+            --panel-border-strong: rgba(255, 255, 255, 0.16);
+            --panel-soft: rgba(255, 255, 255, 0.03);
+
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --text-subtle: #6b7280;
+
+            --color-primary: #6366f1;
+            --color-primary-hover: #4f46e5;
+            --color-primary-glow: rgba(99, 102, 241, 0.25);
+
+            --color-success: #10b981;
+            --color-success-bg: rgba(16, 185, 129, 0.1);
+            --color-success-glow: rgba(16, 185, 129, 0.2);
+
+            --color-warning: #f59e0b;
+            --color-warning-bg: rgba(245, 158, 11, 0.1);
+            --color-warning-glow: rgba(245, 158, 11, 0.2);
+
+            --color-danger: #ef4444;
+            --color-danger-bg: rgba(239, 68, 68, 0.1);
+            --color-danger-glow: rgba(239, 68, 68, 0.2);
+
+            --color-info: #06b6d4;
+            --color-info-bg: rgba(6, 182, 212, 0.1);
+
+            --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.15);
+            --radius: 12px;
+            --mono: "JetBrains Mono", monospace;
+            --sans: "Plus Jakarta Sans", sans-serif;
+        }
+
+        body {
+            background: var(--bg-dark);
+            background-image: var(--bg-gradient);
+            background-attachment: fixed;
+            color: var(--text-main);
+            font-family: var(--sans);
+            line-height: 1.6;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        /* ========================================
+       Header & Layout
+       ======================================== */
+        header {
+            max-width: 1400px;
+            margin: 0 auto 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .header-title-area {
+            max-width: 800px;
+        }
+
+        .eyebrow {
+            color: var(--color-primary);
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            font-weight: 800;
+            letter-spacing: 0.15em;
+            margin-bottom: 0.5rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        h1 {
+            font-size: clamp(1.8rem, 4vw, 2.8rem);
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            line-height: 1.1;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(to right, #ffffff 40%, #c7d2fe 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+        }
+
+        .privacy-badge {
+            background: rgba(99, 102, 241, 0.08);
+            border: 1px solid rgba(99, 102, 241, 0.25);
+            border-radius: var(--radius);
+            padding: 0.6rem 1rem;
+            color: #c7d2fe;
+            font-weight: 600;
+            font-size: 0.85rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.05);
+        }
+
+        main {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+            gap: 24px;
+            align-items: start;
+        }
+
+        @media (max-width: 1024px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ========================================
+       UI Panels
+       ======================================== */
+        .panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: var(--radius);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--panel-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .panel-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .panel-title i {
+            width: 18px;
+            height: 18px;
+            color: var(--color-primary);
+        }
+
+        .panel-body {
+            padding: 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        /* ========================================
+       Form & Inputs
+       ======================================== */
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-label {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        textarea.log-textarea {
+            width: 100%;
+            height: 240px;
+            background: rgba(5, 7, 12, 0.8);
+            border: 1px solid var(--panel-border);
+            color: #e5e7eb;
+            font-family: var(--mono);
+            font-size: 0.85rem;
+            padding: 16px;
+            border-radius: 8px;
+            resize: vertical;
+            outline: none;
+            line-height: 1.4;
+        }
+
+        textarea.log-textarea:focus {
+            border-color: var(--color-primary);
+            box-shadow: 0 0 10px var(--color-primary-glow);
+        }
+
+        select {
+            background: rgba(5, 7, 12, 0.6);
+            border: 1px solid var(--panel-border);
+            color: var(--text-main);
+            font-family: var(--sans);
+            font-weight: 500;
+            padding: 0.5rem 0.8rem;
+            border-radius: 8px;
+            outline: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        select:focus {
+            border-color: var(--color-primary);
+        }
+
+        /* Checkbox option row */
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .checkbox-row input {
+            accent-color: var(--color-primary);
+            width: 16px;
+            height: 16px;
+        }
+
+        /* ========================================
+       Rebase Table Planner
+       ======================================== */
+        .table-viewport {
+            overflow-x: auto;
+            border-radius: 8px;
+            border: 1px solid var(--panel-border);
+            background: rgba(5, 7, 12, 0.2);
+            max-height: 420px;
+            overflow-y: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.85rem;
+        }
+
+        th,
+        td {
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--panel-border);
+            vertical-align: middle;
+        }
+
+        th {
+            background: rgba(5, 7, 12, 0.8);
+            font-weight: 700;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        tr.row-drop td {
+            opacity: 0.4;
+        }
+
+        /* Command cell coloring */
+        select.rebase-action-select {
+            font-weight: 700;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            border-radius: 6px;
+            padding: 4px 8px;
+            border: 1px solid transparent;
+            cursor: pointer;
+        }
+
+        select.rebase-action-select.act-pick {
+            background: rgba(59, 130, 246, 0.12);
+            color: #60a5fa;
+            border-color: rgba(59, 130, 246, 0.25);
+        }
+
+        select.rebase-action-select.act-reword {
+            background: rgba(99, 102, 241, 0.12);
+            color: #a5b4fc;
+            border-color: rgba(99, 102, 241, 0.25);
+        }
+
+        select.rebase-action-select.act-edit {
+            background: rgba(6, 182, 212, 0.12);
+            color: #22d3ee;
+            border-color: rgba(6, 182, 212, 0.25);
+        }
+
+        select.rebase-action-select.act-squash {
+            background: rgba(245, 158, 11, 0.12);
+            color: #fcd34d;
+            border-color: rgba(245, 158, 11, 0.25);
+        }
+
+        select.rebase-action-select.act-fixup {
+            background: rgba(217, 119, 6, 0.12);
+            color: #fbbf24;
+            border-color: rgba(217, 119, 6, 0.25);
+        }
+
+        select.rebase-action-select.act-drop {
+            background: rgba(239, 68, 68, 0.12);
+            color: #fca5a5;
+            border-color: rgba(239, 68, 68, 0.25);
+        }
+
+        td.commit-hash {
+            font-family: var(--mono);
+            font-weight: 700;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+
+        /* Message fields */
+        .subject-container {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            min-width: 250px;
+        }
+
+        .orig-msg {
+            font-size: 0.76rem;
+            color: var(--text-subtle);
+            font-family: var(--mono);
+            word-break: break-all;
+        }
+
+        .input-wrapper {
+            display: flex;
+            gap: 6px;
+            position: relative;
+            align-items: center;
+        }
+
+        input[type="text"].message-edit-input {
+            flex: 1;
+            background: rgba(5, 7, 12, 0.8);
+            border: 1px solid var(--panel-border);
+            color: #f3f4f6;
+            font-family: var(--mono);
+            font-size: 0.8rem;
+            padding: 5px 10px;
+            border-radius: 6px;
+            outline: none;
+        }
+
+        input[type="text"].message-edit-input:focus {
+            border-color: var(--color-primary);
+        }
+
+        /* Suggestion badge overlay */
+        .badge-warn-marker {
+            color: var(--color-warning);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .badge-warn-marker i {
+            width: 14px;
+            height: 14px;
+        }
+
+        /* ========================================
+       Buttons & Toolbars
+       ======================================== */
+        .toolbar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        button.toolbar-btn {
+            background: var(--panel-soft);
+            border: 1px solid var(--panel-border);
+            color: var(--text-main);
+            font-family: var(--sans);
+            font-weight: 600;
+            font-size: 0.8rem;
+            padding: 0.5rem 0.8rem;
+            border-radius: 8px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            user-select: none;
+        }
+
+        button.toolbar-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--panel-border-strong);
+            transform: translateY(-1px);
+        }
+
+        button.toolbar-btn.primary {
+            background: var(--color-primary);
+            border-color: transparent;
+        }
+
+        button.toolbar-btn.primary:hover {
+            background: var(--color-primary-hover);
+            box-shadow: 0 0 12px var(--color-primary-glow);
+        }
+
+        button.toolbar-btn.danger:hover {
+            background: var(--color-danger);
+            border-color: transparent;
+        }
+
+        /* ========================================
+       Outputs Tabs & Pre Codeblocks
+       ======================================== */
+        .tabs {
+            display: flex;
+            background: rgba(5, 7, 12, 0.5);
+            padding: 4px;
+            border-radius: 8px;
+            border: 1px solid var(--panel-border);
+        }
+
+        .tab {
+            background: transparent;
+            border: none;
+            outline: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .tab:hover {
+            color: var(--text-main);
+        }
+
+        .tab.active {
+            background: var(--color-primary);
+            color: #ffffff;
+        }
+
+        .output-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        pre.output-preview {
+            background: #020617;
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            padding: 16px;
+            font-family: var(--mono);
+            font-size: 0.82rem;
+            color: #93c5fd;
+            white-space: pre-wrap;
+            word-break: break-all;
+            line-height: 1.5;
+            min-height: 140px;
+            max-height: 350px;
+            overflow-y: auto;
+        }
+
+        /* Notification Toast alert */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #1e293b;
+            border: 1px solid var(--panel-border-strong);
+            color: #ffffff;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+            z-index: 999;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: none;
+        }
+
+        .toast.active {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast i {
+            width: 16px;
+            height: 16px;
+            color: var(--color-success);
+        }
+
+        /* Presets details warning notice block */
+        .alert-box {
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 0.82rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            background: rgba(245, 158, 11, 0.04);
+            border: 1px solid rgba(245, 158, 11, 0.15);
+            color: #fcd34d;
+            line-height: 1.4;
+        }
+
+        .alert-box i {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        footer {
+            max-width: 1400px;
+            margin: 2rem auto 0;
+            text-align: center;
+            color: var(--text-subtle);
+            font-size: 0.85rem;
+            border-top: 1px solid var(--panel-border);
+            padding-top: 1.5rem;
+        }
+
+        footer a {
+            color: var(--color-primary);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="header-title-area">
+            <span class="eyebrow"><i data-feather="git-commit"></i> Git Version Control</span>
+            <h1>Commit Message & Range Cleaner</h1>
+            <p>Paste a git log history segment, customize interactive rebase commands, and auto-clean commit messages.
+            </p>
+        </div>
+        <div class="privacy-badge">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"
+                style="margin-right: 4px;">
+                <path
+                    d="M12,1L3,5v6c0,5.55,3.84,10.74,9,12c5.16-1.26,9-6.45,9-12V5L12,1L12,1z M12,11.99h7c-0.53,4.12-3.28,7.79-7,8.94V12H5V6.3l7-3.11V11.99z" />
+            </svg>
+            100% Offline & Secure
+        </div>
+    </header>
+
+    <main>
+        <!-- Left Panel: Input Log -->
+        <section class="panel" aria-labelledby="input-panel-title">
+            <div class="panel-header">
+                <h2 id="input-panel-title" class="panel-title"><i data-feather="file-text"></i> Git Log History Input
+                </h2>
+                <div class="toolbar">
+                    <button class="toolbar-btn primary" id="parse-log-btn"><i data-feather="activity"></i> Parse
+                        History</button>
+                    <button class="toolbar-btn danger" id="clear-log-btn"><i data-feather="trash-2"></i> Clear</button>
+                </div>
+            </div>
+            <div class="panel-body">
+                <!-- Preset Select -->
+                <div class="form-group">
+                    <label for="log-presets" class="form-label">Load Template Examples</label>
+                    <select id="log-presets">
+                        <option value="messy">⚠️ Messy Commits (Typos, WIPs, missing conventional structure)</option>
+                        <option value="part-conventional">⚖️ Partially Conventional Log (Fixes & additions mixture)
+                        </option>
+                        <option value="standard-oneline">📄 Git log --oneline output format</option>
+                    </select>
+                </div>
+
+                <!-- Raw Git log Area -->
+                <div class="form-group">
+                    <label for="raw-log-input" class="form-label">Pasted Git Log (git log or git log --oneline)</label>
+                    <textarea id="raw-log-input" class="log-textarea"
+                        placeholder="Paste your git log terminal outputs here...&#10;e.g.&#10;commit a1b2c3d4e5f6...&#10;Author: John Doe&#10;Date: Mon Jul 12...&#10;    fixed billing validation bugs.&#10;&#10;OR&#10;a1b2c3d fix login logic."></textarea>
+                </div>
+
+                <!-- Settings block -->
+                <div class="alert-box">
+                    <i data-feather="info"></i>
+                    <div>The planner lists commits from oldest to newest (bottom-up from log) representing the exact
+                        order Git interactive rebase executes them.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Panel: Rebase Planner Table & Outputs -->
+        <section class="panel" aria-labelledby="planner-panel-title">
+            <div class="panel-header">
+                <h2 id="planner-panel-title" class="panel-title"><i data-feather="sliders"></i> Interactive Rebase
+                    Planner</h2>
+                <div class="toolbar">
+                    <button class="toolbar-btn" id="bulk-cc-btn"><i data-feather="magic"></i> Clean All</button>
+                    <button class="toolbar-btn" id="bulk-pick-btn">Pick All</button>
+                    <button class="toolbar-btn" id="export-json-btn"><i data-feather="download"></i> Export</button>
+                </div>
+            </div>
+            <div class="panel-body">
+                <!-- Interactive planner table -->
+                <div class="table-viewport">
+                    <table id="rebase-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 130px;">Action</th>
+                                <th style="width: 90px;">Hash</th>
+                                <th>Commit Message & Suggestions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rebase-table-body">
+                            <tr>
+                                <td colspan="3" style="text-align: center; color: var(--text-subtle); padding: 30px;">
+                                    Paste a git log history on the left and click "Parse History".
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Outputs section -->
+                <div class="output-group">
+                    <div class="tabs">
+                        <button class="tab active" data-output="todo">git-rebase-todo file</button>
+                        <button class="tab" data-output="cmds">Rebase Command</button>
+                        <button class="tab" data-output="summary">Changelog Summary</button>
+                    </div>
+
+                    <div class="form-group" style="position: relative;">
+                        <pre class="output-preview" id="output-code-preview"></pre>
+                        <button class="toolbar-btn" id="copy-output-btn"
+                            style="position: absolute; right: 12px; bottom: 12px; padding: 4px 8px; font-size: 0.75rem;">
+                            <i data-feather="copy" style="width: 14px; height: 14px;"></i> Copy Block
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>Part of <a href="https://github.com/praveenscience/One-File-Tools" target="_blank"
+                rel="noopener noreferrer">One File Tools</a> — Developer utilities, one file each.</p>
+    </footer>
+
+    <!-- Toast copy feedback -->
+    <div class="toast" id="toast">
+        <i data-feather="check"></i>
+        <span id="toast-message">Copied to clipboard!</span>
+    </div>
+
+    <!-- Core App Logic Script -->
+    <script>
+        // ========================================
+        // Sample presets git log data
+        // ========================================
+        const PRESETS = {
+            messy: `commit e4f5g6h7i8j9
+Author: Miles Dyson <dyson@cyberdyne.com>
+Date:   Mon Jul 12 18:22:15 2026 +0530
+
+    fixed user settings routing issue.
+
+commit a1b2c3d4e5f6
+Author: Miles Dyson <dyson@cyberdyne.com>
+Date:   Mon Jul 12 18:15:30 2026 +0530
+
+    added validator schema for profile forms (BREAKING CHANGE)
+
+commit c9d8b7a6f5e4
+Author: Miles Dyson <dyson@cyberdyne.com>
+Date:   Mon Jul 12 18:00:12 2026 +0530
+
+    cleanup logs and comments.
+
+commit f1e2d3c4b5a6
+Author: Miles Dyson <dyson@cyberdyne.com>
+Date:   Mon Jul 12 17:45:00 2026 +0530
+
+    wip database connection`,
+
+            "part-conventional": `commit f5a6b7c8d9e0
+Author: Miles Dyson <dyson@cyberdyne.com>
+Date:   Mon Jul 12 18:40:00 2026 +0530
+
+    docs: fix spelling inside configuration guides.
+
+commit d3c4b5a6e7f8
+Author: Miles Dyson <dyson@cyberdyne.com>
+Date:   Mon Jul 12 18:30:15 2026 +0530
+
+    renamed user profile endpoints. BREAKING CHANGE: url changed
+
+commit b2c3d4e5f6a7
+Author: Miles Dyson <dyson@cyberdyne.com>
+Date:   Mon Jul 12 18:20:00 2026 +0530
+
+    feat: add google OAuth integrations login button`,
+
+            "standard-oneline": `e4f5g6h style: format code layout and spaces.
+a1b2c3d added error boundaries for routing pages
+c9d8b7a wip
+f1e2d3c fix: resolve memory leak on event listener.`
+        };
+
+        // ========================================
+        // Global App State
+        // ========================================
+        let activeCommits = []; // stores parsed commits
+        let activeOutputTab = "todo"; // "todo" | "cmds" | "summary"
+
+        document.addEventListener("DOMContentLoaded", () => {
+            feather.replace();
+
+            // Bind element nodes
+            const rawLogInput = document.getElementById("raw-log-input");
+            const logPresets = document.getElementById("log-presets");
+            const parseLogBtn = document.getElementById("parse-log-btn");
+            const clearLogBtn = document.getElementById("clear-log-btn");
+
+            const rebaseTableBody = document.getElementById("rebase-table-body");
+
+            const bulkCcBtn = document.getElementById("bulk-cc-btn");
+            const bulkPickBtn = document.getElementById("bulk-pick-btn");
+            const exportJsonBtn = document.getElementById("export-json-btn");
+
+            const tabsWrap = document.querySelector(".tabs");
+            const outputCodePreview = document.getElementById("output-code-preview");
+            const copyOutputBtn = document.getElementById("copy-output-btn");
+
+            // Load default preset messy
+            logPresets.value = "messy";
+            loadPreset("messy");
+
+            logPresets.addEventListener("change", (e) => {
+                loadPreset(e.target.value);
+            });
+
+            function loadPreset(name) {
+                const content = PRESETS[name];
+                if (content) {
+                    rawLogInput.value = content;
+                    parseGitLog();
+                }
+            }
+
+            parseLogBtn.addEventListener("click", parseGitLog);
+
+            clearLogBtn.addEventListener("click", () => {
+                rawLogInput.value = "";
+                activeCommits = [];
+                renderRebasePlanner();
+                updateOutputPreview();
+                showToast("Editor cleared");
+            });
+
+            // ========================================
+            // Git Log Parsing Logic
+            // ========================================
+            function parseGitLog() {
+                const raw = rawLogInput.value.trim();
+                if (!raw) {
+                    showToast("Git log is empty", true);
+                    return;
+                }
+
+                const parsed = [];
+
+                // Detect format type
+                if (raw.includes("commit ") && (raw.includes("Author:") || raw.includes("Date:"))) {
+                    // Full git log structure
+                    const commitBlocks = raw.split(/^commit\s+/m);
+                    commitBlocks.forEach((block) => {
+                        const lines = block.trim().split("\n");
+                        if (lines.length < 2 || !lines[0]) return;
+
+                        const hash = lines[0].substring(0, 7);
+
+                        // Find first indented line (this represents the commit subject)
+                        let subject = "";
+                        let body = "";
+                        let foundSubject = false;
+
+                        for (let i = 1; i < lines.length; i++) {
+                            const line = lines[i];
+                            if (line.startsWith("    ") || line.startsWith("\t")) {
+                                if (!foundSubject) {
+                                    subject = line.trim();
+                                    foundSubject = true;
+                                } else {
+                                    body += line.trim() + "\n";
+                                }
+                            }
+                        }
+
+                        if (subject) {
+                            parsed.push({ hash, subject, body, action: "pick", rewritten: subject });
+                        }
+                    });
+                    // Rebase works from oldest to newest (bottom to top of log block)
+                    parsed.reverse();
+                } else {
+                    // Oneline format (e.g. hash message)
+                    const lines = raw.split("\n");
+                    lines.forEach((line) => {
+                        const trimmed = line.trim();
+                        if (!trimmed) return;
+
+                        // Match hash (first word, alphanumeric, 7 to 40 chars)
+                        const match = trimmed.match(/^([a-fA-F0-9]{7,40})\s+(.*)$/);
+                        if (match) {
+                            const hash = match[1].substring(0, 7);
+                            const subject = match[2].trim();
+                            parsed.push({ hash, subject, body: "", action: "pick", rewritten: subject });
+                        }
+                    });
+                    // git log --oneline outputs newest first, so we reverse it
+                    parsed.reverse();
+                }
+
+                if (parsed.length === 0) {
+                    showToast("No commits could be parsed from input", true);
+                    return;
+                }
+
+                // Generate auto-suggestions
+                parsed.forEach((c) => {
+                    const suggestion = generateCcSuggestion(c.subject, c.body);
+                    c.rewritten = suggestion.suggested;
+                    c.suggestion = suggestion;
+                });
+
+                activeCommits = parsed;
+                renderRebasePlanner();
+                updateOutputPreview();
+                showToast(`Parsed ${parsed.length} commits successfully!`);
+            }
+
+            // ========================================
+            // Conventional Commits Suggestions Generator
+            // ========================================
+            function generateCcSuggestion(subject, body = "") {
+                let cleaned = subject.trim();
+                if (cleaned.endsWith(".")) {
+                    cleaned = cleaned.substring(0, cleaned.length - 1);
+                }
+
+                // Check if already matches Conventional Commits
+                const ccRegex = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-zA-Z0-9_-]+\))?(!?): (.*)$/i;
+                const match = cleaned.match(ccRegex);
+                let type = "";
+                let scope = "";
+                let breaking = "";
+                let desc = "";
+
+                if (match) {
+                    type = match[1].toLowerCase();
+                    scope = match[2] || "";
+                    breaking = match[3] || "";
+                    desc = match[4];
+
+                    // If breaking change in desc/body but missing "!" marker
+                    if (!breaking && (/breaking change/i.test(desc) || /breaking change/i.test(body))) {
+                        breaking = "!";
+                    }
+
+                    // Lowercase first letter of description
+                    if (desc) {
+                        desc = desc.charAt(0).toLowerCase() + desc.slice(1);
+                    }
+
+                    return {
+                        valid: true,
+                        original: subject,
+                        suggested: `${type}${scope}${breaking}: ${desc}`,
+                        warnings: []
+                    };
+                }
+
+                // Map messy prefixes
+                const prefixes = [
+                    { regex: /^(fix(ed|es)?|resolved?|bugfix)\s+(.*)$/i, type: "fix", desc: "resolve $3" },
+                    { regex: /^(add(ed|ing)?|new|create(d)?)\s+(.*)$/i, type: "feat", desc: "add $4" },
+                    { regex: /^(refactor(ed|ing)?|cleanup|clean)\s+(.*)$/i, type: "refactor", desc: "$3" },
+                    { regex: /^(update(d|s)?|modify|modified|change(d)?)\s+(.*)$/i, type: "chore", desc: "update $4" },
+                    { regex: /^(doc(s|umentation)?|readme)\s+(.*)$/i, type: "docs", desc: "update $3" },
+                    { regex: /^(test(s|ed|ing)?|spec(s)?)\s+(.*)$/i, type: "test", desc: "add tests for $4" },
+                    { regex: /^(perf(ormance)?|optimize(d|s)?)\s+(.*)$/i, type: "perf", desc: "optimize $4" },
+                    { regex: /^(style(s|d)?|format(ted)?|lint(ed)?)\s+(.*)$/i, type: "style", desc: "format $4" }
+                ];
+
+                // Check custom mappings
+                if (/^wip$/i.test(cleaned)) {
+                    return { valid: false, original: subject, suggested: "chore: work in progress", warnings: ["Message is vague WIP"] };
+                }
+                if (/^temp$/i.test(cleaned)) {
+                    return { valid: false, original: subject, suggested: "chore: temporary commit", warnings: ["Message is vague temporary commit"] };
+                }
+
+                for (const p of prefixes) {
+                    const pm = cleaned.match(p.regex);
+                    if (pm) {
+                        type = p.type;
+                        desc = p.desc.replace("$3", pm[3]).replace("$4", pm[4]).trim();
+                        desc = desc.charAt(0).toLowerCase() + desc.slice(1);
+                        if (/breaking change/i.test(desc) || /breaking change/i.test(body)) {
+                            breaking = "!";
+                        }
+                        return {
+                            valid: false,
+                            original: subject,
+                            suggested: `${type}${breaking}: ${desc}`,
+                            warnings: ["Converted messy prefix to conventional syntax"]
+                        };
+                    }
+                }
+
+                // Fallback chore
+                desc = cleaned.charAt(0).toLowerCase() + cleaned.slice(1);
+                if (/breaking change/i.test(desc) || /breaking change/i.test(body)) {
+                    breaking = "!";
+                }
+                return {
+                    valid: false,
+                    original: subject,
+                    suggested: `chore${breaking}: ${desc}`,
+                    warnings: ["Could not identify type prefix, defaulted to chore"]
+                };
+            }
+
+            // ========================================
+            // Render Rebase Planner Rows
+            // ========================================
+            function renderRebasePlanner() {
+                rebaseTableBody.innerHTML = "";
+
+                if (activeCommits.length === 0) {
+                    rebaseTableBody.innerHTML = `
+              <tr>
+                <td colspan="3" style="text-align: center; color: var(--text-subtle); padding: 30px;">
+                  Paste a git log history on the left and click "Parse History".
+                </td>
+              </tr>
+            `;
+                    return;
+                }
+
+                activeCommits.forEach((c, index) => {
+                    const tr = document.createElement("tr");
+                    tr.id = `commit-row-${index}`;
+                    if (c.action === "drop") {
+                        tr.className = "row-drop";
+                    }
+
+                    // 1. Action Dropdown
+                    const actionTd = document.createElement("td");
+                    const select = document.createElement("select");
+                    select.className = `rebase-action-select act-${c.action}`;
+
+                    const actions = ["pick", "reword", "edit", "squash", "fixup", "drop"];
+                    actions.forEach((a) => {
+                        const opt = document.createElement("option");
+                        opt.value = a;
+                        opt.textContent = a;
+                        if (c.action === a) opt.selected = true;
+                        select.appendChild(opt);
+                    });
+
+                    select.addEventListener("change", (e) => {
+                        const oldAct = c.action;
+                        c.action = e.target.value;
+
+                        // Style change
+                        select.className = `rebase-action-select act-${c.action}`;
+                        tr.classList.toggle("row-drop", c.action === "drop");
+
+                        // If action changes to squash/fixup, but it is the very first commit (index 0)
+                        if ((c.action === "squash" || c.action === "fixup") && index === 0) {
+                            showToast("The first commit in a rebase plan cannot be squashed/fixed up. Reset to pick.", true);
+                            c.action = "pick";
+                            select.className = "rebase-action-select act-pick";
+                            select.value = "pick";
+                        }
+
+                        updateOutputPreview();
+                    });
+                    actionTd.appendChild(select);
+
+                    // 2. Hash
+                    const hashTd = document.createElement("td");
+                    hashTd.className = "commit-hash";
+                    hashTd.textContent = c.hash;
+
+                    // 3. Messages & Edit field
+                    const msgTd = document.createElement("td");
+                    const subContainer = document.createElement("div");
+                    subContainer.className = "subject-container";
+
+                    const origDiv = document.createElement("div");
+                    origDiv.className = "orig-msg";
+                    origDiv.textContent = `original: ${c.subject}`;
+
+                    const inputWrap = document.createElement("div");
+                    inputWrap.className = "input-wrapper";
+
+                    const input = document.createElement("input");
+                    input.type = "text";
+                    input.className = "message-edit-input";
+                    input.value = c.rewritten;
+
+                    input.addEventListener("input", (e) => {
+                        c.rewritten = e.target.value;
+                        updateOutputPreview();
+                        validateInlineMessage(input, c);
+                    });
+
+                    // Quick suggestion action button
+                    const applyBtn = document.createElement("button");
+                    applyBtn.className = "icon-btn";
+                    applyBtn.title = `Apply suggested: ${c.suggestion.suggested}`;
+                    applyBtn.innerHTML = '<i data-feather="magic" style="width:14px; height: 14px; color: var(--color-success);"></i>';
+                    applyBtn.addEventListener("click", () => {
+                        input.value = c.suggestion.suggested;
+                        c.rewritten = c.suggestion.suggested;
+                        validateInlineMessage(input, c);
+                        updateOutputPreview();
+                        showToast("Suggestion applied");
+                    });
+
+                    // Warning icon element if non-compliant
+                    const warnIcon = document.createElement("span");
+                    warnIcon.className = "badge-warn-marker hidden";
+                    warnIcon.innerHTML = '<i data-feather="alert-triangle"></i>';
+                    warnIcon.title = "Non-compliant Conventional Commit format";
+
+                    inputWrap.appendChild(input);
+                    inputWrap.appendChild(applyBtn);
+                    inputWrap.appendChild(warnIcon);
+
+                    subContainer.appendChild(origDiv);
+                    subContainer.appendChild(inputWrap);
+                    msgTd.appendChild(subContainer);
+
+                    tr.appendChild(actionTd);
+                    tr.appendChild(hashTd);
+                    tr.appendChild(msgTd);
+                    rebaseTableBody.appendChild(tr);
+
+                    // Run inline check on load
+                    validateInlineMessage(input, c, warnIcon);
+                });
+
+                feather.replace();
+            }
+
+            // Inline validation check
+            function validateInlineMessage(inputNode, commit, warnIconNode = null) {
+                const val = inputNode.value.trim();
+                const targetWarnNode = warnIconNode || inputNode.parentNode.querySelector(".badge-warn-marker");
+
+                const ccRegex = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-zA-Z0-9_-]+\))?!?: (.*)$/;
+                const match = val.match(ccRegex);
+
+                let hasWarn = false;
+                let warningText = "";
+
+                if (!match) {
+                    hasWarn = true;
+                    warningText = "Must follow Conventional Commits formatting, e.g. type: description";
+                } else {
+                    if (val.length > 50) {
+                        hasWarn = true;
+                        warningText = "Commit subject exceeds recommended length of 50 characters";
+                    }
+                    if (val.endsWith(".")) {
+                        hasWarn = true;
+                        warningText = "Commit subject should not end with a period";
+                    }
+                }
+
+                if (hasWarn) {
+                    targetWarnNode.classList.remove("hidden");
+                    targetWarnNode.title = warningText;
+                    inputNode.style.borderColor = "rgba(245, 158, 11, 0.4)";
+                } else {
+                    targetWarnNode.classList.add("hidden");
+                    inputNode.style.borderColor = "var(--panel-border)";
+                }
+                feather.replace();
+            }
+
+            // ========================================
+            // Bulk Actions
+            // ========================================
+            bulkCcBtn.addEventListener("click", () => {
+                if (activeCommits.length === 0) return;
+                activeCommits.forEach((c) => {
+                    c.rewritten = c.suggestion.suggested;
+                    c.action = "reword";
+                });
+                // First commit cannot be reworded inside the todo if we plan to pick/reword (wait, first commit can be reworded, but squash/fixup cannot).
+                // Actually, let's keep reword.
+                renderRebasePlanner();
+                updateOutputPreview();
+                showToast("Rewritten all to suggestions");
+            });
+
+            bulkPickBtn.addEventListener("click", () => {
+                if (activeCommits.length === 0) return;
+                activeCommits.forEach((c) => {
+                    c.action = "pick";
+                });
+                renderRebasePlanner();
+                updateOutputPreview();
+                showToast("Set all to pick");
+            });
+
+            // ========================================
+            // Output Preview Updates
+            // ========================================
+            function updateOutputPreview() {
+                if (activeCommits.length === 0) {
+                    outputCodePreview.textContent = "# Rebase planner is empty.";
+                    return;
+                }
+
+                let text = "";
+
+                if (activeOutputTab === "todo") {
+                    text += "# git-rebase-todo file content\n";
+                    text += "#\n";
+                    text += "# Rebase plan generated by Commit Message & Range Cleaner\n";
+                    text += "# Commands:\n";
+                    text += "# p, pick = use commit\n";
+                    text += "# r, reword = use commit, but edit the commit message\n";
+                    text += "# e, edit = use commit, but stop for amending\n";
+                    text += "# s, squash = use commit, but meld into previous commit\n";
+                    text += "# f, fixup = like \"squash\", but discard this commit's log message\n";
+                    text += "# d, drop = remove commit\n#\n";
+
+                    activeCommits.forEach((c) => {
+                        text += `${c.action} ${c.hash} ${c.rewritten}\n`;
+                    });
+                } else if (activeOutputTab === "cmds") {
+                    text += "# Execute the interactive rebase command in your terminal:\n";
+                    // Get oldest commit hash parent
+                    const oldestHash = activeCommits[0].hash;
+                    text += `git rebase -i ${oldestHash}^\n\n`;
+                    text += "# If you have customized message rewrites, copy the todo text\n";
+                    text += "# and paste it into the git editor when it opens.\n";
+                } else if (activeOutputTab === "summary") {
+                    text += "### Git Commit Clean Range Summary\n\n";
+                    text += "| Commit | Action | Original Message | Rewritten Message |\n";
+                    text += "| :--- | :--- | :--- | :--- |\n";
+                    activeCommits.forEach((c) => {
+                        const orig = c.subject.replace(/\|/g, "\\|");
+                        const rewr = c.action === "drop" ? "~~Dropped~~" : c.rewritten.replace(/\|/g, "\\|");
+                        text += `| \`${c.hash}\` | \`${c.action}\` | ${orig} | ${rewr} |\n`;
+                    });
+                }
+
+                outputCodePreview.textContent = text;
+            }
+
+            // Tab changes
+            tabsWrap.addEventListener("click", (e) => {
+                if (e.target.classList.contains("tab")) {
+                    tabsWrap.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+                    e.target.classList.add("active");
+                    activeOutputTab = e.target.getAttribute("data-output");
+                    updateOutputPreview();
+                }
+            });
+
+            // Copy outputs button
+            copyOutputBtn.addEventListener("click", () => {
+                navigator.clipboard.writeText(outputCodePreview.textContent);
+                showToast("Output block copied!");
+            });
+
+            // ========================================
+            // Export Configuration
+            // ========================================
+            exportJsonBtn.addEventListener("click", () => {
+                if (activeCommits.length === 0) {
+                    showToast("No commits to export", true);
+                    return;
+                }
+
+                const fileContent = JSON.stringify(activeCommits, null, 2);
+                const dataUri = "data:text/json;charset=utf-8," + encodeURIComponent(fileContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", dataUri);
+                link.setAttribute("download", `git_rebase_planner_plan_${Date.now()}.json`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                showToast("Configuration plan exported!");
+            });
+        });
+    </script>
+</body>
+
+</html>
