@@ -1,0 +1,1814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Prototype Chain Séance — The Ashgrove Mansion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=UnifrakturCook:wght@700&family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=IM+Fell+English+SC&family=IM+Fell+English:ital@0;1&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg-void: #080507;
+  --wall-1: #2c0f14;
+  --wall-2: #4a1620;
+  --wall-3: #1a0a0d;
+  --parchment: #ecdfc0;
+  --parchment-dim: #c9b98f;
+  --parchment-dark: #a3906a;
+  --ink: #201410;
+  --brass: #a9822f;
+  --brass-light: #e0b463;
+  --brass-dark: #6b4d1a;
+  --blood: #7c1620;
+  --blood-light: #b23c4d;
+  --ecto: #6fe3b4;
+  --ecto-dim: #3a8f72;
+  --ecto-glow: #b6ffe3;
+  --gold-glow: #f4d78c;
+  --font-title: 'UnifrakturCook', serif;
+  --font-display: 'Cinzel Decorative', serif;
+  --font-ui: 'Cinzel', serif;
+  --font-body: 'Cormorant Garamond', serif;
+  --font-note: 'IM Fell English', serif;
+  --font-note-sc: 'IM Fell English SC', serif;
+  --font-code: 'Courier Prime', monospace;
+  --ease-lux: cubic-bezier(.22,.98,.28,1.02);
+  --ease-soft: cubic-bezier(.4,0,.2,1);
+  --ease-back: cubic-bezier(.34,1.56,.64,1);
+
+  /* z-index scale, so nothing ever silently overlaps again */
+  --z-atmosphere: 0;
+  --z-particles: 2;
+  --z-vignette: 5;
+  --z-room-bg: 1;
+  --z-room-furniture: 3;
+  --z-room-ritual: 4;
+  --z-room-plate: 6;
+  --z-shell: 10;
+  --z-toast: 60;
+  --z-decoy: 80;
+  --z-modal: 90;
+  --z-intro: 100;
+}
+
+*{ box-sizing: border-box; }
+html,body{
+  margin:0; padding:0; width:100%; height:100%;
+  background: var(--bg-void);
+  color: var(--parchment);
+  font-family: var(--font-body);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+button{ font-family: var(--font-ui); cursor:pointer; }
+::selection{ background: var(--blood); color: var(--parchment); }
+::-webkit-scrollbar{ width:10px; }
+::-webkit-scrollbar-track{ background: var(--wall-3); }
+::-webkit-scrollbar-thumb{ background: var(--brass-dark); border-radius:6px; }
+#atmosphere{
+  position:fixed; inset:0; z-index:var(--z-atmosphere); pointer-events:none;
+  background:
+    radial-gradient(ellipse at 50% -10%, rgba(122,22,32,0.22), transparent 55%),
+    radial-gradient(ellipse at 15% 110%, rgba(60,10,16,0.5), transparent 60%),
+    radial-gradient(ellipse at 90% 100%, rgba(20,8,10,0.65), transparent 55%),
+    linear-gradient(180deg, #080507 0%, #170a0d 40%, #080507 100%);
+}
+#vignette{
+  position:fixed; inset:0; z-index:var(--z-vignette); pointer-events:none;
+  box-shadow: inset 0 0 18vw rgba(0,0,0,0.85);
+  mix-blend-mode: multiply;
+}
+.particles-layer{ position:fixed; inset:0; z-index:var(--z-particles); pointer-events:none; overflow:hidden; }
+.dust{
+  position:absolute; bottom:-2vh; border-radius:50%;
+  background: radial-gradient(circle, rgba(230,214,170,0.85), rgba(230,214,170,0));
+  animation: floatUp linear infinite; opacity:0.55;
+}
+@keyframes floatUp{
+  0%{ transform: translate3d(0,0,0) scale(1); opacity:0; }
+  10%{ opacity:0.6; } 90%{ opacity:0.32; }
+  100%{ transform: translate3d(var(--drift,20px), -110vh, 0) scale(0.5); opacity:0; }
+}
+.bat{ position:absolute; animation: batFly linear infinite; opacity:0.55; }
+@keyframes batFly{
+  0%{ transform: translate(-10vw, 0) scale(1); }
+  50%{ transform: translate(55vw, -6vh) scale(0.9); }
+  100%{ transform: translate(115vw, 4vh) scale(1); }
+}
+
+/* ============================================================
+   INTRO SCREEN — full hero mansion illustration
+   ============================================================ */
+#intro{
+  position:fixed; inset:0; z-index:var(--z-intro);
+  display:flex; align-items:flex-end; justify-content:center;
+  transition: opacity 1.1s var(--ease-soft), visibility 1.1s;
+  overflow:hidden;
+}
+#intro.hidden{ opacity:0; visibility:hidden; pointer-events:none; }
+#hero-svg-holder{ position:absolute; inset:0; z-index:0; }
+#hero-svg-holder svg{ width:100%; height:100%; display:block; }
+.intro-scrim{
+  position:absolute; inset:0; z-index:1;
+  background: linear-gradient(0deg, rgba(6,3,5,0.97) 0%, rgba(6,3,5,0.9) 40%, rgba(6,3,5,0.8) 68%, rgba(6,3,5,0.4) 85%, rgba(6,3,5,0.6) 100%);
+}
+.intro-content{
+  position:relative; z-index:2; width:100%; text-align:center;
+  padding: 4vh 4vw 6vh; display:flex; flex-direction:column; align-items:center;
+}
+.intro-content h1{
+  font-family: var(--font-title); font-weight:700;
+  font-size: clamp(2.4rem, 6.4vw, 4.8rem); margin:0 0 .2rem;
+  color: var(--parchment); letter-spacing:1px;
+  text-shadow: 0 0 26px rgba(111,227,180,0.3), 0 4px 22px rgba(0,0,0,0.9);
+}
+.intro-content .subtitle{
+  font-family: var(--font-ui); font-size: clamp(.78rem, 1.4vw, 1.05rem);
+  letter-spacing:.34em; text-transform:uppercase; color: var(--brass-light); margin-bottom:1.3rem;
+}
+.intro-content p.lore{
+  max-width: 660px; font-family: var(--font-note); font-size: clamp(1rem,1.9vw,1.25rem);
+  color: var(--parchment-dim); line-height:1.65; margin: 0 0 1.8rem; font-style:italic;
+}
+.intro-actions{ display:flex; flex-direction:column; align-items:center; gap:.9rem; }
+.btn-primary{
+  font-family: var(--font-ui); font-weight:600; letter-spacing:.14em; text-transform:uppercase;
+  font-size: clamp(.82rem,1.2vw,.98rem); padding: 1rem 2.4rem; border-radius: 3px;
+  color: var(--parchment); background: linear-gradient(180deg, var(--blood-light), var(--blood) 70%);
+  border: 1px solid var(--brass); box-shadow: 0 6px 24px rgba(122,22,32,0.4), inset 0 1px 0 rgba(255,255,255,0.15);
+  transition: transform .45s var(--ease-back), box-shadow .45s var(--ease-lux);
+}
+.btn-primary:hover{ transform: translateY(-3px) scale(1.03); box-shadow: 0 10px 30px rgba(122,22,32,0.55), 0 0 26px rgba(111,227,180,0.25); }
+.btn-primary:active{ transform: translateY(0) scale(0.99); }
+.intro-toggle{
+  font-family: var(--font-body); font-size:.92rem; color: var(--parchment-dark);
+  display:flex; gap:.5rem; align-items:center; cursor:pointer; user-select:none;
+}
+.intro-toggle input{ accent-color: var(--brass); }
+.intro-hint{
+  margin-top:.4rem; font-family:var(--font-note); font-style:italic; font-size:.85rem; color: var(--parchment-dark);
+}
+
+/* ============================================================
+   GAME SHELL
+   ============================================================ */
+#game{
+  position:fixed; inset:0; z-index:var(--z-shell); display:flex; flex-direction:column;
+  opacity:0; visibility:hidden; transition: opacity 1s var(--ease-soft);
+}
+#game.active{ opacity:1; visibility:visible; }
+
+/* Topbar */
+#topbar{
+  display:flex; align-items:center; gap: clamp(.5rem,1.5vw,1.2rem);
+  padding: clamp(.5rem,1.2vh,.9rem) clamp(.8rem,2vw,2rem);
+  background: linear-gradient(180deg, rgba(16,7,9,0.95), rgba(16,7,9,0.8));
+  border-bottom: 1px solid rgba(169,130,47,0.4);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+  position:relative; z-index:20; flex-wrap: wrap; row-gap:.4rem;
+}
+.brand{ font-family: var(--font-title); font-size: clamp(1.05rem,2vw,1.5rem); color: var(--brass-light); white-space:nowrap; text-shadow:0 0 12px rgba(111,227,180,0.25); }
+.level-chip{
+  font-family: var(--font-ui); font-size: clamp(.6rem,.95vw,.74rem); letter-spacing:.1em; text-transform:uppercase;
+  color: var(--parchment-dim); border:1px solid var(--brass-dark); padding:.35rem .8rem; border-radius:20px;
+  background: rgba(111,227,180,0.05); white-space:nowrap;
+}
+.quest-block{ flex:1 1 280px; min-width:0; display:flex; flex-direction:column; gap:.1rem; padding:.15rem .9rem; border-left:2px solid var(--ecto-dim); }
+.quest-block .qb-label{ font-family: var(--font-ui); font-size:.6rem; letter-spacing:.16em; text-transform:uppercase; color: var(--ecto-dim); }
+#quest-chip{
+  font-family: var(--font-note); font-style:italic; color: var(--parchment);
+  font-size: clamp(.82rem,1.3vw,1rem); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+#quest-code{
+  font-family: var(--font-code); font-size: clamp(.68rem,1vw,.82rem); color: var(--ecto-glow);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; opacity:0.9;
+}
+.progress-dots{ display:flex; gap:.4rem; margin-left:auto; }
+.progress-dots span{
+  width:10px; height:10px; border-radius:50%; background: rgba(236,223,192,0.15);
+  border:1px solid var(--brass-dark); transition: all .5s var(--ease-lux);
+}
+.progress-dots span.done{ background: var(--ecto); box-shadow:0 0 8px var(--ecto); border-color: var(--ecto); }
+.progress-dots span.current{ background: var(--brass-light); box-shadow:0 0 10px var(--brass-light); border-color: var(--brass-light); transform:scale(1.3); }
+.icon-btn{
+  width:clamp(34px,4vw,42px); height:clamp(34px,4vw,42px); border-radius:50%;
+  background: rgba(236,223,192,0.05); border:1px solid var(--brass-dark); color: var(--brass-light);
+  display:flex; align-items:center; justify-content:center; font-size:1.05rem;
+  transition: all .3s var(--ease-soft); flex-shrink:0; position:relative;
+}
+.icon-btn:hover{ background: rgba(111,227,180,0.12); border-color: var(--ecto); color: var(--ecto-glow); transform: rotate(-6deg) scale(1.08); }
+.icon-btn .ib-tip{
+  position:absolute; top:110%; right:0; white-space:nowrap; font-family:var(--font-ui); font-size:.62rem;
+  letter-spacing:.06em; text-transform:uppercase; background: rgba(10,5,7,0.95); border:1px solid var(--brass-dark);
+  padding:.3rem .5rem; border-radius:4px; opacity:0; pointer-events:none; transition: opacity .25s;
+}
+.icon-btn:hover .ib-tip{ opacity:1; }
+
+/* Instruction strip (first chapter only, dismissible) */
+#instruction-strip{
+  background: linear-gradient(90deg, rgba(111,227,180,0.1), rgba(111,227,180,0.02));
+  border-bottom: 1px solid rgba(111,227,180,0.25);
+  padding: .5rem clamp(.8rem,2vw,2rem); display:flex; align-items:center; gap:.8rem;
+  font-family: var(--font-body); font-size: clamp(.85rem,1.3vw,1rem); color: var(--parchment-dim);
+  position:relative; z-index:19;
+}
+#instruction-strip b{ color: var(--ecto-glow); font-family:var(--font-ui); font-weight:600; font-size:.85em; }
+#instruction-strip button{
+  margin-left:auto; background:none; border:1px solid var(--brass-dark); color:var(--parchment-dark);
+  border-radius:4px; padding:.25rem .6rem; font-size:.75rem; flex-shrink:0;
+}
+#instruction-strip.hidden{ display:none; }
+
+/* Main stage */
+#stage-wrap{ flex:1; position:relative; display:flex; min-height:0; }
+#stage{ flex:1; position:relative; display:flex; align-items:center; justify-content:center; padding: clamp(.5rem,2vh,1.6rem); min-width:0; min-height:0; }
+#room-svg-holder{
+  width:min(1040px, 94%); max-width:100%; aspect-ratio: 16/9.4; position:relative;
+  filter: drop-shadow(0 30px 50px rgba(0,0,0,0.6));
+  transition: transform .5s var(--ease-lux);
+  border-radius: 10px; overflow:hidden;
+  border: 1px solid rgba(169,130,47,0.35);
+}
+#room-svg-holder.mode-ritual{ aspect-ratio:auto; min-height:60vh; overflow-y:auto; }
+
+#room-bg-target{ position:absolute; inset:0; z-index:var(--z-room-bg); }
+#room-bg-target svg{ width:100%; height:100%; display:block; }
+.furniture-layer{
+  position:absolute; inset:0; z-index:var(--z-room-furniture);
+  display:grid; grid-template-columns: repeat(auto-fit, minmax(112px,1fr));
+  align-content:center; justify-items:center; gap: clamp(.6rem,2vw,1.6rem);
+  padding: 17% 8% 6%;
+}
+.ritual-wrap{
+  position:absolute; inset:0; z-index:var(--z-room-ritual);
+  display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+  gap:1rem; padding: 15% 4% 3%; overflow-y:auto;
+}
+.room-title-plate{
+  position:absolute; top:3%; left:50%; transform:translateX(-50%); z-index:var(--z-room-plate);
+  font-family: var(--font-ui); font-weight:600; color: var(--gold-glow); letter-spacing:.1em;
+  font-size: clamp(.72rem,1.5vw,1.05rem); text-align:center; white-space:nowrap;
+  padding: .5rem 1.4rem; border-radius:20px;
+  background: rgba(8,5,7,0.62); border:1px solid rgba(169,130,47,0.5);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  pointer-events:none; max-width:88%; overflow:hidden; text-overflow:ellipsis;
+}
+
+/* Sidebar - chain breadcrumb */
+#chain-rail{
+  width: clamp(76px, 12vw, 210px); flex-shrink:0; padding: 1rem .6rem;
+  border-left:1px solid rgba(169,130,47,0.3); background: rgba(10,5,7,0.4);
+  display:flex; flex-direction:column; gap:.5rem; overflow-y:auto;
+}
+.chain-rail-title{ font-family:var(--font-ui); font-size:.62rem; letter-spacing:.14em; text-transform:uppercase; color:var(--parchment-dark); text-align:center; margin-bottom:.2rem; }
+.portrait{
+  position:relative; border-radius:6px; border:2px solid var(--brass-dark);
+  background: linear-gradient(160deg, #2b1710, #150b09);
+  padding: .4rem; display:flex; flex-direction:column; align-items:center; gap:.25rem;
+  cursor:pointer; transition: all .35s var(--ease-lux);
+}
+.portrait:hover{ border-color: var(--ecto); transform: translateY(-2px); box-shadow:0 0 14px rgba(111,227,180,0.3); }
+.portrait.current{ border-color: var(--gold-glow); box-shadow:0 0 16px rgba(244,215,140,0.35); }
+.portrait svg{ width: clamp(26px,3.6vw,48px); height:auto; }
+.portrait .p-label{ font-family: var(--font-note-sc); font-size: clamp(.5rem,.85vw,.66rem); color: var(--parchment-dim); text-align:center; letter-spacing:.02em; line-height:1.2; }
+.chain-connector{ width:2px; height:12px; background: var(--brass-dark); margin: 0 auto; }
+.chain-rail-hint{ font-family:var(--font-body); font-size:.72rem; color:var(--parchment-dark); text-align:center; margin-top:.4rem; font-style:italic; }
+
+/* Bottom controls */
+#controls{
+  display:flex; align-items:center; justify-content:center; gap: clamp(.5rem,1.4vw,.9rem);
+  padding: clamp(.6rem,1.6vh,1.1rem); flex-wrap:wrap;
+  background: linear-gradient(0deg, rgba(16,7,9,0.95), rgba(16,7,9,0.35));
+  border-top:1px solid rgba(169,130,47,0.3); position:relative; z-index:20;
+}
+.action-btn{
+  font-family: var(--font-ui); font-weight:600; letter-spacing:.05em; font-size: clamp(.66rem,1.05vw,.82rem);
+  text-transform:uppercase; padding: .68rem 1.25rem; border-radius:4px; color: var(--parchment);
+  background: linear-gradient(180deg, rgba(169,130,47,0.22), rgba(107,77,26,0.3));
+  border:1px solid var(--brass); transition: all .35s var(--ease-lux); white-space:nowrap;
+}
+.action-btn:hover:not(:disabled){ background: linear-gradient(180deg, rgba(111,227,180,0.22), rgba(58,143,114,0.2)); border-color:var(--ecto); color:var(--ecto-glow); transform:translateY(-2px); }
+.action-btn:disabled{ opacity:.28; cursor:not-allowed; }
+.action-btn.danger{ border-color: var(--blood-light); }
+.action-btn.danger:hover:not(:disabled){ background: linear-gradient(180deg, rgba(122,22,32,0.35), rgba(122,22,32,0.15)); color:#ffdada; border-color:var(--blood-light); }
+.action-btn.ghost{ background:rgba(236,223,192,0.03); }
+
+/* Furniture tiles */
+.f-tile{
+  position:relative; width:100%; max-width:132px; text-align:center; background:none; border:none; color:inherit;
+  transition: transform .35s var(--ease-lux), filter .35s; display:flex; flex-direction:column; align-items:center;
+}
+.f-tile .f-icon-wrap{ filter: drop-shadow(0 6px 10px rgba(0,0,0,0.55)); transition: filter .35s; }
+.f-tile:hover .f-icon-wrap{ filter: drop-shadow(0 0 14px rgba(111,227,180,0.55)) drop-shadow(0 6px 10px rgba(0,0,0,0.55)); }
+.f-tile:hover{ transform: translateY(-4px); }
+.f-tile .f-label{ font-family: var(--font-note-sc); font-size: clamp(.58rem,.95vw,.75rem); color: var(--parchment-dim); margin-top:.2rem; letter-spacing:.02em; line-height:1.25; }
+.f-tile .f-key{ font-family:var(--font-code); font-size:.62rem; color:var(--ecto-dim); margin-top:.1rem; }
+.f-tile.ghosted{ opacity:.55; filter: saturate(.45); }
+.f-tile.ghosted .f-icon-wrap{ animation: ghostPulse 2.4s ease-in-out infinite; }
+@keyframes ghostPulse{ 0%,100%{ opacity:.55;} 50%{ opacity:.9;} }
+.f-tile.pedestal .f-label{ color: var(--parchment-dark); font-style:italic; }
+.f-tile.correct-flash .f-icon-wrap{ animation: goldPulse .9s var(--ease-lux); }
+@keyframes goldPulse{ 0%{ filter:none;} 40%{ filter: drop-shadow(0 0 22px var(--gold-glow)); } 100%{ filter:none;} }
+.f-tile.wrong-flash{ animation: shakeX .5s var(--ease-soft); }
+@keyframes shakeX{ 0%,100%{ transform:translateX(0);} 20%{ transform:translateX(-8px) rotate(-2deg);} 40%{ transform:translateX(8px) rotate(2deg);} 60%{ transform:translateX(-6px);} 80%{ transform:translateX(6px);} }
+
+/* Toast feedback */
+#toast{
+  position:fixed; left:50%; bottom: clamp(90px,14vh,140px); transform: translateX(-50%) translateY(20px);
+  z-index:var(--z-toast); max-width:min(600px,88vw); text-align:center; padding: .9rem 1.6rem; border-radius:6px;
+  font-family: var(--font-note); font-size: clamp(.92rem,1.5vw,1.1rem); font-style:italic;
+  opacity:0; pointer-events:none; transition: all .5s var(--ease-back);
+  border:1px solid var(--brass); background: rgba(16,7,9,0.95); box-shadow:0 10px 30px rgba(0,0,0,0.6);
+}
+#toast.show{ opacity:1; transform: translateX(-50%) translateY(0); }
+#toast.good{ border-color: var(--ecto); color: var(--ecto-glow); box-shadow: 0 10px 30px rgba(111,227,180,0.25); }
+#toast.bad{ border-color: var(--blood-light); color:#ffd3d3; box-shadow: 0 10px 30px rgba(122,22,32,0.3); }
+#toast.info{ border-color: var(--brass); color: var(--parchment); }
+
+/* Decoy Ghost full overlay */
+#decoy-overlay{
+  position:fixed; inset:0; z-index:var(--z-decoy); display:flex; flex-direction:column; align-items:center; justify-content:center;
+  background: radial-gradient(circle at 50% 50%, rgba(122,22,32,0.35), rgba(5,2,3,0.94));
+  opacity:0; pointer-events:none; transition: opacity .4s var(--ease-soft); text-align:center; padding:4vh 4vw;
+}
+#decoy-overlay.show{ opacity:1; pointer-events:all; }
+#decoy-overlay svg{ width: clamp(150px,24vw,300px); animation: decoyLoom 1.6s var(--ease-back); }
+@keyframes decoyLoom{ 0%{ transform:scale(.2); opacity:0;} 60%{ transform:scale(1.15); opacity:1;} 100%{ transform:scale(1); opacity:1;} }
+#decoy-text{
+  margin-top:1.4rem; font-family: var(--font-title); font-size: clamp(1.4rem,3.6vw,2.4rem);
+  color: var(--blood-light); text-shadow: 0 0 30px rgba(122,22,32,0.9); max-width:800px;
+}
+#decoy-code{
+  margin-top:.8rem; font-family: var(--font-code); font-size: clamp(.85rem,1.4vw,1rem); color:#ffbdbd; opacity:0.9;
+}
+
+/* Modals */
+.modal-backdrop{
+  position:fixed; inset:0; z-index:var(--z-modal); background: rgba(5,2,3,0.84); backdrop-filter: blur(2px);
+  display:flex; align-items:center; justify-content:center; opacity:0; visibility:hidden;
+  transition: opacity .45s var(--ease-soft), visibility .45s; padding: 3vh 3vw;
+}
+.modal-backdrop.show{ opacity:1; visibility:visible; }
+.modal-book{
+  width:min(800px,94vw); max-height: 88vh; overflow-y:auto; border-radius:8px;
+  background: linear-gradient(160deg, #2a1810, #150c09 60%);
+  border: 2px solid var(--brass); box-shadow: 0 30px 80px rgba(0,0,0,0.8), 0 0 40px rgba(169,130,47,0.15);
+  padding: clamp(1.2rem,3vw,2.6rem); position:relative;
+}
+.modal-book h2{
+  font-family: var(--font-title); color: var(--brass-light); font-size: clamp(1.5rem,3.6vw,2.2rem);
+  margin:0 0 .3rem; text-shadow:0 0 16px rgba(111,227,180,0.2);
+}
+.modal-book .modal-sub{ font-family: var(--font-ui); font-size:.7rem; letter-spacing:.16em; text-transform:uppercase; color: var(--ecto-dim); margin-bottom:1.2rem; }
+.fg-tabs{ display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:1.2rem; }
+.fg-tab{
+  font-family: var(--font-ui); font-size:.7rem; letter-spacing:.05em; text-transform:uppercase;
+  padding:.5rem .85rem; border-radius:4px; border:1px solid var(--brass-dark); background: rgba(236,223,192,0.04);
+  color: var(--parchment-dim); transition: all .3s;
+}
+.fg-tab.active,.fg-tab:hover{ background: rgba(111,227,180,0.15); border-color: var(--ecto); color: var(--ecto-glow); }
+.fg-panel{ display:none; font-family: var(--font-body); font-size: clamp(1rem,1.6vw,1.12rem); line-height:1.7; color: var(--parchment); }
+.fg-panel.active{ display:block; animation: fadeIn .4s var(--ease-soft); }
+@keyframes fadeIn{ from{ opacity:0; transform:translateY(6px);} to{ opacity:1; transform:translateY(0);} }
+.fg-panel code{ background: rgba(0,0,0,0.4); padding:.1em .4em; border-radius:3px; color: var(--ecto-glow); font-family: var(--font-code); font-size:.9em; }
+.fg-panel pre{ background: rgba(0,0,0,0.45); padding: .9rem 1rem; border-radius:6px; overflow-x:auto; border-left:3px solid var(--ecto-dim); font-size:.86rem; color: var(--parchment); font-family: var(--font-code); line-height:1.6; }
+.fg-panel h3{ font-family: var(--font-display); color: var(--brass-light); font-size:1.1rem; margin: 1.1rem 0 .4rem; }
+.fg-panel ul{ padding-left:1.2rem; }
+.modal-close{
+  position:absolute; top: 1rem; right: 1.2rem; background:none; border:1px solid var(--brass-dark); color:var(--parchment-dim);
+  width:34px; height:34px; border-radius:50%; font-size:1.1rem; transition: all .3s; z-index:2;
+}
+.modal-close:hover{ border-color:var(--blood-light); color:#ffd3d3; transform:rotate(90deg); }
+
+/* Code console */
+.code-block{
+  background: rgba(0,0,0,0.5); border:1px solid rgba(111,227,180,0.3); border-radius:6px;
+  padding: 1rem 1.2rem; font-family: var(--font-code); font-size: clamp(.78rem,1.2vw,.92rem);
+  line-height:1.75; color: var(--parchment); overflow-x:auto; white-space:pre;
+}
+.code-block .cm{ color: var(--ecto-dim); }
+.code-block .cv{ color: var(--gold-glow); }
+.code-block .cs{ color: var(--ecto-glow); }
+.code-trace-line{ font-family: var(--font-code); font-size: clamp(.76rem,1.15vw,.88rem); padding:.3rem 0; border-bottom:1px dashed rgba(169,130,47,0.2); }
+.code-trace-line.good{ color: var(--ecto-glow); }
+.code-trace-line.bad{ color: #ff9d9d; }
+.code-trace-line.info{ color: var(--parchment-dim); }
+
+/* Ritual (Object.create level) panel */
+.ritual-parents{ display:grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: clamp(.6rem,2vw,1.2rem); width:100%; max-width:720px; }
+.ritual-parent-card{
+  border:2px solid var(--brass-dark); border-radius:8px; padding:.9rem .7rem;
+  background: linear-gradient(160deg, rgba(58,143,114,0.06), rgba(20,8,10,0.65));
+  text-align:center; transition: all .35s var(--ease-lux); display:flex; flex-direction:column; align-items:center; gap:.3rem;
+}
+.ritual-parent-card:hover{ border-color: var(--ecto); transform: translateY(-4px); box-shadow:0 10px 26px rgba(111,227,180,0.2); }
+.ritual-parent-card svg{ width: clamp(38px,5.5vw,58px); }
+.ritual-parent-card .rp-name{ font-family: var(--font-note-sc); color: var(--parchment); font-size:.85rem; margin-top:.2rem; }
+.ritual-parent-card .rp-props{ font-family: var(--font-code); font-size:.7rem; color: var(--parchment-dark); line-height:1.4; }
+.ritual-heading{ font-family: var(--font-ui); font-weight:600; color: var(--gold-glow); font-size: clamp(.95rem,1.8vw,1.2rem); text-align:center; max-width:640px; }
+.ritual-instructions{ font-family:var(--font-note); font-style:italic; color:var(--parchment-dim); font-size: clamp(.88rem,1.5vw,1.02rem); text-align:center; max-width:600px; }
+.ritual-ghost-grid{ display:grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap:.8rem; width:100%; max-width:760px; }
+.ritual-ghost-card{
+  border:1px dashed rgba(111,227,180,0.45); border-radius:8px; padding:.7rem; opacity:.85;
+  background: rgba(111,227,180,0.04); display:flex; flex-direction:column; align-items:center; gap:.25rem; text-align:center;
+}
+.ritual-ghost-card svg{ width:40px; opacity:0.7; }
+.ritual-ghost-card .rg-name{ font-family:var(--font-note-sc); color:var(--ecto-glow); font-size:.82rem; }
+.ritual-ghost-card .rg-val{ font-family:var(--font-code); font-size:.72rem; color:var(--parchment-dim); }
+.ritual-actions{ display:flex; gap:.6rem; flex-wrap:wrap; justify-content:center; }
+.ritual-code-wrap{ width:100%; max-width:760px; }
+
+/* Level complete / recap */
+.recap-list{ text-align:left; font-family:var(--font-body); font-size:1.02rem; color:var(--parchment); margin: .8rem 0; }
+.recap-list li{ margin-bottom:.35rem; }
+.recap-stat-row{ display:flex; gap:1.4rem; justify-content:center; flex-wrap:wrap; margin: 1rem 0; }
+.recap-stat{ text-align:center; }
+.recap-stat .num{ font-family:var(--font-title); font-size:1.8rem; color:var(--brass-light); display:block; }
+.recap-stat .lbl{ font-family:var(--font-ui); font-size:.62rem; letter-spacing:.1em; text-transform:uppercase; color:var(--parchment-dark); }
+
+/* Responsive tune */
+@media (max-width: 780px){
+  #chain-rail{ width:60px; }
+  .portrait .p-label{ display:none; }
+  .chain-rail-title, .chain-rail-hint{ display:none; }
+  .level-chip{ display:none; }
+  #quest-code{ display:none; }
+  .furniture-layer{ grid-template-columns: repeat(auto-fit, minmax(88px,1fr)); padding: 20% 5% 5%; }
+}
+@media (prefers-reduced-motion: reduce){
+  *{ animation-duration:.001s !important; transition-duration:.001s !important; }
+}
+</style>
+</head>
+<body>
+
+<div id="atmosphere"></div>
+<div class="particles-layer" id="particles"></div>
+<div id="vignette"></div>
+
+<div id="intro">
+  <div id="hero-svg-holder"></div>
+  <div class="intro-scrim"></div>
+  <div class="intro-content">
+    <h1>Prototype Chain Séance</h1>
+    <div class="subtitle">The Ashgrove Family Mansion</div>
+    <p class="lore">Four generations of the Ashgrove line linger within these walls, each ancestor bound to
+    the room they once kept. Nothing here is truly yours until you prove it — knock on your own doors first,
+    and if they answer not, climb toward the dead who came before you. Every room you search is real
+    JavaScript, running as you play.</p>
+    <div class="intro-actions">
+      <button class="btn-primary" id="btn-enter">Enter the Mansion</button>
+      <label class="intro-toggle"><input type="checkbox" id="sound-toggle-intro" checked> Candlelit ambience &amp; séance chimes</label>
+      <div class="intro-hint">A short guide to the house rules opens first — you can reread it anytime from 📖.</div>
+    </div>
+  </div>
+</div>
+
+<div id="game">
+  <div id="topbar">
+    <div class="brand">☠ Ashgrove Séance</div>
+    <div class="level-chip" id="level-chip">Chapter I — The Nursery</div>
+    <div class="quest-block">
+      <div class="qb-label">The séance asks</div>
+      <div id="quest-chip">—</div>
+      <div id="quest-code">—</div>
+    </div>
+    <div class="progress-dots" id="progress-dots"></div>
+    <button class="icon-btn" id="btn-code" title="View the Code">🖥<span class="ib-tip">View the Code</span></button>
+    <button class="icon-btn" id="btn-fieldguide" title="Field Guide">📖<span class="ib-tip">Field Guide</span></button>
+    <button class="icon-btn" id="btn-sound" title="Toggle Sound">🔔<span class="ib-tip">Sound</span></button>
+    <button class="icon-btn" id="btn-restart" title="Restart Chapter">↺<span class="ib-tip">Restart</span></button>
+  </div>
+
+  <div id="instruction-strip">
+    <span><b>How to play:</b> click furniture to answer • click an empty pedestal only if you're sure it's here • ↑ climb when it's not on this floor • ↓ return anytime.</span>
+    <button id="instruction-dismiss">Got it</button>
+  </div>
+
+  <div id="stage-wrap">
+    <div id="stage">
+      <div id="room-svg-holder">
+        <div id="room-bg-target"></div>
+        <div class="furniture-layer" id="furniture-layer"></div>
+        <div class="ritual-wrap" id="ritual-wrap" style="display:none;"></div>
+        <div class="room-title-plate" id="room-title-plate"></div>
+      </div>
+    </div>
+    <div id="chain-rail">
+      <div class="chain-rail-title">Bloodline Climbed</div>
+      <div id="portrait-rail"></div>
+      <div class="chain-rail-hint">Click a portrait to peek inside.</div>
+    </div>
+  </div>
+
+  <div id="controls">
+    <button class="action-btn" id="btn-descend" disabled>↓ Return Downstairs</button>
+    <button class="action-btn" id="btn-climb" disabled>↑ Climb the Stairs</button>
+    <button class="action-btn danger" id="btn-declare-undefined" style="display:none;">Declare: It Does Not Exist</button>
+    <button class="action-btn ghost" id="btn-hint">Whisper a Hint</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- Decoy Ghost -->
+<div id="decoy-overlay">
+  <svg viewBox="0 0 200 260" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="ghostGrad" cx="50%" cy="35%" r="70%">
+        <stop offset="0%" stop-color="#fff0f0"/>
+        <stop offset="55%" stop-color="#d69aa3"/>
+        <stop offset="100%" stop-color="#7c1620"/>
+      </radialGradient>
+      <filter id="ghostBlur"><feGaussianBlur stdDeviation="1.4"/></filter>
+    </defs>
+    <path d="M100 20 C40 20 30 90 30 140 C30 140 15 190 30 230 C45 210 50 195 60 230 C70 200 78 200 88 230 C96 205 104 205 112 230 C122 200 130 200 140 230 C150 195 155 210 170 230 C185 190 170 140 170 140 C170 90 160 20 100 20 Z"
+      fill="url(#ghostGrad)" filter="url(#ghostBlur)" opacity="0.94"/>
+    <ellipse cx="76" cy="100" rx="10" ry="14" fill="#2a0508"/>
+    <ellipse cx="124" cy="100" rx="10" ry="14" fill="#2a0508"/>
+    <path d="M78 140 Q100 158 122 140" stroke="#2a0508" stroke-width="5" fill="none" stroke-linecap="round"/>
+  </svg>
+  <div id="decoy-text"></div>
+  <div id="decoy-code"></div>
+</div>
+
+<!-- Field Guide Modal -->
+<div class="modal-backdrop" id="fieldguide-modal">
+  <div class="modal-book">
+    <button class="modal-close" id="fg-close">✕</button>
+    <h2>The Grimoire of Inheritance</h2>
+    <div class="modal-sub">A Field Guide to the Prototype Chain</div>
+    <div class="fg-tabs">
+      <button class="fg-tab active" data-fg="howto">How to Play</button>
+      <button class="fg-tab" data-fg="chain">The Chain</button>
+      <button class="fg-tab" data-fg="proto">__proto__</button>
+      <button class="fg-tab" data-fg="shadow">Shadowing</button>
+      <button class="fg-tab" data-fg="create">Object.create()</button>
+      <button class="fg-tab" data-fg="hasown">hasOwnProperty</button>
+      <button class="fg-tab" data-fg="pitfalls">Pitfalls</button>
+    </div>
+    <div class="fg-panel active" data-panel="howto">
+      <p>Every object in JavaScript is a <strong>room</strong>. This mansion turns that idea into somewhere
+      you can actually walk through.</p>
+      <h3>What the pieces mean</h3>
+      <ul>
+        <li><strong>Solid furniture</strong> — a property the current room owns for itself.</li>
+        <li><strong>An empty marble pedestal</strong> — the property the séance is asking about isn't owned
+        here. Don't claim it — climb instead.</li>
+        <li><strong>The staircase (↑ Climb the Stairs)</strong> — walks up to <code>__proto__</code>, the next
+        room in the chain.</li>
+        <li><strong>Return Downstairs (↓)</strong> — walks back down, in case you want to double check a
+        floor you already passed.</li>
+        <li><strong>Portraits on the right</strong> — every room you've stood in this attempt. Click one to
+        peek at what it owns without leaving your current floor.</li>
+      </ul>
+      <h3>What to actually do</h3>
+      <p>Read the question in the top bar. If the matching furniture is visible in your current room, click
+      it. If instead you only see an empty pedestal with that name, climb the stairs and check the next room —
+      repeat until you find it, or until the attic (<code>Object.prototype</code>) proves it was never there
+      at all.</p>
+      <p>Every action you take is mirrored as real code — press <strong>🖥 View the Code</strong> any time to
+      see the exact JavaScript your choices are equivalent to.</p>
+    </div>
+    <div class="fg-panel" data-panel="chain">
+      <p>When you ask for a property that isn't sitting on the floor of the room you're in, JavaScript doesn't
+      give up — it climbs upstairs to the room's <em>prototype</em>, and if that room doesn't have it either,
+      it keeps climbing, generation after generation, until it reaches the attic: <code>Object.prototype</code>.</p>
+      <p>If even the attic is empty, the search ends and you get <code>undefined</code>. This upward search is
+      called <strong>walking the prototype chain</strong>, and it happens every time you read a property — you
+      just never see the stairs.</p>
+      <pre>const grandfather = { landDeed: "Mansion Deed" };
+const father = Object.create(grandfather);
+const you = Object.create(father);
+
+you.landDeed;
+// → "Mansion Deed"  (found three floors up)</pre>
+    </div>
+    <div class="fg-panel" data-panel="proto">
+      <p><code>obj.__proto__</code> (properly: <code>Object.getPrototypeOf(obj)</code>) is the door at the top
+      of a room's staircase — it points to the very next room up. It is not a copy of the parent's furniture;
+      it is a live link. If the ancestor's room changes, everyone downstream feels it immediately, because they
+      were never holding a copy — only a door.</p>
+      <h3>Reading vs. writing</h3>
+      <p>Reading climbs the chain. Writing never does — <code>you.name = "New"</code> always places furniture
+      in <em>your own room</em>, even if an ancestor already owns a "name". That is exactly how shadowing is
+      born.</p>
+    </div>
+    <div class="fg-panel" data-panel="shadow">
+      <p><strong>Shadowing</strong> happens when a descendant room has its own version of an item an ancestor
+      also owns. JavaScript always stops at the first match walking up from where you started — so the
+      descendant's version answers, and the ancestor's identical item goes dark, unreachable through that name,
+      for as long as you're standing downstream.</p>
+      <p>The ancestor's item isn't destroyed — it's still upstairs. It is simply shadowed: hidden behind a
+      closer answer.</p>
+      <pre>const father = { surname: "Ashgrove-Senior" };
+const you = Object.create(father);
+you.surname = "Ashgrove";
+
+you.surname;
+// → "Ashgrove"  (Father's version never answers)</pre>
+    </div>
+    <div class="fg-panel" data-panel="create">
+      <p><code>Object.create(parent)</code> builds a brand-new, empty room and hangs a single door at the top
+      of its staircase pointing at <code>parent</code>. The new room owns nothing yet — every item you see in
+      it at first is a translucent ghost, borrowed from upstairs. The moment you place your own furniture, it
+      becomes solid, and if it shares a name with something upstairs, it starts shadowing it.</p>
+      <pre>const founder = { motto: "Memento Mori" };
+const medium = Object.create(founder);
+
+medium.motto;
+// → "Memento Mori"  (ghosted, inherited)
+
+medium.hasOwnProperty("motto");
+// → false — it isn't really hers, yet</pre>
+    </div>
+    <div class="fg-panel" data-panel="hasown">
+      <p><code>obj.hasOwnProperty(key)</code> is the one question that never climbs the stairs. It only checks
+      the floor you're standing on — "is this furniture truly mine, in this very room?" — no matter what might
+      be found further up. It's the difference between "can I access this?" (which walks the chain) and "do I
+      own this?" (which never does).</p>
+      <pre>you.hasOwnProperty("surname");
+// → true — it's your own
+
+you.hasOwnProperty("landDeed");
+// → false — that belongs to Grandfather</pre>
+    </div>
+    <div class="fg-panel" data-panel="pitfalls">
+      <h3>Common hauntings</h3>
+      <ul>
+        <li>Modifying a shared ancestor room changes every descendant's inherited furniture at once — a
+        single vase moved upstairs appears moved for the whole family.</li>
+        <li><code>for...in</code> loops walk the entire chain, picking up inherited furniture as if it were
+        your own, unless guarded with <code>hasOwnProperty</code>.</li>
+        <li>The chain always terminates at <code>Object.prototype</code>, whose own <code>__proto__</code> is
+        <code>null</code> — the one door in the mansion that opens onto nothing at all.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Code Console Modal -->
+<div class="modal-backdrop" id="code-modal">
+  <div class="modal-book">
+    <button class="modal-close" id="code-close">✕</button>
+    <h2>The Séance Transcript</h2>
+    <div class="modal-sub" id="code-sub">How this chapter's chain is really written</div>
+    <div class="code-block" id="code-source-block">—</div>
+    <h3 style="font-family:var(--font-display); color:var(--brass-light); font-size:1.05rem; margin:1.3rem 0 .5rem;">Live Trace — what you've asked so far</h3>
+    <div id="code-trace-list" style="max-height:220px; overflow-y:auto; border-top:1px solid rgba(169,130,47,0.25); padding-top:.5rem;"></div>
+  </div>
+</div>
+
+<!-- Level Complete Modal -->
+<div class="modal-backdrop" id="levelcomplete-modal">
+  <div class="modal-book" style="text-align:center;">
+    <h2 id="lc-title">The Chain Is Traced</h2>
+    <div class="modal-sub" id="lc-sub">Chapter Complete</div>
+    <div id="lc-body"></div>
+    <button class="btn-primary" id="lc-continue" style="margin-top:.6rem;">Continue Deeper</button>
+  </div>
+</div>
+
+<!-- Game Complete Modal -->
+<div class="modal-backdrop" id="gamecomplete-modal">
+  <div class="modal-book" style="text-align:center;">
+    <h2>The Lineage Is Unbroken</h2>
+    <div class="modal-sub">The Ashgrove Séance Concludes</div>
+    <p style="font-family:var(--font-note); font-style:italic; font-size:1.15rem; color:var(--parchment); line-height:1.7;">
+      You have walked the prototype chain from the nursery to the founder's attic, four generations tall, and
+      every door has finally answered true.
+    </p>
+    <div class="recap-stat-row" id="gc-stats"></div>
+    <div id="gc-recap" style="text-align:left;"></div>
+    <button class="btn-primary" id="gc-restart" style="margin-top:1rem;">Begin Anew</button>
+  </div>
+</div>
+
+<!-- Hidden global SVG defs (gradients / filters / reusable symbols) -->
+<svg width="0" height="0" style="position:absolute;">
+<defs>
+  <linearGradient id="wallGradA" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#4a1620"/><stop offset="55%" stop-color="#3a1017"/><stop offset="100%" stop-color="#1a0a0d"/>
+  </linearGradient>
+  <linearGradient id="wallGradB" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#2c1f12"/><stop offset="55%" stop-color="#241a10"/><stop offset="100%" stop-color="#120c08"/>
+  </linearGradient>
+  <linearGradient id="wallGradC" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#243020"/><stop offset="55%" stop-color="#1a2418"/><stop offset="100%" stop-color="#0e130d"/>
+  </linearGradient>
+  <linearGradient id="floorGrad" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#1a0f0a"/><stop offset="100%" stop-color="#0a0605"/>
+  </linearGradient>
+  <radialGradient id="candleGlow" cx="50%" cy="50%" r="50%">
+    <stop offset="0%" stop-color="#ffe6a0" stop-opacity="0.85"/><stop offset="100%" stop-color="#ffe6a0" stop-opacity="0"/>
+  </radialGradient>
+  <radialGradient id="ectoGlowGrad" cx="50%" cy="50%" r="50%">
+    <stop offset="0%" stop-color="#9fe0c0" stop-opacity="0.55"/><stop offset="100%" stop-color="#9fe0c0" stop-opacity="0"/>
+  </radialGradient>
+  <linearGradient id="woodGrad" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#8a5a30"/><stop offset="100%" stop-color="#42280f"/>
+  </linearGradient>
+  <linearGradient id="brassGrad" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#e0b463"/><stop offset="100%" stop-color="#6b4d1a"/>
+  </linearGradient>
+  <linearGradient id="marbleGrad" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#8a8a92"/><stop offset="100%" stop-color="#3d3d44"/>
+  </linearGradient>
+  <linearGradient id="frameGrad" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#c99a4a"/><stop offset="100%" stop-color="#5c3f16"/>
+  </linearGradient>
+  <filter id="softBlur"><feGaussianBlur stdDeviation="2.2"/></filter>
+  <filter id="fogTurb" x="-20%" y="-20%" width="140%" height="140%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.008 0.02" numOctaves="2" seed="7" result="n"/>
+    <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.7  0 0 0 0 0.65 0 0 0 0 0.5  0 0 0 0.08 0"/>
+  </filter>
+  <filter id="cobwebFilter"><feGaussianBlur stdDeviation="0.3"/></filter>
+
+  <!-- Furniture symbols -->
+  <symbol id="ic-chest" viewBox="0 0 100 80">
+    <g><rect x="8" y="34" width="84" height="40" rx="4" fill="url(#woodGrad)" stroke="#2a1808" stroke-width="1.5"/>
+    <path d="M8 34 Q50 12 92 34 L92 44 Q50 24 8 44 Z" fill="url(#woodGrad)" stroke="#2a1808" stroke-width="1.5"/>
+    <rect x="44" y="40" width="12" height="16" rx="2" fill="url(#brassGrad)" stroke="#3a2a10" stroke-width="1"/>
+    <circle cx="50" cy="48" r="2.2" fill="#2a1808"/><rect x="8" y="52" width="84" height="3" fill="#2a1808" opacity="0.4"/></g>
+  </symbol>
+  <symbol id="ic-bookshelf" viewBox="0 0 100 90">
+    <g><rect x="10" y="6" width="80" height="80" fill="url(#woodGrad)" stroke="#2a1808" stroke-width="1.5"/>
+    <rect x="16" y="14" width="68" height="20" fill="#1a0f0a"/><rect x="16" y="40" width="68" height="20" fill="#1a0f0a"/><rect x="16" y="66" width="68" height="14" fill="#1a0f0a"/>
+    <rect x="19" y="16" width="6" height="16" fill="#7c1620"/><rect x="27" y="16" width="6" height="16" fill="#3a8f72"/>
+    <rect x="35" y="16" width="6" height="16" fill="#a9822f"/><rect x="43" y="17" width="6" height="15" fill="#5c3f16"/>
+    <rect x="19" y="42" width="6" height="16" fill="#a9822f"/><rect x="27" y="43" width="6" height="15" fill="#7c1620"/><rect x="35" y="42" width="6" height="16" fill="#3a8f72"/></g>
+  </symbol>
+  <symbol id="ic-mirror" viewBox="0 0 100 100">
+    <g><ellipse cx="50" cy="46" rx="34" ry="40" fill="url(#frameGrad)" stroke="#3a2a10" stroke-width="2"/>
+    <ellipse cx="50" cy="46" rx="26" ry="32" fill="#0d2420" stroke="#0a1815" stroke-width="1"/>
+    <ellipse cx="50" cy="46" rx="26" ry="32" fill="url(#ectoGlowGrad)" opacity="0.7"/>
+    <path d="M38 20 Q50 10 62 20" stroke="#e0b463" stroke-width="2" fill="none"/></g>
+  </symbol>
+  <symbol id="ic-clock" viewBox="0 0 100 100">
+    <g><rect x="30" y="10" width="40" height="80" rx="6" fill="url(#woodGrad)" stroke="#2a1808" stroke-width="1.5"/>
+    <circle cx="50" cy="36" r="18" fill="#ecdfc0" stroke="#3a2a10" stroke-width="2"/>
+    <line x1="50" y1="36" x2="50" y2="24" stroke="#201410" stroke-width="2"/><line x1="50" y1="36" x2="59" y2="40" stroke="#201410" stroke-width="2"/>
+    <circle cx="50" cy="36" r="1.6" fill="#201410"/><rect x="44" y="66" width="12" height="16" fill="url(#brassGrad)"/></g>
+  </symbol>
+  <symbol id="ic-scroll" viewBox="0 0 100 70">
+    <g><rect x="14" y="16" width="72" height="38" fill="#ecdfc0" stroke="#a3906a" stroke-width="1.5"/>
+    <ellipse cx="14" cy="35" rx="6" ry="19" fill="#c9b98f" stroke="#a3906a" stroke-width="1.5"/><ellipse cx="86" cy="35" rx="6" ry="19" fill="#c9b98f" stroke="#a3906a" stroke-width="1.5"/>
+    <line x1="24" y1="26" x2="76" y2="26" stroke="#7c1620" stroke-width="1.4" opacity="0.6"/>
+    <line x1="24" y1="34" x2="70" y2="34" stroke="#201410" stroke-width="1.2" opacity="0.5"/><line x1="24" y1="42" x2="72" y2="42" stroke="#201410" stroke-width="1.2" opacity="0.5"/></g>
+  </symbol>
+  <symbol id="ic-toy" viewBox="0 0 100 90">
+    <g><path d="M20 74 Q18 40 40 32 Q46 18 60 24 Q76 24 78 42 Q86 46 82 60 L78 74 Z" fill="url(#woodGrad)" stroke="#2a1808" stroke-width="1.6"/>
+    <circle cx="66" cy="34" r="4" fill="#201410"/><circle cx="30" cy="78" r="8" fill="#3a2a10" stroke="#201410" stroke-width="1.4"/>
+    <circle cx="66" cy="78" r="8" fill="#3a2a10" stroke="#201410" stroke-width="1.4"/><path d="M40 32 Q34 14 20 18" stroke="#42280f" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  </symbol>
+  <symbol id="ic-ring" viewBox="0 0 100 100">
+    <g><circle cx="50" cy="55" r="26" fill="none" stroke="url(#brassGrad)" stroke-width="6"/>
+    <path d="M50 22 L58 38 L44 38 Z" fill="#9fe0c0" stroke="#3a8f72" stroke-width="1.5"/><circle cx="50" cy="55" r="26" fill="url(#ectoGlowGrad)" opacity="0.4"/></g>
+  </symbol>
+  <symbol id="ic-candle" viewBox="0 0 100 100">
+    <g><rect x="42" y="52" width="16" height="34" rx="3" fill="#ecdfc0" stroke="#a3906a" stroke-width="1.2"/>
+    <ellipse cx="50" cy="86" rx="16" ry="4" fill="url(#brassGrad)"/><path d="M50 50 Q46 38 50 28 Q54 38 50 50 Z" fill="#ffbf5c"/><circle cx="50" cy="34" r="14" fill="url(#candleGlow)"/></g>
+  </symbol>
+  <symbol id="ic-quill" viewBox="0 0 100 100">
+    <g><path d="M20 82 Q40 60 62 22 Q70 14 78 18 Q82 26 74 34 Q40 58 20 82 Z" fill="#ecdfc0" stroke="#a3906a" stroke-width="1.4"/>
+    <path d="M62 22 Q66 30 74 34" stroke="#7c1620" stroke-width="2" fill="none"/><ellipse cx="24" cy="84" rx="10" ry="4" fill="#0d2420" opacity="0.5"/></g>
+  </symbol>
+  <symbol id="ic-key" viewBox="0 0 100 100">
+    <g><circle cx="32" cy="34" r="16" fill="none" stroke="url(#brassGrad)" stroke-width="7"/>
+    <rect x="30" y="46" width="8" height="42" fill="url(#brassGrad)"/><rect x="30" y="70" width="18" height="7" fill="url(#brassGrad)"/><rect x="30" y="82" width="14" height="6" fill="url(#brassGrad)"/></g>
+  </symbol>
+  <symbol id="ic-bell" viewBox="0 0 100 100">
+    <g><path d="M50 18 Q26 22 26 54 L18 72 L82 72 L74 54 Q74 22 50 18 Z" fill="url(#brassGrad)" stroke="#3a2a10" stroke-width="1.6"/>
+    <rect x="42" y="76" width="16" height="8" rx="3" fill="url(#brassGrad)"/><circle cx="50" cy="88" r="4" fill="#3a2a10"/></g>
+  </symbol>
+  <symbol id="ic-cabinet" viewBox="0 0 100 100">
+    <g><rect x="16" y="10" width="68" height="82" fill="url(#woodGrad)" stroke="#2a1808" stroke-width="1.6"/>
+    <rect x="22" y="16" width="26" height="72" fill="#1a0f0a" stroke="#2a1808"/><rect x="52" y="16" width="26" height="72" fill="#1a0f0a" stroke="#2a1808"/>
+    <circle cx="46" cy="52" r="2.4" fill="url(#brassGrad)"/><circle cx="54" cy="52" r="2.4" fill="url(#brassGrad)"/></g>
+  </symbol>
+  <symbol id="ic-pedestal" viewBox="0 0 100 100">
+    <g><path d="M32 20 L68 20 L64 40 L36 40 Z" fill="url(#marbleGrad)" stroke="#22222a" stroke-width="1.4" opacity="0.6"/>
+    <rect x="40" y="40" width="20" height="42" fill="url(#marbleGrad)" stroke="#22222a" stroke-width="1.4" opacity="0.6"/>
+    <path d="M24 82 L76 82 L70 92 L30 92 Z" fill="url(#marbleGrad)" stroke="#22222a" stroke-width="1.4" opacity="0.6"/>
+    <ellipse cx="50" cy="26" rx="8" ry="4" fill="#050505" opacity="0.4"/></g>
+  </symbol>
+  <symbol id="ic-portrait-generic" viewBox="0 0 60 74">
+    <rect x="2" y="2" width="56" height="70" rx="3" fill="url(#frameGrad)" stroke="#3a2a10" stroke-width="1.4"/>
+    <rect x="9" y="9" width="42" height="56" fill="#1a1015"/><ellipse cx="30" cy="30" rx="11" ry="13" fill="#5c4636"/><path d="M17 60 Q30 42 43 60 Z" fill="#3a2a24"/>
+  </symbol>
+</defs>
+</svg>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================================================
+   0. UTILITIES
+   ============================================================ */
+const $ = (sel, ctx) => (ctx||document).querySelector(sel);
+const $all = (sel, ctx) => Array.from((ctx||document).querySelectorAll(sel));
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
+
+/* ============================================================
+   1. SOUND ENGINE — procedural WebAudio, zero external assets
+   ============================================================ */
+const SoundEngine = (function(){
+  let ctx = null, enabled = true, ambientNodes = null;
+  function ensureCtx(){
+    if(!ctx){ const AC = window.AudioContext || window.webkitAudioContext; ctx = new AC(); }
+    if(ctx.state === "suspended") ctx.resume();
+    return ctx;
+  }
+  function noiseBuffer(duration){
+    const c = ensureCtx();
+    const buffer = c.createBuffer(1, c.sampleRate * duration, c.sampleRate);
+    const data = buffer.getChannelData(0);
+    for(let i=0;i<data.length;i++){ data[i] = (Math.random()*2-1); }
+    return buffer;
+  }
+  function envGain(node, start, attack, sustain, release, peak){
+    node.gain.setValueAtTime(0.0001, start);
+    node.gain.exponentialRampToValueAtTime(peak, start+attack);
+    node.gain.exponentialRampToValueAtTime(Math.max(peak*0.4,0.0001), start+attack+sustain);
+    node.gain.exponentialRampToValueAtTime(0.0001, start+attack+sustain+release);
+  }
+  function chime(){
+    if(!enabled) return;
+    const c = ensureCtx(); const now = c.currentTime;
+    [880, 1318.5, 1760].forEach((freq, i)=>{
+      const osc = c.createOscillator(); const gain = c.createGain();
+      osc.type = "sine"; osc.frequency.value = freq;
+      osc.connect(gain); gain.connect(c.destination);
+      const t = now + i*0.09;
+      envGain(gain, t, 0.02, 0.5, 0.9, 0.10);
+      osc.start(t); osc.stop(t+1.6);
+    });
+  }
+  function wrongBuzz(){
+    if(!enabled) return;
+    const c = ensureCtx(); const now = c.currentTime;
+    const osc = c.createOscillator(); const gain = c.createGain();
+    osc.type = "sawtooth"; osc.frequency.setValueAtTime(140, now); osc.frequency.exponentialRampToValueAtTime(60, now+0.35);
+    osc.connect(gain); gain.connect(c.destination);
+    envGain(gain, now, 0.01, 0.18, 0.25, 0.14);
+    osc.start(now); osc.stop(now+0.6);
+  }
+  function creak(){
+    if(!enabled) return;
+    const c = ensureCtx(); const now = c.currentTime;
+    const src = c.createBufferSource(); src.buffer = noiseBuffer(0.7);
+    const filt = c.createBiquadFilter(); filt.type = "bandpass";
+    filt.frequency.setValueAtTime(220, now); filt.frequency.exponentialRampToValueAtTime(600, now+0.6); filt.Q.value = 6;
+    const gain = c.createGain(); envGain(gain, now, 0.05, 0.3, 0.35, 0.18);
+    src.connect(filt); filt.connect(gain); gain.connect(c.destination);
+    src.start(now); src.stop(now+0.75);
+  }
+  function ghostMoan(){
+    if(!enabled) return;
+    const c = ensureCtx(); const now = c.currentTime;
+    const osc = c.createOscillator(); const osc2 = c.createOscillator(); const gain = c.createGain();
+    osc.type = "sine"; osc2.type = "sine";
+    osc.frequency.setValueAtTime(220, now); osc.frequency.exponentialRampToValueAtTime(90, now+1.4);
+    osc2.frequency.setValueAtTime(224, now); osc2.frequency.exponentialRampToValueAtTime(88, now+1.4);
+    const filt = c.createBiquadFilter(); filt.type = "lowpass"; filt.frequency.value = 900;
+    osc.connect(filt); osc2.connect(filt); filt.connect(gain); gain.connect(c.destination);
+    envGain(gain, now, 0.15, 0.9, 0.8, 0.16);
+    osc.start(now); osc2.start(now); osc.stop(now+1.9); osc2.stop(now+1.9);
+  }
+  function doorOpen(){
+    if(!enabled) return;
+    const c = ensureCtx(); const now = c.currentTime;
+    const src = c.createBufferSource(); src.buffer = noiseBuffer(1.1);
+    const filt = c.createBiquadFilter(); filt.type = "lowpass";
+    filt.frequency.setValueAtTime(320, now); filt.frequency.linearRampToValueAtTime(900, now+0.9);
+    const gain = c.createGain(); envGain(gain, now, 0.08, 0.6, 0.4, 0.2);
+    src.connect(filt); filt.connect(gain); gain.connect(c.destination);
+    src.start(now); src.stop(now+1.2);
+    setTimeout(chime, 500);
+  }
+  function pageFlip(){
+    if(!enabled) return;
+    const c = ensureCtx(); const now = c.currentTime;
+    const src = c.createBufferSource(); src.buffer = noiseBuffer(0.25);
+    const filt = c.createBiquadFilter(); filt.type = "highpass"; filt.frequency.value = 1800;
+    const gain = c.createGain(); envGain(gain, now, 0.005, 0.08, 0.1, 0.12);
+    src.connect(filt); filt.connect(gain); gain.connect(c.destination);
+    src.start(now); src.stop(now+0.3);
+  }
+  function startAmbient(){
+    if(!enabled || ambientNodes) return;
+    const c = ensureCtx();
+    const drone = c.createOscillator(); drone.type = "sine"; drone.frequency.value = 55;
+    const drone2 = c.createOscillator(); drone2.type = "sine"; drone2.frequency.value = 55*1.5;
+    const g = c.createGain(); g.gain.value = 0.032;
+    const filt = c.createBiquadFilter(); filt.type="lowpass"; filt.frequency.value=200;
+    drone.connect(filt); drone2.connect(filt); filt.connect(g); g.connect(c.destination);
+    drone.start(); drone2.start();
+    ambientNodes = {drone, drone2, g};
+  }
+  function stopAmbient(){
+    if(ambientNodes){ try{ ambientNodes.drone.stop(); ambientNodes.drone2.stop(); }catch(e){} ambientNodes = null; }
+  }
+  function setEnabled(v){ enabled = v; if(enabled) startAmbient(); else stopAmbient(); }
+  return { ensureCtx, chime, wrongBuzz, creak, ghostMoan, doorOpen, pageFlip, startAmbient, stopAmbient, setEnabled, isEnabled: ()=>enabled };
+})();
+
+/* ============================================================
+   2. PARTICLES — dust + bats
+   ============================================================ */
+function initParticles(){
+  const layer = $("#particles");
+  const count = window.innerWidth < 700 ? 14 : 26;
+  for(let i=0;i<count;i++){
+    const d = document.createElement("div");
+    d.className = "dust";
+    const size = 1.5 + Math.random()*3.2;
+    d.style.width = size+"px"; d.style.height = size+"px";
+    d.style.left = Math.random()*100+"vw";
+    d.style.setProperty("--drift", (Math.random()*80-40)+"px");
+    const dur = 14 + Math.random()*18;
+    d.style.animationDuration = dur+"s";
+    d.style.animationDelay = (-Math.random()*dur)+"s";
+    layer.appendChild(d);
+  }
+  for(let i=0;i<3;i++){
+    const b = document.createElement("div");
+    b.className = "bat";
+    b.style.top = (10+Math.random()*30)+"vh";
+    b.style.animationDuration = (18+Math.random()*10)+"s";
+    b.style.animationDelay = (-Math.random()*20)+"s";
+    b.innerHTML = '<svg width="26" height="14" viewBox="0 0 26 14"><path d="M13 6 Q9 0 0 3 Q7 5 9 8 Q4 8 1 12 Q9 12 13 6 Q17 12 25 12 Q22 8 17 8 Q19 5 26 3 Q17 0 13 6Z" fill="#0b0508"/></svg>';
+    layer.appendChild(b);
+  }
+}
+
+/* ============================================================
+   3. HERO MANSION SVG (intro illustration)
+   ============================================================ */
+function heroMansionSVG(){
+  let stars = "";
+  for(let i=0;i<90;i++){
+    const x = Math.random()*1600, y = Math.random()*430, r = Math.random()*1.4+0.3, o = (Math.random()*0.7+0.2).toFixed(2);
+    stars += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(2)}" fill="#fdf6e3" opacity="${o}"/>`;
+  }
+  let fence = "";
+  for(let x=40; x<1560; x+=34){ fence += `<line x1="${x}" y1="700" x2="${x}" y2="640" />`; }
+  let graves = "";
+  const gpos = [ [120,780],[190,800],[1420,790],[1480,770],[80,820] ];
+  gpos.forEach(([gx,gy])=>{ graves += `<rect x="${gx-14}" y="${gy-30}" width="28" height="34" rx="8" fill="#0c0709" stroke="#000" stroke-opacity="0.4"/>`; });
+
+  return `
+  <svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="heroSky" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#05070c"/><stop offset="45%" stop-color="#160a10"/><stop offset="100%" stop-color="#2c0f14"/>
+      </linearGradient>
+      <radialGradient id="moonGlow" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#fdf6e3" stop-opacity="0.85"/><stop offset="55%" stop-color="#fdf6e3" stop-opacity="0.16"/><stop offset="100%" stop-color="#fdf6e3" stop-opacity="0"/>
+      </radialGradient>
+      <linearGradient id="mansionSilhouette" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#201013"/><stop offset="100%" stop-color="#0b0508"/>
+      </linearGradient>
+      <linearGradient id="windowGlow" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#ffe9b0"/><stop offset="100%" stop-color="#e0b463"/>
+      </linearGradient>
+      <linearGradient id="ectoWindowGlow" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#c9fff0"/><stop offset="100%" stop-color="#6fe3b4"/>
+      </linearGradient>
+      <linearGradient id="fogGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#2c0f14" stop-opacity="0"/><stop offset="100%" stop-color="#080507" stop-opacity="0.96"/>
+      </linearGradient>
+      <linearGradient id="hillGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#1c0e11"/><stop offset="100%" stop-color="#0e070a"/>
+      </linearGradient>
+    </defs>
+    <rect width="1600" height="900" fill="url(#heroSky)"/>
+    ${stars}
+    <circle cx="1230" cy="150" r="150" fill="url(#moonGlow)"/>
+    <circle cx="1230" cy="150" r="58" fill="#f4ecd8"/>
+    <circle cx="1213" cy="132" r="9" fill="#e2d7b8" opacity="0.55"/>
+    <circle cx="1248" cy="162" r="6" fill="#e2d7b8" opacity="0.5"/>
+    <circle cx="1222" cy="172" r="4" fill="#e2d7b8" opacity="0.45"/>
+    <path d="M0 640 Q 220 580 460 630 T 900 610 T 1600 645 L1600 900 L0 900 Z" fill="url(#hillGrad)"/>
+    <!-- bare trees -->
+    <g stroke="#0c0709" stroke-width="5" fill="none" stroke-linecap="round" opacity="0.85">
+      <path d="M120 780 L110 690 M110 690 L80 640 M110 690 L140 645 M110 690 L100 620"/>
+      <path d="M1500 790 L1512 700 M1512 700 L1550 655 M1512 700 L1480 650"/>
+    </g>
+    ${graves}
+    <!-- mansion silhouette -->
+    <g fill="url(#mansionSilhouette)" stroke="#000" stroke-opacity="0.45" stroke-width="2">
+      <rect x="500" y="430" width="600" height="230"/>
+      <polygon points="500,430 800,310 1100,430"/>
+      <rect x="440" y="490" width="80" height="170"/>
+      <polygon points="440,490 480,425 520,490"/>
+      <rect x="1080" y="470" width="80" height="190"/>
+      <polygon points="1080,470 1120,405 1160,470"/>
+      <rect x="760" y="350" width="80" height="80"/>
+      <polygon points="760,350 800,305 840,350"/>
+      <rect x="470" y="560" width="30" height="100"/>
+      <rect x="1100" y="560" width="30" height="100"/>
+    </g>
+    <!-- windows -->
+    <g fill="url(#windowGlow)" opacity="0.92">
+      <rect x="540" y="470" width="28" height="44" rx="13"/>
+      <rect x="610" y="470" width="28" height="44" rx="13"/>
+      <rect x="960" y="470" width="28" height="44" rx="13"/>
+      <rect x="1030" y="470" width="28" height="44" rx="13"/>
+      <rect x="540" y="560" width="28" height="44" rx="13"/>
+      <rect x="1030" y="560" width="28" height="44" rx="13"/>
+      <rect x="784" y="372" width="32" height="32" rx="16"/>
+      <rect x="460" y="520" width="20" height="28" rx="10"/>
+      <rect x="1118" y="500" width="20" height="28" rx="10"/>
+    </g>
+    <g fill="url(#ectoWindowGlow)" opacity="0.85">
+      <rect x="675" y="470" width="26" height="42" rx="12"/>
+      <rect x="898" y="470" width="26" height="42" rx="12"/>
+    </g>
+    <!-- grand door -->
+    <path d="M755 660 L755 570 Q800 525 845 570 L845 660 Z" fill="#0b0508" stroke="#000" stroke-opacity="0.5"/>
+    <circle cx="833" cy="615" r="3.4" fill="#e0b463"/>
+    <!-- path to gate -->
+    <path d="M760 900 Q790 760 800 660 Q810 760 840 900 Z" fill="#140b0c" opacity="0.7"/>
+    <!-- iron fence -->
+    <g stroke="#0b0508" stroke-width="4" opacity="0.9">
+      <line x1="20" y1="700" x2="1580" y2="700"/>
+      ${fence}
+    </g>
+    <!-- fog banks -->
+    <rect x="0" y="680" width="1600" height="220" fill="url(#fogGrad)"/>
+    <ellipse cx="300" cy="770" rx="260" ry="34" fill="#c9c2b0" opacity="0.06"/>
+    <ellipse cx="1000" cy="800" rx="340" ry="40" fill="#c9c2b0" opacity="0.06"/>
+    <ellipse cx="1400" cy="760" rx="220" ry="30" fill="#c9c2b0" opacity="0.06"/>
+  </svg>`;
+}
+
+/* ============================================================
+   4. GAME DATA — rooms, chains, quests
+   ============================================================ */
+function objProtoRoom(){
+  return { displayName:"Object.prototype — The Void Attic", varName:"Object.prototype", own:{}, proto:null, isRoot:true };
+}
+
+const LEVELS = [
+  /* ---------------- LEVEL 1 — THE NURSERY ---------------- */
+  {
+    id:1, type:"trace", title:"The Nursery", chip:"Chapter I — The Nursery",
+    concept:"Own properties live on the floor you're standing on — no climbing required.",
+    intro:"A single small room. Nothing to climb to yet but the attic above — learn to search your own floor first.",
+    rooms:{
+      you:{ displayName:"You — The Nursery", varName:"you", proto:"objProto",
+        own:{ favoriteToy:{icon:"ic-toy", label:"Wooden Horse", value:"Wooden Horse"},
+              age:{icon:"ic-scroll", label:"Age: 8", value:8},
+              name:{icon:"ic-ring", label:"Name: Evelyn", value:"Evelyn"} } },
+      objProto: objProtoRoom()
+    },
+    start:"you",
+    quests:[
+      { prop:"favoriteToy", prompt:"What is your favoriteToy?", hint:"It's furniture in your own room — no climbing required.", mustReachRoot:false },
+      { prop:"title", prompt:"What is your title?", hint:"Check your own room, then climb all the way to the attic. Some things simply aren't written anywhere.", mustReachRoot:true }
+    ]
+  },
+
+  /* ---------------- LEVEL 2 — THE STUDY ---------------- */
+  {
+    id:2, type:"trace", title:"The Study", chip:"Chapter II — The Study",
+    concept:"When your own floor lacks the property, climb __proto__ to the next room.",
+    intro:"Your room connects upward now, to your Father's study. When a pedestal stands empty, climb the stairs.",
+    rooms:{
+      you:{ displayName:"You — The Study Nook", varName:"you", proto:"father",
+        own:{ quillCount:{icon:"ic-quill", label:"3 Quills", value:3},
+              currentBook:{icon:"ic-scroll", label:"The Diary", value:"The Diary"} } },
+      father:{ displayName:"Father — The Study", varName:"father", proto:"objProto",
+        own:{ familyMotto:{icon:"ic-bell", label:"Memento Mori", value:"Memento Mori"},
+              oldLedger:{icon:"ic-cabinet", label:"Book of Debts", value:"Book of Debts"} } },
+      objProto: objProtoRoom()
+    },
+    start:"you",
+    quests:[
+      { prop:"currentBook", prompt:"What is your currentBook?", hint:"It's on your own floor — no climbing needed.", mustReachRoot:false },
+      { prop:"familyMotto", prompt:"What is the familyMotto?", hint:"Not in your room. Climb the stairs to Father's Study.", mustReachRoot:false }
+    ]
+  },
+
+  /* ---------------- LEVEL 3 — THE PORTRAIT GALLERY (Shadowing) ---------------- */
+  {
+    id:3, type:"trace", title:"The Portrait Gallery", chip:"Chapter III — The Portrait Gallery",
+    concept:"Your own property answers first, even when ancestors share its name — it shadows theirs.",
+    intro:"Three generations now stand between you and the attic. Some names repeat — but only the nearest one answers.",
+    rooms:{
+      you:{ displayName:"You — The Gallery Landing", varName:"you", proto:"father",
+        own:{ surname:{icon:"ic-ring", label:"Ashgrove", value:"Ashgrove"} } },
+      father:{ displayName:"Father — East Wing", varName:"father", proto:"grandfather",
+        own:{ surname:{icon:"ic-ring", label:"Ashgrove-Senior", value:"Ashgrove-Senior"},
+              occupation:{icon:"ic-cabinet", label:"Undertaker", value:"Undertaker"} } },
+      grandfather:{ displayName:"Grandfather — West Wing", varName:"grandfather", proto:"objProto",
+        own:{ surname:{icon:"ic-ring", label:"Original Ashgrove", value:"Original Ashgrove"},
+              landDeed:{icon:"ic-scroll", label:"The Mansion Deed", value:"The Mansion Deed"} } },
+      objProto: objProtoRoom()
+    },
+    start:"you",
+    quests:[
+      { prop:"surname", prompt:"What is your surname?", hint:"It's your own — even though Father and Grandfather both have one too, yours shadows theirs.", mustReachRoot:false },
+      { prop:"occupation", prompt:"What is the occupation?", hint:"Not yours. Climb once, to Father's landing.", mustReachRoot:false },
+      { prop:"landDeed", prompt:"Who holds the landDeed?", hint:"Climb twice — past Father, to Grandfather's West Wing.", mustReachRoot:false }
+    ]
+  },
+
+  /* ---------------- LEVEL 4 — THE SÉANCE CIRCLE (Object.create) ---------------- */
+  {
+    id:4, type:"create", title:"The Séance Circle", chip:"Chapter IV — The Séance Circle",
+    concept:"Object.create(parent) hangs one door upward. Everything you see at first is inherited, not owned.",
+    intro:"Choose an ancestor to bind as the parent of a freshly summoned room, then watch what furniture ghosts through.",
+    parents:["you3","father3","grandfather3"],
+    parentDefs:{
+      you3:{ displayName:"You (of the Gallery)", varName:"you", own:{ surname:"Ashgrove" }, proto:"father3" },
+      father3:{ displayName:"Father (of the Gallery)", varName:"father", own:{ surname:"Ashgrove-Senior", occupation:"Undertaker" }, proto:"grandfather3" },
+      grandfather3:{ displayName:"Grandfather (of the Gallery)", varName:"grandfather", own:{ surname:"Original Ashgrove", landDeed:"The Mansion Deed" }, proto:null }
+    },
+    ritualAddOptions:[
+      { key:"occupation", label:"Write: medium.occupation = \"Spirit-Talker\"", value:"Spirit-Talker" },
+      { key:"candleCount", label:"Write: medium.candleCount = 7", value:7 }
+    ]
+  },
+
+  /* ---------------- LEVEL 5 — THE BELFRY (methods, 3 hops) ---------------- */
+  {
+    id:5, type:"trace", title:"The Belfry", chip:"Chapter V — The Belfry", methodsMode:true,
+    concept:"Methods are furniture too. Calling one still walks the exact same staircase.",
+    intro:"Methods live in rooms too — they're just furniture you can ring. Trace two bells through three floors.",
+    rooms:{
+      you:{ displayName:"You — The Belfry Ladder", varName:"you", proto:"father",
+        own:{ climbLadder:{icon:"ic-key", label:"climbLadder()", value:"function(){...}"} } },
+      father:{ displayName:"Father — The Bell Loft", varName:"father", proto:"grandfather",
+        own:{ lightCandle:{icon:"ic-candle", label:"lightCandle()", value:"function(){...}"} } },
+      grandfather:{ displayName:"Grandfather — The Belfry", varName:"grandfather", proto:"objProto",
+        own:{ ringBell:{icon:"ic-bell", label:"ringBell()", value:"function(){...}"} } },
+      objProto: objProtoRoom()
+    },
+    start:"you",
+    quests:[
+      { prop:"ringBell", prompt:"Call .ringBell() — where does it answer from?", hint:"Not on you, not on Father. Climb twice, to Grandfather's Belfry.", mustReachRoot:false },
+      { prop:"hauntHall", prompt:"Call .hauntHall() — where does it answer from?", hint:"Climb all three floors. This bell was never cast at all.", mustReachRoot:true }
+    ]
+  },
+
+  /* ---------------- LEVEL 6 — FINALE: THE LOCKED ATTIC (4 generations, decoy ghosts) ---------------- */
+  {
+    id:6, type:"finale", title:"The Locked Attic", chip:"Finale — The Locked Attic",
+    concept:"Verify every floor honestly. A false claim anywhere in the chain summons a decoy.",
+    intro:"Four generations stand between you and the founder's secret. Verify each floor truthfully — a false claim summons a decoy ghost and sends you back down to the nursery landing.",
+    rooms:{
+      you:{ displayName:"You — The Attic Stair Landing", varName:"you", proto:"father",
+        own:{ candleStub:{icon:"ic-candle", label:"A Candle Stub", value:"Candle Stub"} } },
+      father:{ displayName:"Father — The Antechamber", varName:"father", proto:"grandfather",
+        own:{ pocketWatch:{icon:"ic-clock", label:"A Pocket Watch", value:"Pocket Watch"} } },
+      grandfather:{ displayName:"Grandfather — The Old Study", varName:"grandfather", proto:"founder",
+        own:{ huntingRifle:{icon:"ic-cabinet", label:"A Hunting Rifle", value:"Hunting Rifle"} } },
+      founder:{ displayName:"The Founder — The Locked Attic", varName:"founder", proto:"objProto",
+        own:{ foundersSecret:{icon:"ic-key", label:"The Founder's Secret", value:"A Hidden Confession"} } },
+      objProto: objProtoRoom()
+    },
+    start:"you",
+    quests:[
+      { prop:"foundersSecret", prompt:"Where rests the foundersSecret?", hint:"Verify every floor honestly — You, then Father, then Grandfather — before the Founder's attic will yield it.", mustReachRoot:false, finale:true }
+    ]
+  }
+];
+
+/* ============================================================
+   5. GAME STATE
+   ============================================================ */
+const State = {
+  levelIndex: 0, roomStack: [], currentRoomId: null, questIndex: 0,
+  mistakes: 0, totalMistakes: 0, finaleDecoys: 0,
+  createChosenParent: null, createAdded: false,
+  codeLog: [], seenInstructions: false
+};
+
+function currentLevel(){ return LEVELS[State.levelIndex]; }
+function currentQuest(){ const lvl = currentLevel(); return lvl.quests ? lvl.quests[State.questIndex] : null; }
+
+/* ============================================================
+   6. CHAIN HELPERS (mirrors real prototype-chain semantics)
+   ============================================================ */
+function getChain(rooms, startId){
+  const chain = []; let cur = startId; let guard = 0;
+  while(cur && guard < 20){ chain.push(cur); cur = rooms[cur].proto; guard++; }
+  return chain;
+}
+function ownHas(room, prop){ return Object.prototype.hasOwnProperty.call(room.own, prop); }
+function findOwnerId(rooms, startId, prop){
+  const chain = getChain(rooms, startId);
+  for(const id of chain){ if(ownHas(rooms[id], prop)) return id; }
+  return null;
+}
+function jsLit(v){ return typeof v === "string" ? JSON.stringify(v) : String(v); }
+
+/* ============================================================
+   7. CODE GENERATION — real JS mirroring the current level
+   ============================================================ */
+function generateChainCode(lvl){
+  const rooms = lvl.rooms;
+  const chain = getChain(rooms, lvl.start);
+  const custom = chain.filter(id => id !== "objProto");
+  const reversed = custom.slice().reverse();
+  const lines = [];
+  reversed.forEach((id, idx) => {
+    const room = rooms[id]; const vn = room.varName;
+    if(idx === 0){
+      const inline = Object.keys(room.own).map(k => `${k}: ${jsLit(room.own[k].value)}`).join(", ");
+      lines.push(`const ${vn} = { ${inline} };`);
+    } else {
+      const parentVn = rooms[reversed[idx-1]].varName;
+      lines.push(`const ${vn} = Object.create(${parentVn});`);
+      Object.keys(room.own).forEach(k => lines.push(`${vn}.${k} = ${jsLit(room.own[k].value)};`));
+    }
+  });
+  return lines;
+}
+function highlightCode(lines){
+  return lines.map(line => {
+    let l = esc(line);
+    l = l.replace(/\b(const|Object\.create)\b/g, '<span class="cm">$1</span>');
+    l = l.replace(/("(?:[^"\\]|\\.)*")/g, '<span class="cs">$1</span>');
+    l = l.replace(/= (\d+);/g, '= <span class="cv">$1</span>;');
+    return l;
+  }).join("\n");
+}
+function pushCodeLog(text, kind){
+  State.codeLog.push({levelIndex: State.levelIndex, text, kind: kind||"info"});
+}
+function currentQueryExpr(){
+  const lvl = currentLevel();
+  const q = currentQuest();
+  if(!q || !lvl.rooms) return "";
+  const room = lvl.rooms[State.currentRoomId];
+  return `${room.varName}.${q.prop}`;
+}
+
+/* ============================================================
+   8. RENDER — ROOM SVG SCENE
+   ============================================================ */
+const ROOM_PALETTES = ["url(#wallGradA)","url(#wallGradB)","url(#wallGradC)"];
+function paletteFor(roomId){
+  let hash = 0;
+  for(let i=0;i<roomId.length;i++) hash = (hash*31 + roomId.charCodeAt(i)) % 997;
+  return ROOM_PALETTES[hash % ROOM_PALETTES.length];
+}
+function buildRoomSceneSVG(roomId, isAttic){
+  const wallFill = isAttic ? "url(#wallGradB)" : paletteFor(roomId);
+  return `
+  <svg viewBox="0 0 900 560" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+    <rect x="0" y="0" width="900" height="560" fill="${wallFill}"/>
+    <rect x="0" y="0" width="900" height="560" filter="url(#fogTurb)" opacity="${isAttic?0.85:0.3}"/>
+    <rect x="0" y="404" width="900" height="10" fill="#100807" opacity="0.6"/>
+    <rect x="0" y="414" width="900" height="146" fill="url(#floorGrad)"/>
+    ${Array.from({length:16}).map((_,i)=>`<line x1="${i*64-40}" y1="414" x2="${i*64+110}" y2="560" stroke="#000" stroke-opacity="0.16" stroke-width="2"/>`).join("")}
+    <line x1="0" y1="404" x2="900" y2="404" stroke="#000" stroke-opacity="0.3" stroke-width="2"/>
+    <line x1="0" y1="70" x2="900" y2="70" stroke="#000" stroke-opacity="0.18" stroke-width="1.5"/>
+    <path d="M0 0 Q 56 8 38 54 Q 12 36 0 54 Z" fill="none" stroke="#cfd8d4" stroke-width="1" opacity="0.22" filter="url(#cobwebFilter)"/>
+    <path d="M900 0 Q 844 8 862 54 Q 888 36 900 54 Z" fill="none" stroke="#cfd8d4" stroke-width="1" opacity="0.22" filter="url(#cobwebFilter)"/>
+    <g>
+      <circle cx="60" cy="130" r="66" fill="url(#candleGlow)" opacity="0.45"/>
+      <circle cx="840" cy="130" r="66" fill="url(#candleGlow)" opacity="0.45"/>
+      <rect x="50" y="140" width="20" height="30" fill="url(#brassGrad)"/>
+      <rect x="830" y="140" width="20" height="30" fill="url(#brassGrad)"/>
+      <path d="M60 138 Q56 128 60 118 Q64 128 60 138 Z" fill="#ffbf5c"/>
+      <path d="M840 138 Q836 128 840 118 Q844 128 840 138 Z" fill="#ffbf5c"/>
+    </g>
+    ${isAttic ? `<g opacity="0.9"><circle cx="450" cy="130" r="150" fill="url(#ectoGlowGrad)"/><text x="450" y="142" text-anchor="middle" font-family="serif" font-size="24" fill="#b6ffe3" opacity="0.5">∅ Object.prototype</text></g>` : ""}
+  </svg>`;
+}
+
+function renderFurnitureLayer(roomId, questProp, opts){
+  opts = opts || {};
+  const lvl = currentLevel();
+  const room = lvl.rooms[roomId];
+  const layer = $("#furniture-layer");
+  layer.innerHTML = "";
+  const keys = Object.keys(room.own);
+  const showPedestal = questProp && !ownHas(room, questProp);
+  const slotItems = keys.map(k => ({key:k, own:true})).concat(showPedestal ? [{key:questProp, own:false}] : []);
+
+  slotItems.forEach((item) => {
+    const btn = document.createElement("button");
+    btn.className = "f-tile" + (item.own ? "" : " pedestal") + (opts.ghosted ? " ghosted" : "");
+    const icon = item.own ? room.own[item.key].icon : "ic-pedestal";
+    const label = item.own ? room.own[item.key].label : "empty pedestal";
+    btn.innerHTML = `<div class="f-icon-wrap"><svg viewBox="0 0 100 100" style="width:clamp(46px,6.5vw,82px);height:auto;"><use href="#${icon}"/></svg></div>
+      <div class="f-label">${esc(label)}</div><div class="f-key">${esc(item.key)}</div>`;
+    btn.dataset.key = item.key; btn.dataset.own = item.own ? "1" : "0";
+    btn.addEventListener("click", () => onFurnitureClick(item.key, item.own, btn));
+    layer.appendChild(btn);
+  });
+}
+
+function renderRoom(roomId){
+  const lvl = currentLevel();
+  const room = lvl.rooms[roomId];
+  const isAttic = roomId === "objProto";
+  $("#room-bg-target").innerHTML = buildRoomSceneSVG(roomId, isAttic);
+  $("#room-title-plate").textContent = room.displayName;
+  const q = currentQuest();
+  renderFurnitureLayer(roomId, q ? q.prop : null, {});
+  renderPortraitRail();
+  updateControlsForRoom(roomId);
+  updateQuestChip();
+}
+
+function updateControlsForRoom(roomId){
+  const lvl = currentLevel();
+  const room = lvl.rooms[roomId];
+  const climbBtn = $("#btn-climb"), descendBtn = $("#btn-descend"), declareBtn = $("#btn-declare-undefined");
+  climbBtn.disabled = !room.proto;
+  climbBtn.textContent = room.proto ? "↑ Climb the Stairs" : "↑ No Stairs Remain";
+  descendBtn.disabled = State.roomStack.length <= 1;
+  const q = currentQuest();
+  const atRoot = roomId === "objProto";
+  declareBtn.style.display = (q && q.mustReachRoot && atRoot) ? "inline-block" : "none";
+}
+
+/* ============================================================
+   9. PORTRAIT RAIL (chain breadcrumb + shadow reveal on peek)
+   ============================================================ */
+function renderPortraitRail(){
+  const lvl = currentLevel();
+  const rail = $("#portrait-rail");
+  rail.innerHTML = "";
+  State.roomStack.forEach((roomId, i) => {
+    if(i > 0){ const conn = document.createElement("div"); conn.className = "chain-connector"; rail.appendChild(conn); }
+    const room = lvl.rooms[roomId];
+    const card = document.createElement("div");
+    card.className = "portrait" + (roomId === State.currentRoomId ? " current" : "");
+    card.innerHTML = `<svg viewBox="0 0 60 74"><use href="#ic-portrait-generic"/></svg><div class="p-label">${esc(room.displayName.split("—")[0].trim())}</div>`;
+    card.title = "Peek: " + room.displayName;
+    card.addEventListener("click", () => peekAncestor(roomId));
+    rail.appendChild(card);
+  });
+}
+function peekAncestor(roomId){
+  const lvl = currentLevel();
+  const room = lvl.rooms[roomId];
+  const q = currentQuest();
+  let msg = room.displayName + " owns: " + (Object.keys(room.own).length ? Object.keys(room.own).join(", ") : "(nothing)");
+  if(q && ownHas(room, q.prop)){
+    const ownerId = findOwnerId(lvl.rooms, State.currentRoomId, q.prop);
+    if(ownerId !== roomId){
+      msg += `. Its "${q.prop}" is shadowed by ${lvl.rooms[ownerId].varName}'s own version and can't answer while you stand downstream.`;
+    }
+  }
+  showToast(msg, "info", 4400);
+  SoundEngine.pageFlip();
+}
+
+/* ============================================================
+   10. TOAST + FEEDBACK
+   ============================================================ */
+let toastTimer = null;
+function showToast(msg, kind, duration){
+  const t = $("#toast");
+  t.textContent = msg;
+  t.className = "show " + (kind || "info");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.className = t.className.replace("show",""); }, duration || 3000);
+}
+
+/* ============================================================
+   11. INTERACTION HANDLERS — TRACE LEVELS
+   ============================================================ */
+function onFurnitureClick(key, isOwn, btnEl){
+  const lvl = currentLevel();
+  const q = currentQuest();
+  if(!q) return;
+  const room = lvl.rooms[State.currentRoomId];
+  const expr = `${room.varName}.${key}`;
+
+  if(key === q.prop && isOwn){
+    btnEl.classList.add("correct-flash");
+    SoundEngine.chime();
+    const foundText = room.own[key].label;
+    pushCodeLog(`${expr}  →  ${jsLit(room.own[key].value)}   (own property, found)`, "good");
+    showToast(`Found it! ${room.varName}'s own "${q.prop}" answers: ${foundText}`, "good", 3200);
+    setTimeout(()=>advanceQuest(), 1200);
+  } else if(key === q.prop && !isOwn){
+    if(lvl.type === "finale"){
+      pushCodeLog(`${expr}  →  undefined  (not own here — you should have climbed)`, "bad");
+      triggerDecoyGhost(`${expr} isn't here.`, "You reached for an empty pedestal.");
+    } else {
+      btnEl.classList.add("wrong-flash");
+      SoundEngine.wrongBuzz();
+      pushCodeLog(`${room.varName}.hasOwnProperty("${q.prop}")  →  false`, "bad");
+      showToast("This pedestal is empty here — nothing to claim. Try climbing the stairs.", "bad", 2600);
+      State.mistakes++;
+    }
+  } else {
+    if(lvl.type === "finale"){
+      pushCodeLog(`${expr}  —  not what the séance seeks`, "bad");
+      triggerDecoyGhost(`${expr} is not the ${q.prop} the séance seeks.`, "Wrong furniture claimed.");
+    } else {
+      btnEl.classList.add("wrong-flash");
+      SoundEngine.wrongBuzz();
+      showToast(`That's not what the séance seeks. Look for "${q.prop}" instead.`, "bad", 2600);
+      State.mistakes++;
+    }
+  }
+}
+
+function onClimb(){
+  const lvl = currentLevel();
+  const q = currentQuest();
+  const room = lvl.rooms[State.currentRoomId];
+  if(!room.proto) return;
+  if(q && ownHas(room, q.prop)){
+    if(lvl.type === "finale"){
+      pushCodeLog(`${room.varName}.hasOwnProperty("${q.prop}")  →  true  (you climbed past it!)`, "bad");
+      triggerDecoyGhost(`You climbed past a floor that had "${q.prop}" the whole time.`, "Overlooked your own furniture.");
+      return;
+    } else {
+      pushCodeLog(`${room.varName}.hasOwnProperty("${q.prop}")  →  true  (you nearly climbed past it)`, "bad");
+      showToast(`Wait — "${q.prop}" was right here! You nearly overlooked your own furniture.`, "bad", 2800);
+      State.mistakes++;
+    }
+  } else {
+    pushCodeLog(`${room.varName}.hasOwnProperty("${q.prop}")  →  false  →  climbing to ${room.varName}.__proto__`, "info");
+    SoundEngine.creak();
+  }
+  State.currentRoomId = room.proto;
+  State.roomStack.push(State.currentRoomId);
+  renderRoom(State.currentRoomId);
+}
+
+function onDescend(){
+  if(State.roomStack.length <= 1) return;
+  State.roomStack.pop();
+  State.currentRoomId = State.roomStack[State.roomStack.length-1];
+  SoundEngine.creak();
+  renderRoom(State.currentRoomId);
+}
+
+function onDeclareUndefined(){
+  const lvl = currentLevel();
+  const q = currentQuest();
+  if(State.currentRoomId !== "objProto"){
+    showToast("You can only declare this from the attic — climb all the way up first.", "bad", 2800);
+    return;
+  }
+  const owner = findOwnerId(lvl.rooms, State.roomStack[0], q.prop);
+  const startVn = lvl.rooms[State.roomStack[0]].varName;
+  if(owner === null){
+    SoundEngine.ghostMoan();
+    pushCodeLog(`${startVn}.${q.prop}  →  undefined  (confirmed — nowhere in the chain)`, "good");
+    showToast(`Confirmed: "${q.prop}" exists nowhere in the chain. The séance returns undefined.`, "good", 3400);
+    setTimeout(()=>advanceQuest(), 1300);
+  } else {
+    SoundEngine.wrongBuzz();
+    showToast(`Not quite — "${q.prop}" does exist, on ${lvl.rooms[owner].varName}'s floor. Look again.`, "bad", 3000);
+    State.mistakes++;
+  }
+}
+
+function onHint(){
+  const q = currentQuest();
+  const lvl = currentLevel();
+  if(lvl.type === "create"){
+    showToast("Choose an ancestor portrait below to bind as this new room's parent, then watch which furniture ghosts through.", "info", 3600);
+    return;
+  }
+  if(!q) return;
+  showToast(q.hint, "info", 4200);
+  SoundEngine.pageFlip();
+}
+
+/* ============================================================
+   12. DECOY GHOST (finale strict penalty)
+   ============================================================ */
+function triggerDecoyGhost(codeLine, reason){
+  State.finaleDecoys++; State.mistakes++;
+  SoundEngine.ghostMoan();
+  const overlay = $("#decoy-overlay");
+  $("#decoy-text").textContent = reason + " Sent back down to the landing.";
+  $("#decoy-code").textContent = codeLine;
+  overlay.classList.add("show");
+  setTimeout(() => {
+    overlay.classList.remove("show");
+    const lvl = currentLevel();
+    State.currentRoomId = lvl.start;
+    State.roomStack = [lvl.start];
+    renderRoom(State.currentRoomId);
+  }, 2300);
+}
+
+/* ============================================================
+   13. LEVEL 4 — RITUAL (Object.create) UI
+   ============================================================ */
+function renderCreateLevel(){
+  const lvl = currentLevel();
+  $("#room-bg-target").innerHTML = buildRoomSceneSVG("ritual", false);
+  $("#room-title-plate").textContent = "The Séance Circle — Summon a New Room";
+  $("#furniture-layer").innerHTML = "";
+  $("#furniture-layer").style.display = "none";
+  $("#portrait-rail").innerHTML = "";
+  $("#btn-climb").disabled = true;
+  $("#btn-descend").disabled = true;
+  $("#btn-declare-undefined").style.display = "none";
+  $("#room-svg-holder").classList.add("mode-ritual");
+
+  const wrap = $("#ritual-wrap");
+  wrap.style.display = "flex";
+
+  if(!State.createChosenParent){
+    wrap.innerHTML = `
+      <div class="ritual-instructions">Bind a chosen ancestor as this new room's parent.
+      <code style="font-family:var(--font-code); color:var(--ecto-glow);">Object.create(parent)</code>
+      hangs a single door at the top of the stairs — nothing more.</div>
+      <div class="ritual-parents" id="ritual-parent-cards"></div>`;
+    const cardsHolder = $("#ritual-parent-cards");
+    lvl.parents.forEach(pid => {
+      const pdef = lvl.parentDefs[pid];
+      const card = document.createElement("div");
+      card.className = "ritual-parent-card";
+      card.innerHTML = `<svg viewBox="0 0 60 74"><use href="#ic-portrait-generic"/></svg>
+        <div class="rp-name">${esc(pdef.displayName)}</div>
+        <div class="rp-props">owns: ${Object.keys(pdef.own).join(", ") || "(nothing)"}</div>`;
+      card.addEventListener("click", () => chooseCreateParent(pid));
+      cardsHolder.appendChild(card);
+    });
+  } else {
+    renderCreateResult();
+  }
+}
+function chooseCreateParent(pid){
+  State.createChosenParent = pid; State.createAdded = false;
+  SoundEngine.doorOpen();
+  pushCodeLog(`const medium = Object.create(${currentLevel().parentDefs[pid].varName});`, "info");
+  renderCreateLevel();
+}
+function collectInheritedProps(lvl, parentId){
+  const chain = []; let cur = parentId; let guard=0;
+  while(cur && guard<20){ chain.push(cur); cur = lvl.parentDefs[cur].proto; guard++; }
+  const props = {};
+  for(let i=chain.length-1;i>=0;i--){
+    const r = lvl.parentDefs[chain[i]];
+    Object.keys(r.own).forEach(k => { props[k] = {value:r.own[k], sourceId:chain[i]}; });
+  }
+  return props;
+}
+function guessIconFor(key){
+  const map = { surname:"ic-ring", occupation:"ic-cabinet", landDeed:"ic-scroll", candleCount:"ic-candle" };
+  return map[key] || "ic-scroll";
+}
+function renderCreateResult(){
+  const lvl = currentLevel();
+  const parentId = State.createChosenParent;
+  const parentDef = lvl.parentDefs[parentId];
+  const inherited = collectInheritedProps(lvl, parentId);
+  const wrap = $("#ritual-wrap");
+
+  const codeLines = [`const medium = Object.create(${parentDef.varName});`];
+  if(State.createAdded){
+    const opt = lvl.ritualAddOptions.find(o => o.key === State.createAdded);
+    codeLines.push(`medium.${opt.key} = ${jsLit(opt.value)};`);
+  }
+
+  let addedBlock = "";
+  if(State.createAdded){
+    const opt = lvl.ritualAddOptions.find(o => o.key === State.createAdded);
+    const shadows = !!inherited[opt.key];
+    addedBlock = `<div style="font-family:var(--font-note-sc); color:var(--gold-glow); font-size:.95rem; text-align:center; max-width:640px;">
+      Own furniture placed: <strong>${esc(opt.key)} = ${jsLit(opt.value)}</strong>
+      ${shadows ? ` — this now <span style="color:var(--ecto-glow);">shadows</span> the inherited "${esc(opt.key)}" from ${esc(lvl.parentDefs[inherited[opt.key].sourceId].varName)}.` : " — a brand-new item; there was nothing here to shadow."}
+    </div>`;
+  }
+
+  const ghostCards = Object.keys(inherited).map(k => `
+    <div class="ritual-ghost-card">
+      <svg viewBox="0 0 100 100"><use href="#${guessIconFor(k)}"/></svg>
+      <div class="rg-name">${esc(k)} <span style="color:var(--ecto-dim); font-family:var(--font-body);">(ghosted)</span></div>
+      <div class="rg-val">${esc(String(inherited[k].value.value !== undefined ? inherited[k].value.value : inherited[k].value))} — from ${esc(lvl.parentDefs[inherited[k].sourceId].varName)}</div>
+    </div>`).join("") || `<div style="font-family:var(--font-note); font-style:italic; color:var(--parchment-dark);">This ancestor and its chain hold no furniture at all.</div>`;
+
+  wrap.innerHTML = `
+    <div class="ritual-heading">medium — bound to ${esc(parentDef.displayName)}</div>
+    <div class="ritual-instructions">Everything below ghosted through from upstairs. medium owns none of it — yet.</div>
+    <div class="ritual-ghost-grid">${ghostCards}</div>
+    ${addedBlock}
+    <div class="ritual-code-wrap"><div class="code-block">${highlightCode(codeLines)}</div></div>
+    <div class="ritual-actions">
+      ${!State.createAdded ? lvl.ritualAddOptions.map(o => `<button class="action-btn" data-add="${esc(o.key)}">${esc(o.label)}</button>`).join("") : `<button class="action-btn" id="ritual-finish">Complete the Ritual</button>`}
+      <button class="action-btn ghost" id="ritual-restart">Choose a Different Ancestor</button>
+    </div>
+  `;
+
+  $all("[data-add]", wrap).forEach(btn => {
+    btn.addEventListener("click", () => {
+      State.createAdded = btn.dataset.add;
+      SoundEngine.chime();
+      const opt = lvl.ritualAddOptions.find(o => o.key === State.createAdded);
+      pushCodeLog(`medium.${opt.key} = ${jsLit(opt.value)};`, "good");
+      renderCreateResult();
+    });
+  });
+  const finishBtn = $("#ritual-finish", wrap);
+  if(finishBtn) finishBtn.addEventListener("click", () => completeLevel());
+  $("#ritual-restart", wrap).addEventListener("click", () => {
+    State.createChosenParent = null; State.createAdded = false;
+    renderCreateLevel();
+  });
+}
+
+/* ============================================================
+   14. LEVEL / QUEST FLOW
+   ============================================================ */
+function loadLevel(idx){
+  State.levelIndex = idx; State.mistakes = 0; State.questIndex = 0;
+  State.createChosenParent = null; State.createAdded = false;
+  const lvl = currentLevel();
+
+  $("#level-chip").textContent = lvl.chip;
+  $("#ritual-wrap").style.display = "none";
+  $("#furniture-layer").style.display = "grid";
+  $("#room-svg-holder").classList.remove("mode-ritual");
+  renderProgressDots();
+
+  $("#instruction-strip").classList.toggle("hidden", idx !== 0 || State.seenInstructions);
+
+  if(lvl.type === "trace" || lvl.type === "finale"){
+    State.currentRoomId = lvl.start;
+    State.roomStack = [lvl.start];
+    renderRoom(State.currentRoomId);
+    showToast(lvl.intro, "info", 4600);
+  } else if(lvl.type === "create"){
+    $("#quest-chip").textContent = "Bind a parent, then perform the writing ritual.";
+    $("#quest-code").textContent = "Object.create(parent)";
+    $("#btn-declare-undefined").style.display = "none";
+    $("#btn-climb").disabled = true;
+    $("#btn-descend").disabled = true;
+    renderCreateLevel();
+    showToast(lvl.intro, "info", 4600);
+  }
+}
+function updateQuestChip(){
+  const q = currentQuest();
+  $("#quest-chip").textContent = q ? q.prompt : "";
+  $("#quest-code").textContent = q ? currentQueryExpr() : "";
+}
+function renderProgressDots(){
+  const holder = $("#progress-dots");
+  holder.innerHTML = "";
+  LEVELS.forEach((lvl, i) => {
+    const dot = document.createElement("span");
+    if(i < State.levelIndex) dot.className = "done";
+    else if(i === State.levelIndex) dot.className = "current";
+    holder.appendChild(dot);
+  });
+}
+function advanceQuest(){
+  const lvl = currentLevel();
+  if(lvl.quests && State.questIndex < lvl.quests.length - 1){
+    State.questIndex++;
+    State.currentRoomId = lvl.start;
+    State.roomStack = [lvl.start];
+    renderRoom(State.currentRoomId);
+  } else {
+    completeLevel();
+  }
+}
+function completeLevel(){
+  const lvl = currentLevel();
+  State.totalMistakes += State.mistakes;
+  const isLast = State.levelIndex === LEVELS.length - 1;
+
+  if(isLast){
+    $("#gc-stats").innerHTML = `
+      <div class="recap-stat"><span class="num">${LEVELS.length}</span><span class="lbl">Chapters Walked</span></div>
+      <div class="recap-stat"><span class="num">${State.totalMistakes}</span><span class="lbl">Total Missteps</span></div>
+      <div class="recap-stat"><span class="num">${State.finaleDecoys}</span><span class="lbl">Decoy Ghosts</span></div>`;
+    $("#gc-recap").innerHTML = `<ul class="recap-list">${LEVELS.map(l => `<li><strong>${esc(l.title)}:</strong> ${esc(l.concept)}</li>`).join("")}</ul>`;
+    $("#gamecomplete-modal").classList.add("show");
+    SoundEngine.doorOpen();
+    return;
+  }
+
+  $("#lc-title").textContent = lvl.type === "finale" ? "The Locked Door Opens" : "The Chain Is Traced";
+  $("#lc-sub").textContent = lvl.title + " — Complete";
+  const recapEntries = State.codeLog.filter(l => l.levelIndex === State.levelIndex);
+  $("#lc-body").innerHTML = `
+    <p style="font-family:var(--font-note); font-style:italic; font-size:1.08rem; color:var(--parchment); margin:0 0 .8rem;">${esc(lvl.concept)}</p>
+    ${recapEntries.length ? `<div class="code-block" style="text-align:left; max-height:180px; overflow-y:auto;">${recapEntries.map(e=>esc(e.text)).join("\n")}</div>` : ""}
+    <div class="recap-stat-row"><div class="recap-stat"><span class="num">${State.mistakes}</span><span class="lbl">Missteps This Chapter</span></div></div>`;
+  $("#levelcomplete-modal").classList.add("show");
+  SoundEngine.doorOpen();
+}
+
+/* ============================================================
+   15. CODE CONSOLE MODAL
+   ============================================================ */
+function openCodeModal(){
+  const lvl = currentLevel();
+  $("#code-sub").textContent = lvl.title + " — as real JavaScript";
+  if(lvl.type === "trace" || lvl.type === "finale"){
+    const lines = generateChainCode(lvl);
+    $("#code-source-block").innerHTML = highlightCode(lines);
+  } else {
+    $("#code-source-block").innerHTML = State.createChosenParent
+      ? highlightCode([`const medium = Object.create(${lvl.parentDefs[State.createChosenParent].varName});`].concat(
+          State.createAdded ? [`medium.${State.createAdded} = ${jsLit(lvl.ritualAddOptions.find(o=>o.key===State.createAdded).value)};`] : []))
+      : "// Choose an ancestor below to begin the ritual.";
+  }
+  const traceHolder = $("#code-trace-list");
+  const entries = State.codeLog.filter(l => l.levelIndex === State.levelIndex);
+  traceHolder.innerHTML = entries.length
+    ? entries.map(e => `<div class="code-trace-line ${e.kind}">${esc(e.text)}</div>`).join("")
+    : `<div class="code-trace-line info">Nothing tried yet in this chapter — every click and climb will appear here.</div>`;
+  $("#code-modal").classList.add("show");
+  SoundEngine.pageFlip();
+}
+function closeCodeModal(){ $("#code-modal").classList.remove("show"); }
+
+/* ============================================================
+   16. FIELD GUIDE MODAL
+   ============================================================ */
+function openFieldGuide(){ $("#fieldguide-modal").classList.add("show"); SoundEngine.pageFlip(); }
+function closeFieldGuide(){ $("#fieldguide-modal").classList.remove("show"); }
+function initFieldGuideTabs(){
+  $all(".fg-tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      $all(".fg-tab").forEach(t => t.classList.remove("active"));
+      $all(".fg-panel").forEach(p => p.classList.remove("active"));
+      tab.classList.add("active");
+      $(`.fg-panel[data-panel="${tab.dataset.fg}"]`).classList.add("active");
+      SoundEngine.pageFlip();
+    });
+  });
+}
+
+/* ============================================================
+   17. WIRE UP EVENTS
+   ============================================================ */
+function initEvents(){
+  $("#btn-enter").addEventListener("click", () => {
+    const soundOn = $("#sound-toggle-intro").checked;
+    SoundEngine.setEnabled(soundOn);
+    $("#btn-sound").innerHTML = soundOn ? '🔔<span class="ib-tip">Sound</span>' : '🔕<span class="ib-tip">Sound</span>';
+    SoundEngine.ensureCtx();
+    if(soundOn) SoundEngine.startAmbient();
+    $("#intro").classList.add("hidden");
+    $("#game").classList.add("active");
+    loadLevel(0);
+    setTimeout(() => { openFieldGuide(); }, 500);
+  });
+
+  $("#btn-fieldguide").addEventListener("click", openFieldGuide);
+  $("#fg-close").addEventListener("click", closeFieldGuide);
+  $("#fieldguide-modal").addEventListener("click", (e) => { if(e.target.id === "fieldguide-modal") closeFieldGuide(); });
+
+  $("#btn-code").addEventListener("click", openCodeModal);
+  $("#code-close").addEventListener("click", closeCodeModal);
+  $("#code-modal").addEventListener("click", (e) => { if(e.target.id === "code-modal") closeCodeModal(); });
+
+  $("#instruction-dismiss").addEventListener("click", () => {
+    State.seenInstructions = true;
+    $("#instruction-strip").classList.add("hidden");
+  });
+
+  $("#btn-sound").addEventListener("click", () => {
+    const next = !SoundEngine.isEnabled();
+    SoundEngine.setEnabled(next);
+    $("#btn-sound").innerHTML = next ? '🔔<span class="ib-tip">Sound</span>' : '🔕<span class="ib-tip">Sound</span>';
+    if(next) SoundEngine.chime();
+  });
+
+  $("#btn-restart").addEventListener("click", () => { loadLevel(State.levelIndex); });
+  $("#btn-climb").addEventListener("click", onClimb);
+  $("#btn-descend").addEventListener("click", onDescend);
+  $("#btn-declare-undefined").addEventListener("click", onDeclareUndefined);
+  $("#btn-hint").addEventListener("click", onHint);
+
+  $("#lc-continue").addEventListener("click", () => {
+    $("#levelcomplete-modal").classList.remove("show");
+    loadLevel(State.levelIndex + 1);
+  });
+  $("#gc-restart").addEventListener("click", () => {
+    $("#gamecomplete-modal").classList.remove("show");
+    State.totalMistakes = 0; State.finaleDecoys = 0; State.codeLog = [];
+    loadLevel(0);
+  });
+
+  initFieldGuideTabs();
+  window.addEventListener("keydown", (e) => {
+    if(e.key === "Escape"){ closeFieldGuide(); closeCodeModal(); }
+  });
+}
+document.addEventListener("DOMContentLoaded", () => {
+  $("#hero-svg-holder").innerHTML = heroMansionSVG();
+  initParticles();
+  initEvents();
+});
+
+})();
+</script>
+</body>
+</html>
