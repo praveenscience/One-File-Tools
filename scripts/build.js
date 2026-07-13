@@ -575,4 +575,3 @@ console.log("  " + totalQuestCount + " quests across " + questCategories.length 
 console.log("  " + totalQuizCount + " quizzes across " + quizCategories.length + " categories");
 console.log("  Template: " + templatePath);
 console.log("  Output: " + outPath);
-

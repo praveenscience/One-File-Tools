@@ -1,0 +1,1406 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description"
+        content="Build and validate recommended HTTP security headers, scan Content-Security-Policy (CSP) configurations for XSS flaws, verify HSTS preload requirements, and export config blocks offline." />
+    <title>Security Header Coach — One File Tools</title>
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap"
+        rel="stylesheet" />
+    <script src="https://unpkg.com/feather-icons"></script>
+
+    <style>
+        /* ========================================
+       Reset & Design Tokens
+       ======================================== */
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg-dark: #090d16;
+            --bg-gradient: radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.15) 0%, rgba(9, 13, 22, 0) 75%), linear-gradient(135deg, #090d16 0%, #0d1222 100%);
+            --panel-bg: rgba(17, 24, 39, 0.6);
+            --panel-border: rgba(255, 255, 255, 0.08);
+            --panel-border-strong: rgba(255, 255, 255, 0.16);
+            --panel-soft: rgba(255, 255, 255, 0.03);
+
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --text-subtle: #6b7280;
+
+            --color-primary: #6366f1;
+            --color-primary-hover: #4f46e5;
+            --color-primary-glow: rgba(99, 102, 241, 0.25);
+
+            --color-success: #10b981;
+            --color-success-bg: rgba(16, 185, 129, 0.1);
+            --color-success-glow: rgba(16, 185, 129, 0.2);
+
+            --color-warning: #f59e0b;
+            --color-warning-bg: rgba(245, 158, 11, 0.1);
+            --color-warning-glow: rgba(245, 158, 11, 0.2);
+
+            --color-danger: #ef4444;
+            --color-danger-bg: rgba(239, 68, 68, 0.1);
+            --color-danger-glow: rgba(239, 68, 68, 0.2);
+
+            --color-info: #06b6d4;
+            --color-info-bg: rgba(6, 182, 212, 0.1);
+
+            --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.15);
+            --radius: 12px;
+            --mono: "JetBrains Mono", monospace;
+            --sans: "Plus Jakarta Sans", sans-serif;
+        }
+
+        body {
+            background: var(--bg-dark);
+            background-image: var(--bg-gradient);
+            background-attachment: fixed;
+            color: var(--text-main);
+            font-family: var(--sans);
+            line-height: 1.6;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        /* ========================================
+       Header & Layout
+       ======================================== */
+        header {
+            max-width: 1400px;
+            margin: 0 auto 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .header-title-area {
+            max-width: 800px;
+        }
+
+        .eyebrow {
+            color: var(--color-primary);
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            font-weight: 800;
+            letter-spacing: 0.15em;
+            margin-bottom: 0.5rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        h1 {
+            font-size: clamp(1.8rem, 4vw, 2.8rem);
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            line-height: 1.1;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(to right, #ffffff 40%, #c7d2fe 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+        }
+
+        .privacy-badge {
+            background: rgba(99, 102, 241, 0.08);
+            border: 1px solid rgba(99, 102, 241, 0.25);
+            border-radius: var(--radius);
+            padding: 0.6rem 1rem;
+            color: #c7d2fe;
+            font-weight: 600;
+            font-size: 0.85rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.05);
+        }
+
+        main {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+            gap: 24px;
+            align-items: start;
+        }
+
+        @media (max-width: 1024px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ========================================
+       UI Panels
+       ======================================== */
+        .panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: var(--radius);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--panel-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .panel-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .panel-title i {
+            width: 18px;
+            height: 18px;
+            color: var(--color-primary);
+        }
+
+        .panel-body {
+            padding: 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* ========================================
+       Form & Configuration Styling
+       ======================================== */
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-label {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        select,
+        input[type="text"],
+        input[type="number"],
+        textarea {
+            background: rgba(5, 7, 12, 0.6);
+            border: 1px solid var(--panel-border);
+            color: var(--text-main);
+            font-family: var(--sans);
+            font-size: 0.9rem;
+            font-weight: 500;
+            padding: 0.6rem 1rem;
+            border-radius: 8px;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        textarea.code-textarea {
+            font-family: var(--mono);
+            font-size: 0.82rem;
+            line-height: 1.4;
+        }
+
+        select:focus,
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        textarea:focus {
+            border-color: var(--color-primary);
+            box-shadow: 0 0 8px var(--color-primary-glow);
+        }
+
+        /* Toggles / Checkboxes */
+        .header-switch-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.02);
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: 1px solid var(--panel-border);
+        }
+
+        .switch-label-area {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .switch-title {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        .switch-desc {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+        }
+
+        /* IOS Style Switch Toggle */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background-color: #374151;
+            transition: .3s;
+            border-radius: 24px;
+        }
+
+        .slider::before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+        }
+
+        input:checked+.slider {
+            background-color: var(--color-primary);
+        }
+
+        input:checked+.slider::before {
+            transform: translateX(20px);
+        }
+
+        /* Sub configurations panel */
+        .sub-config-box {
+            margin-left: 16px;
+            padding-left: 16px;
+            border-left: 2px dashed var(--panel-border-strong);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: -8px;
+            margin-bottom: 8px;
+        }
+
+        .sub-config-box.hidden {
+            display: none;
+        }
+
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .checkbox-row input[type="checkbox"] {
+            accent-color: var(--color-primary);
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        /* ========================================
+       Rating Grade Scorecard
+       ======================================== */
+        .grade-panel {
+            background: rgba(5, 7, 12, 0.4);
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .grade-badge-circle {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: #ffffff;
+            font-family: var(--sans);
+            box-shadow: 0 0 15px currentColor;
+            flex-shrink: 0;
+        }
+
+        .grade-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .grade-title {
+            font-size: 1.1rem;
+            font-weight: 800;
+        }
+
+        .grade-desc {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        /* ========================================
+       Audit Recommendations List
+       ======================================== */
+        .audit-header {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid var(--panel-border);
+            padding-bottom: 8px;
+        }
+
+        .audit-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
+        .audit-item {
+            display: flex;
+            gap: 12px;
+            align-items: start;
+            background: rgba(255, 255, 255, 0.01);
+            border: 1px solid var(--panel-border);
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 0.82rem;
+        }
+
+        .audit-item.error {
+            border-left: 4px solid var(--color-danger);
+        }
+
+        .audit-item.warning {
+            border-left: 4px solid var(--color-warning);
+        }
+
+        .audit-item.info {
+            border-left: 4px solid var(--color-info);
+        }
+
+        .audit-icon-wrap {
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .audit-icon-wrap i {
+            width: 16px;
+            height: 16px;
+        }
+
+        .audit-item.error i {
+            color: var(--color-danger);
+        }
+
+        .audit-item.warning i {
+            color: var(--color-warning);
+        }
+
+        .audit-item.info i {
+            color: var(--color-info);
+        }
+
+        .audit-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .audit-item-title {
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        .audit-item-desc {
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        .audit-empty {
+            padding: 20px;
+            text-align: center;
+            color: var(--color-success);
+            font-weight: 600;
+        }
+
+        /* ========================================
+       Copy Output Templates & Tabs
+       ======================================== */
+        .tabs {
+            display: flex;
+            background: rgba(5, 7, 12, 0.5);
+            padding: 4px;
+            border-radius: 8px;
+            border: 1px solid var(--panel-border);
+            align-self: flex-start;
+        }
+
+        .tab {
+            background: transparent;
+            border: none;
+            outline: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .tab:hover {
+            color: var(--text-main);
+        }
+
+        .tab.active {
+            background: var(--color-primary);
+            color: #ffffff;
+        }
+
+        pre.output-code-block {
+            background: #020617;
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            padding: 16px;
+            font-family: var(--mono);
+            font-size: 0.82rem;
+            color: #93c5fd;
+            white-space: pre-wrap;
+            word-break: break-all;
+            line-height: 1.5;
+            overflow-x: auto;
+            min-height: 180px;
+        }
+
+        /* Button group toolbar */
+        .toolbar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        button.toolbar-btn {
+            background: var(--panel-soft);
+            border: 1px solid var(--panel-border);
+            color: var(--text-main);
+            font-family: var(--sans);
+            font-weight: 600;
+            font-size: 0.82rem;
+            padding: 0.5rem 0.8rem;
+            border-radius: 8px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            user-select: none;
+        }
+
+        button.toolbar-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--panel-border-strong);
+            transform: translateY(-1px);
+        }
+
+        button.toolbar-btn:active {
+            transform: translateY(0);
+        }
+
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #1e293b;
+            border: 1px solid var(--panel-border-strong);
+            color: #ffffff;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+            z-index: 999;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: none;
+        }
+
+        .toast.active {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast i {
+            width: 16px;
+            height: 16px;
+            color: var(--color-success);
+        }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        footer {
+            max-width: 1400px;
+            margin: 2rem auto 0;
+            text-align: center;
+            color: var(--text-subtle);
+            font-size: 0.85rem;
+            border-top: 1px solid var(--panel-border);
+            padding-top: 1.5rem;
+        }
+
+        footer a {
+            color: var(--color-primary);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="header-title-area">
+            <span class="eyebrow"><i data-feather="globe"></i> Web & SEO Tools</span>
+            <h1>Security Header Coach</h1>
+            <p>Build, validate, and optimize HTTP response security headers (especially CSP) with live audit feedback.
+            </p>
+        </div>
+        <div class="privacy-badge">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"
+                style="margin-right: 4px;">
+                <path
+                    d="M12,1L3,5v6c0,5.55,3.84,10.74,9,12c5.16-1.26,9-6.45,9-12V5L12,1L12,1z M12,11.99h7c-0.53,4.12-3.28,7.79-7,8.94V12H5V6.3l7-3.11V11.99z" />
+            </svg>
+            100% Offline & Secure
+        </div>
+    </header>
+
+    <main>
+        <!-- Left Panel: Configuration Builder -->
+        <section class="panel" aria-labelledby="config-panel-title">
+            <div class="panel-header">
+                <h2 id="config-panel-title" class="panel-title"><i data-feather="sliders"></i> Header Configurations
+                </h2>
+                <div class="toolbar">
+                    <button class="toolbar-btn" id="import-json-btn"><i data-feather="upload-cloud"></i> Import
+                        Config</button>
+                    <input type="file" id="import-file-input" style="display: none;" accept=".json" />
+                </div>
+            </div>
+            <div class="panel-body">
+                <!-- Preset Selector -->
+                <div class="form-group">
+                    <label for="header-presets" class="form-label">Pre-configured Policy Templates</label>
+                    <select id="header-presets">
+                        <option value="secure-defaults">🛡️ Secure Defaults (Highly Recommended)</option>
+                        <option value="strict-paranoiac">🔒 Strict Mode (Paranoiac Policy)</option>
+                        <option value="spa-standard">⚡ Single Page App Standard (SPA)</option>
+                        <option value="minimum-compliance">⚠️ Minimum Compliance (Basic headers)</option>
+                    </select>
+                </div>
+
+                <!-- 1. Content Security Policy (CSP) -->
+                <div class="header-switch-row">
+                    <div class="switch-label-area">
+                        <span class="switch-title">Content-Security-Policy (CSP)</span>
+                        <span class="switch-desc">Defends against XSS and script injection attacks.</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="csp-toggle" checked />
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="sub-config-box" id="csp-sub-panel">
+                    <div class="form-group">
+                        <label for="csp-value" class="form-label">CSP Directive List</label>
+                        <textarea id="csp-value" rows="4" class="code-textarea"
+                            placeholder="default-src 'self'; script-src 'self';">default-src 'self'; script-src 'self' 'unsafe-inline' https:; img-src 'self' data:; object-src 'none'; frame-ancestors 'none';</textarea>
+                    </div>
+                    <div class="checkbox-row" id="csp-quick-quote">
+                        <i data-feather="check-square"
+                            style="width: 14px; height: 14px; color: var(--color-primary);"></i>
+                        <span>Ensure keywords ('self', 'none', 'unsafe-inline') are wrapped in single quotes.</span>
+                    </div>
+                </div>
+
+                <!-- 2. Strict-Transport-Security (HSTS) -->
+                <div class="header-switch-row">
+                    <div class="switch-label-area">
+                        <span class="switch-title">Strict-Transport-Security (HSTS)</span>
+                        <span class="switch-desc">Forces all client connections over HTTPS.</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="hsts-toggle" checked />
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="sub-config-box" id="hsts-sub-panel">
+                    <div class="form-group">
+                        <label for="hsts-maxage" class="form-label">max-age (Seconds)</label>
+                        <input type="number" id="hsts-maxage" value="31536000" min="0" placeholder="31536000" />
+                    </div>
+                    <label class="checkbox-row">
+                        <input type="checkbox" id="hsts-subdomains" checked />
+                        <span>Include Subdomains (includeSubDomains)</span>
+                    </label>
+                    <label class="checkbox-row">
+                        <input type="checkbox" id="hsts-preload" checked />
+                        <span>Allow Preloading (preload)</span>
+                    </label>
+                </div>
+
+                <!-- 3. X-Frame-Options -->
+                <div class="header-switch-row">
+                    <div class="switch-label-area">
+                        <span class="switch-title">X-Frame-Options (Clickjacking)</span>
+                        <span class="switch-desc">Restricts page framing by other websites.</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="xfo-toggle" checked />
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="sub-config-box" id="xfo-sub-panel">
+                    <div class="form-group">
+                        <label for="xfo-value" class="form-label">Action directive</label>
+                        <select id="xfo-value">
+                            <option value="SAMEORIGIN" selected>SAMEORIGIN (Allow frame on same origin)</option>
+                            <option value="DENY">DENY (Block all framing)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 4. X-Content-Type-Options -->
+                <div class="header-switch-row">
+                    <div class="switch-label-area">
+                        <span class="switch-title">X-Content-Type-Options (nosniff)</span>
+                        <span class="switch-desc">Blocks browsers from MIME sniffing response files.</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="xcto-toggle" checked />
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <!-- 5. Referrer-Policy -->
+                <div class="header-switch-row">
+                    <div class="switch-label-area">
+                        <span class="switch-title">Referrer-Policy (Privacy)</span>
+                        <span class="switch-desc">Controls how much referrer metadata is sent on link clicks.</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="referrer-toggle" checked />
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="sub-config-box" id="referrer-sub-panel">
+                    <div class="form-group">
+                        <label for="referrer-value" class="form-label">Privacy standard</label>
+                        <select id="referrer-value">
+                            <option value="strict-origin-when-cross-origin" selected>strict-origin-when-cross-origin
+                                (Recommended)</option>
+                            <option value="no-referrer">no-referrer (Highest security, hides all referrers)</option>
+                            <option value="origin-when-cross-origin">origin-when-cross-origin</option>
+                            <option value="same-origin">same-origin</option>
+                            <option value="unsafe-url">unsafe-url (Leaky referrer)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 6. Permissions-Policy -->
+                <div class="header-switch-row">
+                    <div class="switch-label-area">
+                        <span class="switch-title">Permissions-Policy</span>
+                        <span class="switch-desc">Controls browser features (camera, microphone, location).</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="permissions-toggle" checked />
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="sub-config-box" id="permissions-sub-panel">
+                    <div class="form-group">
+                        <label for="permissions-value" class="form-label">Allowed Features List</label>
+                        <input type="text" id="permissions-value" value="camera=(), microphone=(), geolocation=()"
+                            placeholder="geolocation=()" />
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Panel: Auditor & Outputs -->
+        <section class="panel" aria-labelledby="audit-panel-title">
+            <div class="panel-header">
+                <h2 id="audit-panel-title" class="panel-title"><i data-feather="shield"></i> Auditor & Exports</h2>
+                <div class="toolbar">
+                    <button class="toolbar-btn" id="export-json-btn-right"><i data-feather="download"></i> Export
+                        JSON</button>
+                </div>
+            </div>
+            <div class="panel-body" style="gap: 16px;">
+                <!-- Grade Scorecard -->
+                <div class="grade-panel" id="grade-panel">
+                    <div class="grade-badge-circle" id="grade-badge">A</div>
+                    <div class="grade-info">
+                        <div class="grade-title" id="grade-title">Good Protection</div>
+                        <div class="grade-desc" id="grade-score-desc">Overall security score: 85%</div>
+                    </div>
+                </div>
+
+                <!-- Live Audit Findings -->
+                <div class="form-group">
+                    <div class="audit-header">Coach Audit Findings</div>
+                    <div class="audit-list" id="audit-findings-list">
+                        <!-- Audits loaded dynamically -->
+                    </div>
+                </div>
+
+                <!-- Tabs selection -->
+                <div class="form-group" style="margin-top: 10px;">
+                    <div class="tabs">
+                        <button class="tab active" data-format="raw">Raw Headers</button>
+                        <button class="tab" data-format="nginx">Nginx</button>
+                        <button class="tab" data-format="apache">Apache</button>
+                        <button class="tab" data-format="nextjs">Next.js</button>
+                        <button class="tab" data-format="node">Node.js</button>
+                    </div>
+                </div>
+
+                <!-- Code preview box -->
+                <div class="form-group">
+                    <div class="form-label">
+                        Generated Configuration Snippet
+                        <button class="toolbar-btn" id="copy-code-btn" style="padding: 2px 8px; font-size: 0.72rem;"><i
+                                data-feather="copy" style="width: 12px; height:12px;"></i> Copy Code</button>
+                    </div>
+                    <pre class="output-code-block" id="output-code-preview"></pre>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>Part of <a href="https://github.com/praveenscience/One-File-Tools" target="_blank"
+                rel="noopener noreferrer">One File Tools</a> — Developer utilities, one file each.</p>
+    </footer>
+
+    <!-- Copy Status Toast -->
+    <div class="toast" id="toast">
+        <i data-feather="check"></i>
+        <span id="toast-message">Copied to clipboard!</span>
+    </div>
+
+    <!-- Core App Logic -->
+    <script>
+        // ========================================
+        // Config Presets Mappings
+        // ========================================
+        const PRESETS = {
+            "secure-defaults": {
+                csp: { enabled: true, value: "default-src 'self'; script-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; object-src 'none'; frame-ancestors 'none';" },
+                hsts: { enabled: true, maxAge: "31536000", includeSubDomains: true, preload: true },
+                xfo: { enabled: true, value: "SAMEORIGIN" },
+                xcto: { enabled: true },
+                referrer: { enabled: true, value: "strict-origin-when-cross-origin" },
+                permissions: { enabled: true, value: "camera=(), microphone=(), geolocation=()" }
+            },
+            "strict-paranoiac": {
+                csp: { enabled: true, value: "default-src 'none'; script-src 'self'; img-src 'self'; style-src 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; base-uri 'none';" },
+                hsts: { enabled: true, maxAge: "63072000", includeSubDomains: true, preload: true },
+                xfo: { enabled: true, value: "DENY" },
+                xcto: { enabled: true },
+                referrer: { enabled: true, value: "no-referrer" },
+                permissions: { enabled: true, value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()" }
+            },
+            "spa-standard": {
+                csp: { enabled: true, value: "default-src 'self'; script-src 'self' https://apis.google.com; img-src 'self' https: data:; connect-src 'self' https://api.yourdomain.com; style-src 'self' 'unsafe-inline'; object-src 'none';" },
+                hsts: { enabled: true, maxAge: "31536000", includeSubDomains: true, preload: false },
+                xfo: { enabled: true, value: "SAMEORIGIN" },
+                xcto: { enabled: true },
+                referrer: { enabled: true, value: "strict-origin-when-cross-origin" },
+                permissions: { enabled: false, value: "" }
+            },
+            "minimum-compliance": {
+                csp: { enabled: false, value: "" },
+                hsts: { enabled: true, maxAge: "15768000", includeSubDomains: false, preload: false },
+                xfo: { enabled: true, value: "SAMEORIGIN" },
+                xcto: { enabled: true },
+                referrer: { enabled: false, value: "strict-origin-when-cross-origin" },
+                permissions: { enabled: false, value: "" }
+            }
+        };
+
+        // ========================================
+        // Active config state
+        // ========================================
+        let activeFormat = "raw"; // "raw" | "nginx" | "apache" | "nextjs" | "node"
+
+        document.addEventListener("DOMContentLoaded", () => {
+            feather.replace();
+
+            // Bind interactive controls
+            const presetSelect = document.getElementById("header-presets");
+            const importBtn = document.getElementById("import-json-btn");
+            const importFileInput = document.getElementById("import-file-input");
+            const exportJsonBtnRight = document.getElementById("export-json-btn-right");
+
+            const cspToggle = document.getElementById("csp-toggle");
+            const cspSubPanel = document.getElementById("csp-sub-panel");
+            const cspValue = document.getElementById("csp-value");
+
+            const hstsToggle = document.getElementById("hsts-toggle");
+            const hstsSubPanel = document.getElementById("hsts-sub-panel");
+            const hstsMaxAge = document.getElementById("hsts-maxage");
+            const hstsSubdomains = document.getElementById("hsts-subdomains");
+            const hstsPreload = document.getElementById("hsts-preload");
+
+            const xfoToggle = document.getElementById("xfo-toggle");
+            const xfoSubPanel = document.getElementById("xfo-sub-panel");
+            const xfoValue = document.getElementById("xfo-value");
+
+            const xctoToggle = document.getElementById("xcto-toggle");
+
+            const referrerToggle = document.getElementById("referrer-toggle");
+            const referrerSubPanel = document.getElementById("referrer-sub-panel");
+            const referrerValue = document.getElementById("referrer-value");
+
+            const permissionsToggle = document.getElementById("permissions-toggle");
+            const permissionsSubPanel = document.getElementById("permissions-sub-panel");
+            const permissionsValue = document.getElementById("permissions-value");
+
+            const gradeBadge = document.getElementById("grade-badge");
+            const gradeTitle = document.getElementById("grade-title");
+            const gradeScoreDesc = document.getElementById("grade-score-desc");
+            const auditFindingsList = document.getElementById("audit-findings-list");
+
+            const tabsContainer = document.querySelector(".tabs");
+            const outputCodePreview = document.getElementById("output-code-preview");
+            const copyCodeBtn = document.getElementById("copy-code-btn");
+
+            // Set default config
+            loadConfig(PRESETS["secure-defaults"]);
+
+            // Presets selector change
+            presetSelect.addEventListener("change", (e) => {
+                const config = PRESETS[e.target.value];
+                if (config) {
+                    loadConfig(config);
+                    showToast("Template loaded successfully");
+                }
+            });
+
+            // Trigger updates on any configurations modifications
+            const allConfigInputs = [
+                cspToggle, cspValue,
+                hstsToggle, hstsMaxAge, hstsSubdomains, hstsPreload,
+                xfoToggle, xfoValue,
+                xctoToggle,
+                referrerToggle, referrerValue,
+                permissionsToggle, permissionsValue
+            ];
+
+            allConfigInputs.forEach((input) => {
+                input.addEventListener("input", runEvaluation);
+                input.addEventListener("change", runEvaluation);
+            });
+
+            // Toggle sub panels
+            function updateSubPanelsVisibility() {
+                cspSubPanel.classList.toggle("hidden", !cspToggle.checked);
+                hstsSubPanel.classList.toggle("hidden", !hstsToggle.checked);
+                xfoSubPanel.classList.toggle("hidden", !xfoToggle.checked);
+                referrerSubPanel.classList.toggle("hidden", !referrerToggle.checked);
+                permissionsSubPanel.classList.toggle("hidden", !permissionsToggle.checked);
+            }
+
+            // Load config values into UI fields
+            function loadConfig(config) {
+                cspToggle.checked = config.csp.enabled;
+                cspValue.value = config.csp.value;
+
+                hstsToggle.checked = config.hsts.enabled;
+                hstsMaxAge.value = config.hsts.maxAge;
+                hstsSubdomains.checked = config.hsts.includeSubDomains;
+                hstsPreload.checked = config.hsts.preload;
+
+                xfoToggle.checked = config.xfo.enabled;
+                xfoValue.value = config.xfo.value;
+
+                xctoToggle.checked = config.xcto.enabled;
+
+                referrerToggle.checked = config.referrer.enabled;
+                referrerValue.value = config.referrer.value;
+
+                permissionsToggle.checked = config.permissions.enabled;
+                permissionsValue.value = config.permissions.value;
+
+                updateSubPanelsVisibility();
+                runEvaluation();
+            }
+
+            // Extract UI config state values
+            function getConfigState() {
+                return {
+                    csp: { enabled: cspToggle.checked, value: cspValue.value },
+                    hsts: {
+                        enabled: hstsToggle.checked,
+                        maxAge: hstsMaxAge.value,
+                        includeSubDomains: hstsSubdomains.checked,
+                        preload: hstsPreload.checked
+                    },
+                    xfo: { enabled: xfoToggle.checked, value: xfoValue.value },
+                    xcto: { enabled: xctoToggle.checked },
+                    referrer: { enabled: referrerToggle.checked, value: referrerValue.value },
+                    permissions: { enabled: permissionsToggle.checked, value: permissionsValue.value }
+                };
+            }
+
+            // ========================================
+            // Live Auditor Logic
+            // ========================================
+            function runEvaluation() {
+                updateSubPanelsVisibility();
+
+                const config = getConfigState();
+                const audit = auditHeaders(config);
+
+                // Update scorecard badge
+                gradeBadge.textContent = audit.grade;
+                gradeBadge.style.color = audit.color;
+                gradeTitle.textContent = audit.desc;
+                gradeTitle.style.color = audit.color;
+                gradeScoreDesc.textContent = `Overall compliance score: ${audit.score}%`;
+
+                // Fill findings list
+                auditFindingsList.innerHTML = "";
+                if (audit.audits.length === 0) {
+                    auditFindingsList.innerHTML = '<div class="audit-empty"><i data-feather="check-circle" style="vertical-align: middle;"></i> Perfect Audit! All headers are securely configured.</div>';
+                    feather.replace();
+                    updateCodeSnippet();
+                    return;
+                }
+
+                audit.audits.forEach((item) => {
+                    const el = document.createElement("div");
+                    el.className = `audit-item ${item.severity}`;
+
+                    const iconWrap = document.createElement("div");
+                    iconWrap.className = "audit-icon-wrap";
+                    const icon = document.createElement("i");
+                    icon.setAttribute("data-feather", item.severity === 'error' ? 'x-circle' : item.severity === 'warning' ? 'alert-triangle' : 'info');
+                    iconWrap.appendChild(icon);
+
+                    const content = document.createElement("div");
+                    content.className = "audit-content";
+                    const title = document.createElement("span");
+                    title.className = "audit-item-title";
+                    title.textContent = item.title;
+                    const desc = document.createElement("span");
+                    desc.className = "audit-item-desc";
+                    desc.textContent = item.message;
+
+                    content.appendChild(title);
+                    content.appendChild(desc);
+
+                    el.appendChild(iconWrap);
+                    el.appendChild(content);
+                    auditFindingsList.appendChild(el);
+                });
+
+                feather.replace();
+                updateCodeSnippet();
+            }
+
+            function auditHeaders(config) {
+                const audits = [];
+                let score = 100;
+
+                function addCheck(severity, title, message) {
+                    audits.push({ severity, title, message });
+                    if (severity === 'error') score -= 20;
+                    if (severity === 'warning') score -= 10;
+                    if (severity === 'info') score -= 2;
+                }
+
+                // CSP checks
+                if (config.csp.enabled) {
+                    const csp = config.csp.value.trim();
+                    if (!csp) {
+                        addCheck('error', 'Empty CSP Directive', 'Content-Security-Policy is active but blank. Provides zero protection.');
+                    } else {
+                        const dirs = {};
+                        csp.split(";").forEach((part) => {
+                            const trimmed = part.trim();
+                            if (!trimmed) return;
+                            const [dir, ...vals] = trimmed.split(/\s+/);
+                            dirs[dir.toLowerCase()] = vals;
+                        });
+
+                        // Missing single quotes on special keywords
+                        const kwds = ["self", "none", "unsafe-inline", "unsafe-eval", "strict-dynamic", "wasm-unsafe-eval"];
+                        for (const d in dirs) {
+                            dirs[d].forEach((val) => {
+                                if (kwds.includes(val)) {
+                                    addCheck('warning', 'Unquoted CSP Keyword', `Keyword '${val}' in directive '${d}' is unquoted. Browser treats it as a domain host. Wrap in single quotes: '${val}'.`);
+                                }
+                            });
+                        }
+
+                        // Missing default-src
+                        if (!dirs["default-src"]) {
+                            addCheck('warning', 'Missing default-src Directive', "default-src is missing. It acts as fallback for connect, image, and style requests when not explicitly listed.");
+                        } else {
+                            const fallback = dirs["default-src"];
+                            if (fallback.includes("*") || fallback.includes("https:")) {
+                                addCheck('warning', 'Broad default-src Fallback', "default-src fallback permits loading assets from any wildcard ('*') or secure ('https:') source.");
+                            }
+                        }
+
+                        // Permissive scripts
+                        if (dirs["script-src"]) {
+                            const scr = dirs["script-src"];
+                            if (scr.includes("'unsafe-inline'") && !scr.some(v => v.startsWith("'nonce-") || v.startsWith("'sha256-") || v.includes("'strict-dynamic'"))) {
+                                addCheck('error', 'Insecure Inline Scripts Permitted', "script-src includes 'unsafe-inline' without hashes or nonces, exposing the application to Cross-Site Scripting (XSS).");
+                            }
+                            if (scr.includes("*") || scr.includes("https:")) {
+                                addCheck('error', 'Wildcard script-src Origin', "script-src permits loading script files from any wildcard ('*') server.");
+                            }
+                        } else if (!dirs["default-src"]) {
+                            addCheck('error', 'Unrestricted Script Execution', "Neither script-src nor default-src is configured. Scripts can load from any source.");
+                        }
+
+                        // object-src checks
+                        if (!dirs["object-src"]) {
+                            addCheck('warning', 'Missing object-src Directive', "object-src fallback is missing. Specify object-src 'none' to block plugin vectors (Flash, Java).");
+                        } else if (dirs["object-src"].includes("*") || dirs["object-src"].includes("https:")) {
+                            addCheck('warning', 'Permissive object-src Directive', "object-src allows loading plugin runtimes from any wildcard endpoint.");
+                        }
+                    }
+                } else {
+                    addCheck('error', 'Content-Security-Policy Missing', "CSP is disabled. CSP blocks Cross-Site Scripting (XSS) injections.");
+                }
+
+                // HSTS checks
+                if (config.hsts.enabled) {
+                    const age = parseInt(config.hsts.maxAge, 10);
+                    if (isNaN(age) || age <= 0) {
+                        addCheck('error', 'Invalid HSTS max-age', "HSTS is enabled but max-age duration is invalid or set to 0.");
+                    } else {
+                        if (age < 31536000) {
+                            addCheck('warning', 'Short HSTS max-age', "HSTS max-age is below 1 year. Chrome preload list requires at least 31536000 seconds (1 year).");
+                        }
+                        if (!config.hsts.includeSubDomains) {
+                            addCheck('warning', 'HSTS subdomains unprotected', "includeSubDomains is missing. Browser preloading lists require subdomains coverage.");
+                        }
+                        if (!config.hsts.preload) {
+                            addCheck('info', 'Preload Flag Inactive', "Preload directive is not active. Enable this to register your site on static browsers HTTPS enforce lists.");
+                        }
+                    }
+                } else {
+                    addCheck('error', 'HSTS Inactive', "Strict-Transport-Security is missing. Attackers can downgrade user connections to plain HTTP.");
+                }
+
+                // Frame options
+                if (config.xfo.enabled) {
+                    const val = config.xfo.value;
+                    if (val !== "DENY" && val !== "SAMEORIGIN") {
+                        addCheck('warning', 'Weak X-Frame-Options Directive', `Value '${val}' is non-standard. Frame actions must utilize DENY or SAMEORIGIN.`);
+                    }
+                } else {
+                    addCheck('error', 'Clickjacking Protection Missing', "X-Frame-Options is disabled, leaving the site vulnerable to clickjacking overlay exploits.");
+                }
+
+                // Content type options sniffing
+                if (!config.xcto.enabled) {
+                    addCheck('warning', 'MIME Sniffing Vulnerability', "X-Content-Type-Options is disabled. Browsers may sniff response content types, potentially executing data payloads as scripts.");
+                }
+
+                // Referrer Policy
+                if (config.referrer.enabled) {
+                    const val = config.referrer.value;
+                    if (val === "unsafe-url") {
+                        addCheck('error', 'Referrer Policy Leaks URLs', "Referrer-Policy is set to 'unsafe-url'. Full query-strings and pathways will leak to third-party destinations.");
+                    } else if (val === "no-referrer-when-downgrade" || val === "origin-when-cross-origin") {
+                        addCheck('info', 'Moderate Referrer policy', `Policy '${val}' is fair, but 'strict-origin-when-cross-origin' is recommended.`);
+                    }
+                } else {
+                    addCheck('warning', 'Referrer Policy Missing', "Referrer-Policy is missing. Browsers fallback to default behaviors, potentially leaking path tokens.");
+                }
+
+                score = Math.max(0, score);
+                let grade = 'F';
+                let desc = 'Vulnerable to Attacks';
+                let color = 'var(--color-danger)';
+
+                if (score >= 95) { grade = 'A+'; desc = 'Highly Secure'; color = 'var(--color-success)'; }
+                else if (score >= 85) { grade = 'A'; desc = 'Strong Protection'; color = 'var(--color-success)'; }
+                else if (score >= 70) { grade = 'B'; desc = 'Moderate Security'; color = 'var(--color-warning)'; }
+                else if (score >= 50) { grade = 'C'; desc = 'Weak Protection'; color = 'var(--color-warning)'; }
+                else if (score >= 30) { grade = 'D'; desc = 'Vulnerable'; color = 'var(--color-danger)'; }
+
+                return { audits, score, grade, desc, color };
+            }
+
+            // ========================================
+            // Generate Output Configurations Snippets
+            // ========================================
+            function getComputedHeaders() {
+                const config = getConfigState();
+                const headers = [];
+
+                if (config.csp.enabled && config.csp.value.trim()) {
+                    headers.push({ key: "Content-Security-Policy", val: config.csp.value.trim() });
+                }
+                if (config.hsts.enabled && config.hsts.maxAge) {
+                    let val = `max-age=${config.hsts.maxAge}`;
+                    if (config.hsts.includeSubDomains) val += "; includeSubDomains";
+                    if (config.hsts.preload) val += "; preload";
+                    headers.push({ key: "Strict-Transport-Security", val });
+                }
+                if (config.xfo.enabled) {
+                    headers.push({ key: "X-Frame-Options", val: config.xfo.value });
+                }
+                if (config.xcto.enabled) {
+                    headers.push({ key: "X-Content-Type-Options", val: "nosniff" });
+                }
+                if (config.referrer.enabled) {
+                    headers.push({ key: "Referrer-Policy", val: config.referrer.value });
+                }
+                if (config.permissions.enabled && config.permissions.value.trim()) {
+                    headers.push({ key: "Permissions-Policy", val: config.permissions.value.trim() });
+                }
+
+                return headers;
+            }
+
+            function updateCodeSnippet() {
+                const headers = getComputedHeaders();
+                let output = "";
+
+                if (headers.length === 0) {
+                    outputCodePreview.textContent = "# No headers configured or enabled.";
+                    return;
+                }
+
+                if (activeFormat === "raw") {
+                    headers.forEach((h) => {
+                        output += `${h.key}: ${h.val}\n`;
+                    });
+                } else if (activeFormat === "nginx") {
+                    output += "# Nginx Virtual Host Configuration Block\n";
+                    headers.forEach((h) => {
+                        output += `add_header ${h.key} "${h.val.replace(/"/g, '\\"')}" always;\n`;
+                    });
+                } else if (activeFormat === "apache") {
+                    output += "# Apache Web Server .htaccess configuration\n";
+                    output += "<IfModule mod_headers.c>\n";
+                    headers.forEach((h) => {
+                        output += `  Header set ${h.key} "${h.val.replace(/"/g, '\\"')}"\n`;
+                    });
+                    output += "</IfModule>";
+                } else if (activeFormat === "nextjs") {
+                    output += "// next.config.js - Custom Security Headers block\n";
+                    output += "const securityHeaders = [\n";
+                    headers.forEach((h) => {
+                        output += `  { key: '${h.key}', value: "${h.val.replace(/"/g, '\\"')}" },\n`;
+                    });
+                    output += "];\n\n";
+                    output += "module.exports = {\n";
+                    output += "  async headers() {\n";
+                    output += "    return [\n";
+                    output += "      { source: '/:path*', headers: securityHeaders }\n";
+                    output += "    ];\n";
+                    output += "  }\n";
+                    output += "};";
+                } else if (activeFormat === "node") {
+                    output += "// Node.js Express custom headers middleware\n";
+                    output += "const express = require('express');\n";
+                    output += "const app = express();\n\n";
+                    output += "app.use((req, res, next) => {\n";
+                    headers.forEach((h) => {
+                        output += `  res.setHeader('${h.key}', "${h.val.replace(/"/g, '\\"')}");\n`;
+                    });
+                    output += "  next();\n";
+                    output += "});";
+                }
+
+                outputCodePreview.textContent = output;
+            }
+
+            // Tab switches
+            tabsContainer.addEventListener("click", (e) => {
+                if (e.target.classList.contains("tab")) {
+                    tabsContainer.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+                    e.target.classList.add("active");
+                    activeFormat = e.target.getAttribute("data-format");
+                    updateCodeSnippet();
+                }
+            });
+
+            // Copy button trigger
+            copyCodeBtn.addEventListener("click", () => {
+                navigator.clipboard.writeText(outputCodePreview.textContent);
+                showToast("Configuration copied to clipboard");
+            });
+
+            // ========================================
+            // Export & Import configurations
+            // ========================================
+            exportJsonBtnRight.addEventListener("click", () => {
+                const config = getConfigState();
+                const fileContent = JSON.stringify(config, null, 2);
+
+                const dataUri = "data:text/json;charset=utf-8," + encodeURIComponent(fileContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", dataUri);
+                link.setAttribute("download", `security_headers_coach_config_${Date.now()}.json`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                showToast("Configuration JSON exported!");
+            });
+
+            importBtn.addEventListener("click", () => {
+                importFileInput.click();
+            });
+
+            importFileInput.addEventListener("change", (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const config = JSON.parse(event.target.result);
+                        // Quick check for keys structure compatibility
+                        if (config.csp && config.hsts && config.xfo) {
+                            loadConfig(config);
+                            showToast("Configuration imported successfully!");
+                        } else {
+                            showToast("Invalid configuration schema", true);
+                        }
+                    } catch (err) {
+                        showToast("Failed to parse JSON file", true);
+                    }
+                };
+                reader.readAsText(file);
+            });
+
+            // Toast indicator helper
+            let toastTimeout;
+            function showToast(message, isError = false) {
+                const toast = document.getElementById("toast");
+                const toastMsg = document.getElementById("toast-message");
+                const icon = toast.querySelector("i");
+
+                toastMsg.textContent = message;
+                if (isError) {
+                    icon.setAttribute("data-feather", "alert-circle");
+                    icon.style.color = "var(--color-danger)";
+                } else {
+                    icon.setAttribute("data-feather", "check");
+                    icon.style.color = "var(--color-success)";
+                }
+                feather.replace();
+
+                toast.classList.add("active");
+                clearTimeout(toastTimeout);
+                toastTimeout = setTimeout(() => {
+                    toast.classList.remove("active");
+                }, 2500);
+            }
+        });
+    </script>
+</body>
+
+</html>
