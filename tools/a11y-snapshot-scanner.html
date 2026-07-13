@@ -1,0 +1,1595 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description"
+        content="Paste HTML markup to perform an instant offline accessibility audit, check labeling, header outlines, image descriptions, link contexts, and keyboard focus flows." />
+    <title>Local A11y Snapshot Scanner — One File Tools</title>
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap"
+        rel="stylesheet" />
+    <script src="https://unpkg.com/feather-icons"></script>
+
+    <style>
+        /* ========================================
+       Reset & Design Tokens
+       ======================================== */
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg-dark: #090d16;
+            --bg-gradient: radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.15) 0%, rgba(9, 13, 22, 0) 75%), linear-gradient(135deg, #090d16 0%, #0d1222 100%);
+            --panel-bg: rgba(17, 24, 39, 0.6);
+            --panel-border: rgba(255, 255, 255, 0.08);
+            --panel-border-strong: rgba(255, 255, 255, 0.16);
+            --panel-soft: rgba(255, 255, 255, 0.03);
+
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --text-subtle: #6b7280;
+
+            --color-primary: #6366f1;
+            --color-primary-hover: #4f46e5;
+            --color-primary-glow: rgba(99, 102, 241, 0.25);
+
+            --color-success: #10b981;
+            --color-success-bg: rgba(16, 185, 129, 0.1);
+            --color-success-glow: rgba(16, 185, 129, 0.2);
+
+            --color-warning: #f59e0b;
+            --color-warning-bg: rgba(245, 158, 11, 0.1);
+            --color-warning-glow: rgba(245, 158, 11, 0.2);
+
+            --color-danger: #ef4444;
+            --color-danger-bg: rgba(239, 68, 68, 0.1);
+            --color-danger-glow: rgba(239, 68, 68, 0.2);
+
+            --color-info: #06b6d4;
+            --color-info-bg: rgba(6, 182, 212, 0.1);
+
+            --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.15);
+            --radius: 12px;
+            --mono: "JetBrains Mono", monospace;
+            --sans: "Plus Jakarta Sans", sans-serif;
+        }
+
+        body {
+            background: var(--bg-dark);
+            background-image: var(--bg-gradient);
+            background-attachment: fixed;
+            color: var(--text-main);
+            font-family: var(--sans);
+            line-height: 1.6;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        /* ========================================
+       Header & Layout
+       ======================================== */
+        header {
+            max-width: 1400px;
+            margin: 0 auto 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .header-title-area {
+            max-width: 800px;
+        }
+
+        .eyebrow {
+            color: var(--color-primary);
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            font-weight: 800;
+            letter-spacing: 0.15em;
+            margin-bottom: 0.5rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        h1 {
+            font-size: clamp(1.8rem, 4vw, 2.8rem);
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            line-height: 1.1;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(to right, #ffffff 40%, #c7d2fe 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+        }
+
+        .privacy-badge {
+            background: rgba(99, 102, 241, 0.08);
+            border: 1px solid rgba(99, 102, 241, 0.25);
+            border-radius: var(--radius);
+            padding: 0.6rem 1rem;
+            color: #c7d2fe;
+            font-weight: 600;
+            font-size: 0.85rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.05);
+        }
+
+        main {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+            gap: 24px;
+            align-items: start;
+        }
+
+        @media (max-width: 1024px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ========================================
+       UI Panels
+       ======================================== */
+        .panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: var(--radius);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--panel-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .panel-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .panel-title i {
+            width: 18px;
+            height: 18px;
+            color: var(--color-primary);
+        }
+
+        .panel-body {
+            padding: 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        /* ========================================
+       Buttons & Actions
+       ======================================== */
+        .toolbar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        button,
+        .file-upload-label {
+            background: var(--panel-soft);
+            border: 1px solid var(--panel-border);
+            color: var(--text-main);
+            font-family: var(--sans);
+            font-weight: 600;
+            font-size: 0.82rem;
+            padding: 0.5rem 0.8rem;
+            border-radius: 8px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            user-select: none;
+        }
+
+        button:hover,
+        .file-upload-label:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--panel-border-strong);
+            transform: translateY(-1px);
+        }
+
+        button:active,
+        .file-upload-label:active {
+            transform: translateY(0);
+        }
+
+        button.primary {
+            background: var(--color-primary);
+            border-color: transparent;
+        }
+
+        button.primary:hover {
+            background: var(--color-primary-hover);
+            box-shadow: 0 0 15px var(--color-primary-glow);
+        }
+
+        button.danger:hover {
+            background: var(--color-danger);
+            border-color: transparent;
+            box-shadow: 0 0 15px var(--color-danger-glow);
+        }
+
+        .file-upload-input {
+            display: none;
+        }
+
+        /* ========================================
+       HTML Input Panel
+       ======================================== */
+        .editor-container {
+            position: relative;
+            width: 100%;
+            border-radius: 8px;
+            border: 1px solid var(--panel-border);
+            background: rgba(5, 7, 12, 0.8);
+            overflow: hidden;
+        }
+
+        .editor-container:focus-within {
+            border-color: var(--color-primary);
+            box-shadow: 0 0 10px var(--color-primary-glow);
+        }
+
+        .drag-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(99, 102, 241, 0.95);
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 16px;
+            z-index: 10;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease;
+        }
+
+        .drag-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .drag-overlay i {
+            width: 48px;
+            height: 48px;
+            stroke-width: 1.5;
+        }
+
+        .drag-overlay p {
+            font-weight: 700;
+            font-size: 1.25rem;
+        }
+
+        textarea.html-textarea {
+            width: 100%;
+            height: 420px;
+            background: transparent;
+            border: none;
+            color: #e5e7eb;
+            font-family: var(--mono);
+            font-size: 0.88rem;
+            padding: 16px;
+            resize: vertical;
+            outline: none;
+            tab-size: 2;
+            line-height: 1.5;
+            display: block;
+        }
+
+        /* Form controls */
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-label {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        select {
+            background: rgba(5, 7, 12, 0.6);
+            border: 1px solid var(--panel-border);
+            color: var(--text-main);
+            font-family: var(--sans);
+            font-weight: 500;
+            padding: 0.6rem 1rem;
+            border-radius: 8px;
+            outline: none;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.2s ease;
+        }
+
+        select:focus {
+            border-color: var(--color-primary);
+            box-shadow: 0 0 8px var(--color-primary-glow);
+        }
+
+        /* ========================================
+       Scorecard Dashboard
+       ======================================== */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 12px;
+        }
+
+        .score-card {
+            background: rgba(5, 7, 12, 0.4);
+            border: 1px solid var(--panel-border);
+            padding: 14px;
+            border-radius: 8px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .score-num {
+            font-size: 1.8rem;
+            font-weight: 800;
+            font-family: var(--mono);
+        }
+
+        .score-card.total {
+            color: #ffffff;
+        }
+
+        .score-card.errors {
+            color: var(--color-danger);
+            border-color: rgba(239, 68, 68, 0.15);
+        }
+
+        .score-card.warnings {
+            color: var(--color-warning);
+            border-color: rgba(245, 158, 11, 0.15);
+        }
+
+        .score-card.infos {
+            color: var(--color-info);
+            border-color: rgba(6, 182, 212, 0.15);
+        }
+
+        .score-label {
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--text-subtle);
+            letter-spacing: 0.05em;
+        }
+
+        /* ========================================
+       Severity Filters & Controls
+       ======================================== */
+        .filter-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--panel-border);
+            padding-bottom: 12px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .severity-filters {
+            display: flex;
+            background: rgba(5, 7, 12, 0.5);
+            padding: 4px;
+            border-radius: 8px;
+            border: 1px solid var(--panel-border);
+        }
+
+        .filter-btn {
+            background: transparent;
+            border: none;
+            outline: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .filter-btn:hover {
+            color: var(--text-main);
+        }
+
+        .filter-btn.active {
+            background: var(--color-primary);
+            color: #ffffff;
+        }
+
+        .filter-btn.active.err-only {
+            background: var(--color-danger);
+        }
+
+        .filter-btn.active.warn-only {
+            background: var(--color-warning);
+        }
+
+        .filter-btn.active.info-only {
+            background: var(--color-info);
+        }
+
+        /* ========================================
+       Audit Findings List
+       ======================================== */
+        .findings-viewport {
+            max-height: 520px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding-right: 4px;
+        }
+
+        .empty-audit {
+            padding: 40px;
+            text-align: center;
+            color: var(--text-subtle);
+            background: rgba(255, 255, 255, 0.01);
+            border: 1px dashed var(--panel-border);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .empty-audit i {
+            width: 32px;
+            height: 32px;
+        }
+
+        .empty-audit.clean {
+            border-color: var(--color-success);
+            background: rgba(16, 185, 129, 0.02);
+        }
+
+        .empty-audit.clean p {
+            color: #34d399;
+            font-weight: 600;
+        }
+
+        .finding-card {
+            background: rgba(15, 23, 42, 0.4);
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            overflow: hidden;
+            border-left-width: 4px;
+            display: flex;
+            flex-direction: column;
+            transition: border-color 0.25s ease;
+        }
+
+        .finding-card.severity-error {
+            border-left-color: var(--color-danger);
+        }
+
+        .finding-card.severity-warning {
+            border-left-color: var(--color-warning);
+        }
+
+        .finding-card.severity-info {
+            border-left-color: var(--color-info);
+        }
+
+        .finding-header {
+            padding: 10px 16px;
+            background: rgba(255, 255, 255, 0.01);
+            border-bottom: 1px solid var(--panel-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .finding-title-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .badge {
+            font-size: 0.65rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: #ffffff;
+        }
+
+        .badge.err {
+            background: var(--color-danger);
+        }
+
+        .badge.warn {
+            background: var(--color-warning);
+        }
+
+        .badge.inf {
+            background: var(--color-info);
+        }
+
+        .rule-name {
+            font-weight: 700;
+            font-size: 0.85rem;
+        }
+
+        .element-tag {
+            font-family: var(--mono);
+            font-size: 0.72rem;
+            background: rgba(255, 255, 255, 0.05);
+            color: #a5b4fc;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: lowercase;
+        }
+
+        .finding-body {
+            padding: 12px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .finding-desc {
+            font-size: 0.85rem;
+            color: #e2e8f0;
+        }
+
+        .snippet-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-top: 4px;
+        }
+
+        pre.html-snippet {
+            background: #020617;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-family: var(--mono);
+            font-size: 0.78rem;
+            color: #93c5fd;
+            white-space: pre-wrap;
+            word-break: break-all;
+            line-height: 1.4;
+        }
+
+        /* Recommended Fix snippet block */
+        .fix-container {
+            margin-top: 6px;
+            background: rgba(16, 185, 129, 0.04);
+            border: 1px solid rgba(16, 185, 129, 0.15);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .fix-header {
+            background: rgba(16, 185, 129, 0.08);
+            padding: 6px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(16, 185, 129, 0.1);
+        }
+
+        .fix-label {
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: #34d399;
+            text-transform: uppercase;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .fix-label i {
+            width: 12px;
+            height: 12px;
+        }
+
+        .copy-fix-btn {
+            background: transparent;
+            border: none;
+            color: #34d399;
+            cursor: pointer;
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 2px 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .copy-fix-btn:hover {
+            background: rgba(16, 185, 129, 0.12);
+            border-radius: 4px;
+        }
+
+        pre.fix-code {
+            padding: 10px 12px;
+            font-family: var(--mono);
+            font-size: 0.78rem;
+            color: #a7f3d0;
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-all;
+            background: transparent;
+        }
+
+        /* Toast Notifications */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #1e293b;
+            border: 1px solid var(--panel-border-strong);
+            color: #ffffff;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+            z-index: 999;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: none;
+        }
+
+        .toast.active {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast i {
+            width: 16px;
+            height: 16px;
+            color: var(--color-success);
+        }
+
+        footer {
+            max-width: 1400px;
+            margin: 2rem auto 0;
+            text-align: center;
+            color: var(--text-subtle);
+            font-size: 0.85rem;
+            border-top: 1px solid var(--panel-border);
+            padding-top: 1.5rem;
+        }
+
+        footer a {
+            color: var(--color-primary);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="header-title-area">
+            <span class="eyebrow"><i data-feather="eye"></i> Accessibility Tools</span>
+            <h1>Local A11y Snapshot Scanner</h1>
+            <p>Paste static HTML code segments to run accessibility compliance audits client-side.</p>
+        </div>
+        <div class="privacy-badge">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"
+                style="margin-right: 4px;">
+                <path
+                    d="M12,1L3,5v6c0,5.55,3.84,10.74,9,12c5.16-1.26,9-6.45,9-12V5L12,1L12,1z M12,11.99h7c-0.53,4.12-3.28,7.79-7,8.94V12H5V6.3l7-3.11V11.99z" />
+            </svg>
+            100% Offline & Secure
+        </div>
+    </header>
+
+    <main>
+        <!-- Left Panel: Input Editor -->
+        <section class="panel" aria-labelledby="input-panel-title">
+            <div class="panel-header">
+                <h2 id="input-panel-title" class="panel-title"><i data-feather="file-text"></i> HTML Document</h2>
+                <div class="toolbar">
+                    <label for="html-file-input" class="file-upload-label">
+                        <i data-feather="upload"></i> Upload
+                    </label>
+                    <input type="file" id="html-file-input" class="file-upload-input" accept=".html,.htm,text/html" />
+                    <button id="format-html-btn" title="Reindent HTML"><i data-feather="align-left"></i> Format</button>
+                    <button id="copy-html-btn" title="Copy HTML"><i data-feather="copy"></i> Copy</button>
+                    <button id="clear-html-btn" class="danger" title="Clear Code"><i data-feather="trash-2"></i>
+                        Clear</button>
+                </div>
+            </div>
+            <div class="panel-body">
+                <!-- Template selector -->
+                <div class="form-group">
+                    <label for="html-preset" class="form-label">Load Example Templates</label>
+                    <select id="html-preset">
+                        <option value="inaccessible">⚠️ Inaccessible Form Example (Shows errors/warnings)</option>
+                        <option value="accessible">✅ Accessible Form Example (Clean audit report)</option>
+                        <option value="hierarchy">📑 Broken Heading Outline Example</option>
+                    </select>
+                </div>
+
+                <!-- Textarea dropzone -->
+                <div class="editor-container" id="editor-dropzone">
+                    <div class="drag-overlay" id="drag-overlay">
+                        <i data-feather="download-cloud"></i>
+                        <p>Drop HTML file here</p>
+                    </div>
+                    <textarea id="html-input" class="html-textarea" placeholder="Paste your HTML segment here..."
+                        autocomplete="off" spellcheck="false"></textarea>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Panel: Audit Logs -->
+        <section class="panel" aria-labelledby="audit-panel-title">
+            <div class="panel-header">
+                <h2 id="audit-panel-title" class="panel-title"><i data-feather="activity"></i> Audit Results</h2>
+                <div class="toolbar">
+                    <button class="toolbar-btn" id="export-report-btn"><i data-feather="copy"></i> Report
+                        Summary</button>
+                    <button class="toolbar-btn" id="export-json-btn"><i data-feather="download"></i> JSON</button>
+                </div>
+            </div>
+            <div class="panel-body" style="gap: 18px;">
+                <!-- Scorecard Dashboard -->
+                <div class="dashboard-grid">
+                    <div class="score-card total">
+                        <span class="score-num" id="score-total">0</span>
+                        <span class="score-label">Total Alert</span>
+                    </div>
+                    <div class="score-card errors">
+                        <span class="score-num" id="score-errors">0</span>
+                        <span class="score-label">Errors</span>
+                    </div>
+                    <div class="score-card warnings">
+                        <span class="score-num" id="score-warnings">0</span>
+                        <span class="score-label">Warnings</span>
+                    </div>
+                    <div class="score-card infos">
+                        <span class="score-num" id="score-infos">0</span>
+                        <span class="score-label">Infos</span>
+                    </div>
+                </div>
+
+                <!-- Filters bar -->
+                <div class="filter-toolbar">
+                    <div class="severity-filters">
+                        <button class="filter-btn active" data-severity="all">All Alerts</button>
+                        <button class="filter-btn err-only" data-severity="error">Errors</button>
+                        <button class="filter-btn warn-only" data-severity="warning">Warnings</button>
+                        <button class="filter-btn info-only" data-severity="info">Infos</button>
+                    </div>
+                </div>
+
+                <!-- Finding Cards Viewport -->
+                <div class="findings-viewport" id="findings-container">
+                    <!-- Findings populated dynamically -->
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>Part of <a href="https://github.com/praveenscience/One-File-Tools" target="_blank"
+                rel="noopener noreferrer">One File Tools</a> — Developer utilities, one file each.</p>
+    </footer>
+
+    <!-- Copy Status Toast -->
+    <div class="toast" id="toast">
+        <i data-feather="check"></i>
+        <span id="toast-message">Copied to clipboard!</span>
+    </div>
+
+    <!-- Core App Script -->
+    <script>
+        // ========================================
+        // HTML Example Preset Templates
+        // ========================================
+        const PRESETS = {
+            inaccessible: `<!-- Malformed and Inaccessible Form -->
+<h1>Accessibility Demo Page</h1>
+<h2>User Registration</h2>
+
+<div class="form-container">
+  <!-- Error: Unlabeled input fields -->
+  <p>First Name: <input type="text" name="fname" /></p>
+  <p>Last Name: <input type="text" name="lname" id="l_name" /></p>
+
+  <!-- Error: Empty alt on linked image -->
+  <a href="/profile-photos">
+    <img src="avatar.png" alt="" />
+  </a>
+
+  <!-- Warning: Skipped heading levels -->
+  <h5>Contact Information</h5>
+
+  <p>Email: <input type="text" name="email" id="user-email" /></p>
+  <!-- Error: Focusable element inside aria-hidden container -->
+  <div aria-hidden="true" style="border: 1px solid #ccc; padding: 10px;">
+    <p>Sign up for our newsletter:</p>
+    <input type="checkbox" name="newsletter" /> Subscribe
+  </div>
+
+  <!-- Warning: Tabindex value greater than 0 -->
+  <p>Security Code: <input type="text" id="sec-code" tabindex="4" /></p>
+
+  <!-- Warning: Generic non-descriptive link label -->
+  <p>Read terms and conditions <a href="/terms">here</a></p>
+
+  <!-- Error: Empty, unlabeled icon button -->
+  <button type="submit" class="btn-submit">
+    <i class="icon-submit"></i>
+  </button>
+</div>`,
+            accessible: `<!-- Properly Structured Accessible Form -->
+<h1>Accessibility Demo Page</h1>
+<h2>User Registration</h2>
+
+<form action="/submit" method="post">
+  <div class="form-group">
+    <!-- Accessible: Correctly paired label with for/id -->
+    <label for="first-name">First Name</label>
+    <input type="text" id="first-name" name="fname" required />
+  </div>
+
+  <div class="form-group">
+    <!-- Accessible: Wrapped input inside label element -->
+    <label>
+      Last Name
+      <input type="text" name="lname" required />
+    </label>
+  </div>
+
+  <div class="form-group">
+    <!-- Accessible: Linked image has semantic text description -->
+    <a href="/profile-photos" aria-label="View user profile photos catalog">
+      <img src="avatar.png" alt="User avatar thumbnail" />
+    </a>
+  </div>
+
+  <h3>Contact Information</h3>
+
+  <div class="form-group">
+    <label for="user-email">Email Address</label>
+    <input type="email" id="user-email" name="email" required />
+  </div>
+
+  <div class="form-group">
+    <label>
+      <input type="checkbox" name="newsletter" />
+      Sign up for our weekly technical newsletter
+    </label>
+  </div>
+
+  <div class="form-group">
+    <!-- Accessible: Labelled link text pointing to destination -->
+    <p>Read the full <a href="/terms">Vanguard Terms & Conditions Agreement</a>.</p>
+  </div>
+
+  <div class="form-group">
+    <!-- Accessible: Button with description text -->
+    <button type="submit">Submit Registration</button>
+  </div>
+</form>`,
+            hierarchy: `<!-- Document with broken heading outline sequence -->
+<h3>About TechVanguard</h3>
+<p>TechVanguard is a client-first hardware engineering firm...</p>
+
+<h1>Main Platform Overview</h1>
+<p>This is the main application outline...</p>
+
+<h4>Module Configuration</h4>
+<p>Configure hardware parameters below...</p>
+
+<h6>Hardware Interface Pins</h6>
+<p>Mapping pin channels...</p>`
+        };
+
+        // ========================================
+        // State Management
+        // ========================================
+        let currentFindings = [];
+        let activeFilter = "all"; // "all" | "error" | "warning" | "info"
+
+        document.addEventListener("DOMContentLoaded", () => {
+            feather.replace();
+
+            // Bind DOM elements
+            const htmlInput = document.getElementById("html-input");
+            const presetSelect = document.getElementById("html-preset");
+
+            const scoreTotal = document.getElementById("score-total");
+            const scoreErrors = document.getElementById("score-errors");
+            const scoreWarnings = document.getElementById("score-warnings");
+            const scoreInfos = document.getElementById("score-infos");
+
+            const filterBar = document.querySelector(".severity-filters");
+            const findingsContainer = document.getElementById("findings-container");
+
+            const formatBtn = document.getElementById("format-html-btn");
+            const copyHtmlBtn = document.getElementById("copy-html-btn");
+            const clearHtmlBtn = document.getElementById("clear-html-btn");
+            const fileInput = document.getElementById("html-file-input");
+            const dropZone = document.getElementById("editor-dropzone");
+            const dragOverlay = document.getElementById("drag-overlay");
+
+            const exportReportBtn = document.getElementById("export-report-btn");
+            const exportJsonBtn = document.getElementById("export-json-btn");
+
+            // Set default template
+            presetSelect.value = "inaccessible";
+            loadPreset("inaccessible");
+
+            // Dropdown presets selector
+            presetSelect.addEventListener("change", (e) => {
+                loadPreset(e.target.value);
+            });
+
+            function loadPreset(name) {
+                const content = PRESETS[name];
+                if (content) {
+                    htmlInput.value = content;
+                    runAudit();
+                }
+            }
+
+            // Live audit evaluation (debounced)
+            let auditTimeout;
+            htmlInput.addEventListener("input", () => {
+                clearTimeout(auditTimeout);
+                auditTimeout = setTimeout(() => {
+                    runAudit();
+                }, 300);
+            });
+
+            // Edit toolbar actions
+            formatBtn.addEventListener("click", () => {
+                const raw = htmlInput.value.trim();
+                if (!raw) return;
+                // Simple formatting indentation utility using DOMParser
+                try {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(raw, "text/html");
+                    const body = doc.body;
+
+                    // Format elements with tabs
+                    const formatted = formatNode(body, 0).trim();
+                    htmlInput.value = formatted;
+                    runAudit();
+                    showToast("HTML indented successfully");
+                } catch (e) {
+                    showToast("Formatting failed", true);
+                }
+            });
+
+            // Simple HTML formatter helper
+            function formatNode(node, depth) {
+                let indent = "  ".repeat(depth);
+                let html = "";
+
+                if (node.nodeType === Node.TEXT_NODE) {
+                    const text = node.nodeValue.trim();
+                    if (text) {
+                        html += text + "\n";
+                    }
+                } else if (node.nodeType === Node.ELEMENT_NODE) {
+                    if (node.tagName.toLowerCase() === "body") {
+                        // Format children only
+                        Array.from(node.childNodes).forEach((child) => {
+                            html += formatNode(child, depth);
+                        });
+                    } else {
+                        const tag = node.tagName.toLowerCase();
+                        let attrs = "";
+                        Array.from(node.attributes).forEach((attr) => {
+                            attrs += ` ${attr.name}="${attr.value}"`;
+                        });
+
+                        const selfClosing = ["img", "input", "br", "hr", "meta", "link"].includes(tag);
+
+                        if (selfClosing) {
+                            html += `${indent}<${tag}${attrs} />\n`;
+                        } else {
+                            html += `${indent}<${tag}${attrs}>\n`;
+                            Array.from(node.childNodes).forEach((child) => {
+                                html += formatNode(child, depth + 1);
+                            });
+                            html += `${indent}</${tag}>\n`;
+                        }
+                    }
+                }
+                return html;
+            }
+
+            copyHtmlBtn.addEventListener("click", () => {
+                navigator.clipboard.writeText(htmlInput.value);
+                showToast("HTML copied to clipboard");
+            });
+
+            clearHtmlBtn.addEventListener("click", () => {
+                htmlInput.value = "";
+                runAudit();
+                showToast("Clear editor");
+            });
+
+            // File upload actions
+            fileInput.addEventListener("change", (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                readFile(file);
+            });
+
+            function readFile(file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    htmlInput.value = e.target.result;
+                    runAudit();
+                    showToast(`Loaded ${file.name}`);
+                };
+                reader.readAsText(file);
+            }
+
+            // Drag & Drop zones
+            dropZone.addEventListener("dragover", (e) => {
+                e.preventDefault();
+                dragOverlay.classList.add("active");
+            });
+
+            dropZone.addEventListener("dragleave", () => {
+                dragOverlay.classList.remove("active");
+            });
+
+            dropZone.addEventListener("drop", (e) => {
+                e.preventDefault();
+                dragOverlay.classList.remove("active");
+                const file = e.dataTransfer.files[0];
+                if (file) {
+                    readFile(file);
+                }
+            });
+
+            // ========================================
+            // Run Audits Logic
+            // ========================================
+            function runAudit() {
+                const html = htmlInput.value.trim();
+
+                if (!html) {
+                    currentFindings = [];
+                    updateDashboard();
+                    renderFindings();
+                    return;
+                }
+
+                // Native parsing
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, "text/html");
+                const findings = [];
+
+                function addFinding(severity, rule, element, description, fixSuggestion) {
+                    let snippet = "";
+                    if (element) {
+                        // Clone element outline
+                        const clone = element.cloneNode(false);
+                        if (element.innerHTML && element.innerHTML.trim() !== "") {
+                            clone.innerHTML = "...";
+                        }
+                        snippet = clone.outerHTML;
+                    }
+                    findings.push({
+                        severity,
+                        rule,
+                        elementTag: element ? element.tagName.toLowerCase() : "document",
+                        snippet,
+                        description,
+                        fixSuggestion
+                    });
+                }
+
+                // 1. Audit Form Controls Labeling
+                const controls = doc.querySelectorAll("input, select, textarea");
+                controls.forEach((input) => {
+                    if (input.tagName.toLowerCase() === "input" && input.type === "hidden") return;
+
+                    let labeled = false;
+                    if (input.closest("label")) labeled = true;
+
+                    const id = input.id;
+                    if (id) {
+                        const matchingLabel = doc.querySelectorAll(`label[for="${id}"]`);
+                        if (matchingLabel.length > 0) labeled = true;
+                    }
+
+                    if (input.getAttribute("aria-label") || input.getAttribute("aria-labelledby") || input.getAttribute("title")) {
+                        labeled = true;
+                    }
+
+                    if (!labeled) {
+                        const tag = input.tagName.toLowerCase();
+                        addFinding(
+                            "error",
+                            "Unlabeled Input Control",
+                            input,
+                            `The <${tag}> element lacks a matching <label> or aria annotation. Screen-readers will fail to announce its context/label description.`,
+                            id
+                                ? `<label for="${id}">Provide Label Text</label>\n${input.outerHTML.replace('...', '')}`
+                                : `<label>\n  Provide Label Text\n  <${tag} name="${input.name || 'field'}" ...>\n</label>`
+                        );
+                    }
+                });
+
+                // Unlabeled buttons
+                const buttons = doc.querySelectorAll("button, input[type='submit'], input[type='button']");
+                buttons.forEach((btn) => {
+                    let descName = "";
+                    if (btn.tagName.toLowerCase() === "button") {
+                        descName = btn.innerText.trim() || btn.getAttribute("aria-label") || btn.getAttribute("title");
+                        const innerImgs = btn.querySelectorAll("img");
+                        innerImgs.forEach((img) => {
+                            if (img.getAttribute("alt")) descName += " " + img.getAttribute("alt");
+                        });
+                    } else {
+                        descName = btn.value || btn.getAttribute("aria-label") || btn.getAttribute("title");
+                    }
+
+                    if (!descName || descName.trim() === "") {
+                        addFinding(
+                            "error",
+                            "Unlabeled Button Action",
+                            btn,
+                            "The button element has no textual description. Screen-readers will announce the element simply as 'button', blocking interaction guidance.",
+                            `<button aria-label="Action Description">${btn.innerHTML || 'Submit'}</button>`
+                        );
+                    }
+                });
+
+                // 2. Heading Hierarchy Audit
+                const headings = doc.querySelectorAll("h1, h2, h3, h4, h5, h6");
+                if (headings.length > 0) {
+                    const h1s = doc.querySelectorAll("h1");
+                    if (h1s.length === 0) {
+                        addFinding(
+                            "warning",
+                            "Missing Main Document Heading (h1)",
+                            null,
+                            "No <h1> heading was declared. Every document requires a single top-level heading to outline the main subject context.",
+                            "<h1>Main Page Title</h1>"
+                        );
+                    } else if (h1s.length > 1) {
+                        addFinding(
+                            "info",
+                            "Multiple h1 Headings Declared",
+                            h1s[1],
+                            "Multiple <h1> headings found. For maximum clarity and accessibility, structure pages with a single <h1>, using sub-headings for sections.",
+                            "Use <h2> or <h3> headings for subdivisions instead of multiple <h1>s."
+                        );
+                    }
+
+                    // check hierarchy jumps
+                    let prevLevel = null;
+                    headings.forEach((heading) => {
+                        const level = parseInt(heading.tagName.substring(1), 10);
+                        if (prevLevel !== null) {
+                            if (level > prevLevel + 1) {
+                                addFinding(
+                                    "warning",
+                                    "Skipped Heading Outline Level",
+                                    heading,
+                                    `Skipped rank index levels directly from <h${prevLevel}> to <h${level}>. Screen-reader outlines are broken by skipped levels.`,
+                                    `Change heading to <h${prevLevel + 1}> to align with structure.`
+                                );
+                            }
+                        }
+                        prevLevel = level;
+                    });
+                } else {
+                    addFinding(
+                        "warning",
+                        "No Outline Headings Found",
+                        null,
+                        "No headings (h1-h6) were found. Screen-reader outlines are heavily dependent on heading structures to navigate pages.",
+                        "<h1>Document Heading</h1>"
+                    );
+                }
+
+                // 3. Image Alt text audit
+                const images = doc.querySelectorAll("img");
+                images.forEach((img) => {
+                    const alt = img.getAttribute("alt");
+                    if (alt === null) {
+                        addFinding(
+                            "error",
+                            "Missing alt Attribute on Image",
+                            img,
+                            "Image lacks an [alt] attribute. Screen-readers will fall back to reading the filename string aloud.",
+                            `<img src="${img.getAttribute('src') || 'image.png'}" alt="Contextual image description text">`
+                        );
+                    } else if (alt.trim() === "") {
+                        if (img.closest("a")) {
+                            addFinding(
+                                "error",
+                                "Empty alt on Interactive Image",
+                                img,
+                                "The image is wrapped in an interactive <a> link, but has an empty [alt] description. The link has no accessible content.",
+                                `<img src="${img.getAttribute('src') || 'image.png'}" alt="Link action/destination summary">`
+                            );
+                        } else {
+                            addFinding(
+                                "info",
+                                "Decorative Graphic Node (Empty alt)",
+                                img,
+                                "The empty alt='' attribute hides the image from screen-readers, treating it as decorative. Ensure it carries no informational value.",
+                                "Verify image is cosmetic. If it holds contextual info, provide a description in the alt attribute."
+                            );
+                        }
+                    }
+                });
+
+                // 4. Keyboard focus & ARIA flows
+                const hiddenElements = doc.querySelectorAll("[aria-hidden='true']");
+                hiddenElements.forEach((container) => {
+                    const focusable = container.querySelectorAll("a, button, input, select, textarea, [tabindex]");
+                    focusable.forEach((item) => {
+                        if (item.getAttribute("tabindex") === "-1") return;
+                        addFinding(
+                            "error",
+                            "Focusable Node inside Hidden Container",
+                            item,
+                            "The focusable element is child of a container with aria-hidden='true'. The user can tab focus it, but screen-readers won't announce it.",
+                            "Remove aria-hidden='true' from container or apply tabindex='-1' to the focusable child to ignore focus."
+                        );
+                    });
+                });
+
+                const tabindexes = doc.querySelectorAll("[tabindex]");
+                tabindexes.forEach((el) => {
+                    const indexVal = parseInt(el.getAttribute("tabindex"), 10);
+                    if (!isNaN(indexVal) && indexVal > 0) {
+                        addFinding(
+                            "warning",
+                            "Explicit Positive Tabindex Enforced",
+                            el,
+                            `tabindex="${indexVal}" is positive. Setting values > 0 creates custom navigation paths, breaking intuitive keyboard layouts.`,
+                            "Remove tabindex attribute, or use tabindex='0' to include it in natural DOM flow."
+                        );
+                    }
+                });
+
+                // 5. Generic links text
+                const links = doc.querySelectorAll("a");
+                const uninformativeStrings = ["click here", "click", "read more", "read", "more", "link", "here", "go"];
+                links.forEach((link) => {
+                    const txt = link.innerText.trim().toLowerCase();
+                    if (txt && uninformativeStrings.includes(txt)) {
+                        addFinding(
+                            "warning",
+                            "Generic Link text label",
+                            link,
+                            `The link text label "${link.innerText}" is non-descriptive. Screen-readers read links independently of surrounding text.`,
+                            `<a href="${link.getAttribute('href') || '#'}">Describe target context or destination</a>`
+                        );
+                    } else if (!txt || txt === "") {
+                        const hasAria = link.getAttribute("aria-label") || link.getAttribute("aria-labelledby") || link.getAttribute("title");
+                        const hasImgAlt = Array.from(link.querySelectorAll("img")).some(img => img.getAttribute("alt"));
+                        if (!hasAria && !hasImgAlt) {
+                            addFinding(
+                                "error",
+                                "Empty Link Node",
+                                link,
+                                "Link contains no text content, empty attributes, and no image alt nodes. It forms an empty keyboard trap.",
+                                `<a href="${link.getAttribute('href') || '#'}">Link Context Title</a>`
+                            );
+                        }
+                    }
+                });
+
+                currentFindings = findings;
+                updateDashboard();
+                renderFindings();
+            }
+
+            // ========================================
+            // UI Display Updates
+            // ========================================
+            function updateDashboard() {
+                const total = currentFindings.length;
+                const errors = currentFindings.filter(f => f.severity === "error").length;
+                const warnings = currentFindings.filter(f => f.severity === "warning").length;
+                const infos = currentFindings.filter(f => f.severity === "info").length;
+
+                scoreTotal.textContent = total;
+                scoreErrors.textContent = errors;
+                scoreWarnings.textContent = warnings;
+                scoreInfos.textContent = infos;
+            }
+
+            // Filter button selections
+            filterBar.addEventListener("click", (e) => {
+                if (e.target.classList.contains("filter-btn")) {
+                    // Reset active styles
+                    filterBar.querySelectorAll(".filter-btn").forEach(btn => btn.classList.remove("active"));
+
+                    e.target.classList.add("active");
+                    activeFilter = e.target.getAttribute("data-severity");
+                    renderFindings();
+                }
+            });
+
+            // Render Cards
+            function renderFindings() {
+                findingsContainer.innerHTML = "";
+
+                if (!htmlInput.value.trim()) {
+                    findingsContainer.innerHTML = `
+              <div class="empty-audit">
+                <i data-feather="file-text"></i>
+                <p>Paste or upload HTML markup to start scanning.</p>
+              </div>
+            `;
+                    feather.replace();
+                    return;
+                }
+
+                const filtered = currentFindings.filter((finding) => {
+                    if (activeFilter === "all") return true;
+                    return finding.severity === activeFilter;
+                });
+
+                if (filtered.length === 0) {
+                    findingsContainer.innerHTML = `
+              <div class="empty-audit clean">
+                <i data-feather="smile"></i>
+                <p>Clean snapshot audit! No accessibility issues found matching filter.</p>
+              </div>
+            `;
+                    feather.replace();
+                    return;
+                }
+
+                filtered.forEach((finding, idx) => {
+                    const card = document.createElement("div");
+                    card.className = `finding-card severity-${finding.severity}`;
+
+                    // Header
+                    const header = document.createElement("div");
+                    header.className = "finding-header";
+
+                    const titleG = document.createElement("div");
+                    titleG.className = "finding-title-group";
+
+                    const badge = document.createElement("span");
+                    badge.className = `badge ${finding.severity === 'error' ? 'err' : finding.severity === 'warning' ? 'warn' : 'inf'}`;
+                    badge.textContent = finding.severity;
+
+                    const ruleName = document.createElement("span");
+                    ruleName.className = "rule-name";
+                    ruleName.textContent = finding.rule;
+
+                    titleG.appendChild(badge);
+                    titleG.appendChild(ruleName);
+
+                    const tagBadge = document.createElement("span");
+                    tagBadge.className = "element-tag";
+                    tagBadge.textContent = finding.elementTag;
+
+                    header.appendChild(titleG);
+                    header.appendChild(tagBadge);
+
+                    // Body
+                    const body = document.createElement("div");
+                    body.className = "finding-body";
+
+                    const desc = document.createElement("div");
+                    desc.className = "finding-desc";
+                    desc.textContent = finding.description;
+                    body.appendChild(desc);
+
+                    if (finding.snippet) {
+                        const label = document.createElement("div");
+                        label.className = "snippet-title";
+                        label.textContent = "Offending Code Snippet";
+                        body.appendChild(label);
+
+                        const pre = document.createElement("pre");
+                        pre.className = "html-snippet";
+                        pre.textContent = finding.snippet;
+                        body.appendChild(pre);
+                    }
+
+                    if (finding.fixSuggestion) {
+                        const fixWrap = document.createElement("div");
+                        fixWrap.className = "fix-container";
+
+                        const fixHeader = document.createElement("div");
+                        fixHeader.className = "fix-header";
+
+                        const fixLabel = document.createElement("span");
+                        fixLabel.className = "fix-label";
+                        fixLabel.innerHTML = '<i data-feather="tool"></i> Suggested Remedy';
+
+                        const copyFix = document.createElement("button");
+                        copyFix.className = "copy-fix-btn";
+                        copyFix.innerHTML = '<i data-feather="copy"></i> Copy Fix';
+                        copyFix.addEventListener("click", () => {
+                            navigator.clipboard.writeText(finding.fixSuggestion);
+                            showToast("Fix code copied!");
+                        });
+
+                        fixHeader.appendChild(fixLabel);
+                        fixHeader.appendChild(copyFix);
+
+                        const code = document.createElement("pre");
+                        code.className = "fix-code";
+                        code.textContent = finding.fixSuggestion;
+
+                        fixWrap.appendChild(fixHeader);
+                        fixWrap.appendChild(code);
+                        body.appendChild(fixWrap);
+                    }
+
+                    card.appendChild(header);
+                    card.appendChild(body);
+                    findingsContainer.appendChild(card);
+                });
+
+                feather.replace();
+            }
+
+            // ========================================
+            // Export Actions
+            // ========================================
+            exportReportBtn.addEventListener("click", () => {
+                if (currentFindings.length === 0) {
+                    showToast("No audit data to copy", true);
+                    return;
+                }
+
+                const summaryLines = [
+                    "==================================================",
+                    "  LOCAL A11y SNAPSHOT SCANNER - AUDIT REPORT",
+                    "==================================================",
+                    `Scan Time: ${new Date().toISOString()}`,
+                    `Total Alerts: ${currentFindings.length}`,
+                    `  - Errors: ${currentFindings.filter(f => f.severity === "error").length}`,
+                    `  - Warnings: ${currentFindings.filter(f => f.severity === "warning").length}`,
+                    `  - Infos: ${currentFindings.filter(f => f.severity === "info").length}`,
+                    "--------------------------------------------------\n"
+                ];
+
+                currentFindings.forEach((f, i) => {
+                    summaryLines.push(
+                        `[${i + 1}] [${f.severity.toUpperCase()}] ${f.rule} (${f.elementTag})`,
+                        `Description: ${f.description}`,
+                        f.snippet ? `Element Snippet: ${f.snippet}` : "",
+                        f.fixSuggestion ? `Remedy Suggestion: ${f.fixSuggestion}` : "",
+                        "--------------------------------------------------"
+                    );
+                });
+
+                navigator.clipboard.writeText(summaryLines.join("\n"));
+                showToast("Plain text report summary copied!");
+            });
+
+            exportJsonBtn.addEventListener("click", () => {
+                if (currentFindings.length === 0) {
+                    showToast("No audit data to export", true);
+                    return;
+                }
+
+                const fileContent = JSON.stringify({
+                    auditTime: new Date().toISOString(),
+                    metrics: {
+                        total: currentFindings.length,
+                        errors: currentFindings.filter(f => f.severity === "error").length,
+                        warnings: currentFindings.filter(f => f.severity === "warning").length,
+                        infos: currentFindings.filter(f => f.severity === "info").length
+                    },
+                    violations: currentFindings
+                }, null, 2);
+
+                const dataUri = "data:text/json;charset=utf-8," + encodeURIComponent(fileContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", dataUri);
+                link.setAttribute("download", `a11y_audit_report_${Date.now()}.json`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                showToast("JSON report downloaded successfully!");
+            });
+
+            // Toast alert helper
+            let toastTimeout;
+            function showToast(message, isError = false) {
+                const toast = document.getElementById("toast");
+                const toastMsg = document.getElementById("toast-message");
+                const icon = toast.querySelector("i");
+
+                toastMsg.textContent = message;
+                if (isError) {
+                    icon.setAttribute("data-feather", "alert-circle");
+                    icon.style.color = "var(--color-danger)";
+                } else {
+                    icon.setAttribute("data-feather", "check");
+                    icon.style.color = "var(--color-success)";
+                }
+                feather.replace();
+
+                toast.classList.add("active");
+                clearTimeout(toastTimeout);
+                toastTimeout = setTimeout(() => {
+                    toast.classList.remove("active");
+                }, 2500);
+            }
+        });
+    </script>
+</body>
+
+</html>
