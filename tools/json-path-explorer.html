@@ -1,0 +1,2203 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description"
+        content="Paste a JSON document, build and test JSONPath expressions, and preview matching nodes or values offline with breadcrumb paths, match counts, and live syntax verification." />
+    <title>JSONPath Explorer — One File Tools</title>
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap"
+        rel="stylesheet" />
+    <script src="https://unpkg.com/feather-icons"></script>
+    <!-- JSONPath-Plus library -->
+    <script src="https://cdn.jsdelivr.net/npm/jsonpath-plus/dist/index-browser-umd.cjs"></script>
+
+    <style>
+        /* ========================================
+Reset & Design Tokens
+======================================== */
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg-dark: #090d16;
+            --bg-gradient: radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.15) 0%, rgba(9, 13, 22, 0) 75%), linear-gradient(135deg, #090d16 0%, #0d1222 100%);
+            --panel-bg: rgba(17, 24, 39, 0.6);
+            --panel-border: rgba(255, 255, 255, 0.08);
+            --panel-border-strong: rgba(255, 255, 255, 0.16);
+            --panel-soft: rgba(255, 255, 255, 0.03);
+
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --text-subtle: #6b7280;
+
+            --color-primary: #6366f1;
+            --color-primary-hover: #4f46e5;
+            --color-primary-glow: rgba(99, 102, 241, 0.25);
+
+            --color-success: #10b981;
+            --color-success-bg: rgba(16, 185, 129, 0.1);
+            --color-success-glow: rgba(16, 185, 129, 0.2);
+
+            --color-warning: #f59e0b;
+            --color-warning-bg: rgba(245, 158, 11, 0.1);
+            --color-warning-glow: rgba(245, 158, 11, 0.2);
+
+            --color-danger: #ef4444;
+            --color-danger-bg: rgba(239, 68, 68, 0.1);
+            --color-danger-glow: rgba(239, 68, 68, 0.2);
+
+            --color-info: #06b6d4;
+            --color-info-bg: rgba(6, 182, 212, 0.1);
+
+            --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.15);
+            --radius: 12px;
+            --mono: "JetBrains Mono", monospace;
+            --sans: "Plus Jakarta Sans", sans-serif;
+        }
+
+        body {
+            background: var(--bg-dark);
+            background-image: var(--bg-gradient);
+            background-attachment: fixed;
+            color: var(--text-main);
+            font-family: var(--sans);
+            line-height: 1.6;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        /* ========================================
+Header & Layout
+======================================== */
+        header {
+            max-width: 1400px;
+            margin: 0 auto 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .header-title-area {
+            max-width: 800px;
+        }
+
+        .eyebrow {
+            color: var(--color-primary);
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            font-weight: 800;
+            letter-spacing: 0.15em;
+            margin-bottom: 0.5rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        h1 {
+            font-size: clamp(1.8rem, 4vw, 2.8rem);
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            line-height: 1.1;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(to right, #ffffff 40%, #c7d2fe 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+        }
+
+        .privacy-badge {
+            background: rgba(99, 102, 241, 0.08);
+            border: 1px solid rgba(99, 102, 241, 0.25);
+            border-radius: var(--radius);
+            padding: 0.6rem 1rem;
+            color: #c7d2fe;
+            font-weight: 600;
+            font-size: 0.85rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.05);
+        }
+
+        main {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+            gap: 24px;
+            align-items: start;
+        }
+
+        @media (max-width: 1024px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ========================================
+UI Panels
+======================================== */
+        .panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: var(--radius);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--panel-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .panel-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .panel-title i {
+            width: 18px;
+            height: 18px;
+            color: var(--color-primary);
+        }
+
+        .panel-body {
+            padding: 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        /* ========================================
+Buttons & Actions
+======================================== */
+        .toolbar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        button,
+        .file-upload-label {
+            background: var(--panel-soft);
+            border: 1px solid var(--panel-border);
+            color: var(--text-main);
+            font-family: var(--sans);
+            font-weight: 600;
+            font-size: 0.82rem;
+            padding: 0.5rem 0.8rem;
+            border-radius: 8px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            user-select: none;
+        }
+
+        button:hover,
+        .file-upload-label:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--panel-border-strong);
+            transform: translateY(-1px);
+        }
+
+        button:active,
+        .file-upload-label:active {
+            transform: translateY(0);
+        }
+
+        button.primary {
+            background: var(--color-primary);
+            border-color: transparent;
+        }
+
+        button.primary:hover {
+            background: var(--color-primary-hover);
+            box-shadow: 0 0 15px var(--color-primary-glow);
+        }
+
+        button.danger:hover {
+            background: var(--color-danger);
+            border-color: transparent;
+            box-shadow: 0 0 15px var(--color-danger-glow);
+        }
+
+        .file-upload-input {
+            display: none;
+        }
+
+        /* ========================================
+JSON Input Panel Styling
+======================================== */
+        .editor-container {
+            position: relative;
+            width: 100%;
+            border-radius: 8px;
+            border: 1px solid var(--panel-border);
+            background: rgba(5, 7, 12, 0.8);
+            overflow: hidden;
+        }
+
+        .editor-container:focus-within {
+            border-color: var(--color-primary);
+            box-shadow: 0 0 10px var(--color-primary-glow);
+        }
+
+        .drag-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(99, 102, 241, 0.95);
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 16px;
+            z-index: 10;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease;
+        }
+
+        .drag-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .drag-overlay i {
+            width: 48px;
+            height: 48px;
+            stroke-width: 1.5;
+        }
+
+        .drag-overlay p {
+            font-weight: 700;
+            font-size: 1.25rem;
+        }
+
+        textarea.json-textarea {
+            width: 100%;
+            height: 380px;
+            background: transparent;
+            border: none;
+            color: #e5e7eb;
+            font-family: var(--mono);
+            font-size: 0.88rem;
+            padding: 16px;
+            resize: vertical;
+            outline: none;
+            tab-size: 2;
+            line-height: 1.5;
+            display: block;
+        }
+
+        /* Form controls */
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-label {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        select {
+            background: rgba(5, 7, 12, 0.6);
+            border: 1px solid var(--panel-border);
+            color: var(--text-main);
+            font-family: var(--sans);
+            font-weight: 500;
+            padding: 0.6rem 1rem;
+            border-radius: 8px;
+            outline: none;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.2s ease;
+        }
+
+        select:focus {
+            border-color: var(--color-primary);
+            box-shadow: 0 0 8px var(--color-primary-glow);
+        }
+
+        .quick-suggestions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 4px;
+        }
+
+        .suggestion-chip {
+            font-family: var(--mono);
+            font-size: 0.75rem;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--panel-border);
+            color: #c7d2fe;
+            padding: 4px 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .suggestion-chip:hover {
+            background: rgba(99, 102, 241, 0.15);
+            border-color: var(--color-primary);
+            transform: translateY(-1px);
+        }
+
+        /* ========================================
+JSONPath Input Area & Live Checks
+======================================== */
+        .query-area {
+            display: flex;
+            gap: 8px;
+            position: relative;
+        }
+
+        .query-input-wrap {
+            position: relative;
+            flex: 1;
+        }
+
+        .query-input-wrap i.search-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-subtle);
+            pointer-events: none;
+            width: 16px;
+            height: 16px;
+        }
+
+        input[type="text"].query-input {
+            width: 100%;
+            background: rgba(5, 7, 12, 0.6);
+            border: 1px solid var(--panel-border);
+            color: var(--text-main);
+            font-family: var(--mono);
+            font-size: 0.95rem;
+            padding: 0.75rem 1rem 0.75rem 2.4rem;
+            border-radius: 8px;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        input[type="text"].query-input:focus {
+            border-color: var(--color-primary);
+            box-shadow: 0 0 10px var(--color-primary-glow);
+        }
+
+        .query-history-trigger {
+            padding: 0.75rem;
+        }
+
+        /* History Dropdown menu */
+        .history-menu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 8px;
+            background: #0f172a;
+            border: 1px solid var(--panel-border-strong);
+            border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            z-index: 50;
+            min-width: 280px;
+            max-width: 450px;
+            overflow: hidden;
+            display: none;
+        }
+
+        .history-menu.active {
+            display: block;
+        }
+
+        .history-header {
+            padding: 10px 14px;
+            font-weight: 700;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--panel-border);
+            background: rgba(255, 255, 255, 0.02);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .clear-history-btn {
+            background: transparent;
+            border: none;
+            color: var(--color-danger);
+            cursor: pointer;
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 2px 6px;
+        }
+
+        .history-list {
+            max-height: 240px;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            padding: 10px 14px;
+            font-family: var(--mono);
+            font-size: 0.8rem;
+            color: #e2e8f0;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            transition: background 0.15s ease;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        .history-item:hover {
+            background: rgba(99, 102, 241, 0.15);
+            color: #ffffff;
+        }
+
+        .history-empty {
+            padding: 20px;
+            text-align: center;
+            color: var(--text-subtle);
+            font-size: 0.8rem;
+        }
+
+        /* Query Evaluator Visualizer */
+        .validation-msg {
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 8px;
+            padding: 12px 16px;
+            border-left: 4px solid var(--color-success);
+            font-size: 0.85rem;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .validation-msg.invalid {
+            border-left-color: var(--color-danger);
+            background: rgba(239, 68, 68, 0.03);
+        }
+
+        .validation-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+        }
+
+        .validation-status.success {
+            color: #34d399;
+        }
+
+        .validation-status.danger {
+            color: #f87171;
+        }
+
+        .validation-status i {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* Failing segment visual highlight */
+        .error-visual {
+            font-family: var(--mono);
+            font-size: 0.9rem;
+            background: #020617;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            overflow-x: auto;
+            white-space: pre;
+            color: var(--text-muted);
+        }
+
+        .error-highlight {
+            background: rgba(239, 68, 68, 0.25);
+            border-bottom: 2px dashed var(--color-danger);
+            color: #fca5a5;
+            padding: 2px 0;
+            font-weight: 700;
+        }
+
+        .error-text {
+            font-size: 0.8rem;
+            color: #fca5a5;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .error-text i {
+            width: 14px;
+            height: 14px;
+            flex-shrink: 0;
+        }
+
+        /* ========================================
+Results Section & Tabs
+======================================= */
+        .results-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            border-bottom: 1px solid var(--panel-border);
+            padding-bottom: 12px;
+        }
+
+        .tabs {
+            display: flex;
+            background: rgba(5, 7, 12, 0.5);
+            padding: 4px;
+            border-radius: 8px;
+            border: 1px solid var(--panel-border);
+        }
+
+        .tab {
+            background: transparent;
+            border: none;
+            outline: none;
+            padding: 6px 14px;
+            border-radius: 6px;
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.8rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+        }
+
+        .tab:hover {
+            color: var(--text-main);
+        }
+
+        .tab.active {
+            background: var(--color-primary);
+            color: #ffffff;
+        }
+
+        .results-search-wrap {
+            position: relative;
+            min-width: 180px;
+        }
+
+        .results-search-wrap i {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-subtle);
+            width: 14px;
+            height: 14px;
+        }
+
+        input[type="text"].results-search {
+            padding: 4px 8px 4px 28px;
+            font-size: 0.8rem;
+            background: rgba(5, 7, 12, 0.4);
+            border: 1px solid var(--panel-border);
+            color: var(--text-main);
+            border-radius: 6px;
+            width: 100%;
+            outline: none;
+        }
+
+        input[type="text"].results-search:focus {
+            border-color: var(--color-primary);
+        }
+
+        .metrics-badge {
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 20px;
+            background: rgba(99, 102, 241, 0.08);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            color: #c7d2fe;
+        }
+
+        /* Results List View Cards */
+        .results-viewport {
+            max-height: 480px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding-right: 4px;
+        }
+
+        .no-results {
+            padding: 40px;
+            text-align: center;
+            color: var(--text-subtle);
+            background: rgba(255, 255, 255, 0.01);
+            border: 1px dashed var(--panel-border);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .no-results i {
+            width: 32px;
+            height: 32px;
+        }
+
+        .match-card {
+            background: rgba(15, 23, 42, 0.4);
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: border-color 0.25s ease;
+        }
+
+        .match-card:hover {
+            border-color: var(--panel-border-strong);
+        }
+
+        .match-card-header {
+            padding: 10px 16px;
+            background: rgba(255, 255, 255, 0.01);
+            border-bottom: 1px solid var(--panel-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .match-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .match-index {
+            font-family: var(--mono);
+            font-weight: 700;
+            font-size: 0.75rem;
+            color: var(--color-primary);
+            background: rgba(99, 102, 241, 0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .match-type {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+
+        .match-card-actions {
+            display: flex;
+            gap: 6px;
+        }
+
+        .icon-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+        }
+
+        .icon-btn:hover {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .icon-btn i {
+            width: 14px;
+            height: 14px;
+        }
+
+        .match-card-body {
+            padding: 12px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .breadcrumb-path {
+            font-family: var(--mono);
+            font-size: 0.8rem;
+            color: #818cf8;
+            cursor: pointer;
+            background: rgba(99, 102, 241, 0.05);
+            padding: 6px 10px;
+            border-radius: 4px;
+            word-break: break-all;
+            display: inline-block;
+            transition: all 0.15s ease;
+        }
+
+        .breadcrumb-path:hover {
+            background: rgba(99, 102, 241, 0.1);
+            color: #a5b4fc;
+        }
+
+        /* Raw JSON View */
+        .raw-preview-container {
+            width: 100%;
+            background: #020617;
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            padding: 16px;
+            overflow-x: auto;
+        }
+
+        pre.raw-json-block {
+            font-family: var(--mono);
+            font-size: 0.82rem;
+            color: #e2e8f0;
+            white-space: pre-wrap;
+            word-break: break-all;
+            line-height: 1.5;
+        }
+
+        /* ========================================
+Custom Collapsible JSON Renderer
+======================================= */
+        .json-line {
+            font-family: var(--mono);
+            font-size: 0.85rem;
+            line-height: 1.5;
+            margin-left: 4px;
+            white-space: pre;
+        }
+
+        .json-line-header {
+            display: inline-flex;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .json-key {
+            color: #a5b4fc;
+            /* light-indigo */
+            font-weight: 500;
+        }
+
+        .json-value.json-string {
+            color: #34d399;
+            /* emerald */
+        }
+
+        .json-value.json-number {
+            color: #38bdf8;
+            /* sky */
+        }
+
+        .json-value.json-boolean {
+            color: #f472b6;
+            /* pink */
+            font-weight: 500;
+        }
+
+        .json-value.json-null {
+            color: #9ca3af;
+            /* gray */
+            font-style: italic;
+        }
+
+        .json-bracket {
+            color: #ffffff;
+        }
+
+        .json-caret {
+            cursor: pointer;
+            user-select: none;
+            color: var(--color-primary);
+            font-size: 0.65rem;
+            padding: 0 4px;
+            margin-right: 4px;
+            display: inline-block;
+            transition: transform 0.1s ease;
+        }
+
+        .json-children {
+            border-left: 1px dashed rgba(255, 255, 255, 0.08);
+            margin-left: 8px;
+            padding-left: 16px;
+        }
+
+        .json-summary {
+            color: var(--text-subtle);
+            font-size: 0.75rem;
+            font-style: italic;
+            margin-left: 6px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .json-collapsible {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Floating alert boxes */
+        .alert-box {
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .alert-box.danger {
+            background: rgba(239, 68, 68, 0.06);
+            border: 1px solid rgba(239, 68, 68, 0.15);
+            color: #fca5a5;
+        }
+
+        .alert-box i {
+            flex-shrink: 0;
+            width: 18px;
+            height: 18px;
+            margin-top: 2px;
+        }
+
+        .alert-box-content {
+            flex: 1;
+        }
+
+        .alert-title {
+            font-weight: 700;
+            margin-bottom: 2px;
+        }
+
+        .alert-desc {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        footer {
+            max-width: 1400px;
+            margin: 2rem auto 0;
+            text-align: center;
+            color: var(--text-subtle);
+            font-size: 0.85rem;
+            border-top: 1px solid var(--panel-border);
+            padding-top: 1.5rem;
+        }
+
+        footer a {
+            color: var(--color-primary);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Utility notification toast */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #1e293b;
+            border: 1px solid var(--panel-border-strong);
+            color: #ffffff;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+            z-index: 999;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: none;
+        }
+
+        .toast.active {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast i {
+            width: 16px;
+            height: 16px;
+            color: var(--color-success);
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="header-title-area">
+            <span class="eyebrow"><i data-feather="link"></i> JSON & API Tools</span>
+            <h1>JSONPath Explorer</h1>
+            <p>Paste a JSON document, build and test JSONPath expressions, and extract matching elements offline.</p>
+        </div>
+        <div class="privacy-badge">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <path
+                    d="M12,1L3,5v6c0,5.55,3.84,10.74,9,12c5.16-1.26,9-6.45,9-12V5L12,1L12,1z M12,11.99h7c-0.53,4.12-3.28,7.79-7,8.94V12H5V6.3l7-3.11V11.99z" />
+            </svg>
+            100% Offline & Secure
+        </div>
+    </header>
+
+    <main>
+        <!-- Left Panel: JSON Input & Config -->
+        <section class="panel" aria-labelledby="json-panel-title">
+            <div class="panel-header">
+                <h2 id="json-panel-title" class="panel-title"><i data-feather="file-text"></i> JSON Document</h2>
+                <div class="toolbar">
+                    <label for="json-file-input" class="file-upload-label">
+                        <i data-feather="upload"></i> Upload
+                    </label>
+                    <input type="file" id="json-file-input" class="file-upload-input" accept=".json,text/plain" />
+                    <button id="format-json-btn" title="Format JSON (Pretty Print)"><i data-feather="align-left"></i>
+                        Format</button>
+                    <button id="minify-json-btn" title="Minify JSON (Compact)"><i data-feather="minimize-2"></i>
+                        Minify</button>
+                    <button id="copy-json-btn" title="Copy JSON to Clipboard"><i data-feather="copy"></i> Copy</button>
+                    <button id="clear-json-btn" class="danger" title="Clear Text"><i data-feather="trash-2"></i>
+                        Clear</button>
+                </div>
+            </div>
+            <div class="panel-body">
+                <!-- Dropdown Examples -->
+                <div class="form-group">
+                    <label for="example-dataset" class="form-label">Load Template Dataset</label>
+                    <select id="example-dataset">
+                        <option value="bookstore">📚 Book Store Catalog (Standard)</option>
+                        <option value="users">👥 User Organization Directory</option>
+                        <option value="github">🐙 GitHub Repository Search API Response</option>
+                    </select>
+                </div>
+
+                <!-- Drag and Drop Textarea container -->
+                <div class="editor-container" id="editor-dropzone">
+                    <div class="drag-overlay" id="drag-overlay">
+                        <i data-feather="download-cloud"></i>
+                        <p>Drop JSON file here</p>
+                    </div>
+                    <textarea id="json-input" class="json-textarea" placeholder="Paste your raw JSON document here..."
+                        autocomplete="off" spellcheck="false"></textarea>
+                </div>
+
+                <!-- JSON Error box -->
+                <div id="json-error-box" class="alert-box danger hidden">
+                    <i data-feather="alert-circle"></i>
+                    <div class="alert-box-content">
+                        <div class="alert-title">Invalid JSON Data</div>
+                        <div class="alert-desc" id="json-error-desc">Error details will appear here.</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Panel: JSONPath Queries & Match Results -->
+        <section class="panel" aria-labelledby="query-panel-title">
+            <div class="panel-header">
+                <h2 id="query-panel-title" class="panel-title"><i data-feather="code"></i> JSONPath Query</h2>
+                <div class="metrics-badge" id="latency-metrics">Idle</div>
+            </div>
+            <div class="panel-body">
+                <!-- Query input with history dropdown -->
+                <div class="form-group">
+                    <label for="jsonpath-query" class="form-label">
+                        JSONPath Expression
+                        <span id="history-anchor" style="position: relative;">
+                            <button class="icon-btn" id="history-btn" title="Query History"><i
+                                    data-feather="history"></i></button>
+                            <div class="history-menu" id="history-menu">
+                                <div class="history-header">
+                                    Recent Queries
+                                    <button class="clear-history-btn" id="clear-history-btn">Clear</button>
+                                </div>
+                                <div class="history-list" id="history-list">
+                                    <!-- History entries filled dynamically -->
+                                </div>
+                            </div>
+                        </span>
+                    </label>
+                    <div class="query-area">
+                        <div class="query-input-wrap">
+                            <i data-feather="search" class="search-icon"></i>
+                            <input type="text" id="jsonpath-query" class="query-input"
+                                placeholder="$.store.book[*].author" value="$.store.book[*].author" autocomplete="off"
+                                spellcheck="false" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recommendations list -->
+                <div class="form-group">
+                    <label class="form-label">Recommended Queries</label>
+                    <div class="quick-suggestions" id="quick-suggestions">
+                        <!-- Filled dynamically by dataset loaded -->
+                    </div>
+                </div>
+
+                <!-- JSONPath Syntax Evaluator (under query field) -->
+                <div class="validation-msg" id="query-validation">
+                    <div class="validation-status success" id="query-status-title">
+                        <i data-feather="check-circle"></i> Valid JSONPath syntax
+                    </div>
+                    <!-- Dynamic visual error layout -->
+                    <div id="query-error-details" class="hidden"></div>
+                </div>
+
+                <!-- Results visualizer tab controller -->
+                <div class="results-controls">
+                    <div class="tabs">
+                        <button class="tab active" id="tab-tree-view"><i data-feather="list"></i> Matches Tree</button>
+                        <button class="tab" id="tab-raw-view"><i data-feather="terminal"></i> Raw JSON</button>
+                    </div>
+
+                    <div class="toolbar" id="tree-only-actions">
+                        <button id="expand-all-btn"><i data-feather="plus-square"></i> Expand All</button>
+                        <button id="collapse-all-btn"><i data-feather="minus-square"></i> Collapse All</button>
+                    </div>
+
+                    <div class="results-search-wrap">
+                        <i data-feather="filter"></i>
+                        <input type="text" class="results-search" id="results-filter" placeholder="Filter matches..." />
+                    </div>
+                </div>
+
+                <!-- Match Outputs Container -->
+                <div class="results-viewport" id="results-container">
+                    <!-- Matches list filled dynamically -->
+                </div>
+
+                <div class="raw-preview-container hidden" id="raw-container">
+                    <pre class="raw-json-block" id="raw-json-output"></pre>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>Part of <a href="https://github.com/praveenscience/One-File-Tools" target="_blank"
+                rel="noopener noreferrer">One File Tools</a> — Developer utilities, one file each.</p>
+    </footer>
+
+    <!-- Copy Status Toast -->
+    <div class="toast" id="toast">
+        <i data-feather="check"></i>
+        <span id="toast-message">Copied to clipboard!</span>
+    </div>
+
+    <!-- Core App Logic -->
+    <script>
+        // ========================================
+        // Sample Datasets & Recommendations
+        // ========================================
+        const DATASETS = {
+            bookstore: {
+                data: {
+                    "store": {
+                        "book": [
+                            {
+                                "category": "reference",
+                                "author": "Nigel Rees",
+                                "title": "Sayings of the Century",
+                                "price": 8.95
+                            },
+                            {
+                                "category": "fiction",
+                                "author": "Evelyn Waugh",
+                                "title": "Sword of Honour",
+                                "price": 12.99
+                            },
+                            {
+                                "category": "fiction",
+                                "author": "Herman Melville",
+                                "title": "Moby Dick",
+                                "isbn": "0-553-21311-3",
+                                "price": 8.99
+                            },
+                            {
+                                "category": "fiction",
+                                "author": "J. R. R. Tolkien",
+                                "title": "The Lord of the Rings",
+                                "isbn": "0-395-19395-8",
+                                "price": 22.99
+                            }
+                        ],
+                        "bicycle": {
+                            "color": "red",
+                            "price": 19.95
+                        }
+                    },
+                    "expensive": 10
+                },
+                suggestions: [
+                    { query: "$.store.book[*].author", desc: "All authors" },
+                    { query: "$.store.book[?(@.price < 10)]", desc: "Books under $10" },
+                    { query: "$.store.book[2]", desc: "Third book in the list" },
+                    { query: "$..author", desc: "All authors recursively" },
+                    { query: "$.store.bicycle.color", desc: "Color of bicycle" }
+                ]
+            },
+            users: {
+                data: {
+                    "company": "TechVanguard Industries",
+                    "department": "Engineering & Design",
+                    "users": [
+                        {
+                            "id": 101,
+                            "name": "Sarah Connor",
+                            "role": "Lead Architect",
+                            "skills": ["Rust", "Kubernetes", "Systems Architecture"],
+                            "active": true,
+                            "address": { "city": "Los Angeles", "state": "CA" }
+                        },
+                        {
+                            "id": 102,
+                            "name": "John Doe",
+                            "role": "Frontend Developer",
+                            "skills": ["JavaScript", "CSS", "UI/UX Design"],
+                            "active": false,
+                            "address": { "city": "Seattle", "state": "WA" }
+                        },
+                        {
+                            "id": 103,
+                            "name": "Miles Dyson",
+                            "role": "Cybernetics Specialist",
+                            "skills": ["AI/ML", "Python", "Neural Networks"],
+                            "active": true,
+                            "address": { "city": "San Francisco", "state": "CA" }
+                        },
+                        {
+                            "id": 104,
+                            "name": "Marcus Wright",
+                            "role": "DevOps Engineer",
+                            "skills": ["Docker", "AWS", "Bash Programming"],
+                            "active": true,
+                            "address": { "city": "Denver", "state": "CO" }
+                        }
+                    ]
+                },
+                suggestions: [
+                    { query: "$.users[?(@.active == true)]", desc: "Active users only" },
+                    { query: "$.users[?(@.role == 'Lead Architect')].name", desc: "Name of Lead Architect" },
+                    { query: "$.users[*].skills[*]", desc: "Flattened list of all skills" },
+                    { query: "$.users[?(@.address.state == 'CA')].name", desc: "Users in California" },
+                    { query: "$..city", desc: "All city listings" }
+                ]
+            },
+            github: {
+                data: {
+                    "total_count": 3,
+                    "incomplete_results": false,
+                    "items": [
+                        {
+                            "id": 5261729,
+                            "name": "jsonpath-plus",
+                            "full_name": "jsonpath-plus/jsonpath-plus",
+                            "private": false,
+                            "owner": {
+                                "login": "jsonpath-plus",
+                                "id": 481920,
+                                "type": "Organization"
+                            },
+                            "html_url": "https://github.com/jsonpath-plus/jsonpath-plus",
+                            "description": "An advanced JSONPath library for JavaScript.",
+                            "stargazers_count": 2841,
+                            "license": {
+                                "key": "mit",
+                                "name": "MIT License",
+                                "spdx_id": "MIT"
+                            },
+                            "topics": ["json", "jsonpath", "javascript", "nodejs"]
+                        },
+                        {
+                            "id": 9283748,
+                            "name": "one-file-tools",
+                            "full_name": "praveenscience/One-File-Tools",
+                            "private": false,
+                            "owner": {
+                                "login": "praveenscience",
+                                "id": 918239,
+                                "type": "User"
+                            },
+                            "html_url": "https://github.com/praveenscience/One-File-Tools",
+                            "description": "A collection of useful developer tools, one file each.",
+                            "stargazers_count": 520,
+                            "license": {
+                                "key": "mit",
+                                "name": "MIT License",
+                                "spdx_id": "MIT"
+                            },
+                            "topics": ["developer-tools", "offline-first", "vanilla-js"]
+                        }
+                    ]
+                },
+                suggestions: [
+                    { query: "$.items[?(@.stargazers_count > 1000)].name", desc: "Repos with > 1k stars" },
+                    { query: "$.items[*].owner.login", desc: "Repository owners" },
+                    { query: "$.items[*].topics[*]", desc: "All repository topics" },
+                    { query: "$.items[?(@.license.spdx_id == 'MIT')].html_url", desc: "URLs of MIT licensed repos" }
+                ]
+            }
+        };
+
+        // ========================================
+        // State Management
+        // ========================================
+        let currentJson = {};
+        let activeTab = "tree"; // "tree" or "raw"
+        let queryHistory = [];
+
+        // Load initial state
+        try {
+            const storedHistory = localStorage.getItem("jsonpath_query_history");
+            if (storedHistory) {
+                queryHistory = JSON.parse(storedHistory);
+            }
+        } catch (e) {
+            console.error("Failed to load history from localStorage", e);
+        }
+
+        // ========================================
+        // Custom JSONPath Query Validator
+        // ========================================
+        function validateJSONPath(path) {
+            if (!path) {
+                return { valid: false, message: "Query path cannot be empty", index: 0, length: 0 };
+            }
+            if (!path.startsWith("$")) {
+                return { valid: false, message: "JSONPath query must start with '$'", index: 0, length: Math.min(path.length, 1) };
+            }
+
+            let i = 1;
+            const len = path.length;
+            let state = "operator"; // "operator", "property", "bracket", "dot"
+
+            while (i < len) {
+                const char = path[i];
+
+                if (char === ".") {
+                    if (state === "dot") {
+                        // Check for recursive descent double dot ".."
+                        if (i + 1 < len && path[i + 1] === ".") {
+                            return { valid: false, message: "Too many consecutive dots in query expression", index: i - 1, length: 3 };
+                        }
+                        i++;
+                        state = "operator";
+                        continue;
+                    }
+                    if (state === "operator") {
+                        return { valid: false, message: "Unexpected dot operator", index: i, length: 1 };
+                    }
+                    state = "dot";
+                    i++;
+                    continue;
+                }
+
+                if (char === "[") {
+                    if (state === "dot") {
+                        return { valid: false, message: "Unexpected dot operator before bracket. Use '$.store[0]' instead of '$.store.[0]'", index: i - 1, length: 2 };
+                    }
+
+                    // Extract bracket content
+                    let bracketContent = "";
+                    let j = i + 1;
+                    let quote = null;
+                    let closed = false;
+                    let escaped = false;
+
+                    while (j < len) {
+                        const c = path[j];
+                        if (escaped) {
+                            escaped = false;
+                        } else if (c === "\\") {
+                            escaped = true;
+                        } else if (quote) {
+                            if (c === quote) {
+                                quote = null; // Close quote
+                            }
+                        } else if (c === "'" || c === '"') {
+                            quote = c;
+                        } else if (c === "]") {
+                            closed = true;
+                            break;
+                        }
+                        bracketContent += c;
+                        j++;
+                    }
+
+                    if (!closed) {
+                        return { valid: false, message: "Unclosed bracket expression", index: i, length: len - i };
+                    }
+
+                    if (quote) {
+                        return { valid: false, message: "Unclosed string literal inside bracket", index: i, length: len - i };
+                    }
+
+                    if (bracketContent.trim() === "") {
+                        return { valid: false, message: "Empty bracket expression", index: i, length: j - i + 1 };
+                    }
+
+                    i = j + 1;
+                    state = "property";
+                    continue;
+                }
+
+                if (char === "]") {
+                    return { valid: false, message: "Unexpected closing bracket", index: i, length: 1 };
+                }
+
+                // Identifier check
+                if (state === "dot" || state === "operator") {
+                    if (!/[a-zA-Z_$]/.test(char) && char !== "*") {
+                        return { valid: false, message: `Invalid character '${char}' in property selector. Use bracket notation for keys with special characters, e.g. $['${char}']`, index: i, length: 1 };
+                    }
+                    let j = i + 1;
+                    while (j < len && /[a-zA-Z0-9_$-]/.test(path[j])) {
+                        j++;
+                    }
+                    i = j;
+                    state = "property";
+                    continue;
+                }
+
+                if (state === "property") {
+                    return { valid: false, message: `Expected a dot or bracket selector after property name, found '${char}'`, index: i, length: 1 };
+                }
+
+                i++;
+            }
+
+            if (state === "dot") {
+                return { valid: false, message: "Trailing dot selector at the end of path", index: len - 1, length: 1 };
+            }
+
+            return { valid: true };
+        }
+
+        // Helper to convert JSON pointers to standard dots/brackets breadcrumb paths
+        function pointerToJSONPath(pointer) {
+            if (!pointer || pointer === "/") return "$";
+            const parts = pointer.split("/").slice(1);
+            let path = "$";
+            for (const part of parts) {
+                const decoded = part.replace(/~1/g, "/").replace(/~0/g, "~");
+                if (/^\d+$/.test(decoded)) {
+                    path += `[${decoded}]`;
+                } else if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(decoded)) {
+                    path += `.${decoded}`;
+                } else {
+                    path += `['${decoded.replace(/'/g, "\\'")}']`;
+                }
+            }
+            return path;
+        }
+
+        // ========================================
+        // Custom Collapsible JSON Tree Renderer
+        // ========================================
+        function escapeHtml(str) {
+            if (typeof str !== "string") return str;
+            return str
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function createJsonHtml(val, isLast = true, key = null) {
+            const container = document.createElement("div");
+            container.className = "json-line";
+
+            const lineHeader = document.createElement("span");
+            lineHeader.className = "json-line-header";
+
+            if (key !== null) {
+                const keySpan = document.createElement("span");
+                keySpan.className = "json-key";
+                keySpan.textContent = `"${key}": `;
+                lineHeader.appendChild(keySpan);
+            }
+
+            if (val === null) {
+                const nullSpan = document.createElement("span");
+                nullSpan.className = "json-value json-null";
+                nullSpan.textContent = "null";
+                lineHeader.appendChild(nullSpan);
+                if (!isLast) lineHeader.appendChild(document.createTextNode(","));
+                container.appendChild(lineHeader);
+            } else if (typeof val === "boolean") {
+                const boolSpan = document.createElement("span");
+                boolSpan.className = "json-value json-boolean";
+                boolSpan.textContent = val ? "true" : "false";
+                lineHeader.appendChild(boolSpan);
+                if (!isLast) lineHeader.appendChild(document.createTextNode(","));
+                container.appendChild(lineHeader);
+            } else if (typeof val === "number") {
+                const numSpan = document.createElement("span");
+                numSpan.className = "json-value json-number";
+                numSpan.textContent = val;
+                lineHeader.appendChild(numSpan);
+                if (!isLast) lineHeader.appendChild(document.createTextNode(","));
+                container.appendChild(lineHeader);
+            } else if (typeof val === "string") {
+                const strSpan = document.createElement("span");
+                strSpan.className = "json-value json-string";
+                strSpan.textContent = `"${val}"`;
+                lineHeader.appendChild(strSpan);
+                if (!isLast) lineHeader.appendChild(document.createTextNode(","));
+                container.appendChild(lineHeader);
+            } else if (Array.isArray(val)) {
+                const wrap = document.createElement("div");
+                wrap.className = "json-collapsible";
+
+                const caret = document.createElement("span");
+                caret.className = "json-caret";
+                caret.innerHTML = "▼";
+
+                const bracketOpen = document.createElement("span");
+                bracketOpen.className = "json-bracket";
+                bracketOpen.textContent = "[";
+
+                const summary = document.createElement("span");
+                summary.className = "json-summary hidden";
+                summary.textContent = `... ] /* ${val.length} items */`;
+
+                lineHeader.insertBefore(caret, lineHeader.firstChild);
+                lineHeader.appendChild(bracketOpen);
+                lineHeader.appendChild(summary);
+
+                const childrenContainer = document.createElement("div");
+                childrenContainer.className = "json-children";
+
+                val.forEach((item, index) => {
+                    const childNode = createJsonHtml(item, index === val.length - 1);
+                    childrenContainer.appendChild(childNode);
+                });
+
+                const lineFooter = document.createElement("div");
+                lineFooter.className = "json-line-footer";
+                const bracketClose = document.createElement("span");
+                bracketClose.className = "json-bracket";
+                bracketClose.textContent = "]";
+                lineFooter.appendChild(bracketClose);
+                if (!isLast) lineFooter.appendChild(document.createTextNode(","));
+
+                caret.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    const isExpanded = caret.classList.toggle("expanded");
+                    caret.innerHTML = isExpanded ? "▼" : "▶";
+                    childrenContainer.classList.toggle("hidden", !isExpanded);
+                    lineFooter.classList.toggle("hidden", !isExpanded);
+                    summary.classList.toggle("hidden", isExpanded);
+                });
+
+                wrap.appendChild(lineHeader);
+                wrap.appendChild(childrenContainer);
+                wrap.appendChild(lineFooter);
+                container.appendChild(wrap);
+            } else if (typeof val === "object") {
+                const wrap = document.createElement("div");
+                wrap.className = "json-collapsible";
+
+                const caret = document.createElement("span");
+                caret.className = "json-caret";
+                caret.innerHTML = "▼";
+
+                const braceOpen = document.createElement("span");
+                braceOpen.className = "json-bracket";
+                braceOpen.textContent = "{";
+
+                const keys = Object.keys(val);
+
+                const summary = document.createElement("span");
+                summary.className = "json-summary hidden";
+                summary.textContent = `... } /* ${keys.length} fields */`;
+
+                lineHeader.insertBefore(caret, lineHeader.firstChild);
+                lineHeader.appendChild(braceOpen);
+                lineHeader.appendChild(summary);
+
+                const childrenContainer = document.createElement("div");
+                childrenContainer.className = "json-children";
+
+                keys.forEach((k, index) => {
+                    const childNode = createJsonHtml(val[k], index === keys.length - 1, k);
+                    childrenContainer.appendChild(childNode);
+                });
+
+                const lineFooter = document.createElement("div");
+                lineFooter.className = "json-line-footer";
+                const braceClose = document.createElement("span");
+                braceClose.className = "json-bracket";
+                braceClose.textContent = "}";
+                lineFooter.appendChild(braceClose);
+                if (!isLast) lineFooter.appendChild(document.createTextNode(","));
+
+                caret.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    const isExpanded = caret.classList.toggle("expanded");
+                    caret.innerHTML = isExpanded ? "▼" : "▶";
+                    childrenContainer.classList.toggle("hidden", !isExpanded);
+                    lineFooter.classList.toggle("hidden", !isExpanded);
+                    summary.classList.toggle("hidden", isExpanded);
+                });
+
+                wrap.appendChild(lineHeader);
+                wrap.appendChild(childrenContainer);
+                wrap.appendChild(lineFooter);
+                container.appendChild(wrap);
+            }
+
+            return container;
+        }
+
+        // ========================================
+        // Toast Notification
+        // ========================================
+        let toastTimeout;
+        function showToast(message, isError = false) {
+            const toast = document.getElementById("toast");
+            const toastMsg = document.getElementById("toast-message");
+            const icon = toast.querySelector("i");
+
+            toastMsg.textContent = message;
+
+            if (isError) {
+                icon.setAttribute("data-feather", "alert-circle");
+                icon.style.color = "var(--color-danger)";
+            } else {
+                icon.setAttribute("data-feather", "check");
+                icon.style.color = "var(--color-success)";
+            }
+
+            feather.replace();
+
+            toast.classList.add("active");
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove("active");
+            }, 2500);
+        }
+
+        // ========================================
+        // Main Application Logic
+        // ========================================
+        document.addEventListener("DOMContentLoaded", () => {
+            feather.replace();
+
+            // Element Bindings
+            const jsonInput = document.getElementById("json-input");
+            const jsonErrorBox = document.getElementById("json-error-box");
+            const jsonErrorDesc = document.getElementById("json-error-desc");
+            const datasetSelector = document.getElementById("example-dataset");
+            const quickSuggestions = document.getElementById("quick-suggestions");
+            const jsonPathQuery = document.getElementById("jsonpath-query");
+            const queryValidation = document.getElementById("query-validation");
+            const queryStatusTitle = document.getElementById("query-status-title");
+            const queryErrorDetails = document.getElementById("query-error-details");
+            const latencyMetrics = document.getElementById("latency-metrics");
+            const resultsContainer = document.getElementById("results-container");
+            const resultsFilter = document.getElementById("results-filter");
+
+            const historyBtn = document.getElementById("history-btn");
+            const historyMenu = document.getElementById("history-menu");
+            const historyList = document.getElementById("history-list");
+            const clearHistoryBtn = document.getElementById("clear-history-btn");
+
+            const tabTree = document.getElementById("tab-tree-view");
+            const tabRaw = document.getElementById("tab-raw-view");
+            const rawContainer = document.getElementById("raw-container");
+            const rawJsonOutput = document.getElementById("raw-json-output");
+            const treeOnlyActions = document.getElementById("tree-only-actions");
+
+            const formatBtn = document.getElementById("format-json-btn");
+            const minifyBtn = document.getElementById("minify-json-btn");
+            const copyJsonBtn = document.getElementById("copy-json-btn");
+            const clearJsonBtn = document.getElementById("clear-json-btn");
+            const fileInput = document.getElementById("json-file-input");
+            const dropZone = document.getElementById("editor-dropzone");
+            const dragOverlay = document.getElementById("drag-overlay");
+
+            const expandAllBtn = document.getElementById("expand-all-btn");
+            const collapseAllBtn = document.getElementById("collapse-all-btn");
+
+            // Set default dataset bookstore
+            loadDataset("bookstore");
+            updateHistoryUI();
+
+            // Preset Dataset Selection Change
+            datasetSelector.addEventListener("change", (e) => {
+                loadDataset(e.target.value);
+            });
+
+            // Load dataset functionality
+            function loadDataset(name) {
+                const ds = DATASETS[name];
+                if (!ds) return;
+
+                // Set JSON string
+                jsonInput.value = JSON.stringify(ds.data, null, 2);
+                parseAndValidateJSON();
+
+                // Fill recommended paths
+                quickSuggestions.innerHTML = "";
+                ds.suggestions.forEach((s) => {
+                    const chip = document.createElement("span");
+                    chip.className = "suggestion-chip";
+                    chip.textContent = s.query;
+                    chip.title = s.desc;
+                    chip.addEventListener("click", () => {
+                        jsonPathQuery.value = s.query;
+                        runQuery();
+                    });
+                    quickSuggestions.appendChild(chip);
+                });
+
+                // Pick first recommended query as default search query
+                if (ds.suggestions.length > 0) {
+                    jsonPathQuery.value = ds.suggestions[0].query;
+                }
+
+                runQuery();
+            }
+
+            // Live json change listener (debounced)
+            let jsonParseTimeout;
+            jsonInput.addEventListener("input", () => {
+                clearTimeout(jsonParseTimeout);
+                jsonParseTimeout = setTimeout(() => {
+                    parseAndValidateJSON();
+                    runQuery();
+                }, 300);
+            });
+
+            // Validate JSON Input
+            function parseAndValidateJSON() {
+                const str = jsonInput.value.trim();
+                if (str === "") {
+                    currentJson = {};
+                    jsonErrorBox.classList.add("hidden");
+                    return true;
+                }
+
+                try {
+                    currentJson = JSON.parse(str);
+                    jsonErrorBox.classList.add("hidden");
+                    return true;
+                } catch (err) {
+                    jsonErrorBox.classList.remove("hidden");
+
+                    // Format descriptive parse error
+                    let errorMsg = err.message;
+                    const modernMatch = errorMsg.match(/line (\d+) column (\d+)/);
+                    const posMatch = errorMsg.match(/at position (\d+)/);
+
+                    if (modernMatch) {
+                        const line = modernMatch[1];
+                        const col = modernMatch[2];
+                        errorMsg = `${errorMsg.replace(/ in JSON.*/, '')} at line ${line}, column ${col}`;
+                    } else if (posMatch) {
+                        const pos = parseInt(posMatch[1], 10);
+                        const before = str.substring(0, pos);
+                        const lines = before.split("\n");
+                        const line = lines.length;
+                        const col = lines[lines.length - 1].length + 1;
+                        errorMsg = `${errorMsg.replace(/ in JSON.*/, '')} at line ${line}, column ${col}`;
+                    }
+
+                    jsonErrorDesc.textContent = errorMsg;
+                    return false;
+                }
+            }
+
+            // Edit Toolbar actions
+            formatBtn.addEventListener("click", () => {
+                if (parseAndValidateJSON()) {
+                    jsonInput.value = JSON.stringify(currentJson, null, 2);
+                    showToast("JSON formatted successfully");
+                } else {
+                    showToast("Invalid JSON cannot be formatted", true);
+                }
+            });
+
+            minifyBtn.addEventListener("click", () => {
+                if (parseAndValidateJSON()) {
+                    jsonInput.value = JSON.stringify(currentJson);
+                    showToast("JSON minified successfully");
+                } else {
+                    showToast("Invalid JSON cannot be minified", true);
+                }
+            });
+
+            copyJsonBtn.addEventListener("click", () => {
+                navigator.clipboard.writeText(jsonInput.value);
+                showToast("JSON copied to clipboard");
+            });
+
+            clearJsonBtn.addEventListener("click", () => {
+                jsonInput.value = "";
+                currentJson = {};
+                jsonErrorBox.classList.add("hidden");
+                runQuery();
+                showToast("Clear editor");
+            });
+
+            // File upload actions
+            fileInput.addEventListener("change", (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                readFile(file);
+            });
+
+            function readFile(file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    jsonInput.value = e.target.result;
+                    parseAndValidateJSON();
+                    runQuery();
+                    showToast(`Loaded ${file.name}`);
+                };
+                reader.readAsText(file);
+            }
+
+            // Drag and Drop Zone actions
+            dropZone.addEventListener("dragover", (e) => {
+                e.preventDefault();
+                dragOverlay.classList.add("active");
+            });
+
+            dropZone.addEventListener("dragleave", () => {
+                dragOverlay.classList.remove("active");
+            });
+
+            dropZone.addEventListener("drop", (e) => {
+                e.preventDefault();
+                dragOverlay.classList.remove("active");
+                const file = e.dataTransfer.files[0];
+                if (file) {
+                    readFile(file);
+                }
+            });
+
+            // ========================================
+            // Query History Dropdown
+            // ========================================
+            historyBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                historyMenu.classList.toggle("active");
+            });
+
+            document.addEventListener("click", () => {
+                historyMenu.classList.remove("active");
+            });
+
+            clearHistoryBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                queryHistory = [];
+                localStorage.removeItem("jsonpath_query_history");
+                updateHistoryUI();
+                showToast("Query history cleared");
+            });
+
+            function addToHistory(path) {
+                if (!path || queryHistory.includes(path)) return;
+                queryHistory.unshift(path);
+                if (queryHistory.length > 10) {
+                    queryHistory.pop();
+                }
+                localStorage.setItem("jsonpath_query_history", JSON.stringify(queryHistory));
+                updateHistoryUI();
+            }
+
+            function updateHistoryUI() {
+                historyList.innerHTML = "";
+                if (queryHistory.length === 0) {
+                    historyList.innerHTML = '<div class="history-empty">No recent queries</div>';
+                    return;
+                }
+                queryHistory.forEach((item) => {
+                    const el = document.createElement("div");
+                    el.className = "history-item";
+                    el.textContent = item;
+                    el.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        jsonPathQuery.value = item;
+                        historyMenu.classList.remove("active");
+                        runQuery();
+                    });
+                    historyList.appendChild(el);
+                });
+            }
+
+            // ========================================
+            // JSONPath Evaluation & Match Rendering
+            // ========================================
+            let queryTimeout;
+            jsonPathQuery.addEventListener("input", () => {
+                clearTimeout(queryTimeout);
+                queryTimeout = setTimeout(() => {
+                    runQuery();
+                }, 200);
+            });
+
+            // Run the JSONPath Query
+            function runQuery() {
+                const path = jsonPathQuery.value.trim();
+                resultsContainer.innerHTML = "";
+                rawJsonOutput.textContent = "";
+                latencyMetrics.textContent = "Processing...";
+
+                if (!path) {
+                    queryValidation.classList.add("invalid");
+                    queryStatusTitle.innerHTML = '<i data-feather="alert-circle"></i> Query path is empty';
+                    queryErrorDetails.classList.add("hidden");
+                    latencyMetrics.textContent = "Idle";
+                    feather.replace();
+                    return;
+                }
+
+                // Step 1: Validate Path locally
+                const validation = validateJSONPath(path);
+                if (!validation.valid) {
+                    queryValidation.classList.add("invalid");
+                    queryStatusTitle.innerHTML = '<i data-feather="alert-triangle"></i> Syntax check failed';
+
+                    // Build visual segment underline
+                    const before = path.slice(0, validation.index);
+                    const bad = path.slice(validation.index, validation.index + validation.length);
+                    const after = path.slice(validation.index + validation.length);
+
+                    queryErrorDetails.innerHTML = `
+<div class="error-visual"><span>${escapeHtml(before)}</span><span class="error-highlight">${escapeHtml(bad)}</span><span>${escapeHtml(after)}</span></div>
+<div class="error-text"><i data-feather="alert-circle"></i> ${escapeHtml(validation.message)}</div>
+`;
+                    queryErrorDetails.classList.remove("hidden");
+                    latencyMetrics.textContent = "Error";
+                    feather.replace();
+                    return;
+                }
+
+                // Syntax path is valid
+                queryValidation.classList.remove("invalid");
+                queryStatusTitle.innerHTML = '<i data-feather="check-circle"></i> Valid JSONPath syntax';
+                queryErrorDetails.classList.add("hidden");
+                feather.replace();
+
+                // Step 2: Check if JSON is loaded
+                if (!jsonInput.value.trim()) {
+                    resultsContainer.innerHTML = `
+<div class="no-results">
+<i data-feather="file-text"></i>
+<p>Please enter a JSON document first.</p>
+</div>
+`;
+                    latencyMetrics.textContent = "No data";
+                    feather.replace();
+                    return;
+                }
+
+                // Check if JSON has a parse error
+                try {
+                    JSON.parse(jsonInput.value.trim());
+                } catch (e) {
+                    resultsContainer.innerHTML = `
+<div class="no-results">
+<i data-feather="alert-circle"></i>
+<p>The JSON document has syntax errors. Correct them to query.</p>
+</div>
+`;
+                    latencyMetrics.textContent = "Invalid data";
+                    feather.replace();
+                    return;
+                }
+
+                // Step 3: Run evaluation
+                try {
+                    const start = performance.now();
+
+                    // Query with resultType: 'all' to get exact paths
+                    const matchedMeta = JSONPath.JSONPath({
+                        path: path,
+                        json: currentJson,
+                        resultType: "all",
+                        ignoreEvalErrors: true
+                    });
+
+                    const end = performance.now();
+                    const latency = (end - start).toFixed(1);
+
+                    latencyMetrics.textContent = `${matchedMeta.length} matches in ${latency}ms`;
+
+                    if (matchedMeta.length > 0) {
+                        addToHistory(path);
+                    }
+
+                    renderMatches(matchedMeta);
+
+                } catch (err) {
+                    queryValidation.classList.add("invalid");
+                    queryStatusTitle.innerHTML = '<i data-feather="alert-circle"></i> Evaluation error';
+                    queryErrorDetails.innerHTML = `
+<div class="error-text"><i data-feather="alert-circle"></i> ${escapeHtml(err.message)}</div>
+`;
+                    queryErrorDetails.classList.remove("hidden");
+                    latencyMetrics.textContent = "Failed";
+                    feather.replace();
+                }
+            }
+
+            // Render matched arrays
+            let globalMatches = []; // Store metadata of last matches
+
+            function renderMatches(matches) {
+                globalMatches = matches;
+                resultsContainer.innerHTML = "";
+
+                if (matches.length === 0) {
+                    resultsContainer.innerHTML = `
+<div class="no-results">
+<i data-feather="slash"></i>
+<p>No matching elements found for this query.</p>
+</div>
+`;
+                    rawJsonOutput.textContent = "[]";
+                    feather.replace();
+                    return;
+                }
+
+                // Filter matching records if resultsFilter is filled
+                const queryFilter = resultsFilter.value.trim().toLowerCase();
+
+                // Generate Raw Output values
+                const matchedValues = matches.map((m) => m.value);
+                rawJsonOutput.textContent = JSON.stringify(matchedValues, null, 2);
+
+                let renderedCount = 0;
+
+                matches.forEach((match, index) => {
+                    const matchPath = pointerToJSONPath(match.pointer);
+                    const valueStr = typeof match.value === "object" ? JSON.stringify(match.value) : String(match.value);
+
+                    // Check text filter
+                    if (queryFilter && !matchPath.toLowerCase().includes(queryFilter) && !valueStr.toLowerCase().includes(queryFilter)) {
+                        return;
+                    }
+
+                    renderedCount++;
+
+                    // Render card
+                    const card = document.createElement("div");
+                    card.className = "match-card";
+
+                    // Header
+                    const header = document.createElement("div");
+                    header.className = "match-card-header";
+
+                    const meta = document.createElement("div");
+                    meta.className = "match-meta";
+                    const indexBadge = document.createElement("span");
+                    indexBadge.className = "match-index";
+                    indexBadge.textContent = `#${index + 1}`;
+
+                    const typeBadge = document.createElement("span");
+                    typeBadge.className = "match-type";
+                    typeBadge.textContent = match.value === null ? "null" : Array.isArray(match.value) ? `array [${match.value.length}]` : typeof match.value;
+
+                    meta.appendChild(indexBadge);
+                    meta.appendChild(typeBadge);
+
+                    const actions = document.createElement("div");
+                    actions.className = "match-card-actions";
+
+                    const copyPathBtn = document.createElement("button");
+                    copyPathBtn.className = "icon-btn";
+                    copyPathBtn.title = "Copy JSONPath to clipboard";
+                    copyPathBtn.innerHTML = '<i data-feather="link"></i>';
+                    copyPathBtn.addEventListener("click", () => {
+                        navigator.clipboard.writeText(matchPath);
+                        showToast("Path copied: " + matchPath);
+                    });
+
+                    const copyValBtn = document.createElement("button");
+                    copyValBtn.className = "icon-btn";
+                    copyValBtn.title = "Copy value to clipboard";
+                    copyValBtn.innerHTML = '<i data-feather="copy"></i>';
+                    copyValBtn.addEventListener("click", () => {
+                        const strVal = typeof match.value === "object" ? JSON.stringify(match.value, null, 2) : String(match.value);
+                        navigator.clipboard.writeText(strVal);
+                        showToast("Value copied to clipboard");
+                    });
+
+                    actions.appendChild(copyPathBtn);
+                    actions.appendChild(copyValBtn);
+
+                    header.appendChild(meta);
+                    header.appendChild(actions);
+
+                    // Card Body
+                    const body = document.createElement("div");
+                    body.className = "match-card-body";
+
+                    const breadcrumb = document.createElement("span");
+                    breadcrumb.className = "breadcrumb-path";
+                    breadcrumb.textContent = matchPath;
+                    breadcrumb.title = "Click to copy path";
+                    breadcrumb.addEventListener("click", () => {
+                        navigator.clipboard.writeText(matchPath);
+                        showToast("Path copied: " + matchPath);
+                    });
+
+                    body.appendChild(breadcrumb);
+
+                    // Collapsible tree
+                    const jsonTree = createJsonHtml(match.value);
+                    body.appendChild(jsonTree);
+
+                    card.appendChild(header);
+                    card.appendChild(body);
+                    resultsContainer.appendChild(card);
+                });
+
+                if (renderedCount === 0) {
+                    resultsContainer.innerHTML = `
+<div class="no-results">
+<i data-feather="filter"></i>
+<p>No matches match the filter string "${escapeHtml(resultsFilter.value)}".</p>
+</div>
+`;
+                }
+
+                feather.replace();
+            }
+
+            // Live Filter search change
+            resultsFilter.addEventListener("input", () => {
+                renderMatches(globalMatches);
+            });
+
+            // Tab selection logic
+            tabTree.addEventListener("click", () => {
+                activeTab = "tree";
+                tabTree.classList.add("active");
+                tabRaw.classList.remove("active");
+                resultsContainer.classList.remove("hidden");
+                rawContainer.classList.add("hidden");
+                treeOnlyActions.classList.remove("hidden");
+            });
+
+            tabRaw.addEventListener("click", () => {
+                activeTab = "raw";
+                tabRaw.classList.add("active");
+                tabTree.classList.remove("active");
+                resultsContainer.classList.add("hidden");
+                rawContainer.classList.remove("hidden");
+                treeOnlyActions.classList.add("hidden");
+            });
+
+            // Tree expanding collapsing
+            expandAllBtn.addEventListener("click", () => {
+                const carets = resultsContainer.querySelectorAll(".json-caret");
+                carets.forEach((caret) => {
+                    if (!caret.classList.contains("expanded")) {
+                        caret.click();
+                    }
+                });
+            });
+
+            collapseAllBtn.addEventListener("click", () => {
+                const carets = resultsContainer.querySelectorAll(".json-caret");
+                carets.forEach((caret) => {
+                    if (caret.classList.contains("expanded")) {
+                        caret.click();
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+
+</html>
