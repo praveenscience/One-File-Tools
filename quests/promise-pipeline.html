@@ -1,0 +1,2160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Promise Pipeline: Steampunk Flow | JS Fundamentals Quest</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Playfair+Display+SC:wght@700;900&family=Share+Tech+Mono&family=Special+Elite&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@48,400,0,0" rel="stylesheet">
+  <style>
+    :root {
+      --steampunk-dark: #1c140d;
+      --steampunk-panel: #2e2114;
+      --steampunk-border: #875c36;
+      --brass-light: #ffd56b;
+      --brass-base: #c59b27;
+      --brass-dark: #7e5e0c;
+      --copper: #cd7f32;
+      --copper-dim: rgba(205, 127, 50, 0.2);
+      
+      --neon-amber: #ff9100;
+      --neon-amber-dim: rgba(255, 145, 0, 0.2);
+      --neon-blue: #00b0ff;
+      --neon-blue-dim: rgba(0, 176, 255, 0.2);
+      --neon-green: #00e676;
+      --neon-green-dim: rgba(0, 230, 118, 0.2);
+      --neon-red: #ff1744;
+      --neon-red-dim: rgba(255, 23, 68, 0.25);
+      
+      --font-title: 'Playfair Display SC', serif;
+      --font-steampunk: 'Special Elite', cursive;
+      --font-hud: 'Share Tech Mono', monospace;
+      --font-code: 'Courier Prime', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      background-color: var(--steampunk-dark);
+      color: #eae0d5;
+      font-family: var(--font-hud);
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    }
+
+    /* Victorian Steampunk Laboratory Background */
+    .lab-bg {
+      position: absolute;
+      inset: 0;
+      background-color: #120c08;
+      background-image: 
+        radial-gradient(rgba(197, 155, 39, 0.03) 2px, transparent 0),
+        linear-gradient(rgba(205, 127, 50, 0.02) 1px, transparent 0),
+        linear-gradient(90deg, rgba(205, 127, 50, 0.02) 1px, transparent 0);
+      background-size: 40px 40px, 80px 80px, 80px 80px;
+      z-index: 1;
+    }
+
+    .steam-mist {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.03) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    /* Victorian Frame wrapper */
+    .game-wrapper {
+      position: relative;
+      z-index: 10;
+      width: 96vw;
+      height: 94vh;
+      max-width: 1350px;
+      max-height: 850px;
+      background: var(--steampunk-panel);
+      border: 6px double var(--brass-base);
+      border-radius: 8px;
+      box-shadow: 0 30px 70px rgba(0, 0, 0, 0.9), inset 0 0 40px rgba(0, 0, 0, 0.8);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* CRT glass overlay filter */
+    .game-wrapper::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.15) 50%), linear-gradient(90deg, rgba(205, 127, 50, 0.03), rgba(0, 0, 0, 0.05), rgba(205, 127, 50, 0.03));
+      background-size: 100% 6px, 8px 100%;
+      opacity: 0.5;
+      z-index: 100;
+    }
+
+    /* Landing Screen Overlay */
+    .screen {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      z-index: 50;
+      background: #140e0a;
+      transition: opacity 0.5s ease;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .screen.active {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .landing-content {
+      margin: auto;
+      text-align: center;
+      max-width: 650px;
+      padding: 2.5rem;
+      border: 2px solid var(--brass-base);
+      background: rgba(46, 33, 20, 0.9);
+      border-radius: 8px;
+      box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.8);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .logo-container {
+      width: 120px;
+      height: 120px;
+      margin-bottom: 1.5rem;
+      animation: gearSpin 12s linear infinite;
+    }
+
+    @keyframes gearSpin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .game-title {
+      font-family: var(--font-title);
+      font-size: clamp(2rem, 4.5vw, 3rem);
+      font-weight: 900;
+      color: var(--brass-light);
+      text-shadow: 0 2px 10px rgba(126, 94, 12, 0.8), 0 0 20px rgba(255, 145, 0, 0.2);
+      margin-bottom: 0.3rem;
+      letter-spacing: 2px;
+    }
+
+    .game-subtitle {
+      font-family: var(--font-steampunk);
+      font-size: 1.1rem;
+      color: var(--copper);
+      letter-spacing: 3px;
+      margin-bottom: 2rem;
+      text-transform: uppercase;
+    }
+
+    .game-desc {
+      font-family: var(--font-steampunk);
+      font-size: 0.95rem;
+      color: #c4b5a6;
+      line-height: 1.6;
+      margin-bottom: 2.5rem;
+      text-align: justify;
+    }
+
+    .brass-btn {
+      background: linear-gradient(180deg, var(--brass-light) 0%, var(--brass-base) 70%, var(--brass-dark) 100%);
+      border: 2px solid #5a4103;
+      border-radius: 4px;
+      color: #120c08;
+      font-family: var(--font-title);
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 0.8rem 2.5rem;
+      font-size: 1rem;
+      cursor: pointer;
+      letter-spacing: 2px;
+      transition: all 0.2s;
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5), inset 0 2px 3px rgba(255, 255, 255, 0.4);
+    }
+
+    .brass-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.6), 0 0 10px rgba(255, 213, 107, 0.4);
+      filter: brightness(1.1);
+    }
+
+    .brass-btn:active {
+      transform: translateY(2px);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+    }
+
+    /* Header styling */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      background: #140e0a;
+      border-bottom: 3px solid var(--brass-base);
+      z-index: 10;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .hub-btn {
+      color: #eae0d5;
+      text-decoration: none;
+      font-family: var(--font-hud);
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.4rem 0.8rem;
+      border: 1px solid var(--steampunk-border);
+      border-radius: 4px;
+      background: rgba(135, 92, 54, 0.15);
+      transition: all 0.2s;
+    }
+
+    .hub-btn:hover {
+      color: var(--brass-light);
+      border-color: var(--brass-base);
+      background: rgba(197, 155, 39, 0.15);
+    }
+
+    .header-title-container h1 {
+      font-family: var(--font-title);
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--brass-light);
+    }
+
+    .header-title-container span {
+      font-family: var(--font-steampunk);
+      font-size: 0.7rem;
+      color: var(--copper);
+      letter-spacing: 1px;
+    }
+
+    .level-navigator {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 0.3rem 0.8rem;
+      border-radius: 4px;
+      border: 1px solid rgba(197, 155, 39, 0.2);
+    }
+
+    .nav-arrow {
+      background: none;
+      border: none;
+      color: var(--brass-light);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.1rem;
+      transition: color 0.2s;
+    }
+
+    .nav-arrow:hover:not(:disabled) {
+      color: #ffffff;
+      text-shadow: 0 0 5px var(--brass-light);
+    }
+
+    .nav-arrow:disabled {
+      color: #5a493a;
+      cursor: not-allowed;
+    }
+
+    .level-label {
+      font-family: var(--font-hud);
+      font-weight: 700;
+      font-size: 1rem;
+      color: #ffffff;
+      min-width: 130px;
+      text-align: center;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .sound-toggle {
+      background: none;
+      border: 1px solid var(--steampunk-border);
+      color: #eae0d5;
+      border-radius: 4px;
+      padding: 0.4rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .sound-toggle:hover {
+      color: var(--brass-light);
+      background: rgba(197, 155, 39, 0.1);
+    }
+
+    .sound-toggle.muted {
+      color: var(--neon-red);
+      border-color: var(--neon-red-dim);
+      background: rgba(255, 23, 68, 0.05);
+    }
+
+    /* Main board splits */
+    main {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      position: relative;
+    }
+
+    .schematic-panel {
+      flex: 55;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      border-right: 3px solid var(--brass-base);
+      min-width: 0;
+    }
+
+    .control-panel {
+      flex: 45;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+      background: rgba(15, 11, 7, 0.6);
+      overflow-y: auto;
+      min-width: 0;
+    }
+
+    /* SVG Schematic Grid */
+    .schematic-frame {
+      flex: 1;
+      background: #0f0b07;
+      border: 2px solid var(--steampunk-border);
+      border-radius: 4px;
+      position: relative;
+      box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.9);
+      overflow: hidden;
+    }
+
+    .schematic-svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Static copper pipe rendering */
+    .pipe-bg {
+      stroke: #3c2918;
+      stroke-width: 12px;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .pipe-border {
+      stroke: var(--steampunk-border);
+      stroke-width: 10px;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .pipe-copper {
+      stroke: var(--copper);
+      stroke-width: 6px;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    /* Animated flowing steam overlay */
+    .steam-flow {
+      stroke: var(--neon-amber);
+      stroke-width: 4px;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-dasharray: 8 16;
+      stroke-dashoffset: 0;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .steam-flow.active {
+      opacity: 0.85;
+      animation: steamMove 1.5s linear infinite;
+    }
+
+    .steam-flow.reject {
+      stroke: var(--neon-red);
+      opacity: 0.85;
+      animation: steamMove 1.5s linear infinite;
+    }
+
+    @keyframes steamMove {
+      from { stroke-dashoffset: 0; }
+      to { stroke-dashoffset: -24; }
+    }
+
+    /* SVG elements styling */
+    .svg-gear {
+      fill: var(--brass-base);
+      stroke: #483416;
+      stroke-width: 1.5;
+      transform-origin: center;
+    }
+
+    .svg-gear.spinning {
+      animation: gearSpin 4s linear infinite;
+    }
+
+    .svg-node-label {
+      font-family: var(--font-hud);
+      font-size: 11px;
+      fill: #ffffff;
+      text-anchor: middle;
+      font-weight: bold;
+    }
+
+    /* Interactive Pipeline slot overlay */
+    .pipe-slot-circle {
+      fill: rgba(0, 0, 0, 0.85);
+      stroke: var(--brass-base);
+      stroke-width: 2;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .pipe-slot-circle:hover {
+      fill: rgba(197, 155, 39, 0.15);
+      stroke: var(--brass-light);
+    }
+
+    .pipe-slot-circle.selected {
+      stroke: var(--neon-blue);
+      fill: rgba(0, 176, 255, 0.05);
+      filter: drop-shadow(0 0 5px var(--neon-blue));
+    }
+
+    /* Valve handles / machine states */
+    .release-valve-glow {
+      fill: none;
+      stroke: var(--neon-red);
+      stroke-width: 2;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .release-valve-glow.active {
+      opacity: 0.7;
+      animation: pulseLight 1s infinite alternate;
+    }
+
+    @keyframes pulseLight {
+      0% { opacity: 0.2; }
+      100% { opacity: 0.9; }
+    }
+
+    /* Boiler Pressure HUD Gauge */
+    .hud-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .pressure-gauge-card {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(197, 155, 39, 0.25);
+      border-radius: 4px;
+      padding: 0.6rem 1.2rem;
+      flex: 1;
+      max-width: 320px;
+    }
+
+    .pressure-icon {
+      color: var(--neon-amber);
+      font-size: 28px;
+    }
+
+    .pressure-meta {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .pressure-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #94a3b8;
+    }
+
+    .pressure-bar-container {
+      width: 100%;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      margin-top: 4px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .pressure-bar-fill {
+      position: absolute;
+      left: 0; top: 0; height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--neon-green) 0%, var(--neon-amber) 70%, var(--neon-red) 100%);
+      transition: width 0.5s ease;
+    }
+
+    .pressure-val-text {
+      font-family: var(--font-hud);
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #ffffff;
+      min-width: 45px;
+      text-align: right;
+    }
+
+    /* Glitches during siren alarm warning */
+    .boiler-warning-active .pressure-val-text {
+      color: var(--neon-red);
+      animation: pulseText 0.5s infinite alternate;
+    }
+
+    @keyframes pulseText {
+      0% { transform: scale(1); }
+      100% { transform: scale(1.1); text-shadow: 0 0 8px var(--neon-red); }
+    }
+
+    /* Siren alarm layout alert */
+    .siren-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 50;
+      opacity: 0;
+      box-shadow: inset 0 0 100px rgba(255, 23, 68, 0.4);
+      border: 3px solid var(--neon-red-dim);
+      transition: opacity 0.5s;
+    }
+
+    .boiler-warning-active .siren-overlay {
+      animation: sirenFlash 1s infinite alternate;
+    }
+
+    @keyframes sirenFlash {
+      0% { opacity: 0; }
+      100% { opacity: 0.8; }
+    }
+
+    .boiler-warning-active .schematic-frame {
+      animation: shakeFrame 0.25s infinite;
+    }
+
+    @keyframes shakeFrame {
+      0%, 100% { transform: translate(0, 0); }
+      20% { transform: translate(-2px, 1px); }
+      40% { transform: translate(1px, -1px); }
+      60% { transform: translate(-1px, 2px); }
+      80% { transform: translate(2px, -2px); }
+    }
+
+    /* Steam billow leak animation */
+    .steam-leak-cloud {
+      position: absolute;
+      width: 60px;
+      height: 60px;
+      background: radial-gradient(circle, rgba(230, 220, 205, 0.4) 0%, rgba(255, 255, 255, 0) 70%);
+      pointer-events: none;
+      z-index: 10;
+      opacity: 0;
+      transform: scale(0.2);
+    }
+
+    .steam-leak-cloud.leaking {
+      opacity: 1;
+      transform: scale(1.5) translateY(-40px);
+      transition: opacity 1s, transform 1.2s;
+    }
+
+    /* Control Panel Cards */
+    .steampunk-card {
+      background: #251b12;
+      border: 2px solid #5a4103;
+      border-radius: 4px;
+      padding: 1.2rem;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6), inset 0 0 15px rgba(0, 0, 0, 0.5);
+    }
+
+    .card-title {
+      font-family: var(--font-title);
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      color: var(--brass-light);
+      margin-bottom: 0.8rem;
+      border-bottom: 1px solid rgba(197, 155, 39, 0.2);
+      padding-bottom: 0.4rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .card-title .status-badge {
+      font-family: var(--font-hud);
+      font-size: 0.7rem;
+      background: rgba(197, 155, 39, 0.1);
+      color: var(--brass-light);
+      padding: 0.1rem 0.5rem;
+      border: 1px solid rgba(197, 155, 39, 0.25);
+      border-radius: 4px;
+    }
+
+    .mission-desc {
+      font-family: var(--font-steampunk);
+      font-size: 0.95rem;
+      line-height: 1.6;
+      color: #e2d4c9;
+    }
+
+    /* Connection fitting control options */
+    .fitters-container {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .fitter-slot-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.5rem;
+      padding: 0.8rem;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(197, 155, 39, 0.1);
+      border-radius: 4px;
+      transition: all 0.3s;
+    }
+
+    .fitter-slot-row.active-selection {
+      border-color: var(--neon-blue);
+      box-shadow: 0 0 10px rgba(0, 176, 255, 0.1);
+    }
+
+    .slot-meta {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .slot-title {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #94a3b8;
+    }
+
+    .slot-current-val {
+      font-family: var(--font-code);
+      font-size: 0.9rem;
+      color: #ffffff;
+      margin-top: 2px;
+    }
+
+    .options-btn-group {
+      display: flex;
+      gap: 0.4rem;
+    }
+
+    .option-btn {
+      background: #140e0a;
+      border: 1px solid var(--steampunk-border);
+      color: #eae0d5;
+      font-family: var(--font-hud);
+      font-size: 0.75rem;
+      padding: 0.4rem 0.8rem;
+      border-radius: 3px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .option-btn:hover:not(:disabled) {
+      border-color: var(--brass-base);
+      color: var(--brass-light);
+      background: rgba(197, 155, 39, 0.05);
+    }
+
+    .option-btn.active {
+      background: var(--copper-dim);
+      border-color: var(--copper);
+      color: #ffffff;
+      box-shadow: inset 0 0 5px rgba(205, 127, 50, 0.3);
+    }
+
+    .option-btn:disabled {
+      opacity: 0.2;
+      cursor: not-allowed;
+    }
+
+    /* Schematic log typewriter */
+    .schematics-log {
+      background: #f4eae1;
+      border: 1px solid #c9b097;
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4), inset 0 0 30px rgba(18, 12, 8, 0.1);
+      border-radius: 4px;
+      padding: 1.2rem;
+      color: #2b1f15;
+      font-family: var(--font-code);
+      font-size: 0.8rem;
+      position: relative;
+    }
+
+    .schematics-log::before {
+      content: '';
+      position: absolute;
+      left: 20px; top: 0; bottom: 0; width: 1px;
+      background: rgba(255, 0, 0, 0.25);
+    }
+
+    .log-header {
+      font-family: var(--font-steampunk);
+      font-size: 0.95rem;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+      padding-bottom: 0.4rem;
+      margin-bottom: 0.8rem;
+      color: #120c08;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .log-content {
+      white-space: pre-wrap;
+      line-height: 1.5;
+      padding-left: 15px;
+    }
+
+    /* Modal alert styling */
+    .modal-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(18, 12, 8, 0.85);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 60;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s ease;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .modal-box {
+      background: var(--steampunk-panel);
+      border: 3px solid var(--brass-base);
+      border-radius: 6px;
+      width: 90%;
+      max-width: 480px;
+      padding: 2rem;
+      text-align: center;
+      box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
+      transform: translateY(-20px);
+      transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .modal-overlay.active .modal-box {
+      transform: translateY(0);
+    }
+
+    .modal-icon {
+      font-size: 60px;
+      margin-bottom: 1.5rem;
+    }
+
+    .modal-icon.success {
+      color: var(--neon-green);
+    }
+
+    .modal-icon.fail {
+      color: var(--neon-red);
+    }
+
+    .modal-title {
+      font-family: var(--font-title);
+      font-size: 1.6rem;
+      color: var(--brass-light);
+      margin-bottom: 1rem;
+    }
+
+    .modal-text {
+      font-family: var(--font-steampunk);
+      font-size: 0.95rem;
+      color: #eae0d5;
+      line-height: 1.6;
+      margin-bottom: 2rem;
+    }
+
+    .modal-btns {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+    }
+
+    /* Boiler glow animations */
+    .boiler-base {
+      transition: fill 0.5s ease;
+    }
+    .boiler-active .boiler-base {
+      fill: #5a1c0d !important;
+      animation: boilerPulse 1s infinite alternate;
+    }
+
+    @keyframes boilerPulse {
+      0% { fill: #4a1306; }
+      100% { fill: #72240f; }
+    }
+
+    /* Responsive scaling */
+    @media (max-width: 968px) {
+      body {
+        overflow-y: auto;
+        height: auto;
+      }
+      .game-wrapper {
+        height: auto;
+        max-height: none;
+        width: 98vw;
+        margin: 1vh auto;
+      }
+      main {
+        flex-direction: column;
+      }
+      .schematic-panel {
+        border-right: none;
+        border-bottom: 3px solid var(--brass-base);
+        height: 480px;
+        flex: none;
+      }
+      .control-panel {
+        height: auto;
+        flex: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="lab-bg">
+    <div class="steam-mist"></div>
+  </div>
+
+  <!-- Landing Screen -->
+  <div id="landing-screen" class="screen active">
+    <div class="landing-content">
+      <svg class="logo-container" viewBox="0 0 100 100">
+        <!-- Mechanical clockwork gear vector icon -->
+        <circle cx="50" cy="50" r="30" fill="none" stroke="var(--brass-base)" stroke-width="6"/>
+        <path d="M50 8 L50 20 M50 80 L50 92 M8 50 L20 50 M80 50 L92 50" stroke="var(--brass-base)" stroke-width="8" stroke-linecap="round"/>
+        <path d="M20 20 L29 29 M71 71 L80 80 M20 80 L29 71 M71 29 L80 20" stroke="var(--brass-base)" stroke-width="8" stroke-linecap="round"/>
+        <circle cx="50" cy="50" r="16" fill="var(--steampunk-dark)" stroke="var(--brass-light)" stroke-width="3"/>
+        <path d="M44 50 L50 44 L58 50 L50 56 Z" fill="var(--copper)"/>
+      </svg>
+      <div class="game-title">PROMISE PIPELINE</div>
+      <div class="game-subtitle">Steampunk Flow Protocol</div>
+      <div class="game-desc">
+        As a steam engineer, connect pressure boilers (Promise producers) to machinery (consumers) using steam pipes (.then), safety valves (.catch), and manifold junctions (Combinators). Route the flows correctly to prevent a boiler meltdown!
+      </div>
+      <button class="brass-btn" onclick="game.start()">Engage Machinery</button>
+    </div>
+  </div>
+
+  <!-- Game Wrapper -->
+  <div class="game-wrapper">
+    <header>
+      <div class="header-left">
+        <a href="../index.html" class="hub-btn" onclick="game.cleanup()">
+          <span class="material-symbols-outlined">arrow_back</span>
+          <span>Hub</span>
+        </a>
+        <div class="header-title-container">
+          <h1>PROMISE PIPELINE</h1>
+          <span>Asynchronous Steam Laboratory</span>
+        </div>
+      </div>
+
+      <div class="level-navigator">
+        <button class="nav-arrow" id="prev-level-btn" onclick="game.changeLevel(-1)">
+          <span class="material-symbols-outlined">chevron_left</span>
+        </button>
+        <span class="level-label" id="level-title-label">BOILER 1 / 6</span>
+        <button class="nav-arrow" id="next-level-btn" onclick="game.changeLevel(1)">
+          <span class="material-symbols-outlined">chevron_right</span>
+        </button>
+      </div>
+
+      <div class="header-right">
+        <button class="sound-toggle" id="sound-toggle-btn" onclick="game.toggleSound()">
+          <span class="material-symbols-outlined" id="sound-icon">volume_up</span>
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <!-- Left Panel: Interactive Schematic Diagram -->
+      <div class="schematic-panel">
+        
+        <div class="hud-row">
+          <!-- Boiler pressure indicator -->
+          <div class="pressure-gauge-card">
+            <span class="material-symbols-outlined pressure-icon">speed</span>
+            <div class="pressure-meta">
+              <span class="pressure-label">Boiler Pressure</span>
+              <div class="pressure-bar-container">
+                <div class="pressure-bar-fill" id="boiler-pressure-fill"></div>
+              </div>
+            </div>
+            <span class="pressure-val-text" id="boiler-pressure-val">0%</span>
+          </div>
+
+          <button class="brass-btn" style="padding: 0.4rem 1.5rem; font-size: 0.85rem;" onclick="game.resetLevel()">
+            <span>Reset Valves</span>
+          </button>
+        </div>
+
+        <div class="schematic-frame">
+          <div class="siren-overlay"></div>
+          
+          <!-- Steam leak particle emitter coordinates -->
+          <div class="steam-leak-cloud" id="leak-cloud-1" style="left: 0; top: 0;"></div>
+          <div class="steam-leak-cloud" id="leak-cloud-2" style="left: 0; top: 0;"></div>
+
+          <!-- Dynamic SVG rendering for pipe flows -->
+          <svg class="schematic-svg" id="pipe-schematic-svg" viewBox="0 0 500 320">
+            <!-- SVG background pipelines will be drawn dynamically based on active level -->
+          </svg>
+        </div>
+
+      </div>
+
+      <!-- Right Panel: Dashboard Controls -->
+      <div class="control-panel">
+        
+        <!-- Mission briefings -->
+        <div class="steampunk-card">
+          <div class="card-title">
+            <span>Mission Objective</span>
+            <span class="status-badge">VALVE LOG</span>
+          </div>
+          <p class="mission-desc" id="mission-objective-text">
+            Align the boiler piping. Connect the primary steam boiler to the mechanical turbine using correct promise logic.
+          </p>
+        </div>
+
+        <!-- Connection fitters installers -->
+        <div class="steampunk-card">
+          <div class="card-title">
+            <span>Piping Valve Configurations</span>
+            <span class="status-badge" style="color: var(--neon-blue); border-color: rgba(0, 176, 255, 0.3)">ACTIVE FITTER</span>
+          </div>
+          
+          <div class="fitters-container" id="junction-fitters-zone">
+            <!-- Row fitters dynamically populated per level -->
+          </div>
+        </div>
+
+        <!-- Real-time code log display -->
+        <div class="schematics-log">
+          <div class="log-header">
+            <span>SCHEMATIC LOG</span>
+            <span id="log-filename">boiler_system.js</span>
+          </div>
+          <div class="log-content" id="log-code-view">
+            boiler()
+              .then(spinTurbine);
+          </div>
+        </div>
+
+        <!-- Master Trigger Lever -->
+        <button class="brass-btn" style="width: 100%; padding: 1.2rem; font-size: 1.2rem;" id="fire-boiler-btn" onclick="game.fireBoilers()">
+          <span>Fire Boilers</span>
+        </button>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Win/Loss outcomes dialog -->
+  <div class="modal-overlay" id="outcome-modal">
+    <div class="modal-box">
+      <span class="material-symbols-outlined modal-icon success" id="outcome-icon">workspace_premium</span>
+      <div class="modal-title" id="outcome-title">BOILER CLEARED</div>
+      <p class="modal-text" id="outcome-desc">
+        Steam flows perfectly with zero pressure leaks! Machine powered successfully.
+      </p>
+      
+      <div class="modal-btns">
+        <button class="brass-btn" id="modal-action-btn" onclick="game.handleModalAction()">Next Level</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Script Logic -->
+  <script>
+    // Sound FX Synth utilizing Web Audio API
+    const sound = {
+      ctx: null,
+      enabled: true,
+      init() {
+        if (!this.ctx) {
+          this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+      },
+      playClick() {
+        if (!this.enabled) return;
+        this.init();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(400, this.ctx.currentTime);
+        osc.frequency.setValueAtTime(200, this.ctx.currentTime + 0.05);
+        
+        gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.08);
+        
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.08);
+      },
+      playSuccess() {
+        if (!this.enabled) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const notes = [329.63, 392.00, 523.25, 659.25]; // E4, G4, C5, E5
+        notes.forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          
+          osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+          gain.gain.setValueAtTime(0.1, now + idx * 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.005, now + idx * 0.08 + 0.3);
+          
+          osc.start(now + idx * 0.08);
+          osc.stop(now + idx * 0.08 + 0.3);
+        });
+      },
+      playFail() {
+        if (!this.enabled) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(140, now);
+        osc.frequency.linearRampToValueAtTime(60, now + 0.5);
+        
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+        
+        osc.start();
+        osc.stop(now + 0.5);
+      },
+      playSteamHiss(duration = 1.0) {
+        if (!this.enabled) return;
+        this.init();
+        
+        const bufferSize = this.ctx.sampleRate * duration;
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = Math.random() * 2 - 1;
+        }
+        
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+        
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.value = 1200;
+        filter.Q.value = 1.0;
+        
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+        
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.ctx.destination);
+        
+        noise.start();
+      },
+      sirenOsc: null,
+      sirenGain: null,
+      sirenInterval: null,
+      startAlarm() {
+        if (!this.enabled) return;
+        this.init();
+        if (this.sirenOsc) return;
+        
+        this.sirenOsc = this.ctx.createOscillator();
+        this.sirenGain = this.ctx.createGain();
+        this.sirenOsc.connect(this.sirenGain);
+        this.sirenGain.connect(this.ctx.destination);
+        
+        this.sirenOsc.type = 'sawtooth';
+        this.sirenOsc.frequency.setValueAtTime(450, this.ctx.currentTime);
+        
+        this.sirenGain.gain.setValueAtTime(0.02, this.ctx.currentTime);
+        this.sirenOsc.start();
+        
+        let toggle = false;
+        this.sirenInterval = setInterval(() => {
+          if (!this.sirenOsc || this.ctx.state === 'suspended') return;
+          const target = toggle ? 450 : 300;
+          this.sirenOsc.frequency.linearRampToValueAtTime(target, this.ctx.currentTime + 0.15);
+          toggle = !toggle;
+        }, 200);
+      },
+      stopAlarm() {
+        if (this.sirenInterval) {
+          clearInterval(this.sirenInterval);
+          this.sirenInterval = null;
+        }
+        if (this.sirenOsc) {
+          try {
+            this.sirenOsc.stop();
+          } catch(e) {}
+          this.sirenOsc = null;
+        }
+        this.sirenGain = null;
+      }
+    };
+
+    // Levels definitions
+    const levels = [
+      {
+        id: 1,
+        name: "Steam Turbine Flow",
+        objective: "Fit a standard steam routing valve to the boiler pipeline. When the steam boiler fires (resolving after a delay), it must deliver steam to power the mechanical turbine.",
+        logFilename: "turbine_assembly.js",
+        boilerState: "resolve", // boiler will resolve
+        delay: 1200,
+        slots: [
+          { id: "slot1", type: "handler", label: "Boiler Pipe Link", options: ["then", "catch"], default: "none" }
+        ],
+        svgElements: `
+          <!-- Boiler -->
+          <rect class="boiler-base" x="20" y="110" width="80" height="100" fill="#2d2d2d" stroke="var(--brass-base)" stroke-width="3" rx="10"/>
+          <circle cx="60" cy="160" r="20" fill="none" stroke="var(--brass-light)" stroke-width="2"/>
+          <line x1="60" y1="160" x2="60" y2="145" stroke="var(--brass-light)" stroke-width="3"/>
+          <text x="60" y="235" class="svg-node-label">BOILER</text>
+
+          <!-- Turbine -->
+          <circle cx="420" cy="160" r="30" fill="none" stroke="var(--brass-base)" stroke-width="3"/>
+          <path id="turbine-gear" class="svg-gear" d="M420 130 L420 190 M390 160 L450 160 M398 138 L442 182 M398 182 L442 138" stroke="var(--brass-base)" stroke-width="4"/>
+          <circle cx="420" cy="160" r="10" fill="var(--steampunk-dark)"/>
+          <text x="420" y="215" class="svg-node-label">TURBINE</text>
+
+          <!-- Static pipes -->
+          <path class="pipe-bg" d="M100 160 L200 160 M300 160 L390 160"/>
+          <path class="pipe-border" d="M100 160 L200 160 M300 160 L390 160"/>
+          <path class="pipe-copper" d="M100 160 L200 160 M300 160 L390 160"/>
+
+          <!-- Slot Box overlay -->
+          <g class="slot-trigger" data-slot="slot1" transform="translate(210, 135)">
+            <rect class="pipe-slot-box" width="80" height="50" fill="rgba(0,0,0,0.85)" stroke="var(--brass-base)" stroke-width="2" rx="4" style="cursor:pointer;"/>
+            <text x="40" y="30" id="text-slot1" font-family="var(--font-hud)" font-size="11" fill="var(--brass-light)" text-anchor="middle">CHOOSE VALVE</text>
+          </g>
+
+          <!-- Animated Steam Lines -->
+          <path id="flow-boiler-slot" class="steam-flow" d="M100 160 L210 160"/>
+          <path id="flow-slot-turbine" class="steam-flow" d="M290 160 L390 160"/>
+          
+          <!-- Vent escape pipe -->
+          <path class="pipe-bg" d="M250 135 L250 80"/>
+          <path class="pipe-border" d="M250 135 L250 80"/>
+          <path class="pipe-copper" d="M250 135 L250 80"/>
+          <!-- Vent crown -->
+          <path d="M235 80 L265 80 L260 70 L240 70 Z" fill="var(--brass-base)" stroke="#3c2918" stroke-width="2"/>
+          <path id="flow-vent" class="steam-flow" d="M250 135 L250 80"/>
+        `,
+        codeTemplate: "boiler()\n  [slot1](spinTurbine);"
+      },
+      {
+        id: 2,
+        name: "Containment Seal Fail",
+        objective: "The auxiliary boiler has a critical flaw and rejects its promise. Direct the failing flow safely to the release valve using a .catch() pipe to avoid steam leakage and system blowout.",
+        logFilename: "pressure_containment.js",
+        boilerState: "reject", // boiler will reject
+        delay: 1000,
+        slots: [
+          { id: "slot1", type: "handler", label: "Relief Redirect", options: ["then", "catch"], default: "none" }
+        ],
+        svgElements: `
+          <!-- Boiler -->
+          <rect class="boiler-base" x="20" y="110" width="80" height="100" fill="#2d2d2d" stroke="var(--brass-base)" stroke-width="3" rx="10"/>
+          <circle cx="60" cy="160" r="20" fill="none" stroke="var(--brass-light)" stroke-width="2"/>
+          <line x1="60" y1="160" x2="60" y2="145" stroke="var(--brass-light)" stroke-width="3"/>
+          <text x="60" y="235" class="svg-node-label">FAULTY BOILER</text>
+
+          <!-- Safety Release Valve -->
+          <circle cx="420" cy="160" r="25" fill="#3a110a" stroke="var(--neon-red)" stroke-width="2"/>
+          <path d="M405 160 L435 160 M420 145 L420 175" stroke="#ffffff" stroke-width="4"/>
+          <circle id="valve-glow-indicator" class="release-valve-glow" cx="420" cy="160" r="30"/>
+          <text x="420" y="215" class="svg-node-label">SAFETY VALVE</text>
+
+          <!-- Pipes -->
+          <path class="pipe-bg" d="M100 160 L200 160 M300 160 L395 160"/>
+          <path class="pipe-border" d="M100 160 L200 160 M300 160 L395 160"/>
+          <path class="pipe-copper" d="M100 160 L200 160 M300 160 L395 160"/>
+
+          <!-- Slot Trigger -->
+          <g class="slot-trigger" data-slot="slot1" transform="translate(210, 135)">
+            <rect class="pipe-slot-box" width="80" height="50" fill="rgba(0,0,0,0.85)" stroke="var(--brass-base)" stroke-width="2" rx="4" style="cursor:pointer;"/>
+            <text x="40" y="30" id="text-slot1" font-family="var(--font-hud)" font-size="11" fill="var(--brass-light)" text-anchor="middle">CHOOSE VALVE</text>
+          </g>
+
+          <!-- Animated Steam Flows -->
+          <path id="flow-boiler-slot" class="steam-flow" d="M100 160 L210 160"/>
+          <path id="flow-slot-turbine" class="steam-flow" d="M290 160 L395 160"/>
+        `,
+        codeTemplate: "faultyBoiler()\n  [slot1](releaseSteam);"
+      },
+      {
+        id: 3,
+        name: "Boiler Safety Flush",
+        objective: "Connect the pressure system so that the Master Fuel Valve is closed under all conditions (resolved or rejected). Place a cleanup valve (.finally) to close the valve after routing output.",
+        logFilename: "emergency_flush.js",
+        boilerState: "random", // resolves or rejects randomly
+        delay: 1100,
+        slots: [
+          { id: "slot1", type: "handler", label: "Output Redirect", options: ["then", "catch"], default: "none" },
+          { id: "slot2", type: "handler", label: "Post Operation Drain", options: ["then", "finally"], default: "none" }
+        ],
+        svgElements: `
+          <!-- Boiler -->
+          <rect class="boiler-base" x="20" y="110" width="80" height="100" fill="#2d2d2d" stroke="var(--brass-base)" stroke-width="3" rx="10"/>
+          <circle cx="60" cy="160" r="16" fill="none" stroke="var(--brass-light)" stroke-width="2"/>
+          <text x="60" y="235" class="svg-node-label">BOILER</text>
+
+          <!-- Master Fuel Valve -->
+          <rect id="drain-valve" x="400" y="130" width="40" height="60" fill="#222" stroke="var(--brass-base)" stroke-width="2"/>
+          <circle id="drain-handle" cx="420" cy="160" r="15" fill="var(--copper)" stroke="#000" stroke-width="2"/>
+          <line x1="420" y1="145" x2="420" y2="175" stroke="#ffffff" stroke-width="3"/>
+          <text x="420" y="215" class="svg-node-label">FUEL SHUTDOWN</text>
+
+          <!-- Pipes -->
+          <path class="pipe-bg" d="M100 160 L150 160 M230 160 L280 160 M360 160 L400 160"/>
+          <path class="pipe-border" d="M100 160 L150 160 M230 160 L280 160 M360 160 L400 160"/>
+          <path class="pipe-copper" d="M100 160 L150 160 M230 160 L280 160 M360 160 L400 160"/>
+
+          <!-- Slot Triggers -->
+          <g class="slot-trigger" data-slot="slot1" transform="translate(150, 135)">
+            <rect class="pipe-slot-box" width="80" height="50" fill="rgba(0,0,0,0.85)" stroke="var(--brass-base)" stroke-width="2" rx="4" style="cursor:pointer;"/>
+            <text x="40" y="30" id="text-slot1" font-family="var(--font-hud)" font-size="11" fill="var(--brass-light)" text-anchor="middle">VALVE 1</text>
+          </g>
+
+          <g class="slot-trigger" data-slot="slot2" transform="translate(280, 135)">
+            <rect class="pipe-slot-box" width="80" height="50" fill="rgba(0,0,0,0.85)" stroke="var(--brass-base)" stroke-width="2" rx="4" style="cursor:pointer;"/>
+            <text x="40" y="30" id="text-slot2" font-family="var(--font-hud)" font-size="11" fill="var(--brass-light)" text-anchor="middle">VALVE 2</text>
+          </g>
+
+          <!-- Animated Steam Flows -->
+          <path id="flow-boiler-slot1" class="steam-flow" d="M100 160 L150 160"/>
+          <path id="flow-slot1-slot2" class="steam-flow" d="M230 160 L280 160"/>
+          <path id="flow-slot2-drain" class="steam-flow" d="M360 160 L400 160"/>
+        `,
+        codeTemplate: "boiler()\n  [slot1](handleOutput)\n  [slot2](closeFuelValve);"
+      },
+      {
+        id: 4,
+        name: "The Triple Engine Manifold",
+        objective: "Power the heavy gears using three separate steam lines. All three boilers must release pressure at once. Install the correct Promise combinator junction box (all, race, or any) that delivers steam only when ALL lines are ready.",
+        logFilename: "manifold_all.js",
+        boilerState: "triple", // special evaluation
+        delay: [900, 1800, 1400], // separate delays
+        slots: [
+          { id: "combinator", type: "combinator", label: "Combinator Manifold", options: ["all", "race", "any"], default: "none" }
+        ],
+        svgElements: `
+          <!-- Three Boilers -->
+          <rect class="boiler-base" x="20" y="30" width="70" height="60" fill="#2d2d2d" stroke="var(--brass-base)" stroke-width="2" rx="6"/>
+          <text x="55" y="65" class="svg-node-label">GEN 1</text>
+          <text x="250" y="20" font-family="var(--font-hud)" font-size="9" fill="var(--brass-light)">0.9s delay</text>
+
+          <rect class="boiler-base" x="20" y="110" width="70" height="60" fill="#2d2d2d" stroke="var(--brass-base)" stroke-width="2" rx="6"/>
+          <text x="55" y="145" class="svg-node-label">GEN 2</text>
+          <text x="250" y="100" font-family="var(--font-hud)" font-size="9" fill="var(--brass-light)">1.8s delay</text>
+
+          <rect class="boiler-base" x="20" y="190" width="70" height="60" fill="#2d2d2d" stroke="var(--brass-base)" stroke-width="2" rx="6"/>
+          <text x="55" y="225" class="svg-node-label">GEN 3</text>
+          <text x="250" y="180" font-family="var(--font-hud)" font-size="9" fill="var(--brass-light)">1.4s delay</text>
+
+          <!-- Triple Gear Engine -->
+          <circle cx="420" cy="140" r="24" fill="none" stroke="var(--brass-base)" stroke-width="2"/>
+          <path id="engine-gear-1" class="svg-gear" d="M420 116 L420 164 M396 140 L444 140" stroke="var(--brass-base)" stroke-width="3"/>
+          
+          <circle cx="420" cy="200" r="20" fill="none" stroke="var(--brass-base)" stroke-width="2"/>
+          <path id="engine-gear-2" class="svg-gear" d="M420 180 L420 220 M400 200 L440 200" stroke="var(--brass-base)" stroke-width="3"/>
+          <text x="420" y="250" class="svg-node-label">GEAR MATRIX</text>
+
+          <!-- Static pipes -->
+          <path class="pipe-bg" d="M90 60 L140 60 L140 120 L190 120 M90 140 L190 140 M90 220 L140 220 L140 160 L190 160 M290 140 L380 140 L380 170 L395 170 M380 140 L420 140"/>
+          <path class="pipe-border" d="M90 60 L140 60 L140 120 L190 120 M90 140 L190 140 M90 220 L140 220 L140 160 L190 160 M290 140 L380 140 L380 170 L395 170 M380 140 L420 140"/>
+          <path class="pipe-copper" d="M90 60 L140 60 L140 120 L190 120 M90 140 L190 140 M90 220 L140 220 L140 160 L190 160 M290 140 L380 140 L380 170 L395 170 M380 140 L420 140"/>
+
+          <!-- Combinator slot -->
+          <g class="slot-trigger" data-slot="combinator" transform="translate(190, 115)">
+            <rect class="pipe-slot-box" width="100" height="50" fill="rgba(0,0,0,0.85)" stroke="var(--brass-base)" stroke-width="2" rx="4" style="cursor:pointer;"/>
+            <text x="50" y="30" id="text-combinator" font-family="var(--font-hud)" font-size="11" fill="var(--brass-light)" text-anchor="middle">CHOOSE JUNCTION</text>
+          </g>
+
+          <!-- Steam Flows -->
+          <path id="flow-boiler1-slot" class="steam-flow" d="M90 60 L140 60 L140 120 L190 120"/>
+          <path id="flow-boiler2-slot" class="steam-flow" d="M90 140 L190 140"/>
+          <path id="flow-boiler3-slot" class="steam-flow" d="M90 220 L140 220 L140 160 L190 160"/>
+          <path id="flow-slot-engine" class="steam-flow" d="M290 140 L380 140 M380 140 L420 140 M380 140 L380 170 L395 170"/>
+        `,
+        codeTemplate: "Promise.[combinator]([\n  gen(0.9s),\n  gen(1.8s),\n  gen(1.4s)\n]).then(spinMatrix);"
+      },
+      {
+        id: 5,
+        name: "Steampunk Speed Run",
+        objective: "The steam pressure alignment window closes in exactly 1.5 seconds. Connect the line using the fastest possible producer (race combinator). The first to resolve must trigger the gear alignment.",
+        logFilename: "pressure_race.js",
+        boilerState: "race-evaluation",
+        delay: [1100, 2400], // Boiler 1 is 1.1s, Boiler 2 is 2.4s
+        slots: [
+          { id: "combinator", type: "combinator", label: "Combinator Manifold", options: ["all", "race", "any"], default: "none" }
+        ],
+        svgElements: `
+          <!-- Two Boilers -->
+          <rect class="boiler-base" x="20" y="60" width="75" height="70" fill="#2d2d2d" stroke="var(--brass-base)" stroke-width="2" rx="6"/>
+          <text x="57" y="100" class="svg-node-label">FAST GEN</text>
+          <text x="200" y="55" font-family="var(--font-hud)" font-size="9" fill="var(--brass-light)">1.1s delay</text>
+
+          <rect class="boiler-base" x="20" y="170" width="75" height="70" fill="#2d2d2d" stroke="var(--brass-base)" stroke-width="2" rx="6"/>
+          <text x="57" y="210" class="svg-node-label">SLOW GEN</text>
+          <text x="200" y="165" font-family="var(--font-hud)" font-size="9" fill="var(--brass-light)">2.4s delay</text>
+
+          <!-- Speed Gear -->
+          <circle cx="420" cy="150" r="28" fill="none" stroke="var(--brass-base)" stroke-width="3"/>
+          <path id="speed-gear" class="svg-gear" d="M420 122 L420 178 M392 150 L448 150 M400 130 L440 170 M400 170 L440 130" stroke="var(--brass-base)" stroke-width="3"/>
+          <text x="420" y="210" class="svg-node-label">SPEED CORE</text>
+
+          <!-- Static pipes -->
+          <path class="pipe-bg" d="M95 95 L145 95 L145 130 L180 130 M95 205 L145 205 L145 170 L180 170 M280 150 L392 150"/>
+          <path class="pipe-border" d="M95 95 L145 95 L145 130 L180 130 M95 205 L145 205 L145 170 L180 170 M280 150 L392 150"/>
+          <path class="pipe-copper" d="M95 95 L145 95 L145 130 L180 130 M95 205 L145 205 L145 170 L180 170 M280 150 L392 150"/>
+
+          <!-- Combinator slot -->
+          <g class="slot-trigger" data-slot="combinator" transform="translate(180, 125)">
+            <rect class="pipe-slot-box" width="100" height="50" fill="rgba(0,0,0,0.85)" stroke="var(--brass-base)" stroke-width="2" rx="4" style="cursor:pointer;"/>
+            <text x="50" y="30" id="text-combinator" font-family="var(--font-hud)" font-size="11" fill="var(--brass-light)" text-anchor="middle">CHOOSE JUNCTION</text>
+          </g>
+
+          <!-- Flows -->
+          <path id="flow-boiler1-slot" class="steam-flow" d="M95 95 L145 95 L145 130 L180 130"/>
+          <path id="flow-boiler2-slot" class="steam-flow" d="M95 205 L145 205 L145 170 L180 170"/>
+          <path id="flow-slot-gear" class="steam-flow" d="M280 150 L392 150"/>
+        `,
+        codeTemplate: "Promise.[combinator]([\n  fastGen(1.1s),\n  slowGen(2.4s)\n]).then(alignSpeedCore);"
+      },
+      {
+        id: 6,
+        name: "The Redundant Laboratory",
+        objective: "Power the lab core using three backup generators. Gen 1 fails instantly (0.4s) and Gen 3 fails quickly (0.9s). Choose the combinator (any) that delivers power as long as AT LEAST ONE generator resolves successfully.",
+        logFilename: "redundant_core.js",
+        boilerState: "any-evaluation",
+        delay: [400, 1700, 900], // Gen 1 (rejects 0.4s), Gen 2 (resolves 1.7s), Gen 3 (rejects 0.9s)
+        slots: [
+          { id: "combinator", type: "combinator", label: "Combinator Manifold", options: ["all", "race", "any"], default: "none" }
+        ],
+        svgElements: `
+          <!-- Three Generators -->
+          <rect class="boiler-base" x="20" y="35" width="70" height="55" fill="#2d2d2d" stroke="var(--brass-base)" stroke-width="2" rx="6"/>
+          <text x="55" y="65" class="svg-node-label">GEN 1 (FAIL)</text>
+          <text x="250" y="20" font-family="var(--font-hud)" font-size="9" fill="var(--neon-red)">0.4s fail</text>
+
+          <rect class="boiler-base" x="20" y="110" width="70" height="55" fill="#2d2d2d" stroke="var(--brass-base)" stroke-width="2" rx="6"/>
+          <text x="55" y="140" class="svg-node-label">GEN 2 (OK)</text>
+          <text x="250" y="98" font-family="var(--font-hud)" font-size="9" fill="var(--neon-green)">1.7s ok</text>
+
+          <rect class="boiler-base" x="20" y="185" width="70" height="55" fill="#2d2d2d" stroke="var(--brass-base)" stroke-width="2" rx="6"/>
+          <text x="55" y="215" class="svg-node-label">GEN 3 (FAIL)</text>
+          <text x="250" y="175" font-family="var(--font-hud)" font-size="9" fill="var(--neon-red)">0.9s fail</text>
+
+          <!-- Lab Core -->
+          <circle cx="420" cy="140" r="30" fill="none" stroke="var(--brass-base)" stroke-width="3"/>
+          <path id="lab-core-gear" class="svg-gear" d="M420 110 L420 170 M390 140 L450 140" stroke="var(--brass-base)" stroke-width="4"/>
+          <circle id="core-glow-indicator" class="release-valve-glow" cx="420" cy="140" r="35" stroke="var(--neon-blue)"/>
+          <text x="420" y="200" class="svg-node-label">LAB CORE</text>
+
+          <!-- Static pipes -->
+          <path class="pipe-bg" d="M90 60 L140 60 L140 120 L190 120 M90 137 L190 137 M90 212 L140 212 L140 155 L190 155 M290 137 L390 137"/>
+          <path class="pipe-border" d="M90 60 L140 60 L140 120 L190 120 M90 137 L190 137 M90 212 L140 212 L140 155 L190 155 M290 137 L390 137"/>
+          <path class="pipe-copper" d="M90 60 L140 60 L140 120 L190 120 M90 137 L190 137 M90 212 L140 212 L140 155 L190 155 M290 137 L390 137"/>
+
+          <!-- Combinator slot -->
+          <g class="slot-trigger" data-slot="combinator" transform="translate(190, 112)">
+            <rect class="pipe-slot-box" width="100" height="50" fill="rgba(0,0,0,0.85)" stroke="var(--brass-base)" stroke-width="2" rx="4" style="cursor:pointer;"/>
+            <text x="50" y="30" id="text-combinator" font-family="var(--font-hud)" font-size="11" fill="var(--brass-light)" text-anchor="middle">CHOOSE JUNCTION</text>
+          </g>
+
+          <!-- Flows -->
+          <path id="flow-boiler1-slot" class="steam-flow" d="M90 60 L140 60 L140 120 L190 120"/>
+          <path id="flow-boiler2-slot" class="steam-flow" d="M90 137 L190 137"/>
+          <path id="flow-boiler3-slot" class="steam-flow" d="M90 212 L140 212 L140 155 L190 155"/>
+          <path id="flow-slot-engine" class="steam-flow" d="M290 137 L390 137"/>
+        `,
+        codeTemplate: "Promise.[combinator]([\n  gen1(fail 0.4s),\n  gen2(ok 1.7s),\n  gen3(fail 0.9s)\n]).then(powerCore);"
+      }
+    ];
+
+    // Game Core
+    const game = {
+      levelIndex: 0,
+      activeLevel: null,
+      boilerPressure: 0,
+      selectedSlotId: null,
+      slotSelections: {},
+      isFiring: false,
+      completedLevels: new Set(),
+
+      init() {
+        this.loadProgress();
+        
+        // Load initial sound configuration
+        const soundEnabled = localStorage.getItem('steampunk_sound_enabled');
+        if (soundEnabled === 'false') {
+          sound.enabled = false;
+          document.getElementById('sound-toggle-btn').classList.add('muted');
+          document.getElementById('sound-icon').innerText = 'volume_off';
+        }
+
+        this.loadLevel(this.levelIndex);
+      },
+
+      start() {
+        document.getElementById('landing-screen').classList.remove('active');
+      },
+
+      loadLevel(idx) {
+        sound.stopAlarm();
+        document.body.classList.remove('boiler-warning-active');
+        document.getElementById('outcome-modal').classList.remove('active');
+        
+        this.levelIndex = idx;
+        this.activeLevel = levels[idx];
+        this.selectedSlotId = null;
+        this.isFiring = false;
+        
+        // Reset selections
+        this.slotSelections = {};
+        this.activeLevel.slots.forEach(slot => {
+          this.slotSelections[slot.id] = slot.default;
+        });
+
+        // Update Level Navigators
+        document.getElementById('prev-level-btn').disabled = (idx === 0);
+        document.getElementById('next-level-btn').disabled = (idx === levels.length - 1);
+        document.getElementById('level-title-label').innerText = `BOILER ${this.activeLevel.id} / ${levels.length}`;
+        document.getElementById('mission-objective-text').innerText = this.activeLevel.objective;
+        document.getElementById('log-filename').innerText = this.activeLevel.logFilename;
+
+        // Render SVG Schematic contents
+        document.getElementById('pipe-schematic-svg').innerHTML = this.activeLevel.svgElements;
+
+        // Render fitters options dashboard
+        this.renderFittersList();
+
+        // Bind interactive SVG click events
+        this.bindSvgTriggers();
+
+        // Stop existing steam animations
+        this.resetFlowLines();
+
+        this.updateCodeLog();
+      },
+
+      renderFittersList() {
+        const zone = document.getElementById('junction-fitters-zone');
+        zone.innerHTML = '';
+
+        this.activeLevel.slots.forEach(slot => {
+          const row = document.createElement('div');
+          row.className = 'fitter-slot-row';
+          row.id = `fitter-row-${slot.id}`;
+          row.onclick = () => this.selectSlot(slot.id);
+
+          const meta = document.createElement('div');
+          meta.className = 'slot-meta';
+          const title = document.createElement('span');
+          title.className = 'slot-title';
+          title.innerText = slot.label;
+          meta.appendChild(title);
+
+          const currentVal = document.createElement('span');
+          currentVal.className = 'slot-current-val';
+          currentVal.id = `label-val-${slot.id}`;
+          
+          const currentSelection = this.slotSelections[slot.id];
+          currentVal.innerText = currentSelection === 'none' ? '-- FITTINGS EMPTY --' : `.${currentSelection}()`;
+          if (slot.type === 'combinator') {
+            currentVal.innerText = currentSelection === 'none' ? '-- JUNCTION DETACHED --' : `Promise.${currentSelection}()`;
+          }
+          meta.appendChild(currentVal);
+          row.appendChild(meta);
+
+          // Render options buttons
+          const btnGroup = document.createElement('div');
+          btnGroup.className = 'options-btn-group';
+          
+          slot.options.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.className = `option-btn ${currentSelection === opt ? 'active' : ''}`;
+            btn.innerText = opt;
+            btn.onclick = (e) => {
+              e.stopPropagation();
+              this.fitValve(slot.id, opt);
+            };
+            btnGroup.appendChild(btn);
+          });
+          row.appendChild(btnGroup);
+          zone.appendChild(row);
+        });
+      },
+
+      bindSvgTriggers() {
+        document.querySelectorAll('.slot-trigger').forEach(el => {
+          const slotId = el.dataset.slot;
+          el.onclick = () => {
+            sound.playClick();
+            this.selectSlot(slotId);
+          };
+        });
+      },
+
+      selectSlot(slotId) {
+        this.selectedSlotId = slotId;
+
+        // Toggle visual rows highlight
+        document.querySelectorAll('.fitter-slot-row').forEach(row => {
+          if (row.id === `fitter-row-${slotId}`) {
+            row.classList.add('active-selection');
+          } else {
+            row.classList.remove('active-selection');
+          }
+        });
+
+        // Toggle visual SVG slot circle highlight
+        document.querySelectorAll('.slot-trigger').forEach(el => {
+          const box = el.querySelector('.pipe-slot-box');
+          if (el.dataset.slot === slotId) {
+            box.style.stroke = 'var(--neon-blue)';
+            box.style.fill = 'rgba(0, 176, 255, 0.08)';
+          } else {
+            box.style.stroke = 'var(--brass-base)';
+            box.style.fill = 'rgba(0, 0, 0, 0.85)';
+          }
+        });
+      },
+
+      fitValve(slotId, valve) {
+        sound.playClick();
+        this.slotSelections[slotId] = valve;
+
+        // Update value text on dashboard
+        const currentVal = document.getElementById(`label-val-${slotId}`);
+        const slot = this.activeLevel.slots.find(s => s.id === slotId);
+        
+        if (slot.type === 'combinator') {
+          currentVal.innerText = `Promise.${valve}()`;
+        } else {
+          currentVal.innerText = `.${valve}()`;
+        }
+
+        // Sync buttons classes
+        const row = document.getElementById(`fitter-row-${slotId}`);
+        row.querySelectorAll('.option-btn').forEach(btn => {
+          if (btn.innerText === valve) {
+            btn.classList.add('active');
+          } else {
+            btn.classList.remove('active');
+          }
+        });
+
+        // Sync SVG label text
+        const svgText = document.getElementById(`text-${slotId}`);
+        if (svgText) {
+          svgText.innerText = slot.type === 'combinator' ? `Promise.${valve}` : `.${valve}`;
+        }
+
+        this.updateCodeLog();
+      },
+
+      updateCodeLog() {
+        let code = this.activeLevel.codeTemplate;
+        
+        this.activeLevel.slots.forEach(slot => {
+          const sel = this.slotSelections[slot.id];
+          const replaceText = sel === 'none' ? `[${slot.id.toUpperCase()}]` : (slot.type === 'combinator' ? sel : `.${sel}`);
+          code = code.replace(`[${slot.id}]`, replaceText);
+        });
+
+        document.getElementById('log-code-view').innerText = code;
+      },
+
+      resetFlowLines() {
+        document.querySelectorAll('.steam-flow').forEach(el => {
+          el.classList.remove('active', 'reject');
+        });
+        document.querySelectorAll('.svg-gear').forEach(el => {
+          el.classList.remove('spinning');
+        });
+        const valveIndicator = document.getElementById('valve-glow-indicator');
+        if (valveIndicator) valveIndicator.classList.remove('active');
+        const coreIndicator = document.getElementById('core-glow-indicator');
+        if (coreIndicator) coreIndicator.classList.remove('active');
+        
+        document.body.classList.remove('boiler-warning-active');
+        sound.stopAlarm();
+      },
+
+      fireBoilers() {
+        if (this.isFiring) return;
+        
+        // Ensure all slots are configured
+        let allConfigured = true;
+        this.activeLevel.slots.forEach(slot => {
+          if (this.slotSelections[slot.id] === 'none') {
+            allConfigured = false;
+          }
+        });
+
+        if (!allConfigured) {
+          sound.playFail();
+          alert("Boiler flow path incomplete! Please configure all pipe valves.");
+          return;
+        }
+
+        this.isFiring = true;
+        this.resetFlowLines();
+        document.getElementById('fire-boiler-btn').disabled = true;
+
+        // Set boiler active glow on svg
+        const boilers = document.querySelectorAll('.boiler-base');
+        boilers.forEach(b => b.classList.add('boiler-active'));
+
+        // Play initial steam start sound
+        sound.playSteamHiss(0.6);
+
+        // Run async pipeline simulations
+        const state = this.activeLevel.boilerState;
+        
+        if (state === 'resolve') {
+          this.simulateLevel1();
+        } else if (state === 'reject') {
+          this.simulateLevel2();
+        } else if (state === 'random') {
+          this.simulateLevel3();
+        } else if (state === 'triple') {
+          this.simulateLevel4();
+        } else if (state === 'race-evaluation') {
+          this.simulateLevel5();
+        } else if (state === 'any-evaluation') {
+          this.simulateLevel6();
+        }
+      },
+
+      // LEVEL 1: turbine flow (.then)
+      simulateLevel1() {
+        const delay = this.activeLevel.delay;
+        const selection = this.slotSelections['slot1'];
+
+        // Steam travels to slot
+        setTimeout(() => {
+          document.getElementById('flow-boiler-slot').classList.add('active');
+          sound.playSteamHiss(0.3);
+
+          setTimeout(() => {
+            if (selection === 'then') {
+              // Steam travels forward to turbine
+              document.getElementById('flow-slot-turbine').classList.add('active');
+              sound.playSteamHiss(0.5);
+
+              setTimeout(() => {
+                document.getElementById('turbine-gear').classList.add('spinning');
+                this.triggerWin();
+              }, 400);
+
+            } else {
+              // Mistake: catch does not fire on resolution. Steam vents out of chimney or leaks!
+              document.getElementById('flow-vent').classList.add('active');
+              sound.playSteamHiss(1.0);
+              this.triggerLeak(250, 60, "leak-cloud-1"); // vent location
+              this.triggerLoss("TURBINE FAILED - UNUSED STEAM VENTED OUT OF SAFETY STACKS!");
+            }
+          }, 400);
+
+        }, delay);
+      },
+
+      // LEVEL 2: reject valve (.catch)
+      simulateLevel2() {
+        const delay = this.activeLevel.delay;
+        const selection = this.slotSelections['slot1'];
+
+        setTimeout(() => {
+          // Rejection steam flows (represented in red/amber)
+          document.getElementById('flow-boiler-slot').classList.add('reject');
+          sound.playSteamHiss(0.3);
+
+          setTimeout(() => {
+            if (selection === 'catch') {
+              // Safely caught by relief valve
+              document.getElementById('flow-slot-turbine').classList.add('active');
+              sound.playSteamHiss(0.5);
+
+              setTimeout(() => {
+                document.getElementById('valve-glow-indicator').classList.add('active');
+                this.triggerWin();
+              }, 400);
+
+            } else {
+              // Mistake: then does not fire on reject, resulting in unhandled rejection leakage at junction
+              this.triggerLeak(210, 135, "leak-cloud-1"); // junction box location
+              this.triggerLoss("BOILER PRESSURE OVERLOAD - UNHANDLED REJECTION BLOWOUT AT JUNCTION BOX!");
+            }
+          }, 400);
+
+        }, delay);
+      },
+
+      // LEVEL 3: shutdown flush (.finally)
+      simulateLevel3() {
+        const delay = this.activeLevel.delay;
+        const selection1 = this.slotSelections['slot1'];
+        const selection2 = this.slotSelections['slot2'];
+
+        // Decide resolve or reject randomly
+        const isResolve = Math.random() > 0.5;
+        
+        setTimeout(() => {
+          document.getElementById('flow-boiler-slot1').classList.add(isResolve ? 'active' : 'reject');
+          sound.playSteamHiss(0.3);
+
+          setTimeout(() => {
+            let passSlot1 = false;
+            if (isResolve && selection1 === 'then') passSlot1 = true;
+            if (!isResolve && selection1 === 'catch') passSlot1 = true;
+
+            if (passSlot1) {
+              document.getElementById('flow-slot1-slot2').classList.add('active');
+              sound.playSteamHiss(0.4);
+
+              setTimeout(() => {
+                // Finally flows regardless
+                if (selection2 === 'finally') {
+                  document.getElementById('flow-slot2-drain').classList.add('active');
+                  sound.playSteamHiss(0.5);
+
+                  setTimeout(() => {
+                    // Turn handle
+                    document.getElementById('drain-handle').style.transform = 'rotate(90deg)';
+                    document.getElementById('drain-handle').style.transition = 'transform 0.5s';
+                    this.triggerWin();
+                  }, 400);
+                } else {
+                  // Finally not set -> steam blocks and leaks at slot 2
+                  this.triggerLeak(280, 135, "leak-cloud-2");
+                  this.triggerLoss("VALVE BLOCKED - BOILER FAILED TO SHUT DOWN FUEL VENTS!");
+                }
+              }, 400);
+
+            } else {
+              // Leaks at slot 1
+              this.triggerLeak(150, 135, "leak-cloud-1");
+              this.triggerLoss("PIPELINE LEAK - UNHANDLED VALVE CONFLICT AT LINK 1!");
+            }
+          }, 400);
+
+        }, delay);
+      },
+
+      // LEVEL 4: triple manifold (Promise.all)
+      simulateLevel4() {
+        const delays = this.activeLevel.delay;
+        const combinator = this.slotSelections['combinator'];
+
+        // Fire generators in sequence
+        setTimeout(() => {
+          document.getElementById('flow-boiler1-slot').classList.add('active');
+          sound.playSteamHiss(0.2);
+        }, delays[0]);
+
+        setTimeout(() => {
+          document.getElementById('flow-boiler3-slot').classList.add('active');
+          sound.playSteamHiss(0.2);
+        }, delays[2]);
+
+        setTimeout(() => {
+          document.getElementById('flow-boiler2-slot').classList.add('active');
+          sound.playSteamHiss(0.2);
+
+          // All three are now active at junction
+          setTimeout(() => {
+            if (combinator === 'all') {
+              // Promise.all releases steam when ALL are ready
+              document.getElementById('flow-slot-engine').classList.add('active');
+              sound.playSteamHiss(0.6);
+
+              setTimeout(() => {
+                document.getElementById('engine-gear-1').classList.add('spinning');
+                document.getElementById('engine-gear-2').classList.add('spinning');
+                this.triggerWin();
+              }, 500);
+
+            } else if (combinator === 'race') {
+              // Promise.race fires immediately when the first is ready (Gen 1 at 0.9s)
+              // This is a failure because slow generator lines are not ready, gear strips!
+              this.triggerLeak(190, 115, "leak-cloud-1");
+              this.triggerLoss("GEAR SHATTERED - STEAM LEAPED PREMATURELY BEFORE OTHER LINES SECURED!");
+            } else {
+              // any fails as well
+              this.triggerLeak(190, 115, "leak-cloud-1");
+              this.triggerLoss("MANIFOLD BLOWOUT - INVALID PRESSURE MIXTURE AT JUNCTION CORE!");
+            }
+          }, 300);
+
+        }, delays[1]);
+      },
+
+      // LEVEL 5: pressure race (Promise.race)
+      simulateLevel5() {
+        const delays = this.activeLevel.delay;
+        const combinator = this.slotSelections['combinator'];
+
+        // Fast Gen fires first
+        setTimeout(() => {
+          document.getElementById('flow-boiler1-slot').classList.add('active');
+          sound.playSteamHiss(0.2);
+
+          setTimeout(() => {
+            if (combinator === 'race') {
+              // race resolves on the first generator (1.1s < 1.5s limit)
+              document.getElementById('flow-slot-gear').classList.add('active');
+              sound.playSteamHiss(0.5);
+
+              setTimeout(() => {
+                document.getElementById('speed-gear').classList.add('spinning');
+                this.triggerWin();
+              }, 400);
+
+            } else if (combinator === 'all') {
+              // all waits for Gen 2 (2.4s), which violates the 1.5s alignment window constraint
+              setTimeout(() => {
+                document.getElementById('flow-boiler2-slot').classList.add('active');
+                sound.playSteamHiss(0.2);
+                
+                this.triggerLeak(180, 125, "leak-cloud-1");
+                this.triggerLoss("ALIGNMENT TIMEOUT - DELAY EXCEEDED CODES. SPEED CORE SEAL LOCKED DOWN!");
+              }, 1300);
+            } else {
+              // any also resolves on the first Gen (1.1s)
+              // Wait, Promise.any resolves when the first SUCCESS resolves, which Gen 1 does.
+              // So Promise.any also works here since Gen 1 resolves successfully!
+              // But for the time trials, they are both successful, so let's allow Promise.any as a win or race.
+              // Actually, standard Promise.any behaves identical to race if all resolve.
+              // Let's verify: Yes! Promise.any also delivers steam in 1.1s, so it also passes.
+              document.getElementById('flow-slot-gear').classList.add('active');
+              sound.playSteamHiss(0.5);
+
+              setTimeout(() => {
+                document.getElementById('speed-gear').classList.add('spinning');
+                this.triggerWin();
+              }, 400);
+            }
+          }, 200);
+
+        }, delays[0]);
+      },
+
+      // LEVEL 6: redundant backup (Promise.any)
+      simulateLevel6() {
+        const delays = this.activeLevel.delay;
+        const combinator = this.slotSelections['combinator'];
+
+        // Gen 1 fails at 0.4s
+        setTimeout(() => {
+          document.getElementById('flow-boiler1-slot').classList.add('reject');
+          sound.playSteamHiss(0.2);
+          
+          if (combinator === 'race') {
+            // race resolves/rejects immediately on Gen 1 rejection -> fail!
+            setTimeout(() => {
+              this.triggerLeak(190, 112, "leak-cloud-1");
+              this.triggerLoss("CORE BLOWOUT - SYSTEM TRIPPED ON INITIAL GENERATOR FAILURE!");
+            }, 100);
+            return;
+          }
+        }, delays[0]);
+
+        // Gen 3 fails at 0.9s
+        setTimeout(() => {
+          if (this.isFiring === false) return; // already failed
+          document.getElementById('flow-boiler3-slot').classList.add('reject');
+          sound.playSteamHiss(0.2);
+        }, delays[2]);
+
+        // Gen 2 resolves at 1.7s
+        setTimeout(() => {
+          if (this.isFiring === false) return;
+          document.getElementById('flow-boiler2-slot').classList.add('active');
+          sound.playSteamHiss(0.2);
+
+          setTimeout(() => {
+            if (combinator === 'any') {
+              // any ignores rejections and resolves with Gen 2
+              document.getElementById('flow-slot-engine').classList.add('active');
+              sound.playSteamHiss(0.5);
+
+              setTimeout(() => {
+                document.getElementById('lab-core-gear').classList.add('spinning');
+                document.getElementById('core-glow-indicator').classList.add('active');
+                this.triggerWin();
+              }, 400);
+
+            } else {
+              // all fails because Gen 1 & 3 rejected
+              this.triggerLeak(190, 112, "leak-cloud-2");
+              this.triggerLoss("POWER SYSTEM RESET - UNABLE TO SYNC ON COMBINED GENERATORS!");
+            }
+          }, 300);
+
+        }, delays[1]);
+      },
+
+      triggerLeak(x, y, elementId) {
+        const cloud = document.getElementById(elementId);
+        cloud.style.left = `${x}px`;
+        cloud.style.top = `${y}px`;
+        cloud.classList.add('leaking');
+        
+        sound.playSteamHiss(1.5);
+      },
+
+      triggerWin() {
+        this.isFiring = false;
+        document.getElementById('fire-boiler-btn').disabled = false;
+        document.querySelectorAll('.boiler-base').forEach(b => b.classList.remove('boiler-active'));
+
+        // Save progress
+        this.completedLevels.add(this.levelIndex);
+        this.saveProgress();
+
+        setTimeout(() => {
+          sound.playSuccess();
+          this.showOutcomeModal(true);
+        }, 800);
+      },
+
+      triggerLoss(message) {
+        this.isFiring = false;
+        document.getElementById('fire-boiler-btn').disabled = false;
+        document.querySelectorAll('.boiler-base').forEach(b => b.classList.remove('boiler-active'));
+
+        // Increase pressure
+        this.boilerPressure = Math.min(100, this.boilerPressure + 25);
+        this.updatePressureDisplay();
+
+        setTimeout(() => {
+          if (this.boilerPressure >= 100) {
+            // Meltdown
+            sound.playFail();
+            this.showOutcomeModal(false, "BOILER CRITICAL MELTDOWN! Pipeline pressure valves suffered structural collapse. Complete dashboard reset required!");
+          } else {
+            sound.playFail();
+            this.showOutcomeModal(false, message);
+          }
+        }, 1200);
+      },
+
+      updatePressureDisplay() {
+        const fill = document.getElementById('boiler-pressure-fill');
+        const text = document.getElementById('boiler-pressure-val');
+
+        fill.style.width = `${this.boilerPressure}%`;
+        text.innerText = `${this.boilerPressure}%`;
+
+        if (this.boilerPressure >= 75) {
+          // Warning sirens active
+          sound.startAlarm();
+          document.body.classList.add('boiler-warning-active');
+        }
+      },
+
+      showOutcomeModal(success, message = "") {
+        const modal = document.getElementById('outcome-modal');
+        const title = document.getElementById('outcome-title');
+        const desc = document.getElementById('outcome-desc');
+        const icon = document.getElementById('outcome-icon');
+        const actionBtn = document.getElementById('modal-action-btn');
+
+        modal.classList.add('active');
+
+        if (success) {
+          icon.className = 'material-symbols-outlined modal-icon success';
+          icon.innerText = 'workspace_premium';
+          title.innerText = "PIPELINE ALIGNED";
+          desc.innerText = `Zero steam leaks detected! Connection routing code successfully verified. Power core active.`;
+          
+          if (this.levelIndex === levels.length - 1) {
+            actionBtn.innerText = "Finish Mission Check";
+          } else {
+            actionBtn.innerText = "Next Level";
+          }
+        } else {
+          icon.className = 'material-symbols-outlined modal-icon fail';
+          icon.innerText = 'warning';
+          title.innerText = this.boilerPressure >= 100 ? "CORE MELTDOWN" : "VALVE FAILURE";
+          desc.innerText = message;
+          actionBtn.innerText = "Reset Valves";
+        }
+      },
+
+      handleModalAction() {
+        const actionBtn = document.getElementById('modal-action-btn');
+        if (actionBtn.innerText === "Reset Valves") {
+          if (this.boilerPressure >= 100) {
+            // Fully reset progress pressure
+            this.boilerPressure = 0;
+            this.updatePressureDisplay();
+          }
+          this.loadLevel(this.levelIndex);
+        } else if (actionBtn.innerText === "Next Level") {
+          this.loadLevel(this.levelIndex + 1);
+        } else {
+          // Finished final level
+          this.cleanup();
+          window.location.href = '../index.html';
+        }
+      },
+
+      changeLevel(dir) {
+        sound.playClick();
+        const newIdx = this.levelIndex + dir;
+        if (newIdx >= 0 && newIdx < levels.length) {
+          this.loadLevel(newIdx);
+        }
+      },
+
+      resetLevel() {
+        sound.playClick();
+        this.loadLevel(this.levelIndex);
+      },
+
+      toggleSound() {
+        sound.enabled = !sound.enabled;
+        const btn = document.getElementById('sound-toggle-btn');
+        const icon = document.getElementById('sound-icon');
+        
+        if (sound.enabled) {
+          btn.classList.remove('muted');
+          icon.innerText = 'volume_up';
+          localStorage.setItem('steampunk_sound_enabled', 'true');
+        } else {
+          btn.classList.add('muted');
+          icon.innerText = 'volume_off';
+          localStorage.setItem('steampunk_sound_enabled', 'false');
+          sound.stopAlarm();
+        }
+      },
+
+      cleanup() {
+        sound.stopAlarm();
+      },
+
+      loadProgress() {
+        try {
+          const val = localStorage.getItem('promise_pipeline_progress');
+          if (val) {
+            const data = JSON.parse(val);
+            if (data.completed && Array.isArray(data.completed)) {
+              data.completed.forEach(idx => this.completedLevels.add(Number(idx)));
+            }
+            if (data.currentIndex !== undefined) {
+              this.levelIndex = Math.min(levels.length - 1, Math.max(0, Number(data.currentIndex)));
+            }
+          }
+        } catch (e) {
+          console.error("Failed to load progress:", e);
+        }
+      },
+
+      saveProgress() {
+        try {
+          const data = {
+            completed: Array.from(this.completedLevels),
+            currentIndex: this.levelIndex
+          };
+          localStorage.setItem('promise_pipeline_progress', JSON.stringify(data));
+        } catch (e) {
+          console.error("Failed to save progress:", e);
+        }
+      }
+    };
+
+    window.addEventListener('DOMContentLoaded', () => {
+      game.init();
+    });
+  </script>
+</body>
+</html>
