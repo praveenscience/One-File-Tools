@@ -1,0 +1,1802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Event Bubbling Pinball | JS Fundamentals Quest</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@48,400,0,0" rel="stylesheet">
+  <style>
+    :root {
+      --arcade-dark: #0a0813;
+      --arcade-panel: #141126;
+      --arcade-border: #ff007f;
+      --arcade-glow: rgba(255, 0, 127, 0.35);
+      
+      --neon-cyan: #00e5ff;
+      --neon-cyan-dim: rgba(0, 229, 255, 0.15);
+      --neon-pink: #ff007f;
+      --neon-pink-dim: rgba(255, 0, 127, 0.15);
+      --neon-green: #00e676;
+      --neon-green-dim: rgba(0, 230, 118, 0.15);
+      --neon-yellow: #ffea00;
+      --neon-yellow-dim: rgba(255, 234, 0, 0.15);
+      
+      --font-arcade: 'Press Start 2P', monospace;
+      --font-hud: 'Share Tech Mono', monospace;
+      --font-label: 'Rajdhani', sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      background-color: var(--arcade-dark);
+      color: #eae5f5;
+      font-family: var(--font-label);
+      font-size: 16px;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    }
+
+    /* Grid layout background */
+    .arcade-bg {
+      position: absolute;
+      inset: 0;
+      background-color: #05040a;
+      background-image: 
+        radial-gradient(var(--arcade-glow) 1.5px, transparent 0),
+        linear-gradient(rgba(255, 0, 127, 0.02) 1px, transparent 0),
+        linear-gradient(90deg, rgba(255, 0, 127, 0.02) 1px, transparent 0);
+      background-size: 30px 30px, 60px 60px, 60px 60px;
+      z-index: 1;
+    }
+
+    .crt-grid {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(rgba(18, 10, 36, 0) 50%, rgba(0, 0, 0, 0.3) 50%);
+      background-size: 100% 4px;
+      z-index: 99;
+      pointer-events: none;
+      opacity: 0.6;
+    }
+
+    /* Victorian/Neon Frame wrapper */
+    .game-wrapper {
+      position: relative;
+      z-index: 10;
+      width: 96vw;
+      height: 94vh;
+      max-width: 1350px;
+      max-height: 850px;
+      background: var(--arcade-panel);
+      border: 3px solid var(--arcade-border);
+      box-shadow: 0 0 35px var(--arcade-glow), inset 0 0 30px rgba(0, 0, 0, 0.9);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Landing Screen Overlay */
+    .screen {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      z-index: 50;
+      background: #08060f;
+      transition: opacity 0.5s ease;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .screen.active {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .landing-content {
+      margin: auto;
+      text-align: center;
+      max-width: 650px;
+      padding: 3rem;
+      border: 2px solid var(--arcade-border);
+      background: rgba(20, 17, 38, 0.95);
+      border-radius: 8px;
+      box-shadow: 0 0 35px var(--arcade-glow);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .landing-logo {
+      width: 130px;
+      height: 130px;
+      margin-bottom: 2rem;
+      animation: bounceLogo 3s ease-in-out infinite alternate;
+    }
+
+    @keyframes bounceLogo {
+      0% { transform: translateY(0); filter: drop-shadow(0 0 5px var(--neon-pink)); }
+      100% { transform: translateY(-15px); filter: drop-shadow(0 0 20px var(--neon-pink)); }
+    }
+
+    .game-title {
+      font-family: var(--font-arcade);
+      font-size: clamp(1.4rem, 3.5vw, 2.2rem);
+      font-weight: 700;
+      color: #ffffff;
+      text-shadow: 0 0 10px var(--neon-pink), 0 0 25px var(--neon-pink);
+      margin-bottom: 0.8rem;
+      line-height: 1.3;
+    }
+
+    .game-subtitle {
+      font-family: var(--font-hud);
+      font-size: 1.1rem;
+      color: var(--neon-cyan);
+      letter-spacing: 4px;
+      margin-bottom: 2.5rem;
+      text-transform: uppercase;
+    }
+
+    .game-desc {
+      font-size: 1rem;
+      color: #b0a8c2;
+      line-height: 1.6;
+      margin-bottom: 3rem;
+    }
+
+    .arcade-btn {
+      background: rgba(255, 0, 127, 0.1);
+      border: 2px solid var(--neon-pink);
+      color: #ffffff;
+      font-family: var(--font-arcade);
+      padding: 1rem 2.5rem;
+      font-size: 0.85rem;
+      cursor: pointer;
+      border-radius: 4px;
+      text-shadow: 0 0 5px #ffffff;
+      transition: all 0.2s;
+      box-shadow: 0 0 15px rgba(255, 0, 127, 0.2);
+    }
+
+    .arcade-btn:hover {
+      background: var(--neon-pink-dim);
+      box-shadow: 0 0 25px var(--neon-pink);
+      transform: scale(1.03);
+    }
+
+    .arcade-btn:active {
+      transform: scale(0.98);
+    }
+
+    /* Header Panel */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      background: #0a0813;
+      border-bottom: 2px solid var(--arcade-border);
+      z-index: 10;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .hub-btn {
+      color: #eae5f5;
+      text-decoration: none;
+      font-family: var(--font-hud);
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.4rem 0.8rem;
+      border: 1px solid rgba(255, 0, 127, 0.25);
+      border-radius: 4px;
+      background: rgba(255, 0, 127, 0.1);
+      transition: all 0.2s;
+    }
+
+    .hub-btn:hover {
+      color: var(--neon-cyan);
+      border-color: var(--neon-cyan);
+      background: var(--neon-cyan-dim);
+    }
+
+    .header-title-container h1 {
+      font-family: var(--font-arcade);
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #ffffff;
+      text-shadow: 0 0 8px var(--arcade-border);
+    }
+
+    .header-title-container span {
+      font-family: var(--font-hud);
+      font-size: 0.75rem;
+      color: var(--neon-cyan);
+      letter-spacing: 1px;
+    }
+
+    .level-navigator {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 0.3rem 0.8rem;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 0, 127, 0.2);
+    }
+
+    .nav-arrow {
+      background: none;
+      border: none;
+      color: var(--neon-pink);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.1rem;
+      transition: color 0.2s;
+    }
+
+    .nav-arrow:hover:not(:disabled) {
+      color: #ffffff;
+      text-shadow: 0 0 5px var(--neon-pink);
+    }
+
+    .nav-arrow:disabled {
+      color: #382c47;
+      cursor: not-allowed;
+    }
+
+    .level-label {
+      font-family: var(--font-hud);
+      font-weight: 700;
+      font-size: 1rem;
+      color: #ffffff;
+      min-width: 140px;
+      text-align: center;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .score-badge {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+
+    .score-label {
+      font-family: var(--font-arcade);
+      font-size: 0.5rem;
+      color: #8c82a6;
+    }
+
+    .score-value {
+      font-family: var(--font-arcade);
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--neon-yellow);
+      text-shadow: 0 0 8px var(--neon-yellow-dim);
+      margin-top: 4px;
+    }
+
+    .sound-toggle {
+      background: none;
+      border: 1px solid rgba(255, 0, 127, 0.25);
+      color: var(--neon-pink);
+      border-radius: 4px;
+      padding: 0.4rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .sound-toggle:hover {
+      color: #ffffff;
+      background: var(--neon-pink-dim);
+    }
+
+    .sound-toggle.muted {
+      color: var(--neon-red);
+      border-color: rgba(255, 23, 68, 0.25);
+      background: rgba(255, 23, 68, 0.05);
+    }
+
+    /* Main splits layout */
+    main {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      position: relative;
+    }
+
+    .pinball-panel {
+      flex: 55;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      border-right: 2px solid var(--arcade-border);
+      min-width: 0;
+    }
+
+    .control-panel {
+      flex: 45;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      background: rgba(10, 8, 20, 0.6);
+      overflow-y: auto;
+      min-width: 0;
+    }
+
+    /* Board Visualizer */
+    .board-frame {
+      flex: 1;
+      background: #07050d;
+      border: 2px solid rgba(255, 0, 127, 0.2);
+      border-radius: 8px;
+      position: relative;
+      box-shadow: inset 0 0 25px rgba(0, 0, 0, 0.95);
+      overflow: hidden;
+    }
+
+    .board-svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Nested DOM element boundaries */
+    .dom-boundary {
+      fill: none;
+      stroke-width: 2px;
+      transition: stroke 0.3s, fill 0.3s;
+    }
+
+    .dom-boundary.inactive {
+      stroke: rgba(255, 255, 255, 0.05);
+    }
+
+    .dom-boundary.listening {
+      stroke: var(--neon-cyan);
+      stroke-dasharray: 4 4;
+    }
+
+    .dom-boundary.strike-active {
+      animation: pulseBorder 0.4s infinite alternate;
+    }
+
+    @keyframes pulseBorder {
+      0% { stroke-width: 2px; }
+      100% { stroke-width: 4px; filter: drop-shadow(0 0 5px var(--neon-cyan)); }
+    }
+
+    .dom-text {
+      font-family: var(--font-hud);
+      font-size: 11px;
+      fill: #5a4b73;
+      text-anchor: middle;
+      font-weight: bold;
+    }
+
+    .dom-text.listening {
+      fill: var(--neon-cyan);
+    }
+
+    /* Plunger spring drawer visual */
+    .plunger-lane {
+      position: absolute;
+      right: 15px; bottom: 0; top: 0;
+      width: 30px;
+      border-left: 2px solid rgba(255, 0, 127, 0.2);
+      background: rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      align-items: center;
+      padding-bottom: 20px;
+    }
+
+    .plunger-spring {
+      width: 10px;
+      height: 100px;
+      border: 2px solid var(--brass-base);
+      background: repeating-linear-gradient(0deg, #ff007f, #ff007f 4px, transparent 4px, transparent 12px);
+      transition: height 0.3s;
+    }
+
+    .plunger-handle {
+      width: 24px;
+      height: 24px;
+      background: var(--neon-pink);
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 0 10px var(--arcade-glow);
+    }
+
+    /* Event Ball Neon */
+    .event-ball {
+      fill: #ffffff;
+      stroke: var(--neon-pink);
+      stroke-width: 2px;
+      filter: drop-shadow(0 0 6px var(--neon-pink));
+      transition: fill 0.3s, stroke 0.3s;
+    }
+
+    .event-ball.capture-phase {
+      stroke: var(--neon-cyan);
+      filter: drop-shadow(0 0 6px var(--neon-cyan));
+    }
+
+    /* Control Panel Cards */
+    .arcade-card {
+      background: #19162a;
+      border: 1px solid var(--arcade-border);
+      border-radius: 4px;
+      padding: 1.2rem;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+    }
+
+    .card-title {
+      font-family: var(--font-arcade);
+      font-size: 0.7rem;
+      color: var(--neon-pink);
+      margin-bottom: 0.8rem;
+      border-bottom: 1px solid rgba(255, 0, 127, 0.2);
+      padding-bottom: 0.4rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      letter-spacing: 1px;
+    }
+
+    .card-title .status-badge {
+      font-family: var(--font-hud);
+      font-size: 0.75rem;
+      background: var(--neon-cyan-dim);
+      color: var(--neon-cyan);
+      padding: 0.1rem 0.5rem;
+      border-radius: 4px;
+      border: 1px solid rgba(0, 229, 255, 0.2);
+    }
+
+    .objective-desc {
+      font-size: 0.95rem;
+      line-height: 1.5;
+      color: #c9bedb;
+    }
+
+    /* Event Listeners modifier installer grid */
+    .listeners-editor-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+    }
+
+    .node-listener-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.8rem;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 4px;
+      transition: all 0.3s;
+    }
+
+    .node-listener-row.editing {
+      border-color: var(--neon-cyan);
+    }
+
+    .node-label-col {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .node-name-label {
+      font-family: var(--font-hud);
+      font-size: 1.1rem;
+      color: #ffffff;
+    }
+
+    .node-status-label {
+      font-size: 0.7rem;
+      color: #8c82a6;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .node-status-label.active {
+      color: var(--neon-cyan);
+    }
+
+    .listener-toggles-col {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .switch-btn {
+      background: #0a0813;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #c9bedb;
+      font-family: var(--font-hud);
+      font-size: 0.75rem;
+      padding: 0.4rem 0.8rem;
+      border-radius: 3px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .switch-btn:hover:not(:disabled) {
+      border-color: var(--neon-cyan);
+      color: var(--neon-cyan);
+    }
+
+    .switch-btn.active {
+      background: var(--neon-cyan-dim);
+      border-color: var(--neon-cyan);
+      color: #ffffff;
+      box-shadow: inset 0 0 5px rgba(0, 229, 255, 0.3);
+    }
+
+    .switch-btn:disabled {
+      opacity: 0.15;
+      cursor: not-allowed;
+    }
+
+    /* Event Telemetry Log Terminal */
+    .terminal-log-card {
+      background: #05040a;
+      border: 1px solid rgba(255, 0, 127, 0.2);
+      border-radius: 4px;
+      padding: 0.8rem;
+      font-family: var(--font-hud);
+      font-size: 0.85rem;
+      height: 180px;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      overflow-y: auto;
+      box-shadow: inset 0 0 15px rgba(0,0,0,0.9);
+    }
+
+    .terminal-log-card::-webkit-scrollbar {
+      width: 4px;
+    }
+    .terminal-log-card::-webkit-scrollbar-thumb {
+      background: rgba(255, 0, 127, 0.3);
+      border-radius: 2px;
+    }
+
+    .terminal-line {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .log-time {
+      color: var(--neon-pink);
+      min-width: 45px;
+    }
+
+    .log-body {
+      color: #e2e8f0;
+    }
+
+    .log-body.capture {
+      color: var(--neon-cyan);
+    }
+
+    .log-body.bubble {
+      color: var(--neon-pink);
+    }
+
+    .log-body.strike {
+      color: var(--neon-yellow);
+      font-weight: bold;
+    }
+
+    .log-body.error {
+      color: var(--neon-red);
+    }
+
+    /* Win/Loss outcome overlay */
+    .modal-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(5, 4, 10, 0.85);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 60;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s ease;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .modal-box {
+      background: var(--arcade-panel);
+      border: 3px solid var(--arcade-border);
+      border-radius: 6px;
+      width: 90%;
+      max-width: 480px;
+      padding: 2.5rem 2rem;
+      text-align: center;
+      box-shadow: 0 0 30px var(--arcade-glow);
+      transform: translateY(-20px);
+      transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .modal-overlay.active .modal-box {
+      transform: translateY(0);
+    }
+
+    .modal-icon {
+      font-size: 60px;
+      margin-bottom: 1.5rem;
+      animation: pulseIcon 2s infinite alternate;
+    }
+
+    .modal-icon.success {
+      color: var(--neon-green);
+    }
+
+    .modal-icon.fail {
+      color: var(--neon-red);
+    }
+
+    @keyframes pulseIcon {
+      0% { transform: scale(1); filter: drop-shadow(0 0 5px currentColor); }
+      100% { transform: scale(1.1); filter: drop-shadow(0 0 15px currentColor); }
+    }
+
+    .modal-title {
+      font-family: var(--font-arcade);
+      font-size: 1.3rem;
+      color: #ffffff;
+      text-shadow: 0 0 10px var(--neon-pink);
+      margin-bottom: 1rem;
+    }
+
+    .modal-text {
+      font-size: 1rem;
+      color: #c9bedb;
+      line-height: 1.5;
+      margin-bottom: 2rem;
+    }
+
+    .modal-btns {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+    }
+
+    /* Red Flash alarm alert border */
+    .alarm-active {
+      animation: alarmPulse 1s infinite alternate;
+    }
+
+    @keyframes alarmPulse {
+      0% { box-shadow: inset 0 0 30px rgba(0,0,0,0.8); }
+      100% { box-shadow: inset 0 0 80px rgba(255, 23, 68, 0.4); border-color: var(--neon-red); }
+    }
+
+    /* Particle spark effects */
+    .spark {
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      background: var(--neon-pink);
+      pointer-events: none;
+      border-radius: 50%;
+    }
+
+    /* Redirect Drain Hole portal visual */
+    .portal-drain {
+      animation: pulsePortal 1s infinite alternate;
+    }
+
+    @keyframes pulsePortal {
+      0% { transform: scale(1); opacity: 0.5; }
+      100% { transform: scale(1.15); opacity: 0.9; }
+    }
+
+    /* Responsive scaling styles */
+    @media (max-width: 968px) {
+      body {
+        overflow-y: auto;
+        height: auto;
+      }
+      .game-wrapper {
+        height: auto;
+        max-height: none;
+        width: 98vw;
+        margin: 1vh auto;
+      }
+      main {
+        flex-direction: column;
+      }
+      .pinball-panel {
+        border-right: none;
+        border-bottom: 2px solid var(--arcade-border);
+        height: 520px;
+        flex: none;
+      }
+      .control-panel {
+        height: auto;
+        flex: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="arcade-bg"></div>
+  <div class="crt-grid"></div>
+
+  <!-- Landing Screen -->
+  <div id="landing-screen" class="screen active">
+    <div class="landing-content">
+      <svg class="landing-logo" viewBox="0 0 100 100" fill="none">
+        <circle cx="50" cy="50" r="45" stroke="var(--neon-pink)" stroke-width="3" stroke-dasharray="10 10"/>
+        <circle cx="50" cy="50" r="32" stroke="var(--neon-pink)" stroke-width="2"/>
+        <circle cx="50" cy="50" r="20" stroke="var(--neon-cyan)" stroke-width="2" stroke-dasharray="4 4"/>
+        <circle cx="50" cy="50" r="6" fill="#ffffff" filter="drop-shadow(0 0 5px var(--neon-pink))"/>
+        <!-- Flipper indicators -->
+        <path d="M25 75 L42 70 M75 75 L58 70" stroke="var(--neon-cyan)" stroke-width="4" stroke-linecap="round"/>
+      </svg>
+      <div class="game-title">EVENT BUBBLING PINBALL</div>
+      <div class="game-subtitle">Propagation Protocol</div>
+      <div class="game-desc">
+        Take command of the DOM arcade cabinet! Dispatche event balls down target branches, configure event listeners, toggle capture vs bubbling phases, and use stopPropagation and preventDefault to hit high-score target nodes.
+      </div>
+      <button class="arcade-btn" onclick="game.start()">Insert Coin</button>
+    </div>
+  </div>
+
+  <!-- Main Game Panel -->
+  <div class="game-wrapper">
+    <header>
+      <div class="header-left">
+        <a href="../index.html" class="hub-btn" onclick="game.cleanup()">
+          <span class="material-symbols-outlined">arrow_back</span>
+          <span>Hub</span>
+        </a>
+        <div class="header-title-container">
+          <h1>EVENT BUBBLING PINBALL</h1>
+          <span>DOM Target Range</span>
+        </div>
+      </div>
+
+      <div class="level-navigator">
+        <button class="nav-arrow" id="prev-level-btn" onclick="game.changeLevel(-1)">
+          <span class="material-symbols-outlined">chevron_left</span>
+        </button>
+        <span class="level-label" id="level-title-label">TABLE 1 / 5</span>
+        <button class="nav-arrow" id="next-level-btn" onclick="game.changeLevel(1)">
+          <span class="material-symbols-outlined">chevron_right</span>
+        </button>
+      </div>
+
+      <div class="header-right">
+        <div class="score-badge">
+          <span class="score-label">CURRENT SCORE</span>
+          <span class="score-value" id="game-score">000000</span>
+        </div>
+        <button class="sound-toggle" id="sound-toggle-btn" onclick="game.toggleSound()">
+          <span class="material-symbols-outlined" id="sound-icon">volume_up</span>
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <!-- Left Panel: Pinball Board Visualizer -->
+      <div class="pinball-panel">
+        
+        <div class="board-frame" id="board-frame-container">
+          <!-- The visual nested DOM layout rendered inside SVG -->
+          <svg class="board-svg" id="pinball-board-svg">
+            <g id="board-elements-group"></g>
+            <g id="board-triggers-group"></g>
+            
+            <!-- Animated event ball path node overlays -->
+            <circle id="visual-event-ball" class="event-ball" cx="-50" cy="-50" r="8" style="display: none;"/>
+          </svg>
+
+          <!-- Plunger slide HUD -->
+          <div class="plunger-lane" id="launcher-lane-zone">
+            <div class="plunger-spring" id="plunger-spring-element"></div>
+            <div class="plunger-handle" id="plunger-lever" onclick="game.launchBall()"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right Panel: Dashboard Controls -->
+      <div class="control-panel">
+        
+        <!-- Objective Briefs -->
+        <div class="arcade-card">
+          <div class="card-title">
+            <span>Mission Objective</span>
+            <span class="status-badge" style="color: var(--neon-yellow); border-color: rgba(255, 234, 0, 0.2)">TABLE OBJECTIVE</span>
+          </div>
+          <p class="objective-desc" id="level-objective-text">
+            Guide the event ball bubbling from the target BUTTON to the parent DIV to score 200 pts. Prevent the event from bubbling up to BODY where a reset listener resides.
+          </p>
+        </div>
+
+        <!-- Connection fitters installers list -->
+        <div class="arcade-card">
+          <div class="card-title">
+            <span>Element Event Listeners</span>
+            <span class="status-badge">addEventListener()</span>
+          </div>
+          
+          <div class="listeners-editor-grid" id="listeners-editor-list">
+            <!-- Populated dynamically per level elements -->
+          </div>
+        </div>
+
+        <!-- Telemetry history log terminal -->
+        <div class="arcade-card" style="padding: 0.8rem; display: flex; flex-direction: column; gap: 0.4rem;">
+          <div class="card-title" style="margin-bottom: 0.4rem; padding-bottom: 0.2rem;">
+            <span>Event Telemetry Log</span>
+            <span style="font-family: var(--font-hud); font-size: 0.75rem;">stdout</span>
+          </div>
+          <div class="terminal-log-card" id="terminal-event-log">
+            <!-- Event logs -->
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal overlay win/loss dialog -->
+  <div class="modal-overlay" id="outcome-modal">
+    <div class="modal-box">
+      <span class="material-symbols-outlined modal-icon success" id="outcome-icon" style="color: var(--neon-green)">shield_lock</span>
+      <div class="modal-title" id="outcome-title">TABLE CLEARED</div>
+      <p class="modal-text" id="outcome-desc">
+        Maximum score unlocked! Event path successfully secured.
+      </p>
+      <div class="modal-btns">
+        <button class="arcade-btn" id="modal-action-btn" onclick="game.handleModalAction()">Next Table</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Audio Synth and Game state control -->
+  <script>
+    // Audio Sound Engine
+    const sound = {
+      ctx: null,
+      enabled: true,
+      init() {
+        if (!this.ctx) {
+          this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+      },
+      playClick() {
+        if (!this.enabled) return;
+        this.init();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(300, this.ctx.currentTime);
+        gain.gain.setValueAtTime(0.06, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.05);
+        
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.05);
+      },
+      playLauncher() {
+        if (!this.enabled) return;
+        this.init();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(600, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(150, this.ctx.currentTime + 0.3);
+        
+        gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.3);
+        
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.3);
+      },
+      playHit(depth = 1) {
+        if (!this.enabled) return;
+        this.init();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        
+        // Depth scale pitch: inner elements (higher depth) = higher pitch
+        const pitch = 300 + depth * 150;
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(pitch, this.ctx.currentTime);
+        
+        gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.12);
+        
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.12);
+      },
+      playSuccess() {
+        if (!this.enabled) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50]; // C4, E4, G4, C5, E5, G5, C6
+        notes.forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          
+          osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+          gain.gain.setValueAtTime(0.06, now + idx * 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.002, now + idx * 0.08 + 0.25);
+          
+          osc.start(now + idx * 0.08);
+          osc.stop(now + idx * 0.08 + 0.25);
+        });
+      },
+      playFail() {
+        if (!this.enabled) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(180, now);
+        osc.frequency.linearRampToValueAtTime(80, now + 0.45);
+        
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+        
+        osc.start();
+        osc.stop(now + 0.45);
+      },
+      alarmOsc: null,
+      alarmGain: null,
+      alarmInterval: null,
+      startAlarm() {
+        if (!this.enabled) return;
+        this.init();
+        if (this.alarmOsc) return;
+        
+        this.alarmOsc = this.ctx.createOscillator();
+        this.alarmGain = this.ctx.createGain();
+        this.alarmOsc.connect(this.alarmGain);
+        this.alarmGain.connect(this.ctx.destination);
+        
+        this.alarmOsc.type = 'triangle';
+        this.alarmOsc.frequency.setValueAtTime(600, this.ctx.currentTime);
+        
+        this.alarmGain.gain.setValueAtTime(0.02, this.ctx.currentTime);
+        this.alarmOsc.start();
+        
+        let toggle = false;
+        this.alarmInterval = setInterval(() => {
+          if (!this.alarmOsc || this.ctx.state === 'suspended') return;
+          const target = toggle ? 600 : 400;
+          this.alarmOsc.frequency.exponentialRampToValueAtTime(target, this.ctx.currentTime + 0.15);
+          toggle = !toggle;
+        }, 200);
+      },
+      stopAlarm() {
+        if (this.alarmInterval) {
+          clearInterval(this.alarmInterval);
+          this.alarmInterval = null;
+        }
+        if (this.alarmOsc) {
+          try {
+            this.alarmOsc.stop();
+          } catch(e) {}
+          this.alarmOsc = null;
+        }
+        this.alarmGain = null;
+      }
+    };
+
+    // Levels definitions
+    const levels = [
+      {
+        id: 1,
+        title: "The Bubbling Block",
+        objective: "Launch the click event ball from the BUTTON. Score points as it bubbles up to the DIV, but prevent it from reaching the BODY element (which triggers a security reset drain). Install a stopPropagation() valve listener.",
+        nodes: [
+          { name: "Window", depth: 0, r: 160, enabled: false },
+          { name: "Body", depth: 1, r: 130, enabled: false },
+          { name: "Div", depth: 2, r: 100, enabled: true, options: ["active", "stopPropagation"], active: false, stopPropagation: false },
+          { name: "Button", depth: 3, r: 60, enabled: false }
+        ],
+        targetNode: "Button",
+        winScore: 200,
+        securityNode: "Body", // if event hits Body, alarm fails
+        redirectNode: null
+      },
+      {
+        id: 2,
+        title: "Capture Phase Disarm",
+        objective: "The click target is locked by a security trap. Bypassing requires striking a disarm listener on the parent UL element during the downward Capture Phase. Enable the capture option on the UL listener.",
+        nodes: [
+          { name: "Window", depth: 0, r: 160, enabled: false },
+          { name: "Body", depth: 1, r: 130, enabled: false },
+          { name: "Ul", depth: 2, r: 100, enabled: true, options: ["active", "capture"], active: false, capture: false },
+          { name: "Button", depth: 3, r: 60, enabled: false }
+        ],
+        targetNode: "Button",
+        winScore: 200,
+        securityNode: null,
+        redirectNode: null,
+        requiresCapture: "Ul" // must hit UL in capture phase (index of path <= target index)
+      },
+      {
+        id: 3,
+        title: "Bypassing Anchor Redirects",
+        objective: "The click target is an anchor link. Striking it dispatches a default page navigation redirect (ball drains into portal fail). Intercept this by configuring preventDefault() on the anchor listener.",
+        nodes: [
+          { name: "Body", depth: 1, r: 130, enabled: false },
+          { name: "Div", depth: 2, r: 100, enabled: false },
+          { name: "a", depth: 3, r: 70, enabled: true, options: ["active", "preventDefault"], active: false, preventDefault: false }
+        ],
+        targetNode: "a",
+        winScore: 100,
+        securityNode: null,
+        redirectNode: "a" // requires preventDefault to avoid redirect drain
+      },
+      {
+        id: 4,
+        title: "Double Handler Guard",
+        objective: "The DIV element has two click event listeners: Listener A (scores points) and Listener B (activates intrusion alarm). Configure Listener A with stopImmediatePropagation() to execute it while shielding the alarm.",
+        nodes: [
+          { name: "Body", depth: 1, r: 130, enabled: false },
+          { name: "Div", depth: 2, r: 100, enabled: true, options: ["active", "stopImmediatePropagation"], active: false, stopImmediatePropagation: false },
+          { name: "Button", depth: 3, r: 60, enabled: false }
+        ],
+        targetNode: "Button",
+        winScore: 200,
+        securityNode: null,
+        redirectNode: null,
+        requiresStopImmediate: "Div" // blocks second handler
+      },
+      {
+        id: 5,
+        title: "Master Event Wizard",
+        objective: "Final board clearance! Guide the ball through a complex nested path. You must intercept during Capture on the DIV, prevent redirect on the anchor, and stop the event from bubbling up to the Window lockout.",
+        nodes: [
+          { name: "Window", depth: 0, r: 160, enabled: false },
+          { name: "Div", depth: 1, r: 130, enabled: true, options: ["active", "capture"], active: false, capture: false },
+          { name: "Ul", depth: 2, r: 100, enabled: true, options: ["active", "stopPropagation"], active: false, stopPropagation: false },
+          { name: "a", depth: 3, r: 60, enabled: true, options: ["active", "preventDefault"], active: false, preventDefault: false }
+        ],
+        targetNode: "a",
+        winScore: 300,
+        securityNode: "Window",
+        redirectNode: "a"
+      }
+    ];
+
+    // Game Controller
+    const game = {
+      levelIndex: 0,
+      activeLevel: null,
+      score: 0,
+      isLaunching: false,
+      completedLevels: new Set(),
+      
+      // Node listeners config
+      nodeConfigs: {},
+
+      init() {
+        this.loadProgress();
+        
+        // Load initial sound configuration
+        const soundEnabled = localStorage.getItem('pinball_sound_enabled');
+        if (soundEnabled === 'false') {
+          sound.enabled = false;
+          document.getElementById('sound-toggle-btn').classList.add('muted');
+          document.getElementById('sound-icon').innerText = 'volume_off';
+        }
+
+        this.loadLevel(this.levelIndex);
+      },
+
+      start() {
+        document.getElementById('landing-screen').classList.remove('active');
+      },
+
+      loadLevel(idx) {
+        sound.stopAlarm();
+        document.body.classList.remove('alarm-active');
+        document.getElementById('outcome-modal').classList.remove('active');
+        
+        this.levelIndex = idx;
+        this.activeLevel = levels[idx];
+        this.score = 0;
+        this.updateScoreDisplay();
+        this.isLaunching = false;
+        
+        // Reset plunger spring
+        document.getElementById('plunger-spring-element').style.height = '100px';
+
+        // Load configs
+        this.nodeConfigs = {};
+        this.activeLevel.nodes.forEach(node => {
+          if (node.enabled) {
+            this.nodeConfigs[node.name] = {
+              active: false,
+              capture: false,
+              stopPropagation: false,
+              stopImmediatePropagation: false,
+              preventDefault: false
+            };
+          }
+        });
+
+        // Setup Level labels
+        document.getElementById('prev-level-btn').disabled = (idx === 0);
+        document.getElementById('next-level-btn').disabled = (idx === levels.length - 1);
+        document.getElementById('level-title-label').innerText = `TABLE ${this.activeLevel.id} / ${levels.length}`;
+        document.getElementById('level-objective-text').innerText = this.activeLevel.objective;
+
+        // Clear log
+        document.getElementById('terminal-event-log').innerHTML = '';
+        this.logMessage("SYSTEM", "Pinball table loaded. Event sensors initialized.");
+
+        // Render SVG elements
+        this.renderBoard();
+
+        // Render configuration dashboard
+        this.renderControls();
+      },
+
+      renderBoard() {
+        const svg = document.getElementById('pinball-board-svg');
+        const elementsGroup = document.getElementById('board-elements-group');
+        const triggersGroup = document.getElementById('board-triggers-group');
+        
+        elementsGroup.innerHTML = '';
+        triggersGroup.innerHTML = '';
+
+        // We will render nested concentric circles representing DOM hierarchies
+        const centerX = 200;
+        const centerY = 160;
+
+        this.activeLevel.nodes.forEach(node => {
+          const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+          circle.setAttribute("cx", centerX);
+          circle.setAttribute("cy", centerY);
+          circle.setAttribute("r", node.r);
+          circle.setAttribute("class", "dom-boundary inactive");
+          circle.id = `boundary-${node.name}`;
+          
+          if (node.enabled) {
+            circle.classList.add('listening');
+          }
+
+          // Colors based on elements
+          if (node.name === this.activeLevel.securityNode) {
+            circle.style.stroke = 'var(--neon-red)';
+            circle.style.strokeWidth = '1px';
+          }
+
+          elementsGroup.appendChild(circle);
+
+          // Add node label on the top curve
+          const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+          text.setAttribute("x", centerX);
+          text.setAttribute("y", centerY - node.r + 14);
+          text.setAttribute("class", "dom-text");
+          text.id = `label-${node.name}`;
+          text.textContent = `<${node.name.toLowerCase()}>`;
+          
+          if (node.enabled) {
+            text.classList.add('listening');
+          }
+          
+          elementsGroup.appendChild(text);
+        });
+
+        // Add visual Redirect portal at bottom of boundary if exists
+        if (this.activeLevel.redirectNode) {
+          const portal = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+          portal.setAttribute("cx", centerX);
+          portal.setAttribute("cy", centerY + 110);
+          portal.setAttribute("r", 15);
+          portal.setAttribute("fill", "url(#portalG)");
+          portal.setAttribute("class", "portal-drain");
+          portal.id = "redirect-portal-element";
+
+          // Gradient definition
+          let defs = svg.querySelector('defs');
+          if (!defs) {
+            defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+            svg.appendChild(defs);
+          }
+          defs.innerHTML = `
+            <radialGradient id="portalG">
+              <stop offset="0%" stop-color="#ff007f" />
+              <stop offset="70%" stop-color="#7a003a" />
+              <stop offset="100%" stop-color="transparent" />
+            </radialGradient>
+          `;
+          
+          elementsGroup.appendChild(portal);
+
+          // Add label portal
+          const pText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+          pText.setAttribute("x", centerX);
+          pText.setAttribute("y", centerY + 138);
+          pText.setAttribute("font-family", "var(--font-hud)");
+          pText.setAttribute("font-size", "10");
+          pText.setAttribute("fill", "var(--neon-pink)");
+          pText.setAttribute("text-anchor", "middle");
+          pText.textContent = "REDIRECT DRAIN";
+          elementsGroup.appendChild(pText);
+        }
+      },
+
+      renderControls() {
+        const list = document.getElementById('listeners-editor-list');
+        list.innerHTML = '';
+
+        this.activeLevel.nodes.forEach(node => {
+          if (!node.enabled) return;
+
+          const config = this.nodeConfigs[node.name];
+
+          const row = document.createElement('div');
+          row.className = 'node-listener-row';
+          row.id = `control-row-${node.name}`;
+
+          const meta = document.createElement('div');
+          meta.className = 'node-label-col';
+          
+          const name = document.createElement('span');
+          name.className = 'node-name-label';
+          name.innerText = `<${node.name.toLowerCase()}>`;
+          meta.appendChild(name);
+
+          const status = document.createElement('span');
+          status.className = 'node-status-label';
+          status.id = `status-label-${node.name}`;
+          status.innerText = config.active ? 'Listener Enabled' : 'Listener Offline';
+          if (config.active) status.classList.add('active');
+          meta.appendChild(status);
+          row.appendChild(meta);
+
+          const btnGroup = document.createElement('div');
+          btnGroup.className = 'listener-toggles-col';
+
+          // Toggle listener active
+          const activeBtn = document.createElement('button');
+          activeBtn.className = `switch-btn ${config.active ? 'active' : ''}`;
+          activeBtn.innerText = "addEventListener";
+          activeBtn.onclick = () => this.toggleNodeProperty(node.name, 'active', activeBtn);
+          btnGroup.appendChild(activeBtn);
+
+          // Toggles options based on properties
+          node.options.forEach(opt => {
+            if (opt === 'active') return;
+
+            const optBtn = document.createElement('button');
+            optBtn.className = `switch-btn ${config[opt] ? 'active' : ''}`;
+            optBtn.id = `opt-btn-${node.name}-${opt}`;
+            
+            // Map label text
+            let label = opt;
+            if (opt === 'stopPropagation') label = 'stopPropagation()';
+            if (opt === 'stopImmediatePropagation') label = 'stopImmediatePropagation()';
+            if (opt === 'preventDefault') label = 'preventDefault()';
+            if (opt === 'capture') label = 'useCapture';
+
+            optBtn.innerText = label;
+            optBtn.disabled = !config.active;
+            optBtn.onclick = () => this.toggleNodeProperty(node.name, opt, optBtn);
+            btnGroup.appendChild(optBtn);
+          });
+
+          row.appendChild(btnGroup);
+          list.appendChild(row);
+        });
+      },
+
+      toggleNodeProperty(nodeName, prop, btn) {
+        sound.playClick();
+        const config = this.nodeConfigs[nodeName];
+        
+        config[prop] = !config[prop];
+        
+        if (prop === 'active') {
+          // Enable/disable sub-options
+          const status = document.getElementById(`status-label-${nodeName}`);
+          status.innerText = config.active ? 'Listener Enabled' : 'Listener Offline';
+          if (config.active) {
+            status.classList.add('active');
+          } else {
+            status.classList.remove('active');
+          }
+
+          // Toggle sub button disable states
+          const node = this.activeLevel.nodes.find(n => n.name === nodeName);
+          node.options.forEach(opt => {
+            if (opt === 'active') return;
+            const subBtn = document.getElementById(`opt-btn-${nodeName}-${opt}`);
+            if (subBtn) {
+              subBtn.disabled = !config.active;
+              if (!config.active) {
+                subBtn.classList.remove('active');
+                config[opt] = false;
+              }
+            }
+          });
+        }
+
+        // Apply active css classes on button
+        if (config[prop]) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+
+        // Apply visual updates on board boundary
+        const boundary = document.getElementById(`boundary-${nodeName}`);
+        const label = document.getElementById(`label-${nodeName}`);
+        if (boundary && label) {
+          if (config.active) {
+            boundary.style.stroke = 'var(--neon-cyan)';
+            boundary.style.strokeWidth = '3px';
+            label.style.fill = 'var(--neon-cyan)';
+          } else {
+            boundary.style.stroke = 'rgba(255,255,255,0.05)';
+            boundary.style.strokeWidth = '2px';
+            label.style.fill = '#5a4b73';
+          }
+        }
+      },
+
+      logMessage(type, body) {
+        const log = document.getElementById('terminal-event-log');
+        const now = new Date();
+        const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+
+        const line = document.createElement('div');
+        line.className = 'terminal-line';
+
+        const time = document.createElement('span');
+        time.className = 'log-time';
+        time.innerText = `[${timeStr}]`;
+        line.appendChild(time);
+
+        const content = document.createElement('span');
+        content.className = 'log-body';
+        if (type === 'CAPTURE') content.classList.add('capture');
+        if (type === 'BUBBLE') content.classList.add('bubble');
+        if (type === 'STRIKE') content.classList.add('strike');
+        if (type === 'ERROR') content.classList.add('error');
+        content.innerText = body;
+        
+        line.appendChild(content);
+        log.appendChild(line);
+
+        log.scrollTop = log.scrollHeight;
+      },
+
+      launchBall() {
+        if (this.isLaunching) return;
+        this.isLaunching = true;
+        this.score = 0;
+        this.updateScoreDisplay();
+
+        // Mechanical spring pull launch visual
+        sound.playLauncher();
+        document.getElementById('plunger-spring-element').style.height = '40px';
+        
+        setTimeout(() => {
+          document.getElementById('plunger-spring-element').style.height = '100px';
+          this.runSimulation();
+        }, 300);
+      },
+
+      runSimulation() {
+        // Construct the propagation path based on level nodes hierarchy
+        // Path starts at Index 0 (outermost: e.g. Window) down to the target click element (e.g. Button),
+        // then bubbles back up from target to outer.
+        
+        const sortedNodes = [...this.activeLevel.nodes].sort((a, b) => a.depth - b.depth);
+        
+        const path = [];
+        // Capture Phase (downward)
+        sortedNodes.forEach(node => {
+          path.push({ name: node.name, phase: 'capture', depth: node.depth, r: node.r });
+        });
+        
+        // Target click (the deepest node)
+        const target = path[path.length - 1];
+
+        // Bubble Phase (upward)
+        for (let i = path.length - 2; i >= 0; i--) {
+          path.push({ name: path[i].name, phase: 'bubble', depth: path[i].depth, r: path[i].r });
+        }
+
+        // Initialize ball visual
+        const ball = document.getElementById('visual-event-ball');
+        ball.style.display = 'block';
+        ball.setAttribute("class", "event-ball");
+
+        // We animate the ball using SVG concentric circle paths
+        const centerX = 200;
+        const centerY = 160;
+
+        let pathIndex = 0;
+        let preventDefaultActive = false;
+
+        this.logMessage("LAUNCH", `Click event dispatched on <${target.name.toLowerCase()}>`);
+
+        const step = () => {
+          if (pathIndex >= path.length) {
+            // Ball completed cycle. Verify target outcomes diff
+            ball.style.display = 'none';
+            this.evaluateOutcomes(preventDefaultActive);
+            return;
+          }
+
+          const current = path[pathIndex];
+          
+          // Move ball along top of the concentric circles
+          const radius = current.r;
+          
+          // Set visual coordinates
+          ball.setAttribute("cx", centerX);
+          ball.setAttribute("cy", centerY - radius);
+
+          // Phase visual feedback
+          if (current.phase === 'capture') {
+            ball.classList.add('capture-phase');
+          } else {
+            ball.classList.remove('capture-phase');
+          }
+
+          // Check if boundary has active event listener
+          const config = this.nodeConfigs[current.name];
+          let blockPropagation = false;
+
+          // Target node click trigger
+          if (current.name === target.name && current.phase === 'capture') {
+            sound.playHit(current.depth + 1);
+            this.logMessage("STRIKE", `BALL HIT TARGET: <${current.name.toLowerCase()}>! Dispatched Event.`);
+            this.score += 100;
+            this.updateScoreDisplay();
+            
+            // Pulse Target border
+            const tBoundary = document.getElementById(`boundary-${current.name}`);
+            if (tBoundary) {
+              tBoundary.style.stroke = 'var(--neon-yellow)';
+              setTimeout(() => tBoundary.style.stroke = 'var(--neon-cyan)', 300);
+            }
+          }
+
+          if (config && config.active) {
+            // Checks phase match
+            // Event listener matches if:
+            // 1. It is configured as capture option AND current phase is capture, OR
+            // 2. It is configured as default (bubble is false) AND current phase is bubble
+            const phaseMatch = (config.capture && current.phase === 'capture') || (!config.capture && current.phase === 'bubble');
+            
+            if (phaseMatch) {
+              sound.playHit(current.depth);
+              this.logMessage(current.phase === 'capture' ? 'CAPTURE' : 'BUBBLE', `EventListener triggered on <${current.name.toLowerCase()}>`);
+              
+              // Flash bumper visual
+              const boundary = document.getElementById(`boundary-${current.name}`);
+              if (boundary) {
+                boundary.style.stroke = 'var(--neon-pink)';
+                setTimeout(() => {
+                  boundary.style.stroke = 'var(--neon-cyan)';
+                }, 250);
+              }
+
+              // Double handler validation
+              if (this.activeLevel.requiresStopImmediate === current.name) {
+                if (config.stopImmediatePropagation) {
+                  this.logMessage("STRIKE", `stopImmediatePropagation() executed! Listener B shielded.`);
+                  this.score += 100;
+                  this.updateScoreDisplay();
+                } else {
+                  this.logMessage("ERROR", `Listener B triggered! Security system compromise.`);
+                  // trigger error
+                  blockPropagation = true;
+                  this.idsAlarmFail();
+                  return;
+                }
+              } else {
+                // Award points
+                this.score += 100;
+                this.updateScoreDisplay();
+              }
+
+              if (config.stopPropagation || config.stopImmediatePropagation) {
+                this.logMessage("SYSTEM", `Event propagation halted on <${current.name.toLowerCase()}>`);
+                blockPropagation = true;
+              }
+
+              if (config.preventDefault) {
+                this.logMessage("SYSTEM", `preventDefault() executed. Default navigation cancelled.`);
+                preventDefaultActive = true;
+              }
+            }
+          }
+
+          // Level 2 Special disarm capture validation check
+          if (this.activeLevel.requiresCapture === current.name && current.phase === 'capture' && config && config.active && config.capture) {
+            this.logMessage("STRIKE", "UL Capture buffer hit! Trap disabled.");
+            this.score += 100;
+            this.updateScoreDisplay();
+          }
+
+          // Check security drain nodes
+          if (current.name === this.activeLevel.securityNode && current.phase === 'bubble') {
+            this.logMessage("ERROR", `Event bubbled to security node <${current.name.toLowerCase()}>! Lockout active.`);
+            this.idsAlarmFail();
+            return;
+          }
+
+          if (blockPropagation) {
+            // Ball dissolves
+            this.sparkExplosion(centerX, centerY - radius);
+            ball.style.display = 'none';
+            this.evaluateOutcomes(preventDefaultActive);
+            return;
+          }
+
+          pathIndex++;
+          setTimeout(step, 400); // 400ms speed traversal
+        };
+
+        // Run traversal loop
+        setTimeout(step, 400);
+      },
+
+      sparkExplosion(x, y) {
+        const frame = document.getElementById('board-frame-container');
+        for (let i = 0; i < 15; i++) {
+          const spark = document.createElement('div');
+          spark.className = 'spark';
+          spark.style.left = `${x}px`;
+          spark.style.top = `${y}px`;
+          
+          // Random directions
+          const angle = Math.random() * Math.PI * 2;
+          const dist = 20 + Math.random() * 40;
+          const tx = Math.cos(angle) * dist;
+          const ty = Math.sin(angle) * dist;
+          
+          spark.style.transition = 'transform 0.8s ease-out, opacity 0.8s';
+          frame.appendChild(spark);
+          
+          requestAnimationFrame(() => {
+            spark.style.transform = `translate(${tx}px, ${ty}px) scale(0.1)`;
+            spark.style.opacity = '0';
+          });
+          
+          setTimeout(() => spark.remove(), 800);
+        }
+      },
+
+      idsAlarmFail() {
+        this.isLaunching = false;
+        document.body.classList.add('alarm-active');
+        sound.startAlarm();
+        sound.playFail();
+
+        const ball = document.getElementById('visual-event-ball');
+        ball.style.display = 'none';
+
+        setTimeout(() => {
+          this.showOutcomeModal(false, "ALARM INTRUSION! Security bumpers triggered trace counter-measures. Flipper lockdown initiated.");
+        }, 800);
+      },
+
+      evaluateOutcomes(preventDefaultActive) {
+        this.isLaunching = false;
+        
+        // Level redirects checks
+        if (this.activeLevel.redirectNode) {
+          const portal = document.getElementById('redirect-portal-element');
+          if (!preventDefaultActive) {
+            // Ball drains into portal
+            sound.playFail();
+            this.logMessage("ERROR", "Default action executed. Redirecting browser to Cytex servers -> Lockout!");
+            if (portal) portal.style.fill = 'var(--neon-red)';
+            
+            setTimeout(() => {
+              this.showOutcomeModal(false, "REDIRECT FAILURE - Event bubbled anchor defaults, triggering server drain. Connection terminated.");
+            }, 600);
+            return;
+          } else {
+            // Safe
+            if (portal) portal.style.fill = 'var(--neon-green)';
+          }
+        }
+
+        // Verify required score target matched
+        if (this.score >= this.activeLevel.winScore) {
+          this.completedLevels.add(this.levelIndex);
+          this.saveProgress();
+          sound.playSuccess();
+          this.showOutcomeModal(true);
+        } else {
+          sound.playFail();
+          this.logMessage("ERROR", `Minimum score of ${this.activeLevel.winScore} not reached. Configuration incomplete.`);
+          this.showOutcomeModal(false, `Piping incomplete! You only scored ${this.score} out of the target ${this.activeLevel.winScore} points. Secure more event sensors.`);
+        }
+      },
+
+      updateScoreDisplay() {
+        document.getElementById('game-score').innerText = this.score.toString().padStart(6, '0');
+      },
+
+      showOutcomeModal(success, message = "") {
+        const modal = document.getElementById('outcome-modal');
+        const title = document.getElementById('outcome-title');
+        const desc = document.getElementById('outcome-desc');
+        const icon = document.getElementById('outcome-icon');
+        const actionBtn = document.getElementById('modal-action-btn');
+
+        modal.classList.add('active');
+
+        if (success) {
+          icon.className = 'material-symbols-outlined modal-icon success';
+          icon.innerText = 'shield_lock';
+          title.innerText = "TABLE SECURED";
+          desc.innerText = `Maximum propagation telemetry registered! Flipper controls bypassed successfully. Code validated.`;
+          
+          if (this.levelIndex === levels.length - 1) {
+            actionBtn.innerText = "Finish Mission Check";
+          } else {
+            actionBtn.innerText = "Next Table Grid";
+          }
+        } else {
+          icon.className = 'material-symbols-outlined modal-icon fail';
+          icon.innerText = 'warning';
+          title.innerText = "LOCKOUT ALARM";
+          desc.innerText = message;
+          actionBtn.innerText = "Reset Flippers";
+        }
+      },
+
+      handleModalAction() {
+        const actionBtn = document.getElementById('modal-action-btn');
+        document.getElementById('outcome-modal').classList.remove('active');
+
+        if (actionBtn.innerText === "Reset Flippers") {
+          this.loadLevel(this.levelIndex);
+        } else if (actionBtn.innerText === "Next Table Grid") {
+          this.loadLevel(this.levelIndex + 1);
+        } else {
+          this.cleanup();
+          window.location.href = '../index.html';
+        }
+      },
+
+      changeLevel(dir) {
+        sound.playClick();
+        const newIdx = this.levelIndex + dir;
+        if (newIdx >= 0 && newIdx < levels.length) {
+          this.loadLevel(newIdx);
+        }
+      },
+
+      resetLevel() {
+        sound.playClick();
+        this.loadLevel(this.levelIndex);
+      },
+
+      toggleSound() {
+        sound.enabled = !sound.enabled;
+        const btn = document.getElementById('sound-toggle-btn');
+        const icon = document.getElementById('sound-icon');
+        
+        if (sound.enabled) {
+          btn.classList.remove('muted');
+          icon.innerText = 'volume_up';
+          localStorage.setItem('pinball_sound_enabled', 'true');
+        } else {
+          btn.classList.add('muted');
+          icon.innerText = 'volume_off';
+          localStorage.setItem('pinball_sound_enabled', 'false');
+          sound.stopAlarm();
+        }
+      },
+
+      cleanup() {
+        sound.stopAlarm();
+      },
+
+      loadProgress() {
+        try {
+          const val = localStorage.getItem('event_bubbling_pinball_progress');
+          if (val) {
+            const data = JSON.parse(val);
+            if (data.completed && Array.isArray(data.completed)) {
+              data.completed.forEach(idx => this.completedLevels.add(Number(idx)));
+            }
+            if (data.currentIndex !== undefined) {
+              this.levelIndex = Math.min(levels.length - 1, Math.max(0, Number(data.currentIndex)));
+            }
+          }
+        } catch (e) {
+          console.error("Failed to load progress:", e);
+        }
+      },
+
+      saveProgress() {
+        try {
+          const data = {
+            completed: Array.from(this.completedLevels),
+            currentIndex: this.levelIndex
+          };
+          localStorage.setItem('event_bubbling_pinball_progress', JSON.stringify(data));
+        } catch (e) {
+          console.error("Failed to save progress:", e);
+        }
+      }
+    };
+
+    window.addEventListener('DOMContentLoaded', () => {
+      game.init();
+    });
+  </script>
+</body>
+</html>
