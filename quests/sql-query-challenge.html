@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+    <title>SQL Query Challenge — One File Tools</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Rubik+Mono+One&family=Titillium+Web:wght@400;700&display=swap");
+
+      /* ========================================
+         Reset & Base
+         ======================================== */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: "Titillium Web", sans-serif;
+        line-height: 1.6;
+        padding: 2rem;
+        max-width: 1200px;
+        margin: 0 auto;
+        background: #fffacd;
+        color: black;
+      }
+
+      h1,
+      h2,
+      h3,
+      h4,
+      h5,
+      h6 {
+        font-family: "Rubik Mono One", monospace;
+        margin-bottom: 0.5em;
+      }
+
+      header h1 {
+        font-size: 2.1rem;
+        text-shadow: 0 0 10px purple;
+      }
+
+      /* ========================================
+         Cityscape Animation
+         ======================================== */
+      #cityscape-bg {
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        overflow: hidden;
+        opacity: 0.15;
+      }
+      .cityscape-bar {
+        position: absolute;
+        background-color: var(--bar-color);
+        animation: riseAndFall linear infinite;
+      }
+      @keyframes riseAndFall {
+        0%, 100% { height: var(--start-height); }
+        50% { height: var(--end-height); }
+      }
+
+      /* ========================================
+         Custom Text Colors
+         ======================================== */
+      .challenge-description h2 {
+        color: purple;
+        font-size: 1.4em; /* Slightly smaller than default h2 */
+      }
+
+      #h3-expected-output {
+        color: blue;
+      }
+      .query-section h3 {
+        color: green;
+      }
+      #h3-your-output {
+        color: deeppink; /* darkpink */
+      }
+
+      /* ========================================
+         Modal & Confetti
+         ======================================== */
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        display: none; /* Hidden by default */
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+        backdrop-filter: blur(4px);
+      }
+
+      .modal-content {
+        background: #fef9c3; /* A lighter yellow from the theme */
+        padding: 2rem 3rem;
+        border-radius: 12px;
+        text-align: center;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        border: 1px solid #fde047;
+        position: relative;
+      }
+
+      #modal-output-container {
+        margin-bottom: 1.5rem;
+        max-height: 30vh;
+        overflow-y: auto;
+      }
+
+      .modal-content h2 {
+        color: purple; /* Keep consistent with level titles */
+        font-family: "Rubik Mono One", monospace;
+        margin-bottom: 1.5rem;
+      }
+
+      #modal-next-btn {
+        font-family: "Titillium Web", sans-serif;
+        font-weight: 700;
+        background-color: #fde047; /* A brighter yellow for primary action */
+        border-color: #facc15;
+      }
+      #modal-next-btn:hover {
+        background-color: #facc15;
+      }
+
+      #confetti-container {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 101;
+        overflow: hidden;
+      }
+
+      .confetti-piece {
+        position: absolute;
+        width: 10px;
+        height: 20px;
+        background: var(--confetti-color);
+        top: -20px;
+        opacity: 0.7;
+        animation: fall 4s linear forwards;
+      }
+
+      @keyframes fall { to { transform: translateY(105vh) rotate(720deg); opacity: 0; } }
+      /* ========================================
+         Quest Styles
+         ======================================== */
+      header {
+        text-align: center;
+        margin-bottom: 2rem;
+        border-bottom: 1px solid #e7e5e4;
+        padding-bottom: 1rem;
+      }
+
+      main {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+        align-items: start;
+      }
+
+      .challenge-description {
+        grid-column: span 2;
+        position: relative;
+      }
+
+      .query-section {
+        grid-column: span 2;
+      }
+
+      .table-container {
+        overflow-x: auto;
+      }
+
+      h2 {
+        margin-top: 1rem;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 1rem;
+        border: 1px solid #d6d3d1;
+      }
+
+      th,
+      td {
+        padding: 8px 12px;
+        border: 1px solid #d6d3d1;
+        text-align: left;
+      }
+
+      tr {
+        background-color: #ffffff;
+      }
+
+      th {
+        background-color: #f2f2f2;
+      }
+
+      tr:nth-child(even) {
+        background-color: #f9f9f9;
+      }
+
+      #expected-output-table tr {
+        background-color: #e0f2fe; /* light blue */
+      }
+
+      #expected-output-table tr:nth-child(even) {
+        background-color: #c9ebfd; /* slightly darker for striping */
+      }
+
+      textarea {
+        width: 100%;
+        height: 40px;
+        font-family: monospace;
+        font-size: 1rem;
+        padding: 0.5rem;
+        margin-top: 1rem;
+        border: 1px solid #d6d3d1;
+        border-radius: 4px;
+        background-color: #ffffff;
+        color: black;
+      }
+
+      button {
+        padding: 0.75rem 1.5rem;
+        font-size: 1rem;
+        cursor: pointer;
+        border: 1px solid #cccccc;
+        border-radius: 8px;
+        margin-top: 1rem;
+        background-color: #eeeeee;
+        color: black;
+        font-family: "Titillium Web", sans-serif;
+        font-weight: 700;
+      }
+      button:hover {
+        background-color: #dddddd;
+      }
+
+      #prev-level-btn {
+        position: absolute;
+        top: 1rem;
+        right: 0;
+        background-color: red;
+        color: white;
+        border-color: darkred;
+        padding: 0.5rem 1rem;
+        font-size: 0.9rem;
+        margin-top: 0;
+      }
+
+      #prev-level-btn:hover {
+        background-color: #c00;
+      }
+
+      #feedback-section {
+        grid-column: span 2;
+        padding: 1rem;
+        border-radius: 4px;
+        margin-top: 1rem;
+        font-weight: bold;
+        text-align: center;
+        display: none;
+      }
+      .feedback-correct {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+      .feedback-incorrect {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+
+      footer {
+        text-align: center;
+        margin-top: 3rem;
+        padding-top: 1rem;
+        border-top: 1px solid #e7e5e4;
+        font-size: 0.9rem;
+        color: #6b7280;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="confetti-container"></div>
+    <header>
+      <h1>📈 SQL Query Challenge 📉</h1>
+      <p><b>Write queries to match the expected output tables.</b></p>
+    </header>
+
+    <main>
+      <div class="challenge-description">
+        <button id="prev-level-btn" style="display: none;">&lt;- Previous Level</button>
+        <h2>🎯 Level 1: Select all users</h2>
+        <p>Write a SQL query to select all columns from the `users` table.</p>
+      </div>
+
+      <div class="table-container">
+        <h3>🔍 Input Table(s)</h3>
+        <table id="input-table">
+          <!-- JS will populate this -->
+        </table>
+      </div>
+
+      <div class="table-container">
+        <h3 id="h3-expected-output">Expected Output</h3>
+        <table id="expected-output-table">
+          <!-- JS will populate this -->
+        </table>
+      </div>
+
+      <div class="query-section">
+        <h3>🛠️ Your Query</h3>
+        <textarea id="sql-editor" placeholder=""></textarea>
+        <button id="run-query-btn">Run Query</button>
+      </div>
+
+      <div id="feedback-section">
+        <!-- JS will populate this -->
+      </div>
+    </main>
+
+    <div class="modal-overlay" id="correct-modal-overlay">
+      <div class="modal-content">
+        <h2>Correct! Well done.</h2>
+        <div class="table-container" id="modal-output-container">
+          <h3 id="h3-your-output">Your Output</h3>
+          <table id="modal-output-table">
+              <!-- JS will populate this -->
+          </table>
+        </div>
+        <button id="modal-next-btn" style="margin-top: 0;">Next Level →</button>
+      </div>
+    </div>
+
+    <footer>
+      <p>
+        Part of
+        <a href="https://github.com/praveenscience/One-File-Tools">One File Tools</a>
+      </p>
+    </footer>
+
+    <script>
+      const levels = [
+        {
+          id: 1,
+          name: "Select all users",
+          description: "Write a SQL query to select all columns from the `users` table.",
+          schema: "CREATE TABLE users (id INT, name VARCHAR, email VARCHAR);",
+          data: "INSERT INTO users VALUES (1, 'Alice', 'alice@example.com'), (2, 'Bob', 'bob@example.com'), (3, 'Charlie', 'charlie@example.com');",
+          solution: "SELECT * FROM users;",
+          inputTables: ["users"],
+        },
+        {
+          id: 2,
+          name: "Filter Products by Category",
+          description: "Select all products from the 'Electronics' category.",
+          schema: "CREATE TABLE products (id INT, name VARCHAR, price REAL, category VARCHAR);",
+          data: "INSERT INTO products VALUES (1, 'Laptop', 1200, 'Electronics'), (2, 'T-Shirt', 25, 'Apparel'), (3, 'Smartphone', 800, 'Electronics');",
+          solution: "SELECT * FROM products WHERE category = 'Electronics';",
+          inputTables: ["products"],
+        },
+        {
+          id: 3,
+          name: "Order Employees by Salary",
+          description: "Select all employees and order them by salary in descending order.",
+          schema: "CREATE TABLE employees (id INT, name VARCHAR, salary INT, department VARCHAR);",
+          data: "INSERT INTO employees VALUES (1, 'Alice', 80000, 'Engineering'), (2, 'Bob', 95000, 'Engineering'), (3, 'Charlie', 70000, 'Marketing');",
+          solution: "SELECT * FROM employees ORDER BY salary DESC;",
+          inputTables: ["employees"],
+        },
+        {
+          id: 4,
+          name: "Join Customers and Orders",
+          description: "Show which customer ordered which item by joining the `customers` and `orders` tables.",
+          schema: "CREATE TABLE customers (id INT, name VARCHAR); CREATE TABLE orders (id INT, customer_id INT, item VARCHAR, price REAL);",
+          data: "INSERT INTO customers VALUES (1, 'Alice'), (2, 'Bob'); INSERT INTO orders VALUES (101, 1, 'Laptop', 1200), (102, 2, 'Keyboard', 75), (103, 1, 'Mouse', 25);",
+          solution: "SELECT customers.name, orders.item FROM customers JOIN orders ON customers.id = orders.customer_id;",
+          inputTables: ["customers", "orders"],
+        },
+      ];
+
+      let db;
+      let currentLevelIndex = 0;
+      let SQL;
+      const STORAGE_KEY = "sqlQueryChallengeProgress";
+
+      async function init() {
+        SQL = await initSqlJs({
+          locateFile: (file) => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${file}`,
+        });
+
+        document.getElementById("run-query-btn").addEventListener("click", runAndCheckQuery);
+
+        document.getElementById("prev-level-btn").addEventListener("click", () => {
+            if (currentLevelIndex > 0) {
+                currentLevelIndex--;
+                saveProgress();
+                loadLevel(currentLevelIndex);
+            }
+        });
+
+        loadProgress();
+        loadLevel(currentLevelIndex);
+      }
+
+      function loadLevel(index) {
+        currentLevelIndex = index;
+        const level = levels[currentLevelIndex];
+        document.querySelector(".challenge-description h2").textContent = `🎯 Level ${level.id}: ${level.name}`;
+        document.querySelector(".challenge-description p").textContent = level.description;
+
+        const prevBtn = document.getElementById('prev-level-btn');
+        if (level.id > 1) {
+            prevBtn.style.display = 'block';
+        } else {
+            prevBtn.style.display = 'none';
+        }
+
+        db = new SQL.Database();
+        db.run(level.schema);
+        db.run(level.data);
+
+        const inputTableContainer = document.querySelector('h3:first-of-type').parentElement;
+        inputTableContainer.innerHTML = `<h3>🔍 Input Table(s)</h3>`; // Clear and reset
+
+        const editor = document.getElementById("sql-editor");
+        editor.value = "";
+        editor.placeholder = level.id === 1 ? "SELECT * FROM users;" : "";
+
+        level.inputTables.forEach(tableName => {
+            const tableTitle = document.createElement('h4');
+            tableTitle.textContent = `\`${tableName}\``;
+            tableTitle.style.marginTop = '1rem';
+            inputTableContainer.appendChild(tableTitle);
+
+            const tableEl = document.createElement('table');
+            const tableData = db.exec(`SELECT * FROM ${tableName}`)[0];
+            renderTable(tableEl, tableData);
+            inputTableContainer.appendChild(tableEl);
+        });
+
+        const expectedOutputData = db.exec(level.solution)[0];
+        renderTable(document.getElementById("expected-output-table"), expectedOutputData);
+
+        const modalOutputTable = document.getElementById('modal-output-table');
+        if (modalOutputTable) modalOutputTable.innerHTML = "";
+        document.getElementById("feedback-section").style.display = "none";
+      }
+
+      function renderTable(tableElement, data) {
+        tableElement.innerHTML = "";
+        if (!data || !data.columns || !data.values) {
+          tableElement.innerHTML = "<tbody><tr><td>No results</td></tr></tbody>";
+          return;
+        }
+
+        const thead = tableElement.createTHead();
+        const headerRow = thead.insertRow();
+        data.columns.forEach((colName) => {
+          const th = document.createElement("th");
+          th.textContent = colName;
+          headerRow.appendChild(th);
+        });
+
+        const tbody = tableElement.createTBody();
+        data.values.forEach((rowData) => {
+          const tr = tbody.insertRow();
+          rowData.forEach((cellData) => {
+            const td = tr.insertCell();
+            td.textContent = cellData;
+          });
+        });
+      }
+
+      function runAndCheckQuery() {
+        const editor = document.getElementById("sql-editor");
+        const userQuery = editor.value;
+
+        try {
+          const results = db.exec(userQuery);
+          const userOutput = results[0];
+
+          const expectedOutput = db.exec(levels[currentLevelIndex].solution)[0];
+
+          if (JSON.stringify(userOutput) === JSON.stringify(expectedOutput)) {
+            launchConfetti();
+
+            const modalOutputTable = document.getElementById('modal-output-table');
+            renderTable(modalOutputTable, userOutput);
+
+            const modal = document.getElementById('correct-modal-overlay');
+            modal.style.display = 'flex';
+            
+            const nextButton = document.getElementById('modal-next-btn');
+            const newNextButton = nextButton.cloneNode(true);
+            nextButton.parentNode.replaceChild(newNextButton, nextButton);
+
+            const isLastLevel = currentLevelIndex === levels.length - 1;
+
+            if (isLastLevel) {
+                modal.querySelector('h2').textContent = "🏁 Congratulations! You have completed all levels!";
+                newNextButton.textContent = "Restart Quest";
+                newNextButton.onclick = () => {
+                    modal.style.display = 'none';
+                    currentLevelIndex = 0;
+                    saveProgress();
+                    loadLevel(currentLevelIndex);
+                };
+            } else {
+                modal.querySelector('h2').textContent = "Correct! Well done.";
+                newNextButton.textContent = "Next Level →";
+                newNextButton.onclick = () => {
+                    modal.style.display = 'none';
+                    currentLevelIndex++;
+                    saveProgress();
+                    loadLevel(currentLevelIndex);
+                };
+            }
+          } else {
+            showFeedback("Not quite. The output does not match the expected result. Try again.", true);
+          }
+        } catch (e) {
+          showFeedback(`Error: ${e.message}`, true);
+        }
+      }
+
+      function showFeedback(message, isError) {
+        const feedbackSection = document.getElementById("feedback-section");
+        feedbackSection.innerHTML = message;
+        feedbackSection.className = isError ? "feedback-incorrect" : "feedback-correct";
+        feedbackSection.style.display = "block";
+      }
+
+      function loadProgress() {
+        const savedLevel = localStorage.getItem(STORAGE_KEY);
+        if (savedLevel) {
+          currentLevelIndex = parseInt(savedLevel, 10);
+          if (isNaN(currentLevelIndex) || currentLevelIndex >= levels.length) {
+            currentLevelIndex = 0;
+          }
+        }
+      }
+
+      function saveProgress() {
+        localStorage.setItem(STORAGE_KEY, currentLevelIndex);
+      }
+
+      function launchConfetti() {
+        const container = document.getElementById('confetti-container');
+        container.innerHTML = ''; // Clear old confetti
+        const colors = ['#a78bfa', '#34d399', '#60a5fa', '#fb923c'];
+        const confettiCount = 100;
+
+        for (let i = 0; i < confettiCount; i++) {
+          const piece = document.createElement('div');
+          piece.className = 'confetti-piece';
+          piece.style.left = `${Math.random() * 100}vw`;
+          piece.style.setProperty('--confetti-color', colors[i % colors.length]);
+          const duration = 2.5 + Math.random() * 2;
+          const delay = Math.random() * 3;
+          piece.style.animationDuration = `${duration}s`;
+          piece.style.animationDelay = `${delay}s`;
+          piece.style.opacity = Math.random() * 0.5 + 0.5;
+          piece.style.transform = `rotate(${Math.random() * 360}deg)`;
+          container.appendChild(piece);
+        }
+      }
+
+      function createCityscape() {
+        const bg = document.createElement('div');
+        bg.id = 'cityscape-bg';
+        document.body.prepend(bg);
+        const colors = ['#9a7ee8', '#2dbf8a', '#529bf8', '#f58a2e']; // a bit darker
+        const barCount = 60;
+
+        for (let i = 0; i < barCount; i++) {
+          const bar = document.createElement('div');
+          bar.className = 'cityscape-bar';
+          bar.style.setProperty('--bar-color', colors[i % colors.length]);
+          bar.style.left = `${Math.random() * 100}vw`;
+          bar.style.width = `${10 + Math.random() * 40}px`;
+          const duration = 5 + Math.random() * 10;
+          bar.style.animationDuration = `${duration}s`;
+          bar.style.animationDelay = `${Math.random() * duration}s`;
+
+          if (Math.random() > 0.5) {
+            bar.style.top = '0';
+            bar.style.transformOrigin = 'top';
+          } else {
+            bar.style.bottom = '0';
+            bar.style.transformOrigin = 'bottom';
+          }
+          bar.style.setProperty('--start-height', '0%');
+          bar.style.setProperty('--end-height', `${5 + Math.random() * 15}%`);
+          bg.appendChild(bar);
+        }
+      }
+
+      createCityscape();
+      init().catch(console.error);
+    </script>
+  </body>
+</html>
