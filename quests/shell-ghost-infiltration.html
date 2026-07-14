@@ -1,0 +1,2110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Shell Ghost: Infiltration | General Dev Quest</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@48,400,0,0" rel="stylesheet">
+  <style>
+    :root {
+      --terminal-bg: #070a0e;
+      --terminal-panel: #0c121a;
+      --phosphor-green: #00ff66;
+      --phosphor-green-dim: rgba(0, 255, 102, 0.15);
+      --phosphor-green-glow: rgba(0, 255, 102, 0.4);
+      --terminal-border: rgba(0, 255, 102, 0.2);
+      
+      --neon-cyan: #00e5ff;
+      --neon-blue: #2979ff;
+      --neon-red: #ff1744;
+      --neon-red-dim: rgba(255, 23, 68, 0.2);
+      
+      --font-mono: 'Fira Code', monospace;
+      --font-terminal: 'Share Tech Mono', sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--terminal-bg);
+      color: #e2e8f0;
+      font-family: var(--font-terminal);
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    }
+
+    /* Phosphor scanline overlays */
+    .crt-bg {
+      position: absolute;
+      inset: 0;
+      background-color: #030508;
+      background-image: 
+        radial-gradient(rgba(0, 255, 102, 0.03) 2px, transparent 0),
+        linear-gradient(rgba(0, 255, 102, 0.01) 1px, transparent 0),
+        linear-gradient(90deg, rgba(0, 255, 102, 0.01) 1px, transparent 0);
+      background-size: 30px 30px, 60px 60px, 60px 60px;
+      z-index: 1;
+    }
+
+    .crt-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+      background-size: 100% 4px;
+      pointer-events: none;
+      z-index: 99;
+      opacity: 0.8;
+    }
+
+    .game-wrapper {
+      position: relative;
+      z-index: 10;
+      width: 96vw;
+      height: 94vh;
+      max-width: 1400px;
+      max-height: 850px;
+      background: var(--terminal-panel);
+      border: 1px solid var(--terminal-border);
+      border-radius: 8px;
+      box-shadow: 0 0 30px rgba(0, 255, 102, 0.1), inset 0 0 20px rgba(0, 0, 0, 0.8);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Landing Screen Overlay */
+    .screen {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      z-index: 50;
+      background: #040609;
+      transition: opacity 0.5s ease;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .screen.active {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .landing-content {
+      margin: auto;
+      text-align: center;
+      max-width: 600px;
+      padding: 3rem;
+      border: 1px solid var(--terminal-border);
+      background: rgba(12, 18, 26, 0.95);
+      border-radius: 6px;
+      box-shadow: 0 0 40px rgba(0, 255, 102, 0.15);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .landing-icon {
+      font-size: 80px;
+      color: var(--phosphor-green);
+      margin-bottom: 1.5rem;
+      text-shadow: 0 0 15px var(--phosphor-green);
+      animation: terminalPulse 2s infinite alternate;
+    }
+
+    @keyframes terminalPulse {
+      0% { transform: scale(1); opacity: 0.8; }
+      100% { transform: scale(1.05); opacity: 1; }
+    }
+
+    .game-title {
+      font-family: var(--font-terminal);
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 700;
+      color: var(--phosphor-green);
+      text-shadow: 0 0 15px var(--phosphor-green-glow);
+      margin-bottom: 0.5rem;
+      letter-spacing: 2px;
+    }
+
+    .game-subtitle {
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      color: #94a3b8;
+      letter-spacing: 4px;
+      margin-bottom: 2rem;
+      text-transform: uppercase;
+    }
+
+    .game-desc {
+      font-size: 1rem;
+      color: #cbd5e1;
+      line-height: 1.6;
+      margin-bottom: 2.5rem;
+      text-align: justify;
+    }
+
+    .terminal-btn {
+      background: rgba(0, 255, 102, 0.08);
+      border: 1px solid var(--phosphor-green);
+      color: var(--phosphor-green);
+      font-family: var(--font-terminal);
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 0.8rem 2.5rem;
+      font-size: 1rem;
+      cursor: pointer;
+      border-radius: 4px;
+      letter-spacing: 2px;
+      transition: all 0.2s;
+      box-shadow: 0 0 15px rgba(0, 255, 102, 0.1);
+    }
+
+    .terminal-btn:hover {
+      background: var(--phosphor-green-dim);
+      box-shadow: 0 0 25px var(--phosphor-green-glow);
+      text-shadow: 0 0 5px #ffffff;
+      color: #ffffff;
+      transform: translateY(-2px);
+    }
+
+    .terminal-btn:active {
+      transform: translateY(1px);
+    }
+
+    /* Header Panel */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      background: #05080c;
+      border-bottom: 1px solid var(--terminal-border);
+      z-index: 10;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .hub-btn {
+      color: var(--phosphor-green);
+      text-decoration: none;
+      font-family: var(--font-terminal);
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.4rem 0.8rem;
+      border: 1px solid var(--terminal-border);
+      border-radius: 4px;
+      background: rgba(0, 255, 102, 0.05);
+      transition: all 0.2s;
+    }
+
+    .hub-btn:hover {
+      color: #ffffff;
+      border-color: #ffffff;
+      background: var(--phosphor-green-dim);
+    }
+
+    .header-title-container h1 {
+      font-family: var(--font-terminal);
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--phosphor-green);
+      text-shadow: 0 0 8px var(--phosphor-green-glow);
+    }
+
+    .header-title-container span {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: #64748b;
+    }
+
+    .level-navigator {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 0.3rem 0.8rem;
+      border-radius: 4px;
+      border: 1px solid var(--terminal-border);
+    }
+
+    .nav-arrow {
+      background: none;
+      border: none;
+      color: var(--phosphor-green);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.1rem;
+      transition: color 0.2s;
+    }
+
+    .nav-arrow:hover:not(:disabled) {
+      color: #ffffff;
+      text-shadow: 0 0 5px var(--phosphor-green);
+    }
+
+    .nav-arrow:disabled {
+      color: #1e293b;
+      cursor: not-allowed;
+    }
+
+    .level-label {
+      font-family: var(--font-terminal);
+      font-weight: 700;
+      font-size: 1rem;
+      color: #ffffff;
+      min-width: 140px;
+      text-align: center;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .rank-badge {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+
+    .rank-label {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #64748b;
+    }
+
+    .rank-value {
+      font-family: var(--font-terminal);
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--neon-cyan);
+      text-shadow: 0 0 8px rgba(0, 229, 255, 0.3);
+    }
+
+    .sound-toggle {
+      background: none;
+      border: 1px solid var(--terminal-border);
+      color: var(--phosphor-green);
+      border-radius: 4px;
+      padding: 0.4rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .sound-toggle:hover {
+      color: #ffffff;
+      background: var(--phosphor-green-dim);
+    }
+
+    .sound-toggle.muted {
+      color: var(--neon-red);
+      border-color: var(--neon-red-dim);
+      background: rgba(255, 23, 68, 0.05);
+    }
+
+    /* Main workspace panel splits */
+    main {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      position: relative;
+    }
+
+    .map-panel {
+      flex: 45;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      border-right: 1px solid var(--terminal-border);
+      min-width: 0;
+    }
+
+    .console-panel {
+      flex: 55;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      background: rgba(0, 0, 0, 0.4);
+      min-width: 0;
+    }
+
+    /* SVG map visualizer */
+    .map-frame {
+      flex: 1;
+      background: #040609;
+      border: 1px solid var(--terminal-border);
+      border-radius: 4px;
+      position: relative;
+      box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.9);
+      overflow: hidden;
+    }
+
+    .map-svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* SVG network layout styles */
+    .map-link {
+      stroke: var(--terminal-border);
+      stroke-width: 1.5px;
+      fill: none;
+    }
+
+    .map-link.active-path {
+      stroke: var(--phosphor-green);
+      stroke-width: 2.5px;
+      filter: drop-shadow(0 0 3px var(--phosphor-green-glow));
+    }
+
+    .map-node {
+      fill: #0c121a;
+      stroke: var(--terminal-border);
+      stroke-width: 2px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .map-node.dir {
+      rx: 4px;
+    }
+
+    .map-node.file {
+      rx: 2px;
+    }
+
+    .map-node:hover {
+      stroke: var(--phosphor-green);
+      fill: var(--phosphor-green-dim);
+    }
+
+    .map-node.current {
+      stroke: var(--phosphor-green);
+      fill: var(--phosphor-green-dim);
+      filter: drop-shadow(0 0 6px var(--phosphor-green-glow));
+    }
+
+    .map-node.target {
+      stroke: var(--neon-cyan);
+    }
+
+    .map-text {
+      font-family: var(--font-terminal);
+      font-size: 11px;
+      fill: #94a3b8;
+      text-anchor: middle;
+      pointer-events: none;
+    }
+
+    .map-text.current {
+      fill: var(--phosphor-green);
+      font-weight: bold;
+    }
+
+    /* IDS Alarms indicator card */
+    .hud-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .ids-gauge-card {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      background: rgba(0, 0, 0, 0.5);
+      border: 1px solid var(--terminal-border);
+      border-radius: 4px;
+      padding: 0.5rem 1rem;
+      flex: 1;
+    }
+
+    .ids-icon {
+      color: var(--phosphor-green);
+      font-size: 24px;
+    }
+
+    .ids-meta {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .ids-label {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #64748b;
+    }
+
+    .ids-bar-container {
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 3px;
+      overflow: hidden;
+      position: relative;
+      margin-top: 3px;
+    }
+
+    .ids-bar-fill {
+      position: absolute;
+      left: 0; top: 0; height: 100%; width: 0%;
+      background: linear-gradient(90deg, var(--phosphor-green) 0%, var(--neon-cyan) 60%, var(--neon-red) 100%);
+      transition: width 0.4s ease;
+    }
+
+    .ids-val-text {
+      font-family: var(--font-hud);
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #ffffff;
+      min-width: 40px;
+      text-align: right;
+    }
+
+    .ids-active .ids-val-text {
+      color: var(--neon-red);
+      animation: pulseAlertText 0.5s infinite alternate;
+    }
+
+    @keyframes pulseAlertText {
+      0% { transform: scale(1); }
+      100% { transform: scale(1.1); text-shadow: 0 0 5px var(--neon-red); }
+    }
+
+    .ids-active .map-frame {
+      animation: shakeFrame 0.25s infinite;
+    }
+
+    @keyframes shakeFrame {
+      0%, 100% { transform: translate(0, 0); }
+      25% { transform: translate(-2px, 1px); }
+      50% { transform: translate(1px, -1px); }
+      75% { transform: translate(-1px, 2px); }
+    }
+
+    .siren-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 40;
+      opacity: 0;
+      box-shadow: inset 0 0 80px rgba(255, 23, 68, 0.4);
+      border: 2px solid var(--neon-red-dim);
+      transition: opacity 0.5s;
+    }
+
+    .ids-active .siren-overlay {
+      animation: sirenFlash 1s infinite alternate;
+    }
+
+    @keyframes sirenFlash {
+      0% { opacity: 0; }
+      100% { opacity: 0.8; }
+    }
+
+    /* Terminal Console Panel styling */
+    .terminal-container {
+      flex: 1;
+      border: 1px solid var(--terminal-border);
+      background: #040609;
+      border-radius: 4px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.95);
+      position: relative;
+      min-height: 0;
+    }
+
+    .terminal-history {
+      flex: 1;
+      overflow-y: auto;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: #94a3b8;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      padding-bottom: 1rem;
+      line-height: 1.4;
+      white-space: pre-wrap;
+    }
+
+    /* Green terminal style scrolls */
+    .terminal-history::-webkit-scrollbar {
+      width: 6px;
+    }
+    .terminal-history::-webkit-scrollbar-thumb {
+      background: var(--terminal-border);
+      border-radius: 3px;
+    }
+
+    .terminal-line {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .terminal-prompt-line {
+      color: var(--phosphor-green);
+      font-weight: 700;
+    }
+
+    .terminal-output {
+      color: #e2e8f0;
+      padding-left: 0.5rem;
+      margin-top: 2px;
+    }
+
+    .terminal-output.error {
+      color: var(--neon-red);
+    }
+
+    .terminal-output.success {
+      color: var(--phosphor-green);
+    }
+
+    .terminal-input-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--phosphor-green);
+      border-top: 1px solid rgba(0, 255, 102, 0.05);
+      padding-top: 0.6rem;
+    }
+
+    .prompt-label {
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .terminal-input-wrapper {
+      flex: 1;
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .terminal-input {
+      width: 100%;
+      background: none;
+      border: none;
+      outline: none;
+      color: #ffffff;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      caret-color: transparent; /* custom caret */
+    }
+
+    .terminal-caret {
+      position: absolute;
+      width: 8px;
+      height: 15px;
+      background: var(--phosphor-green);
+      box-shadow: 0 0 5px var(--phosphor-green);
+      pointer-events: none;
+      animation: blink 1s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    /* Infiltration briefs card */
+    .mission-brief-card {
+      background: rgba(12, 18, 26, 0.85);
+      border: 1px solid var(--terminal-border);
+      border-radius: 4px;
+      padding: 1rem;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    }
+
+    .mission-title {
+      font-family: var(--font-terminal);
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--phosphor-green);
+      letter-spacing: 1.5px;
+      border-bottom: 1px solid var(--terminal-border);
+      padding-bottom: 0.4rem;
+      margin-bottom: 0.6rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .mission-objective {
+      font-size: 0.9rem;
+      color: #94a3b8;
+      line-height: 1.4;
+      margin-bottom: 1rem;
+    }
+
+    .mission-submit-row {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .token-input {
+      flex: 1;
+      background: #05080c;
+      border: 1px solid var(--terminal-border);
+      padding: 0.4rem 0.8rem;
+      border-radius: 4px;
+      color: #ffffff;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      outline: none;
+    }
+
+    .token-input:focus {
+      border-color: var(--phosphor-green);
+      box-shadow: 0 0 8px var(--phosphor-green-dim);
+    }
+
+    /* Modal box overrides */
+    .modal-box {
+      background: var(--terminal-panel);
+      border: 1px solid var(--terminal-border);
+      box-shadow: 0 0 35px var(--phosphor-green-glow);
+    }
+
+    .modal-text {
+      color: #cbd5e1;
+      margin-bottom: 1.5rem;
+    }
+
+    /* Utility diff formats */
+    .diff-del { color: var(--neon-red); }
+    .diff-add { color: var(--phosphor-green); }
+  </style>
+</head>
+<body>
+
+  <div class="crt-bg"></div>
+  <div class="crt-overlay"></div>
+
+  <!-- Landing Screen -->
+  <div id="landing-screen" class="screen active">
+    <div class="landing-content">
+      <span class="material-symbols-outlined landing-icon">terminal</span>
+      <div class="game-title">SHELL GHOST</div>
+      <div class="game-subtitle">Corporate Infiltration Protocol</div>
+      <div class="game-desc">
+        Infiltrate the secure corporate mainframe of Cytex Corp. Execute authentic bash shell commands to navigate filesystems, change directory permissions, search logs, and extract target key ciphers. Beware of the IDS alarm triggers!
+      </div>
+      <button class="terminal-btn" onclick="game.start()">Establish SSH Tunnel</button>
+    </div>
+  </div>
+
+  <!-- Main Game Panel -->
+  <div class="game-wrapper">
+    <header>
+      <div class="header-left">
+        <a href="../index.html" class="hub-btn" onclick="game.cleanup()">
+          <span class="material-symbols-outlined">arrow_back</span>
+          <span>Hub</span>
+        </a>
+        <div class="header-title-container">
+          <h1>SHELL GHOST: INFILTRATION</h1>
+          <span>Secure Mainframe Cyberdeck</span>
+        </div>
+      </div>
+
+      <div class="level-navigator">
+        <button class="nav-arrow" id="prev-level-btn" onclick="game.changeLevel(-1)">
+          <span class="material-symbols-outlined">chevron_left</span>
+        </button>
+        <span class="level-label" id="level-title-label">NODE 1 / 5</span>
+        <button class="nav-arrow" id="next-level-btn" onclick="game.changeLevel(1)">
+          <span class="material-symbols-outlined">chevron_right</span>
+        </button>
+      </div>
+
+      <div class="header-right">
+        <div class="rank-badge">
+          <span class="rank-label">OPERATIVE RANK</span>
+          <span class="rank-value" id="hacker-rank">Network Cadet</span>
+        </div>
+        <button class="sound-toggle" id="sound-toggle-btn" onclick="game.toggleSound()">
+          <span class="material-symbols-outlined" id="sound-icon">volume_up</span>
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <!-- Left Panel: Directory Network Map -->
+      <div class="map-panel">
+        
+        <div class="hud-row">
+          <!-- Intrusion Detection System Gauge -->
+          <div class="ids-gauge-card">
+            <span class="material-symbols-outlined ids-icon">gshield</span>
+            <div class="ids-meta">
+              <span class="ids-label">IDS Trace Alert</span>
+              <div class="ids-bar-container">
+                <div class="ids-bar-fill" id="ids-bar-fill"></div>
+              </div>
+            </div>
+            <span class="ids-val-text" id="ids-val-text">0%</span>
+          </div>
+        </div>
+
+        <div class="map-frame">
+          <div class="siren-overlay"></div>
+          <!-- Directory nodes are rendered dynamically using SVG -->
+          <svg class="map-svg" id="network-map-svg">
+            <g id="map-links-group"></g>
+            <g id="map-nodes-group"></g>
+          </svg>
+        </div>
+
+      </div>
+
+      <!-- Right Panel: Terminal Console & Objective Briefs -->
+      <div class="console-panel">
+        
+        <!-- Objective briefs -->
+        <div class="mission-brief-card">
+          <div class="mission-title">
+            <span id="mission-title-label">Objective: System Recon</span>
+            <span style="font-size: 0.7rem; font-family: var(--font-mono); color: var(--neon-cyan)">MAIN DECK</span>
+          </div>
+          <p class="mission-objective" id="mission-objective-text">
+            Traverse directories to `/sys/logs/` and locate `boot.log`. Execute cat to read the log content and extract the decryption key code.
+          </p>
+          <div class="mission-submit-row">
+            <input type="text" class="token-input" id="token-submit-input" placeholder="Enter extracted key token..." autocomplete="off">
+            <button class="terminal-btn" style="padding: 0.4rem 1.5rem; font-size: 0.85rem;" onclick="game.submitToken()">Submit Token</button>
+          </div>
+        </div>
+
+        <!-- Terminal screen -->
+        <div class="terminal-container" onclick="game.focusInput()">
+          <div class="terminal-history" id="terminal-history-log">
+            <!-- Console outputs -->
+          </div>
+          
+          <div class="terminal-input-row">
+            <span class="prompt-label" id="terminal-prompt-label">agent@mainframe:~$ </span>
+            <div class="terminal-input-wrapper">
+              <input type="text" class="terminal-input" id="terminal-command-input" autocomplete="off" spellcheck="false">
+              <div class="terminal-caret" id="terminal-cursor-caret"></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Win/Loss result modall -->
+  <div class="modal-overlay" id="outcome-modal">
+    <div class="modal-box">
+      <span class="material-symbols-outlined modal-icon success" id="outcome-icon" style="color: var(--phosphor-green)">shield_lock</span>
+      <div class="modal-title" id="outcome-title">NODE INFILTRATED</div>
+      <p class="modal-text" id="outcome-desc">
+        Target token accepted! Corporate server files extracted successfully.
+      </p>
+      <div class="modal-btns">
+        <button class="terminal-btn" id="modal-action-btn" onclick="game.handleModalAction()">Next Node</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game Logic -->
+  <script>
+    // Audio Synthesizer Engine
+    const sound = {
+      ctx: null,
+      enabled: true,
+      init() {
+        if (!this.ctx) {
+          this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+      },
+      playKeypress() {
+        if (!this.enabled) return;
+        this.init();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        
+        // Short mechanical click sound
+        const pitch = 600 + Math.random() * 400;
+        osc.frequency.setValueAtTime(pitch, this.ctx.currentTime);
+        gain.gain.setValueAtTime(0.015, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.03);
+        
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.03);
+      },
+      playSuccess() {
+        if (!this.enabled) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+        notes.forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          
+          osc.frequency.setValueAtTime(freq, now + idx * 0.07);
+          gain.gain.setValueAtTime(0.05, now + idx * 0.07);
+          gain.gain.exponentialRampToValueAtTime(0.002, now + idx * 0.07 + 0.2);
+          
+          osc.start(now + idx * 0.07);
+          osc.stop(now + idx * 0.07 + 0.2);
+        });
+      },
+      playFail() {
+        if (!this.enabled) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(220, now);
+        osc.frequency.linearRampToValueAtTime(100, now + 0.35);
+        
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+        
+        osc.start();
+        osc.stop(now + 0.35);
+      },
+      alarmOsc: null,
+      alarmGain: null,
+      alarmInterval: null,
+      startAlarm() {
+        if (!this.enabled) return;
+        this.init();
+        if (this.alarmOsc) return;
+        
+        this.alarmOsc = this.ctx.createOscillator();
+        this.alarmGain = this.ctx.createGain();
+        this.alarmOsc.connect(this.alarmGain);
+        this.alarmGain.connect(this.ctx.destination);
+        
+        this.alarmOsc.type = 'sine';
+        this.alarmOsc.frequency.setValueAtTime(880, this.ctx.currentTime);
+        
+        this.alarmGain.gain.setValueAtTime(0.02, this.ctx.currentTime);
+        this.alarmOsc.start();
+        
+        let toggle = false;
+        this.alarmInterval = setInterval(() => {
+          if (!this.alarmOsc || this.ctx.state === 'suspended') return;
+          const target = toggle ? 880 : 660;
+          this.alarmOsc.frequency.exponentialRampToValueAtTime(target, this.ctx.currentTime + 0.18);
+          toggle = !toggle;
+        }, 200);
+      },
+      stopAlarm() {
+        if (this.alarmInterval) {
+          clearInterval(this.alarmInterval);
+          this.alarmInterval = null;
+        }
+        if (this.alarmOsc) {
+          try {
+            this.alarmOsc.stop();
+          } catch(e) {}
+          this.alarmOsc = null;
+        }
+        this.alarmGain = null;
+      }
+    };
+
+    // Virtual filesystem templates per level
+    const levelFileSystems = [
+      // Level 1: System Recon
+      {
+        "bin": { isDir: true, permissions: "r-xr-xr-x", children: { "sh": { isDir: false, permissions: "r-xr-xr-x", content: "[BINARY]" } } },
+        "etc": { isDir: true, permissions: "r-xr-xr-x", children: { "hosts": { isDir: false, permissions: "rw-r--r--", content: "127.0.0.1 localhost\n10.0.8.20 mainframe\n" } } },
+        "sys": {
+          isDir: true,
+          permissions: "r-xr-xr-x",
+          children: {
+            "logs": {
+              isDir: true,
+              permissions: "r-xr-xr-x",
+              children: {
+                "boot.log": {
+                  isDir: false,
+                  permissions: "rw-r--r--",
+                  content: "[INIT] Starting Mainframe Services...\n[LOAD] Memory buffer loaded successfully\n[SECURE] Core Cipher: SG_RECON_8912\n[OK] Port 22 listening."
+                }
+              }
+            }
+          }
+        }
+      },
+      // Level 2: Hidden Cipher
+      {
+        "home": {
+          isDir: true,
+          permissions: "r-xr-xr-x",
+          children: {
+            "operator": {
+              isDir: true,
+              permissions: "rwx------",
+              children: {
+                "notes.txt": { isDir: false, permissions: "rw-r--r--", content: "Don't forget to clean files in the shadow vault." },
+                ".shadow": {
+                  isDir: true,
+                  permissions: "rwx------",
+                  children: {
+                    "secret.key": { isDir: false, permissions: "rw-r--r--", content: "ENCRYPTION KEY: CIPHER_GHOST_4412" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      // Level 3: Security Override
+      {
+        "var": {
+          isDir: true,
+          permissions: "r-xr-xr-x",
+          children: {
+            "log": {
+              isDir: true,
+              permissions: "r-xr-xr-x",
+              children: {
+                "mainframe.log": {
+                  isDir: false,
+                  permissions: "rw-r--r--",
+                  content: "09:00:12 [INFO] Connection established\n09:02:18 [WARN] Low memory sector 4\n09:05:44 [SECURITY] SYSTEM OVERRIDE REQUESTED\n09:05:45 [SECURITY] KEY DECOY SUBMITTED\n09:06:12 [INFO] Database sync completed\n09:08:22 [SECURITY] MAIN OVERRIDE KEY: OVERRIDE_ENABLED\n09:10:00 [INFO] Heartbeat response OK"
+                }
+              }
+            }
+          }
+        },
+        "sys": { isDir: true, permissions: "rwx------", children: {} }
+      },
+      // Level 4: Privilege Escalation
+      {
+        "bin": {
+          isDir: true,
+          permissions: "r-xr-xr-x",
+          children: {
+            "escalate.sh": {
+              isDir: false,
+              permissions: "---------", // inaccessible
+              content: "#!/bin/sh\n# Root Privilege Escalation Token\nexport SUPERVISOR_TOKEN=SUPERVISOR_PASS_9981\necho $SUPERVISOR_TOKEN"
+            }
+          }
+        }
+      },
+      // Level 5: Configuration Diff
+      {
+        "etc": {
+          isDir: true,
+          permissions: "r-xr-xr-x",
+          children: {
+            "configs.conf": {
+              isDir: false,
+              permissions: "rw-r--r--",
+              content: "port=22\nprotocol=ssh\nmax_connections=10\nenable_override=true"
+            },
+            "configs.bak": {
+              isDir: false,
+              permissions: "rw-r--r--",
+              content: "port=22\nprotocol=ssh\nmax_connections=5\nenable_override=false"
+            }
+          }
+        },
+        "home": {
+          isDir: true,
+          permissions: "rwx------",
+          children: {
+            "agent": { isDir: true, permissions: "rwx------", children: {} }
+          }
+        }
+      }
+    ];
+
+    // Levels definitions
+    const levels = [
+      {
+        id: 1,
+        title: "System Recon",
+        objective: "Traverse directories to `/sys/logs/` and list its files. Use cat to inspect `boot.log` and find the system access token. Submit it to unlock the next node.",
+        targetToken: "SG_RECON_8912",
+        startPath: [],
+        mapNodes: [
+          { name: "/", x: 100, y: 150, isDir: true, id: "root" },
+          { name: "bin", x: 220, y: 60, isDir: true, id: "bin" },
+          { name: "etc", x: 220, y: 150, isDir: true, id: "etc" },
+          { name: "sys", x: 220, y: 240, isDir: true, id: "sys" },
+          { name: "logs", x: 340, y: 240, isDir: true, id: "sys/logs" },
+          { name: "boot.log", x: 440, y: 240, isDir: false, id: "sys/logs/boot.log" }
+        ],
+        mapLinks: [
+          { from: "root", to: "bin" },
+          { from: "root", to: "etc" },
+          { from: "root", to: "sys" },
+          { from: "sys", to: "sys/logs" },
+          { from: "sys/logs", to: "sys/logs/boot.log" }
+        ]
+      },
+      {
+        id: 2,
+        title: "The Hidden Cipher",
+        objective: "A cryptographic token is hidden in a hidden directory. Search inside `/home/operator/` for a hidden directory (files starting with a dot, visible via `ls -a`) and read the key file inside it.",
+        targetToken: "CIPHER_GHOST_4412",
+        startPath: ["home", "operator"],
+        mapNodes: [
+          { name: "home", x: 80, y: 150, isDir: true, id: "home" },
+          { name: "operator", x: 180, y: 150, isDir: true, id: "home/operator" },
+          { name: "notes.txt", x: 280, y: 80, isDir: false, id: "home/operator/notes.txt" },
+          { name: ".shadow", x: 280, y: 220, isDir: true, id: "home/operator/.shadow" },
+          { name: "secret.key", x: 400, y: 220, isDir: false, id: "home/operator/.shadow/secret.key" }
+        ],
+        mapLinks: [
+          { from: "home", to: "home/operator" },
+          { from: "home/operator", to: "home/operator/notes.txt" },
+          { from: "home/operator", to: "home/operator/.shadow" },
+          { from: "home/operator/.shadow", to: "home/operator/.shadow/secret.key" }
+        ]
+      },
+      {
+        id: 3,
+        title: "Security Override Extraction",
+        objective: "Extract occurrences of 'override' from `/var/log/mainframe.log` (case-insensitive) and redirect the output to `/sys/override.txt`. Use pipes and output redirection `grep -i override /var/log/mainframe.log > /sys/override.txt`. Submit the token found inside the filtered lines.",
+        targetToken: "OVERRIDE_ENABLED",
+        startPath: [],
+        mapNodes: [
+          { name: "/", x: 80, y: 150, isDir: true, id: "root" },
+          { name: "var", x: 180, y: 80, isDir: true, id: "var" },
+          { name: "log", x: 280, y: 80, isDir: true, id: "var/log" },
+          { name: "mainframe.log", x: 390, y: 80, isDir: false, id: "var/log/mainframe.log" },
+          { name: "sys", x: 180, y: 220, isDir: true, id: "sys" },
+          { name: "override.txt", x: 300, y: 220, isDir: false, id: "sys/override.txt" }
+        ],
+        mapLinks: [
+          { from: "root", to: "var" },
+          { from: "var", to: "var/log" },
+          { from: "var/log", to: "var/log/mainframe.log" },
+          { from: "root", to: "sys" },
+          { from: "sys", to: "sys/override.txt" }
+        ]
+      },
+      {
+        id: 4,
+        title: "Privilege Escalation",
+        objective: "The escalation binary `/bin/escalate.sh` is unreadable (permissions are restricted `---------`). Modify its permissions using `chmod +r /bin/escalate.sh` or `chmod 755 /bin/escalate.sh`, then cat the file to read the supervisor passcode.",
+        targetToken: "SUPERVISOR_PASS_9981",
+        startPath: ["bin"],
+        mapNodes: [
+          { name: "/", x: 100, y: 150, isDir: true, id: "root" },
+          { name: "bin", x: 250, y: 150, isDir: true, id: "bin" },
+          { name: "escalate.sh", x: 400, y: 150, isDir: false, id: "bin/escalate.sh" }
+        ],
+        mapLinks: [
+          { from: "root", to: "bin" },
+          { from: "bin", to: "bin/escalate.sh" }
+        ]
+      },
+      {
+        id: 5,
+        title: "Configuration Diff",
+        objective: "Compare differences between `/etc/configs.conf` and the backup `/etc/configs.bak` using `diff`, and append the results to `/home/agent/diff.log` using `>>`. When the app detects the correct lines in `diff.log`, submit the verification token: DIFF_CONFIRMED.",
+        targetToken: "DIFF_CONFIRMED",
+        startPath: [],
+        mapNodes: [
+          { name: "/", x: 80, y: 150, isDir: true, id: "root" },
+          { name: "etc", x: 180, y: 85, isDir: true, id: "etc" },
+          { name: "configs.conf", x: 280, y: 50, isDir: false, id: "etc/configs.conf" },
+          { name: "configs.bak", x: 280, y: 120, isDir: false, id: "etc/configs.bak" },
+          { name: "home", x: 180, y: 220, isDir: true, id: "home" },
+          { name: "agent", x: 280, y: 220, isDir: true, id: "home/agent" },
+          { name: "diff.log", x: 380, y: 220, isDir: false, id: "home/agent/diff.log" }
+        ],
+        mapLinks: [
+          { from: "root", to: "etc" },
+          { from: "etc", to: "etc/configs.conf" },
+          { from: "etc", to: "etc/configs.bak" },
+          { from: "root", to: "home" },
+          { from: "home", to: "home/agent" },
+          { from: "home/agent", to: "home/agent/diff.log" }
+        ]
+      }
+    ];
+
+    // Game Operative
+    const game = {
+      levelIndex: 0,
+      activeLevel: null,
+      idsAlertLevel: 0,
+      currentPath: [],
+      cmdHistory: [],
+      historyIndex: -1,
+      completedLevels: new Set(),
+      fs: null,
+
+      init() {
+        this.loadProgress();
+        this.updateRankDisplay();
+        
+        // Setup initial volume button icon
+        const soundEnabled = localStorage.getItem('shell_ghost_sound_enabled');
+        if (soundEnabled === 'false') {
+          sound.enabled = false;
+          document.getElementById('sound-toggle-btn').classList.add('muted');
+          document.getElementById('sound-icon').innerText = 'volume_off';
+        }
+
+        // Add keystroke visual listeners
+        document.getElementById('terminal-command-input').addEventListener('keydown', (e) => {
+          this.handleKeydown(e);
+        });
+
+        // Focus input by default
+        this.focusInput();
+      },
+
+      start() {
+        document.getElementById('landing-screen').classList.remove('active');
+        this.loadLevel(this.levelIndex);
+      },
+
+      loadLevel(idx) {
+        sound.stopAlarm();
+        document.body.classList.remove('ids-active');
+        document.getElementById('outcome-modal').classList.remove('active');
+        
+        this.levelIndex = idx;
+        this.activeLevel = levels[idx];
+        this.currentPath = [...this.activeLevel.startPath];
+        this.idsAlertLevel = 0;
+        this.updateIdsDisplay();
+        
+        // Construct separate FS instance for the level
+        this.fs = JSON.parse(JSON.stringify(levelFileSystems[idx]));
+
+        // Setup Header navigation
+        document.getElementById('prev-level-btn').disabled = (idx === 0);
+        document.getElementById('next-level-btn').disabled = (idx === levels.length - 1);
+        document.getElementById('level-title-label').innerText = `NODE ${this.activeLevel.id} / ${levels.length}`;
+        document.getElementById('mission-title-label').innerText = `Objective: ${this.activeLevel.title}`;
+        document.getElementById('mission-objective-text').innerText = this.activeLevel.objective;
+        document.getElementById('token-submit-input').value = '';
+
+        // Render network map nodes
+        this.renderMap();
+
+        // Print initial terminal motd welcome message
+        const consoleLog = document.getElementById('terminal-history-log');
+        consoleLog.innerHTML = `
+<div class="terminal-line">
+  <div class="terminal-output success">====================================================</div>
+  <div class="terminal-output success">SSH CONNECTION SECURED ON PORT 22 - CYTEX MAINFRAME</div>
+  <div class="terminal-output success">====================================================</div>
+  <div class="terminal-output">Welcome back, agent. Intrusion countermeasures are online.</div>
+  <div class="terminal-output">Execute CLI tasks. Use tab autocomplete and command history.</div>
+</div>`;
+        this.updatePromptLabel();
+      },
+
+      renderMap() {
+        const svg = document.getElementById('network-map-svg');
+        const nodesGroup = document.getElementById('map-nodes-group');
+        const linksGroup = document.getElementById('map-links-group');
+        
+        nodesGroup.innerHTML = '';
+        linksGroup.innerHTML = '';
+
+        // Dynamically compute lines
+        this.activeLevel.mapLinks.forEach(link => {
+          const fromNode = this.activeLevel.mapNodes.find(n => n.id === link.from);
+          const toNode = this.activeLevel.mapNodes.find(n => n.id === link.to);
+          if (!fromNode || !toNode) return;
+
+          const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+          line.setAttribute("class", "map-link");
+          line.setAttribute("x1", fromNode.x);
+          line.setAttribute("y1", fromNode.y);
+          line.setAttribute("x2", toNode.x);
+          line.setAttribute("y2", toNode.y);
+          line.id = `link-${fromNode.id}-${toNode.id}`;
+          
+          linksGroup.appendChild(line);
+        });
+
+        // Render nodes
+        this.activeLevel.mapNodes.forEach(node => {
+          const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+          g.id = `node-group-${node.id}`;
+
+          const shape = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+          shape.setAttribute("x", node.x - 35);
+          shape.setAttribute("y", node.y - 15);
+          shape.setAttribute("width", 70);
+          shape.setAttribute("height", 30);
+          shape.setAttribute("class", `map-node ${node.isDir ? 'dir' : 'file'}`);
+          
+          if (node.id === "sys/override.txt" || node.id === "home/agent/diff.log") {
+            shape.classList.add('target');
+          }
+
+          // Setup initial click selection focus cd traversal
+          shape.onclick = () => {
+            if (node.isDir) {
+              sound.playClick();
+              this.executeCommand(`cd /${node.id === 'root' ? '' : node.id}`);
+            }
+          };
+
+          g.appendChild(shape);
+
+          const txt = document.createElementNS("http://www.w3.org/2000/svg", "text");
+          txt.setAttribute("x", node.x);
+          txt.setAttribute("y", node.y + 4);
+          txt.setAttribute("class", "map-text");
+          txt.id = `text-${node.id}`;
+          txt.textContent = node.name;
+          
+          g.appendChild(txt);
+          nodesGroup.appendChild(g);
+        });
+
+        this.syncMapActiveStates();
+      },
+
+      syncMapActiveStates() {
+        // Find current folder ID relative
+        const currentPathStr = this.currentPath.join('/');
+        const currentId = currentPathStr === '' ? 'root' : currentPathStr;
+
+        this.activeLevel.mapNodes.forEach(node => {
+          const shape = document.getElementById(`node-group-${node.id}`)?.querySelector('.map-node');
+          const txt = document.getElementById(`text-${node.id}`);
+          if (shape && txt) {
+            if (node.id === currentId) {
+              shape.classList.add('current');
+              txt.classList.add('current');
+            } else {
+              shape.classList.remove('current');
+              txt.classList.remove('current');
+            }
+          }
+        });
+
+        // Traverse active paths to highlight lines
+        this.activeLevel.mapLinks.forEach(link => {
+          const line = document.getElementById(`link-${link.from}-${link.to}`);
+          if (line) {
+            // If the user path contains the node, highlight connection
+            const currentPathStr = this.currentPath.join('/');
+            if (currentPathStr.startsWith(link.to) || currentPathStr === link.from) {
+              line.classList.add('active-path');
+            } else {
+              line.classList.remove('active-path');
+            }
+          }
+        });
+      },
+
+      updatePromptLabel() {
+        const pathStr = this.currentPath.length === 0 ? '/' : '/' + this.currentPath.join('/');
+        document.getElementById('terminal-prompt-label').innerText = `agent@mainframe:${pathStr}$ `;
+      },
+
+      focusInput() {
+        const input = document.getElementById('terminal-command-input');
+        input.focus();
+        this.updateCursorCaretPosition();
+      },
+
+      updateCursorCaretPosition() {
+        const input = document.getElementById('terminal-command-input');
+        const caret = document.getElementById('terminal-cursor-caret');
+        
+        // Simple calculation of cursor text character width
+        const charWidth = 8.1; // estimate px
+        const offset = input.selectionStart * charWidth;
+        caret.style.left = `${offset}px`;
+      },
+
+      handleKeydown(e) {
+        sound.playKeypress();
+        
+        // Auto-complete (Tab)
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          this.handleAutocomplete();
+        }
+        
+        // Command history cycle (Up)
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (this.cmdHistory.length > 0) {
+            this.historyIndex = Math.min(this.cmdHistory.length - 1, this.historyIndex + 1);
+            e.target.value = this.cmdHistory[this.cmdHistory.length - 1 - this.historyIndex];
+          }
+        }
+        
+        // Command history cycle (Down)
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (this.historyIndex > 0) {
+            this.historyIndex--;
+            e.target.value = this.cmdHistory[this.cmdHistory.length - 1 - this.historyIndex];
+          } else {
+            this.historyIndex = -1;
+            e.target.value = '';
+          }
+        }
+
+        // Return submission (Enter)
+        if (e.key === 'Enter') {
+          const cmd = e.target.value.trim();
+          if (cmd !== '') {
+            this.cmdHistory.push(cmd);
+            this.historyIndex = -1;
+            this.executeCommand(cmd);
+            e.target.value = '';
+          }
+        }
+
+        // Adjust caret blinking position
+        setTimeout(() => this.updateCursorCaretPosition(), 10);
+      },
+
+      handleAutocomplete() {
+        const input = document.getElementById('terminal-command-input');
+        const text = input.value.trim();
+        const tokens = text.split(/\s+/);
+        
+        if (tokens.length === 0) return;
+        
+        const lastToken = tokens[tokens.length - 1];
+        
+        // List entries in current dir
+        const dir = this.getDirNode(this.currentPath);
+        if (!dir || !dir.children) return;
+
+        const options = Object.keys(dir.children);
+        const matches = options.filter(opt => opt.startsWith(lastToken));
+        
+        if (matches.length === 1) {
+          // Replace last token with autocomplete suggestion
+          tokens[tokens.length - 1] = matches[0];
+          input.value = tokens.join(' ') + (dir.children[matches[0]].isDir ? '/' : ' ');
+        }
+      },
+
+      executeCommand(cmdStr) {
+        const historyLog = document.getElementById('terminal-history-log');
+        const promptLabel = document.getElementById('terminal-prompt-label').innerText;
+
+        // Append prompt line
+        const line = document.createElement('div');
+        line.className = 'terminal-line';
+        const prompt = document.createElement('span');
+        prompt.className = 'terminal-prompt-line';
+        prompt.innerText = `${promptLabel}${cmdStr}`;
+        line.appendChild(prompt);
+
+        // Run evaluation
+        const output = this.evaluateShell(cmdStr);
+        const outSpan = document.createElement('span');
+        
+        if (output.error) {
+          outSpan.className = 'terminal-output error';
+          outSpan.innerText = output.text;
+          this.triggerAlert();
+        } else {
+          outSpan.className = 'terminal-output';
+          outSpan.innerText = output.text;
+        }
+        
+        line.appendChild(outSpan);
+        historyLog.appendChild(line);
+
+        // Scroll terminal to bottom
+        historyLog.scrollTop = historyLog.scrollHeight;
+
+        // Sync map active displays
+        this.syncMapActiveStates();
+        this.updatePromptLabel();
+      },
+
+      evaluateShell(cmdStr) {
+        // Check for pipelines (|), redirection outputs (>, >>)
+        // Redirection check:
+        let redirectType = null; // null, "write", "append"
+        let redirectFile = null;
+        let commandPart = cmdStr;
+
+        if (cmdStr.includes('>>')) {
+          redirectType = 'append';
+          const idx = cmdStr.indexOf('>>');
+          commandPart = cmdStr.substring(0, idx).trim();
+          redirectFile = cmdStr.substring(idx + 2).trim();
+        } else if (cmdStr.includes('>')) {
+          redirectType = 'write';
+          const idx = cmdStr.indexOf('>');
+          commandPart = cmdStr.substring(0, idx).trim();
+          redirectFile = cmdStr.substring(idx + 1).trim();
+        }
+
+        // Pipe check:
+        const cmdSegments = commandPart.split('|').map(s => s.trim());
+        let stdin = "";
+        let finalResult = { text: "", error: false };
+
+        for (let i = 0; i < cmdSegments.length; i++) {
+          const seg = cmdSegments[i];
+          const tokens = this.parseArgs(seg);
+          
+          if (tokens.length === 0) continue;
+
+          const action = tokens[0];
+          const args = tokens.slice(1);
+
+          const result = this.dispatchShellAction(action, args, stdin);
+          if (result.error) {
+            return result; // stop pipeline on error
+          }
+          stdin = result.text;
+          finalResult = result;
+        }
+
+        // Apply file redirections if necessary
+        if (redirectType && redirectFile) {
+          const redirResult = this.redirectOutputToFile(redirectFile, finalResult.text, redirectType === 'append');
+          if (redirResult.error) {
+            return redirResult;
+          }
+          // Redirections typically output empty strings on success
+          return { text: "", error: false };
+        }
+
+        return finalResult;
+      },
+
+      parseArgs(cmdPart) {
+        // Simple argument parser respecting double quotes
+        const args = [];
+        let current = '';
+        let inQuotes = false;
+        
+        for (let i = 0; i < cmdPart.length; i++) {
+          const char = cmdPart[i];
+          if (char === '"' || char === "'") {
+            inQuotes = !inQuotes;
+          } else if (char === ' ' && !inQuotes) {
+            if (current !== '') {
+              args.push(current);
+              current = '';
+            }
+          } else {
+            current += char;
+          }
+        }
+        if (current !== '') {
+          args.push(current);
+        }
+        return args;
+      },
+
+      dispatchShellAction(action, args, stdin) {
+        switch (action) {
+          case 'ls':
+            return this.lsAction(args);
+          case 'cd':
+            return this.cdAction(args);
+          case 'cat':
+            return this.catAction(args, stdin);
+          case 'grep':
+            return this.grepAction(args, stdin);
+          case 'find':
+            return this.findAction(args);
+          case 'chmod':
+            return this.chmodAction(args);
+          case 'diff':
+            return this.diffAction(args);
+          case 'help':
+            return { text: "Commands supported: cd, ls, cat, grep, find, chmod, diff, help", error: false };
+          default:
+            return { text: `shell: command not found: ${action}`, error: true };
+        }
+      },
+
+      resolveAbsolutePath(targetPathStr) {
+        let parts = [];
+        if (targetPathStr.startsWith('/')) {
+          parts = targetPathStr.split('/');
+        } else {
+          parts = [...this.currentPath, ...targetPathStr.split('/')];
+        }
+
+        const resolved = [];
+        for (let p of parts) {
+          if (p === '' || p === '.') continue;
+          if (p === '..') {
+            resolved.pop();
+          } else {
+            resolved.push(p);
+          }
+        }
+        return resolved;
+      },
+
+      getDirNode(pathArr) {
+        let current = this.fs;
+        for (let p of pathArr) {
+          if (!current || !current[p] || !current[p].isDir) return null;
+          current = current[p].children;
+        }
+        return { children: current, isDir: true };
+      },
+
+      getFileNode(pathArr) {
+        if (pathArr.length === 0) return null;
+        const dirPath = pathArr.slice(0, -1);
+        const fileName = pathArr[pathArr.length - 1];
+        
+        let current = this.fs;
+        for (let p of dirPath) {
+          if (!current || !current[p] || !current[p].isDir) return null;
+          current = current[p].children;
+        }
+        if (current && current[fileName] && !current[fileName].isDir) {
+          return current[fileName];
+        }
+        return null;
+      },
+
+      lsAction(args) {
+        const showAll = args.includes('-a');
+        const dir = this.getDirNode(this.currentPath);
+        if (!dir) return { text: "ls: directory not found", error: true };
+
+        const items = Object.keys(dir.children);
+        if (items.length === 0) return { text: "", error: false };
+
+        const rows = [];
+        items.forEach(key => {
+          if (!showAll && key.startsWith('.')) return;
+          const node = dir.children[key];
+          const type = node.isDir ? 'd' : '-';
+          const perms = node.permissions || 'rw-r----';
+          rows.push(`${type}${perms}  ${key}`);
+        });
+
+        return { text: rows.join('\n'), error: false };
+      },
+
+      cdAction(args) {
+        if (args.length === 0) {
+          this.currentPath = [];
+          return { text: "", error: false };
+        }
+
+        const pathStr = args[0];
+        const resolved = this.resolveAbsolutePath(pathStr);
+        const dir = this.getDirNode(resolved);
+        
+        if (!dir) {
+          return { text: `cd: no such file or directory: ${pathStr}`, error: true };
+        }
+
+        // Verify permission to access the dir
+        // In level 2, the .shadow dir might be restricted if we want, but default allows traversing.
+        this.currentPath = resolved;
+        return { text: "", error: false };
+      },
+
+      catAction(args, stdin) {
+        if (args.length === 0) {
+          // Read from stdin if piped
+          return { text: stdin, error: false };
+        }
+
+        const pathStr = args[0];
+        const resolved = this.resolveAbsolutePath(pathStr);
+        const file = this.getFileNode(resolved);
+
+        if (!file) {
+          return { text: `cat: ${pathStr}: No such file or directory`, error: true };
+        }
+
+        // Check file read permissions
+        if (file.permissions && !file.permissions.includes('r')) {
+          return { text: `cat: ${pathStr}: Permission denied`, error: true };
+        }
+
+        return { text: file.content, error: false };
+      },
+
+      grepAction(args, stdin) {
+        let pattern = "";
+        let filename = null;
+        let caseInsensitive = false;
+
+        // Parse grep arguments
+        let nextIsPattern = true;
+        for (let i = 0; i < args.length; i++) {
+          const arg = args[i];
+          if (arg === '-i') {
+            caseInsensitive = true;
+          } else if (nextIsPattern) {
+            pattern = arg;
+            nextIsPattern = false;
+          } else {
+            filename = arg;
+          }
+        }
+
+        if (pattern === "") {
+          return { text: "grep: search pattern required", error: true };
+        }
+
+        let content = stdin;
+        if (filename) {
+          const resolved = this.resolveAbsolutePath(filename);
+          const file = this.getFileNode(resolved);
+          if (!file) {
+            return { text: `grep: ${filename}: No such file or directory`, error: true };
+          }
+          if (file.permissions && !file.permissions.includes('r')) {
+            return { text: `grep: ${filename}: Permission denied`, error: true };
+          }
+          content = file.content;
+        }
+
+        const lines = content.split('\n');
+        const matches = [];
+        
+        const regex = new RegExp(this.escapeRegExp(pattern), caseInsensitive ? 'i' : '');
+        lines.forEach(line => {
+          if (regex.test(line)) {
+            matches.push(line);
+          }
+        });
+
+        return { text: matches.join('\n'), error: false };
+      },
+
+      findAction(args) {
+        // find . -name "*.key"
+        let pathStr = ".";
+        let namePattern = null;
+
+        for (let i = 0; i < args.length; i++) {
+          if (args[i] === '-name' && i + 1 < args.length) {
+            namePattern = args[i + 1].replace(/"/g, "").replace(/'/g, "");
+            break;
+          } else if (i === 0 && !args[i].startsWith('-')) {
+            pathStr = args[i];
+          }
+        }
+
+        const resolved = this.resolveAbsolutePath(pathStr);
+        const results = [];
+
+        const traverse = (currentPath, nodePathStr) => {
+          const dir = this.getDirNode(currentPath);
+          if (!dir || !dir.children) return;
+
+          Object.keys(dir.children).forEach(key => {
+            const node = dir.children[key];
+            const relative = nodePathStr === '' ? key : `${nodePathStr}/${key}`;
+            
+            // Check matching
+            if (namePattern) {
+              // Simple wildcard matching e.g. *.key
+              const regexStr = '^' + this.escapeRegExp(namePattern).replace(/\\\*/g, '.*') + '$';
+              const reg = new RegExp(regexStr);
+              if (reg.test(key)) {
+                results.push(relative.startsWith('.') ? relative : `./${relative}`);
+              }
+            } else {
+              results.push(relative.startsWith('.') ? relative : `./${relative}`);
+            }
+
+            if (node.isDir) {
+              traverse([...currentPath, key], relative);
+            }
+          });
+        };
+
+        // Run traverse
+        traverse(resolved, pathStr === '.' ? '.' : pathStr);
+        return { text: results.join('\n'), error: false };
+      },
+
+      chmodAction(args) {
+        // chmod 755 file or chmod +r file
+        if (args.length < 2) {
+          return { text: "chmod: missing arguments. Usage: chmod [mode] [file]", error: true };
+        }
+
+        const mode = args[0];
+        const filename = args[1];
+        const resolved = this.resolveAbsolutePath(filename);
+        const file = this.getFileNode(resolved);
+
+        if (!file) {
+          return { text: `chmod: ${filename}: No such file or directory`, error: true };
+        }
+
+        if (mode === '755' || mode === '+r' || mode === '644' || mode === '777') {
+          file.permissions = "rwxr-xr-x";
+        } else if (mode === '000') {
+          file.permissions = "---------";
+        } else {
+          return { text: `chmod: unsupported mode format: ${mode}`, error: true };
+        }
+
+        return { text: "", error: false };
+      },
+
+      diffAction(args) {
+        if (args.length < 2) {
+          return { text: "diff: missing file parameters. Usage: diff [file1] [file2]", error: true };
+        }
+
+        const file1Str = args[0];
+        const file2Str = args[1];
+
+        const f1Node = this.getFileNode(this.resolveAbsolutePath(file1Str));
+        const f2Node = this.getFileNode(this.resolveAbsolutePath(file2Str));
+
+        if (!f1Node) return { text: `diff: ${file1Str}: No such file`, error: true };
+        if (!f2Node) return { text: `diff: ${file2Str}: No such file`, error: true };
+
+        const lines1 = f1Node.content.split('\n');
+        const lines2 = f2Node.content.split('\n');
+
+        const diffLines = [];
+        const max = Math.max(lines1.length, lines2.length);
+
+        for (let i = 0; i < max; i++) {
+          const l1 = lines1[i];
+          const l2 = lines2[i];
+
+          if (l1 !== l2) {
+            if (l1 !== undefined) diffLines.push(`< ${l1}`);
+            if (l2 !== undefined) diffLines.push(`> ${l2}`);
+          }
+        }
+
+        return { text: diffLines.join('\n'), error: false };
+      },
+
+      redirectOutputToFile(targetFileStr, text, isAppend) {
+        const resolved = this.resolveAbsolutePath(targetFileStr);
+        if (resolved.length === 0) return { text: "redirect: invalid path", error: true };
+
+        const dirPath = resolved.slice(0, -1);
+        const fileName = resolved[resolved.length - 1];
+
+        // Retrieve directory
+        let dir = this.fs;
+        for (let p of dirPath) {
+          if (!dir || !dir[p] || !dir[p].isDir) {
+            return { text: `redirect: directory path not found: /${dirPath.join('/')}`, error: true };
+          }
+          dir = dir[p].children;
+        }
+
+        if (!dir) return { text: "redirect: directory not found", error: true };
+
+        if (dir[fileName]) {
+          // File exists
+          if (dir[fileName].isDir) {
+            return { text: `redirect: ${fileName} is a directory`, error: true };
+          }
+          if (isAppend) {
+            dir[fileName].content += (dir[fileName].content.endsWith('\n') ? '' : '\n') + text;
+          } else {
+            dir[fileName].content = text;
+          }
+        } else {
+          // Create file
+          dir[fileName] = {
+            isDir: false,
+            content: text,
+            permissions: "rw-r----"
+          };
+
+          // Re-render SVG to add file if relevant to visual nodes
+          const levelNodeId = resolved.join('/');
+          const nodeExists = this.activeLevel.mapNodes.some(n => n.id === levelNodeId);
+          if (nodeExists) {
+            this.renderMap();
+          }
+        }
+
+        return { text: "", error: false };
+      },
+
+      escapeRegExp(string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      },
+
+      triggerAlert() {
+        this.idsAlertLevel = Math.min(100, this.idsAlertLevel + 20);
+        this.updateIdsDisplay();
+
+        if (this.idsAlertLevel >= 80) {
+          sound.startAlarm();
+          document.body.classList.add('ids-active');
+        }
+
+        if (this.idsAlertLevel >= 100) {
+          setTimeout(() => {
+            sound.playFail();
+            this.showOutcomeModal(false, "ACCESS DETIED - SYSTEM LOCKOUT! Multiple security alerts triggered corporate trace countermeasures.");
+          }, 500);
+        }
+      },
+
+      updateIdsDisplay() {
+        const fill = document.getElementById('ids-bar-fill');
+        const text = document.getElementById('ids-val-text');
+        fill.style.width = `${this.idsAlertLevel}%`;
+        text.innerText = `${this.idsAlertLevel}%`;
+      },
+
+      submitToken() {
+        const input = document.getElementById('token-submit-input').value.trim();
+        if (input === "") return;
+
+        // Verify task requirements state
+        let pass = false;
+        
+        if (this.levelIndex === 2) {
+          // Check level 3 requirement: override file exists and matches filtered logs
+          const file = this.getFileNode(["sys", "override.txt"]);
+          const logNode = this.getFileNode(["var", "log", "mainframe.log"]);
+          
+          if (file && logNode) {
+            const matches = logNode.content.split('\n').filter(l => l.toLowerCase().includes('override')).join('\n');
+            if (file.content.trim() === matches.trim() && input === this.activeLevel.targetToken) {
+              pass = true;
+            } else {
+              sound.playFail();
+              alert("Verification check failed: /sys/override.txt content is incorrect or missing!");
+              return;
+            }
+          } else {
+            sound.playFail();
+            alert("Verification check failed: /sys/override.txt file was not created!");
+            return;
+          }
+        } else if (this.levelIndex === 4) {
+          // Level 5 configs diff test
+          const file = this.getFileNode(["home", "agent", "diff.log"]);
+          if (file && file.content.includes("max_connections") && input === this.activeLevel.targetToken) {
+            pass = true;
+          } else {
+            sound.playFail();
+            alert("Verification check failed: /home/agent/diff.log differences are missing!");
+            return;
+          }
+        } else {
+          // Default string check
+          if (input === this.activeLevel.targetToken) {
+            pass = true;
+          }
+        }
+
+        if (pass) {
+          this.triggerWin();
+        } else {
+          sound.playFail();
+          this.triggerAlert();
+          alert("Invalid security token code submitted! Trace alert raised.");
+        }
+      },
+
+      triggerWin() {
+        sound.stopAlarm();
+        document.body.classList.remove('ids-active');
+        sound.playSuccess();
+        
+        // Save progression
+        this.completedLevels.add(this.levelIndex);
+        this.saveProgress();
+
+        this.showOutcomeModal(true);
+      },
+
+      showOutcomeModal(success, message = "") {
+        const modal = document.getElementById('outcome-overlay');
+        if (!modal) {
+          // Create outcome overlay dynamic fallback
+          const overlay = document.getElementById('outcome-modal');
+          const title = document.getElementById('outcome-title');
+          const desc = document.getElementById('outcome-desc');
+          const icon = document.getElementById('outcome-icon');
+          const actionBtn = document.getElementById('modal-action-btn');
+
+          overlay.classList.add('active');
+
+          if (success) {
+            icon.className = 'material-symbols-outlined modal-icon success';
+            icon.innerText = 'shield_lock';
+            title.innerText = "NODE INFILTRATED";
+            desc.innerText = `Token verification successful. Central systems database decompiled. Data logs extracted!`;
+            
+            // Recalculate rank
+            this.updateRankDisplay();
+
+            if (this.levelIndex === levels.length - 1) {
+              actionBtn.innerText = "Finalize Hack";
+            } else {
+              actionBtn.innerText = "Next Mainframe Node";
+            }
+          } else {
+            icon.className = 'material-symbols-outlined modal-icon fail';
+            icon.innerText = 'warning';
+            title.innerText = "SSH OVERLOAD DISCONNECT";
+            desc.innerText = message;
+            actionBtn.innerText = "Retry Infiltration";
+          }
+        }
+      },
+
+      handleModalAction() {
+        const actionBtn = document.getElementById('modal-action-btn');
+        document.getElementById('outcome-modal').classList.remove('active');
+
+        if (actionBtn.innerText === "Retry Infiltration") {
+          this.loadLevel(this.levelIndex);
+        } else if (actionBtn.innerText === "Next Mainframe Node") {
+          this.loadLevel(this.levelIndex + 1);
+        } else {
+          this.cleanup();
+          window.location.href = '../index.html';
+        }
+      },
+
+      changeLevel(dir) {
+        sound.playClick();
+        const newIdx = this.levelIndex + dir;
+        if (newIdx >= 0 && newIdx < levels.length) {
+          this.loadLevel(newIdx);
+        }
+      },
+
+      resetLevel() {
+        sound.playClick();
+        this.loadLevel(this.levelIndex);
+      },
+
+      toggleSound() {
+        sound.enabled = !sound.enabled;
+        const btn = document.getElementById('sound-toggle-btn');
+        const icon = document.getElementById('sound-icon');
+        
+        if (sound.enabled) {
+          btn.classList.remove('muted');
+          icon.innerText = 'volume_up';
+          localStorage.setItem('shell_ghost_sound_enabled', 'true');
+        } else {
+          btn.classList.add('muted');
+          icon.innerText = 'volume_off';
+          localStorage.setItem('shell_ghost_sound_enabled', 'false');
+          sound.stopAlarm();
+        }
+      },
+
+      cleanup() {
+        sound.stopAlarm();
+      },
+
+      calculateRank() {
+        const count = this.completedLevels.size;
+        if (count >= 5) return "Ghost in the Shell";
+        if (count >= 4) return "Network Infiltrator";
+        if (count >= 2) return "Terminal Specter";
+        return "Network Cadet";
+      },
+
+      updateRankDisplay() {
+        const rank = this.calculateRank();
+        document.getElementById('hacker-rank').innerText = rank;
+      },
+
+      loadProgress() {
+        try {
+          const val = localStorage.getItem('shell_ghost_progress');
+          if (val) {
+            const data = JSON.parse(val);
+            if (data.completed && Array.isArray(data.completed)) {
+              data.completed.forEach(idx => this.completedLevels.add(Number(idx)));
+            }
+            if (data.currentIndex !== undefined) {
+              this.levelIndex = Math.min(levels.length - 1, Math.max(0, Number(data.currentIndex)));
+            }
+          }
+        } catch (e) {
+          console.error("Failed to load progress:", e);
+        }
+      },
+
+      saveProgress() {
+        try {
+          const data = {
+            completed: Array.from(this.completedLevels),
+            currentIndex: this.levelIndex
+          };
+          localStorage.setItem('shell_ghost_progress', JSON.stringify(data));
+        } catch (e) {
+          console.error("Failed to save progress:", e);
+        }
+      }
+    };
+
+    window.addEventListener('DOMContentLoaded', () => {
+      game.init();
+    });
+  </script>
+</body>
+</html>
