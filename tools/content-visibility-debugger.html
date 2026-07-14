@@ -1,0 +1,849 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Content-Visibility &amp; Intersection Debugger</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,500;0,600;1,500&family=Sora:wght@400;500;600;700&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --paper: #f2ecd9;
+        --paper-dark: #e6dcc0;
+        --paper-line: #d3c6a1;
+        --ink: #16241b;
+        --ink-soft: #4d5b4d;
+        --console: #182821;
+        --console2: #1f342a;
+        --console-line: #33493d;
+        --green: #5fd39a;
+        --green-dim: #2a5540;
+        --green-glow: rgba(95, 211, 154, 0.16);
+        --rust: #e08a5f;
+        --rust-dim: #8a3c22;
+        --rust-glow: rgba(224, 138, 95, 0.14);
+        --gold: #d9b25c;
+        --font-display: "Spectral", serif;
+        --font-ui: "Sora", sans-serif;
+        --font-mono: "Fira Code", monospace;
+      }
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html {
+        background: var(--paper);
+        scroll-behavior: smooth;
+      }
+      body {
+        background: repeating-linear-gradient(180deg, transparent 0 39px, rgba(22, 36, 27, 0.05) 39px 40px), var(--paper);
+        color: var(--ink);
+        font-family: var(--font-ui);
+        min-height: 100vh;
+        line-height: 1.65;
+      }
+      button,
+      input,
+      select {
+        font-family: inherit;
+        color: inherit;
+      }
+      button {
+        cursor: pointer;
+        background: none;
+        border: none;
+      }
+      button:focus-visible,
+      input:focus-visible {
+        outline: 2px solid var(--rust);
+        outline-offset: 2px;
+      }
+      ::selection {
+        background: var(--green-glow);
+      }
+
+      /* ---- app shell: main column + fixed console rail ---- */
+      .app-shell {
+        display: flex;
+        min-height: 100vh;
+      }
+      .main-col {
+        flex: 1;
+        min-width: 0;
+        margin-right: 320px;
+      }
+      @media (max-width: 900px) {
+        .main-col {
+          margin-right: 0;
+        }
+      }
+
+      /* ---- masthead ---- */
+      .masthead {
+        background: var(--paper);
+        border-bottom: 3px double var(--ink);
+        padding: 20px 32px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+      .masthead-left {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+      .instrument-glyph {
+        width: 40px;
+        height: 40px;
+        flex-shrink: 0;
+      }
+      .masthead-title h1 {
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: 22px;
+        letter-spacing: 0.01em;
+      }
+      .masthead-title p {
+        font-family: var(--font-mono);
+        font-size: 10.5px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+        margin-top: 3px;
+      }
+      .masthead-controls {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+      .master-toggle {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .master-toggle-label {
+        font-family: var(--font-mono);
+        font-size: 11.5px;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+      }
+      .toggle-switch {
+        width: 50px;
+        height: 26px;
+        border-radius: 14px;
+        background: var(--paper-dark);
+        border: 1.5px solid var(--ink);
+        position: relative;
+        transition: background 0.2s;
+      }
+      .toggle-knob {
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 19px;
+        height: 19px;
+        border-radius: 50%;
+        background: var(--rust);
+        transition:
+          transform 0.22s cubic-bezier(0.3, 1.3, 0.4, 1),
+          background 0.2s;
+      }
+      .toggle-switch.on {
+        background: var(--green-glow);
+      }
+      .toggle-switch.on .toggle-knob {
+        transform: translateX(23px);
+        background: var(--green);
+      }
+      .intrinsic-field {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .intrinsic-field label {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--ink-soft);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .intrinsic-field input {
+        width: 68px;
+        background: var(--paper-dark);
+        border: 1px solid var(--paper-line);
+        border-radius: 6px;
+        padding: 6px 8px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        text-align: center;
+      }
+
+      /* ---- intro strip ---- */
+      .intro-strip {
+        max-width: 720px;
+        margin: 26px auto 0;
+        padding: 0 32px 26px;
+        text-align: center;
+      }
+      .intro-strip h2 {
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: 25px;
+        margin-bottom: 12px;
+      }
+      .intro-strip p {
+        font-size: 14px;
+        color: var(--ink-soft);
+        line-height: 1.8;
+      }
+      .intro-strip code {
+        font-family: var(--font-mono);
+        background: var(--green-glow);
+        color: var(--green-dim);
+        padding: 1px 7px;
+        border-radius: 5px;
+        font-size: 12.5px;
+      }
+
+      /* ---- the long page itself ---- */
+      .roll {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 0 32px 100px;
+      }
+      .section {
+        margin: 26px 0;
+        border: 1.5px solid var(--ink);
+        border-radius: 3px;
+        background: var(--paper);
+        position: relative;
+        overflow: hidden;
+      }
+      .section-band {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 18px;
+        border-bottom: 1px solid var(--paper-line);
+        background: var(--paper-dark);
+      }
+      .section-band-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .section-index {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--ink-soft);
+        background: var(--paper);
+        border: 1px solid var(--paper-line);
+        border-radius: 20px;
+        padding: 2px 10px;
+      }
+      .section-title {
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: 15.5px;
+      }
+      .state-tag {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        font-weight: 600;
+        padding: 4px 11px;
+        border-radius: 20px;
+        border: 1.5px solid var(--green-dim);
+        color: var(--green-dim);
+        background: var(--green-glow);
+        white-space: nowrap;
+      }
+      .state-tag.skipped {
+        border-color: var(--rust-dim);
+        color: var(--rust-dim);
+        background: var(--rust-glow);
+      }
+      .section-content {
+        padding: 20px 18px;
+        min-height: var(--min-h, 140px);
+      }
+      .section-content p {
+        font-size: 13.5px;
+        color: var(--ink-soft);
+        line-height: 1.75;
+        margin-bottom: 10px;
+      }
+      .section-content p:last-child {
+        margin-bottom: 0;
+      }
+      .decorative-rule {
+        width: 38px;
+        height: 2px;
+        background: var(--rust);
+        margin-bottom: 12px;
+      }
+
+      .roll-footer {
+        text-align: center;
+        padding: 50px 0 20px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--ink-soft);
+        letter-spacing: 0.05em;
+      }
+
+      /* ============================================================
+   RIGHT CONSOLE RAIL — fixed, full height, oscilloscope styling
+   ============================================================ */
+      .console-rail {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 320px;
+        z-index: 50;
+        background: linear-gradient(180deg, var(--console2), var(--console));
+        border-left: 1px solid var(--console-line);
+        font-family: var(--font-mono);
+        color: #dce9df;
+        display: flex;
+        flex-direction: column;
+        box-shadow: -10px 0 30px rgba(0, 0, 0, 0.25);
+      }
+      @media (max-width: 900px) {
+        .console-rail {
+          position: static;
+          width: 100%;
+          border-left: none;
+          border-top: 3px double var(--ink);
+          box-shadow: none;
+        }
+      }
+      .console-head {
+        padding: 18px 20px 14px;
+        border-bottom: 1px solid var(--console-line);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .console-head-title {
+        font-size: 10.5px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: #8fae9a;
+      }
+      .console-clock {
+        font-size: 13px;
+        color: var(--gold);
+        font-weight: 600;
+      }
+      .console-scroll {
+        flex: 1;
+        overflow-y: auto;
+        padding: 18px 20px 24px;
+      }
+      .console-scroll::-webkit-scrollbar {
+        width: 6px;
+      }
+      .console-scroll::-webkit-scrollbar-thumb {
+        background: var(--console-line);
+        border-radius: 4px;
+      }
+
+      .console-block {
+        margin-bottom: 22px;
+      }
+      .console-block:last-child {
+        margin-bottom: 0;
+      }
+      .console-block-title {
+        font-size: 9.5px;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+        color: #8fae9a;
+        margin-bottom: 11px;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .console-block-title svg {
+        width: 12px;
+        height: 12px;
+      }
+
+      /* big readout pair */
+      .readout-pair {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+      .readout-box {
+        flex: 1;
+        background: rgba(0, 0, 0, 0.22);
+        border: 1px solid var(--console-line);
+        border-radius: 8px;
+        padding: 12px 14px;
+      }
+      .readout-box .label {
+        font-size: 9.5px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #8fae9a;
+        margin-bottom: 6px;
+      }
+      .readout-box .value {
+        font-size: 26px;
+        font-weight: 600;
+        line-height: 1;
+      }
+      .readout-box.rendered .value {
+        color: var(--green);
+      }
+      .readout-box.skipped .value {
+        color: var(--rust);
+      }
+
+      /* skip ratio bar */
+      .ratio-bar {
+        height: 10px;
+        border-radius: 6px;
+        overflow: hidden;
+        display: flex;
+        background: rgba(0, 0, 0, 0.3);
+        margin-bottom: 8px;
+      }
+      .ratio-fill-rendered {
+        background: var(--green);
+        transition: width 0.2s ease;
+      }
+      .ratio-fill-skipped {
+        background: var(--rust);
+        transition: width 0.2s ease;
+      }
+      .ratio-caption {
+        font-size: 10.5px;
+        color: #8fae9a;
+        text-align: center;
+      }
+
+      /* strip chart */
+      .strip-chart {
+        height: 70px;
+        background: rgba(0, 0, 0, 0.22);
+        border: 1px solid var(--console-line);
+        border-radius: 6px;
+        position: relative;
+        overflow: hidden;
+      }
+      .strip-chart-mid {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 50%;
+        height: 1px;
+        background: var(--console-line);
+      }
+      .strip-bar {
+        position: absolute;
+        bottom: 0;
+        width: 4px;
+        border-radius: 1px 1px 0 0;
+        transition: height 0.15s ease;
+      }
+      .strip-bar.rendered {
+        background: var(--green);
+      }
+      .strip-bar.skipped {
+        background: var(--rust);
+        opacity: 0.8;
+      }
+
+      /* savings line */
+      .savings-card {
+        background: rgba(217, 178, 92, 0.08);
+        border: 1px dashed var(--gold);
+        border-radius: 8px;
+        padding: 12px 14px;
+        text-align: center;
+      }
+      .savings-card .big {
+        font-size: 20px;
+        font-weight: 600;
+        color: var(--gold);
+      }
+      .savings-card .small {
+        font-size: 10.5px;
+        color: #8fae9a;
+        margin-top: 4px;
+        line-height: 1.5;
+      }
+
+      /* rendered section chips */
+      .chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .sect-chip {
+        font-size: 10px;
+        padding: 4px 8px;
+        border-radius: 5px;
+        border: 1px solid var(--green-dim);
+        color: var(--green);
+        background: rgba(95, 211, 154, 0.08);
+      }
+      .chip-empty {
+        font-size: 11px;
+        color: #8fae9a;
+        font-style: italic;
+      }
+
+      /* event log */
+      .event-log {
+        display: flex;
+        flex-direction: column-reverse;
+        gap: 6px;
+        max-height: 220px;
+        overflow-y: auto;
+      }
+      .event-log::-webkit-scrollbar {
+        width: 5px;
+      }
+      .event-log::-webkit-scrollbar-thumb {
+        background: var(--console-line);
+        border-radius: 4px;
+      }
+      .event-row {
+        display: flex;
+        gap: 8px;
+        align-items: baseline;
+        font-size: 11px;
+        padding: 5px 8px;
+        border-radius: 5px;
+        background: rgba(0, 0, 0, 0.18);
+        border-left: 2px solid var(--console-line);
+        animation: eventIn 0.25s ease both;
+      }
+      @keyframes eventIn {
+        from {
+          opacity: 0;
+          transform: translateX(6px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      .event-row.rendered {
+        border-left-color: var(--green);
+      }
+      .event-row.skipped {
+        border-left-color: var(--rust);
+      }
+      .event-row .t {
+        color: #6e8a78;
+        flex-shrink: 0;
+      }
+      .event-row .s {
+        color: #dce9df;
+        flex-shrink: 0;
+      }
+      .event-row .a {
+        margin-left: auto;
+        font-weight: 600;
+      }
+      .event-row.rendered .a {
+        color: var(--green);
+      }
+      .event-row.skipped .a {
+        color: var(--rust);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          transition: none !important;
+          scroll-behavior: auto !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <div class="main-col">
+        <header class="masthead">
+          <div class="masthead-left">
+            <svg class="instrument-glyph" viewBox="0 0 40 40" fill="none">
+              <rect x="2" y="2" width="36" height="36" rx="4" fill="#f2ecd9" stroke="#16241b" stroke-width="2" />
+              <path d="M6 28 L12 18 L17 24 L23 10 L28 20 L34 14" stroke="#3f7d5c" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+              <circle cx="23" cy="10" r="2" fill="#b5502f" />
+            </svg>
+            <div class="masthead-title">
+              <h1>Content-Visibility &amp; Intersection Debugger</h1>
+              <p>Live rendering-cost instrument</p>
+            </div>
+          </div>
+          <div class="masthead-controls">
+            <div class="intrinsic-field">
+              <label>contain-intrinsic-size</label>
+              <input type="number" id="intrinsic-input" value="140" min="20" max="600" oninput="setIntrinsicSize(this.value)" />
+              <span style="font-size: 11px; color: var(--ink-soft)">px</span>
+            </div>
+            <div class="master-toggle">
+              <span class="master-toggle-label">content-visibility: auto</span>
+              <button class="toggle-switch on" id="master-toggle" onclick="toggleContentVisibility()">
+                <div class="toggle-knob"></div>
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <div class="intro-strip">
+          <h2>Watch the Browser Skip Work, in Real Time</h2>
+          <p><code>content-visibility: auto</code> tells the browser it may skip layout and paint entirely for any section currently off-screen, then resume the instant it approaches the viewport. Every reading in the console on the right is driven by a real <code>contentvisibilityautostatechange</code> event firing on that exact element — nothing here is simulated.</p>
+        </div>
+
+        <main class="roll" id="roll"></main>
+      </div>
+
+      <aside class="console-rail">
+        <div class="console-head">
+          <span class="console-head-title">Render Console</span>
+          <span class="console-clock" id="dock-clock">00:00</span>
+        </div>
+        <div class="console-scroll">
+          <div class="console-block">
+            <div class="console-block-title">Current State</div>
+            <div class="readout-pair">
+              <div class="readout-box rendered">
+                <div class="label">Rendered</div>
+                <div class="value" id="count-rendered">0</div>
+              </div>
+              <div class="readout-box skipped">
+                <div class="label">Skipped</div>
+                <div class="value" id="count-skipped">0</div>
+              </div>
+            </div>
+            <div class="ratio-bar">
+              <div class="ratio-fill-rendered" id="ratio-rendered" style="width: 0%"></div>
+              <div class="ratio-fill-skipped" id="ratio-skipped" style="width: 0%"></div>
+            </div>
+            <div class="ratio-caption" id="ratio-caption">0 of 0 sections currently rendered</div>
+          </div>
+
+          <div class="console-block">
+            <div class="console-block-title">Activity Strip</div>
+            <div class="strip-chart" id="strip-chart">
+              <div class="strip-chart-mid"></div>
+            </div>
+          </div>
+
+          <div class="console-block">
+            <div class="console-block-title">Estimated Savings</div>
+            <div class="savings-card">
+              <div class="big" id="dom-saved">0</div>
+              <div class="small">child nodes currently excluded<br />from layout &amp; paint</div>
+            </div>
+          </div>
+
+          <div class="console-block">
+            <div class="console-block-title">Currently Rendered Sections</div>
+            <div class="chip-row" id="rendered-chips">
+              <span class="chip-empty">—</span>
+            </div>
+          </div>
+
+          <div class="console-block">
+            <div class="console-block-title">Live Event Log</div>
+            <div class="event-log" id="event-log"></div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <script>
+      /* ============================================================
+   CONTENT-VISIBILITY & INTERSECTION DEBUGGER
+   ============================================================ */
+
+      const SECTION_COUNT = 46;
+      const CHILD_NODES_PER_SECTION = 14;
+
+      const TOPICS = ["Tide Pool Ecology", "Cartography of Lost Rivers", "The Physics of Slow Light", "Fermented Grain Archives", "Analog Signal Processing", "Migratory Bird Corridors", "Cast Iron Metallurgy", "Deep Time Sediment Layers", "Mechanical Clockwork Escapements", "Alpine Lichen Growth Rates", "Forgotten Telegraph Lines", "Root Systems of Old Oaks", "Salt Flat Mineral Formation", "Hand-Bound Book Restoration", "Coastal Erosion Patterns", "Wind-Powered Water Mills"];
+
+      function buildSections() {
+        const roll = document.getElementById("roll");
+        let html = "";
+        for (let i = 1; i <= SECTION_COUNT; i++) {
+          const topic = TOPICS[i % TOPICS.length] + " — Field Note " + i;
+          html += `
+    <section class="section cv-section" id="sec-${i}" data-index="${i}">
+      <div class="section-band">
+        <div class="section-band-left">
+          <span class="section-index">§${String(i).padStart(2, "0")}</span>
+          <span class="section-title">${topic}</span>
+        </div>
+        <span class="state-tag" id="tag-${i}">rendered</span>
+      </div>
+      <div class="section-content" id="content-${i}">
+        <div class="decorative-rule"></div>
+        <p>This section occupies real space in the document. When it scrolls far enough off-screen, the browser's <code>content-visibility: auto</code> engine may skip its layout and paint work entirely — this paragraph and its siblings simply stop costing anything until you scroll back.</p>
+        <p>Reserved space is held by <code>contain-intrinsic-size</code>, controlled from the field at the top of the page — shrink it too far below this section's real height and you'll feel the layout jump when it un-skips.</p>
+      </div>
+    </section>`;
+        }
+        roll.innerHTML = html;
+        applyContainStyles();
+        observeSections();
+      }
+
+      let cvEnabled = true;
+      let intrinsicSize = 140;
+
+      function applyContainStyles() {
+        const sections = document.querySelectorAll(".cv-section");
+        sections.forEach((sec) => {
+          if (cvEnabled) {
+            sec.style.contentVisibility = "auto";
+            sec.style.containIntrinsicSize = `auto ${intrinsicSize}px`;
+          } else {
+            sec.style.contentVisibility = "visible";
+            sec.style.containIntrinsicSize = "";
+          }
+        });
+      }
+
+      function toggleContentVisibility() {
+        cvEnabled = !cvEnabled;
+        const toggle = document.getElementById("master-toggle");
+        toggle.classList.toggle("on", cvEnabled);
+        applyContainStyles();
+        refreshCounts();
+      }
+      function setIntrinsicSize(v) {
+        intrinsicSize = Math.max(20, Math.min(600, Number(v) || 140));
+        applyContainStyles();
+      }
+
+      /* ---------- Track real contentvisibilityautostatechange events ---------- */
+      const sectionState = new Map();
+      const eventLogEl = document.getElementById("event-log");
+      const MAX_LOG_ROWS = 40;
+
+      function observeSections() {
+        const sections = document.querySelectorAll(".cv-section");
+        sections.forEach((sec) => {
+          const idx = sec.dataset.index;
+          sectionState.set(idx, false);
+          sec.addEventListener("contentvisibilityautostatechange", (e) => {
+            sectionState.set(idx, e.skipped);
+            const tag = document.getElementById("tag-" + idx);
+            if (tag) {
+              tag.textContent = e.skipped ? "skipped" : "rendered";
+              tag.classList.toggle("skipped", e.skipped);
+            }
+            refreshCounts();
+            pushStripSample(e.skipped);
+            logEvent(idx, e.skipped);
+          });
+        });
+        refreshCounts();
+      }
+
+      /* ---------- Console readouts ---------- */
+      function refreshCounts() {
+        let rendered = 0,
+          skipped = 0;
+        sectionState.forEach((v) => {
+          if (v) skipped++;
+          else rendered++;
+        });
+        if (!cvEnabled) {
+          rendered = SECTION_COUNT;
+          skipped = 0;
+        }
+
+        document.getElementById("count-rendered").textContent = rendered;
+        document.getElementById("count-skipped").textContent = skipped;
+        document.getElementById("dom-saved").textContent = (skipped * CHILD_NODES_PER_SECTION).toLocaleString();
+
+        const total = rendered + skipped || 1;
+        document.getElementById("ratio-rendered").style.width = (rendered / total) * 100 + "%";
+        document.getElementById("ratio-skipped").style.width = (skipped / total) * 100 + "%";
+        document.getElementById("ratio-caption").textContent = `${rendered} of ${total} sections currently rendered`;
+
+        const chipsEl = document.getElementById("rendered-chips");
+        const renderedIdxs = [];
+        sectionState.forEach((v, idx) => {
+          if (!v || !cvEnabled) renderedIdxs.push(Number(idx));
+        });
+        renderedIdxs.sort((a, b) => a - b);
+        chipsEl.innerHTML = renderedIdxs.length ? renderedIdxs.map((i) => `<span class="sect-chip">§${String(i).padStart(2, "0")}</span>`).join("") : `<span class="chip-empty">—</span>`;
+      }
+
+      function logEvent(idx, skipped) {
+        const row = document.createElement("div");
+        row.className = "event-row " + (skipped ? "skipped" : "rendered");
+        const time = new Date();
+        const t = time.toTimeString().slice(0, 8);
+        row.innerHTML = `<span class="t">${t}</span><span class="s">§${String(idx).padStart(2, "0")}</span><span class="a">${skipped ? "SKIPPED" : "RENDERED"}</span>`;
+        eventLogEl.prepend(row);
+        while (eventLogEl.children.length > MAX_LOG_ROWS) {
+          eventLogEl.removeChild(eventLogEl.lastChild);
+        }
+      }
+
+      /* ---------- Strip chart ---------- */
+      const stripChart = document.getElementById("strip-chart");
+      const MAX_BARS = 52;
+      let barQueue = [];
+
+      function pushStripSample(skipped) {
+        barQueue.push(skipped);
+        if (barQueue.length > MAX_BARS) barQueue.shift();
+        renderStrip();
+      }
+      window.addEventListener("resize", () => {
+        if (barQueue.length) renderStrip();
+      });
+
+      function renderStrip() {
+        const width = stripChart.clientWidth || 270;
+        const barWidth = 4;
+        const gap = Math.max(1, (width - barQueue.length * barWidth) / Math.max(1, barQueue.length));
+        let html = `<div class="strip-chart-mid"></div>`;
+        barQueue.forEach((skipped, i) => {
+          const h = skipped ? 16 + (i % 5) * 3 : 44 + (i % 6) * 3;
+          const left = i * (barWidth + gap);
+          html += `<div class="strip-bar ${skipped ? "skipped" : "rendered"}" style="left:${left}px; height:${h}px;"></div>`;
+        });
+        stripChart.innerHTML = html;
+      }
+
+      /* ---------- Console clock ---------- */
+      const startTime = Date.now();
+      function tickClock() {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const m = String(Math.floor(elapsed / 60)).padStart(2, "0");
+        const s = String(elapsed % 60).padStart(2, "0");
+        const clock = document.getElementById("dock-clock");
+        if (clock) clock.textContent = `${m}:${s}`;
+      }
+      setInterval(tickClock, 1000);
+
+      /* ---------- Init ---------- */
+      buildSections();
+    </script>
+  </body>
+</html>
