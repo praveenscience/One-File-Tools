@@ -1046,6 +1046,28 @@ soundToggle.addEventListener("click", function(){
 /* ============================================================
    Progress bar
    ============================================================ */
+function renderProgress(){
+  var solvedCount = 0;
+  for (var i=1;i<=MAIN_TOTAL;i++){ if (state.solved[i]) solvedCount++; }
+  progressValueEl.textContent = solvedCount + " / " + MAIN_TOTAL;
+  progressTicksEl.innerHTML = "";
+  for (var j=1;j<=MAIN_TOTAL;j++){
+    var t = document.createElement("div");
+    t.className = "tick" + (state.solved[j] ? " filled" : "");
+    progressTicksEl.appendChild(t);
+  }
+}
+
+/* ============================================================
+   Sidebar rendering
+   ============================================================ */
+function rankClass(rank){
+  if (rank === "FLAWLESS") return "flawless";
+  if (rank === "SHARP") return "sharp";
+  return "escaped";
+}
+function renderSidebar(){
+  renderProgress();
 function initSidebar(){
   progressTicksEl.innerHTML = "";
   for (var j=1;j<=MAIN_TOTAL;j++){
@@ -1065,6 +1087,24 @@ function initSidebar(){
     var li = document.createElement("li");
     var btn = document.createElement("button");
     btn.type = "button";
+    btn.className = "door-btn" + (state.solved[room.id] ? " solved" : "") + (room.bonus ? " bonus" : "");
+    var locked = room.bonus ? !state.solved[MAIN_TOTAL] : room.id > state.unlocked;
+    btn.disabled = locked;
+    btn.setAttribute("aria-current", room.id === state.currentRoom ? "true" : "false");
+    var rank = state.ranks[room.id];
+    btn.innerHTML =
+      '<span class="num">'+ (state.solved[room.id] ? "" : (room.bonus ? "\u2605" : room.id)) +'</span>' +
+      '<span class="label"><span class="t">'+escapeHtml(room.title)+'</span><span class="c">'+escapeHtml(room.concept)+'</span></span>' +
+      (rank ? '<span class="rank '+rankClass(rank)+'">'+rank+'</span>' : "");
+    btn.addEventListener("click", function(roomId){
+      return function(){
+        playClick();
+        state.currentRoom = roomId;
+        saveState();
+        renderAll();
+        roomViewEl.scrollIntoView({ behavior: "smooth", block: "start" });
+      };
+    }(room.id));
     btn.dataset.roomId = room.id;
     btn.className = "door-btn";
     btn.innerHTML =
@@ -1084,6 +1124,11 @@ function initSidebar(){
 
   badgeShelfEl.innerHTML = "";
   ROOMS.forEach(function(room){
+    var earned = !!state.badges[room.id];
+    var span = document.createElement("span");
+    span.className = "badge" + (earned ? " earned" : "");
+    span.title = earned ? (room.badge + " \u2014 earned") : (room.badge + " \u2014 locked");
+    span.textContent = earned ? "\u2605" : "\u2022";
     var span = document.createElement("span");
     span.className = "badge";
     span.dataset.roomId = room.id;
@@ -1468,6 +1513,7 @@ function renderRoom(room){
             state.unlocked = room.id + 1;
           }
           saveState();
+          renderSidebar();
           updateSidebar();
 
           if (!room.bonus && room.id === MAIN_TOTAL){
@@ -1600,6 +1646,7 @@ function escapeHtml(s){
    Wiring
    ============================================================ */
 function renderAll(){
+  renderSidebar();
   updateSidebar();
   renderSoundToggle();
   var room = ROOMS.filter(function(r){ return r.id === state.currentRoom; })[0] || ROOMS[0];

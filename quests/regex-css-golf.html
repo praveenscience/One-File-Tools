@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Code Golf Quests — Regex & CSS Selector Puzzles</title>
+<meta name="description" content="Two interactive code golf quests in one page: write the shortest regex or CSS selector to match every target and reject every trap." />
+<style>
+  :root{
+    --bg:#0b1020; --panel:#131a33; --panel-2:#1a2244; --border:#263056;
+    --text:#e6ecff; --muted:#94a2c9; --accent:#7cf3c1; --accent-2:#6aa6ff;
+    --bad:#ff6b7a; --good:#7cf3c1; --warn:#ffcf6b;
+    --shadow:0 8px 30px rgba(0,0,0,.35);
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;color:var(--text);
+    font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Inter,sans-serif;
+    background:
+      radial-gradient(1000px 600px at 90% -10%,#1a2860 0%,transparent 60%),
+      radial-gradient(700px 400px at -10% 110%,#2a1560 0%,transparent 60%),
+      var(--bg);
+    -webkit-font-smoothing:antialiased;
+  }
+  header{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:16px 22px;border-bottom:1px solid var(--border);
+    background:rgba(11,16,32,.6);backdrop-filter:blur(8px);
+    position:sticky;top:0;z-index:5;flex-wrap:wrap;
+  }
+  header h1{margin:0;font-size:18px;letter-spacing:.3px}
+  header .sub{color:var(--muted);font-size:13px}
+  .tabs{display:flex;gap:6px;background:var(--panel);padding:4px;border:1px solid var(--border);border-radius:10px}
+  .tab{
+    background:transparent;color:var(--muted);border:0;padding:8px 14px;border-radius:8px;
+    cursor:pointer;font-size:13px;font-weight:600;
+  }
+  .tab.active{background:var(--panel-2);color:var(--text);box-shadow:inset 0 0 0 1px var(--border)}
+  .actions{display:flex;gap:8px}
+  button,.btn{
+    background:var(--panel-2);color:var(--text);border:1px solid var(--border);
+    padding:8px 12px;border-radius:8px;cursor:pointer;font-size:13px;
+  }
+  button:hover{background:#212a56}
+  button.ghost{background:transparent}
+  main{max-width:1200px;margin:0 auto;padding:18px}
+  .intro{
+    background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    padding:18px 22px;margin-bottom:18px;box-shadow:var(--shadow);
+  }
+  .intro h2{margin:0 0 6px;font-size:22px}
+  .intro p{margin:0;color:var(--muted);font-size:14px;line-height:1.55}
+  .game{display:none}
+  .game.active{display:grid;grid-template-columns:260px 1fr;gap:18px}
+  @media(max-width:820px){.game.active{grid-template-columns:1fr}}
+  .levels{
+    background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    padding:12px;box-shadow:var(--shadow);height:fit-content;position:sticky;top:82px;
+  }
+  .levels h3{margin:4px 6px 10px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.12em}
+  .level-list{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+  .lvl{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:8px 0;border-radius:8px;border:1px solid var(--border);background:var(--panel-2);
+    font-size:12px;cursor:pointer;
+  }
+  .lvl.active{outline:2px solid var(--accent-2)}
+  .lvl .stars{font-size:10px;color:var(--warn);height:12px}
+  .lvl.solved{border-color:#2b7a56}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px;box-shadow:var(--shadow)}
+  .puzzle-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+  .puzzle-head h2{margin:0;font-size:20px}
+  .par{color:var(--muted);font-size:13px}
+  .prompt{color:var(--muted);margin:8px 0 14px;line-height:1.5}
+  .input-row{
+    display:flex;gap:8px;align-items:center;background:#0a0f24;
+    border:1px solid var(--border);border-radius:10px;padding:8px 10px;
+  }
+  .input-row .prefix{color:var(--muted);font-family:var(--mono)}
+  .input-row input{
+    flex:1;background:transparent;border:0;outline:0;color:var(--text);
+    font-family:var(--mono);font-size:15px;
+  }
+  .status{margin-top:10px;font-size:13px;min-height:20px}
+  .status.ok{color:var(--good)} .status.bad{color:var(--bad)} .status.warn{color:var(--warn)}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
+  .len{color:var(--muted);font-size:13px}
+  .stars-line{color:var(--warn)}
+  .hint{margin-top:10px;background:#0a0f24;border:1px dashed #3a4680;border-radius:8px;padding:10px 12px;color:#cfe0ff;font-size:13px;display:none}
+  .hint.show{display:block}
+
+  /* Regex-specific list rendering */
+  .strings{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:640px){.strings{grid-template-columns:1fr}}
+  .card{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:12px}
+  .card h4{margin:0 0 8px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em}
+  .strlist{display:flex;flex-direction:column;gap:4px;font-family:var(--mono);font-size:13px}
+  .strlist .item{padding:6px 8px;border-radius:6px;background:#0a0f24;border:1px solid transparent;display:flex;justify-content:space-between;align-items:center}
+  .strlist .item.hit{border-color:#2b7a56;background:rgba(34,197,94,.10)}
+  .strlist .item.miss{border-color:#7a2b2b;background:rgba(239,68,68,.10)}
+  .strlist .item .mark{font-size:11px;color:var(--muted)}
+
+  /* CSS-specific render */
+  .render-wrap{margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:720px){.render-wrap{grid-template-columns:1fr}}
+  .stage{background:#fff;color:#1a1a1a;border-radius:8px;padding:12px;min-height:140px;max-height:320px;overflow:auto}
+  .stage .hit{outline:2px solid #22c55e;outline-offset:2px;background:rgba(34,197,94,.15)}
+  .stage .miss{outline:2px dashed #ef4444;outline-offset:2px;background:rgba(239,68,68,.10)}
+  .code{background:#0a0f24;border:1px solid var(--border);border-radius:8px;padding:10px;font-family:var(--mono);font-size:12.5px;color:#cfe0ff;white-space:pre;overflow:auto;max-height:320px}
+
+  footer{text-align:center;color:var(--muted);font-size:12px;padding:24px}
+  kbd{background:#1a2244;border:1px solid var(--border);border-bottom-width:2px;border-radius:4px;padding:1px 5px;font-family:var(--mono);font-size:11px}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>⛳ Code Golf Quests</h1>
+    <div class="sub">Write the shortest expression. Hit every ✅, reject every ❌.</div>
+  </div>
+  <div class="tabs" role="tablist">
+    <button class="tab active" data-tab="regex" role="tab">Regex Golf</button>
+    <button class="tab" data-tab="css" role="tab">CSS Selector Golf</button>
+  </div>
+  <div class="actions">
+    <button id="hintBtn" title="Show a hint">💡 Hint</button>
+    <button id="resetBtn" class="ghost" title="Reset progress for this game">↺ Reset</button>
+  </div>
+</header>
+
+<main>
+  <section class="intro">
+    <h2>Two quests, one page</h2>
+    <p>
+      Switch between <b>Regex Golf</b> and <b>CSS Selector Golf</b> using the tabs above.
+      Each has 10 progressive levels with live validation, hints, and star scoring by length.
+      Progress is saved locally. Use <kbd>Ctrl</kbd>+<kbd>←/→</kbd> to change levels.
+    </p>
+  </section>
+
+  <!-- REGEX GAME -->
+  <section class="game active" id="game-regex">
+    <aside class="levels">
+      <h3>Regex Levels</h3>
+      <div id="regexLevels" class="level-list"></div>
+      <div class="row" style="justify-content:space-between;margin-top:14px;">
+        <span class="len">⭐ <span id="regexTotal">0</span>/<span id="regexMax">0</span></span>
+      </div>
+    </aside>
+    <div class="panel">
+      <div class="puzzle-head">
+        <h2 id="regexTitle">Level</h2>
+        <div class="par">Par: <span id="regexPar">–</span> chars</div>
+      </div>
+      <p class="prompt" id="regexPrompt"></p>
+      <div class="input-row">
+        <span class="prefix">/</span>
+        <input id="regexInput" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="type a regex, e.g. ^cat$" />
+        <span class="prefix">/</span>
+      </div>
+      <div id="regexStatus" class="status">Type a regex…</div>
+      <div class="row">
+        <span class="len">Length: <b id="regexLen">0</b></span>
+        <span class="stars-line" id="regexStars"></span>
+      </div>
+      <div id="regexHint" class="hint"></div>
+      <div class="strings">
+        <div class="card"><h4>✅ Must match</h4><div id="regexMust" class="strlist"></div></div>
+        <div class="card"><h4>❌ Must NOT match</h4><div id="regexNot" class="strlist"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CSS GAME -->
+  <section class="game" id="game-css">
+    <aside class="levels">
+      <h3>CSS Levels</h3>
+      <div id="cssLevels" class="level-list"></div>
+      <div class="row" style="justify-content:space-between;margin-top:14px;">
+        <span class="len">⭐ <span id="cssTotal">0</span>/<span id="cssMax">0</span></span>
+      </div>
+    </aside>
+    <div class="panel">
+      <div class="puzzle-head">
+        <h2 id="cssTitle">Level</h2>
+        <div class="par">Par: <span id="cssPar">–</span> chars</div>
+      </div>
+      <p class="prompt" id="cssPrompt"></p>
+      <div class="input-row">
+        <span class="prefix">CSS</span>
+        <input id="cssInput" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="type a selector, e.g. li.item" />
+      </div>
+      <div id="cssStatus" class="status">Type a selector…</div>
+      <div class="row">
+        <span class="len">Length: <b id="cssLen">0</b></span>
+        <span class="stars-line" id="cssStars"></span>
+      </div>
+      <div id="cssHint" class="hint"></div>
+      <div class="render-wrap">
+        <div class="card"><h4>Rendered</h4><div id="cssStage" class="stage"></div></div>
+        <div class="card"><h4>Source</h4><pre id="cssSource" class="code"></pre></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>Fully offline · single HTML file · <a href="/" style="color:var(--accent-2)">← Home</a></footer>
+
+<script>
+(() => {
+  /* ---------- shared helpers ---------- */
+  const starsFor = (len, par) => len <= par ? 3 : (len <= Math.ceil(par*1.5) ? 2 : 1);
+  const starStr = n => "★".repeat(n) + "☆".repeat(3-n);
+
+  function makeStore(key){
+    let s={};
+    try{ s = JSON.parse(localStorage.getItem(key)) || {}; }catch{ s={}; }
+    return {
+      get:()=>s,
+      best:i=>s["best_"+i] ?? null,
+      setBest:(i,v)=>{ const p=s["best_"+i]; if(p==null||v.length<p.length){s["best_"+i]=v;} },
+      setCurrent:i=>{ s.current=i; },
+      current:()=>s.current ?? 0,
+      save:()=>localStorage.setItem(key, JSON.stringify(s)),
+      clear:()=>{ localStorage.removeItem(key); s={}; },
+    };
+  }
+
+  /* ---------- REGEX LEVELS ---------- */
+  const REGEX_LEVELS = [
+    { title:"Literal match", prompt:"Match the word <code>cat</code> anywhere.", must:["cat","cats","concatenate","bobcat"], not:["dog","car","bat"], par:3, hint:"Just type the literal letters." },
+    { title:"Anchored", prompt:"Match strings that are exactly <code>cat</code>.", must:["cat"], not:["cats","concat","Cat "," cat"], par:5, hint:"Use ^ and $ to anchor start and end." },
+    { title:"Digits", prompt:"Match strings made only of digits (1+).", must:["1","42","007","12345"], not:["12a","","x1","1.0"], par:6, hint:"Use \\d+ and anchors." },
+    { title:"Character class", prompt:"Match a single vowel (a,e,i,o,u).", must:["a","e","i","o","u"], not:["b","z","","ae"], par:8, hint:"Square brackets [aeiou] with anchors." },
+    { title:"Quantifier", prompt:"Match 3–5 letters, all lowercase.", must:["cat","hello","abcde"], not:["ab","abcdef","Hello","cat1"], par:12, hint:"[a-z]{3,5} plus anchors." },
+    { title:"Alternation", prompt:"Match <code>yes</code> or <code>no</code> only.", must:["yes","no"], not:["yess","No","maybe",""], par:9, hint:"Group with (yes|no) and anchor." },
+    { title:"Optional group", prompt:"Match <code>color</code> or <code>colour</code>.", must:["color","colour"], not:["colouur","Color","colr"], par:11, hint:"Make the u optional with u?." },
+    { title:"Word boundary", prompt:"Match the whole word <code>go</code>, not parts of larger words.", must:["go","let go","go home"], not:["gone","ago","going"], par:6, hint:"Use \\bgo\\b." },
+    { title:"Negated class", prompt:"Match strings with NO digits.", must:["hello","abc def","!!!"], not:["a1","123","x9y"], par:8, hint:"^[^0-9]*$ or ^\\D*$." },
+    { title:"Lookahead", prompt:"Match strings containing both a letter and a digit.", must:["a1","1a","abc123","x9"], not:["abc","123","!!!",""], par:20, hint:"Use two lookaheads: (?=.*[a-z])(?=.*\\d)." },
+  ];
+
+  /* ---------- CSS LEVELS ---------- */
+  const CSS_LEVELS = [
+    { title:"All paragraphs", prompt:"Hit every <code>&lt;p&gt;</code>.", html:`<p>hello</p><p>world</p><div>nope</div><p>again</p><div>skip</div>`, target:"p", par:1, hint:"Just the tag name." },
+    { title:"By class", prompt:"Select elements with class <code>pick</code>.", html:`<div class="pick">a</div><div>b</div><div class="pick">c</div><span class="pick">d</span><span>e</span>`, target:".pick", par:5, hint:"Class selectors start with a dot." },
+    { title:"By id", prompt:"Select the element with id <code>go</code>.", html:`<button>one</button><button id="go">two</button><button>three</button>`, target:"#go", par:3, hint:"ID selectors start with #." },
+    { title:"Tag + class", prompt:"Only <code>&lt;li&gt;</code> items with class <code>done</code>.", html:`<ul>
+  <li class="done">a</li>
+  <li>b</li>
+  <li class="done">c</li>
+  <li class="todo">d</li>
+</ul>
+<span class="done">nope</span>`, target:"li.done", par:7, hint:"Chain tag.class with no space." },
+    { title:"Descendant", prompt:"Every <code>&lt;a&gt;</code> inside <code>nav</code>.", html:`<nav><a href="#">home</a><a href="#">docs</a></nav>
+<footer><a href="#">skip</a></footer>`, target:"nav a", par:5, hint:"Space between selectors." },
+    { title:"Direct child", prompt:"Direct <code>&lt;li&gt;</code> children of the outer <code>&lt;ul&gt;</code>.", html:`<ul id="outer">
+  <li>a</li>
+  <li>b<ul><li>nested-skip</li><li>nested-skip</li></ul></li>
+  <li>c</li>
+</ul>`, target:"#outer > li", par:9, hint:"Use > for direct children." },
+    { title:"Attribute", prompt:"Inputs whose <code>type</code> is <code>email</code>.", html:`<form>
+  <input type="text" />
+  <input type="email" />
+  <input type="password" />
+  <input type="email" />
+</form>`, target:'input[type="email"]', par:14, hint:"[attr=\"value\"]." },
+    { title:"First child", prompt:"First <code>&lt;li&gt;</code> of every list.", html:`<ul><li>a</li><li>b</li><li>c</li></ul>
+<ul><li>d</li><li>e</li></ul>
+<ol><li>f</li><li>g</li></ol>`, target:"li:first-child", par:14, hint:":first-child." },
+    { title:"Grouping", prompt:"All <code>&lt;h2&gt;</code> AND all <code>.tag</code>.", html:`<h1>h1</h1>
+<h2>hit</h2>
+<p class="tag">hit</p>
+<p>skip</p>
+<h2>hit</h2>
+<span class="tag">hit</span>`, target:"h2,.tag", par:6, hint:"Comma-separate." },
+    { title:"Negation", prompt:"Every <code>&lt;button&gt;</code> NOT disabled.", html:`<button>ok</button>
+<button disabled>x</button>
+<button>go</button>
+<button disabled>y</button>`, target:"button:not([disabled])", par:22, hint:":not(selector)." },
+  ];
+
+  /* ---------- REGEX GAME ---------- */
+  const regexStore = makeStore("regex-golf-v1");
+  let regexCur = regexStore.current();
+  const rEls = {
+    list: document.getElementById("regexLevels"),
+    title: document.getElementById("regexTitle"),
+    prompt: document.getElementById("regexPrompt"),
+    par: document.getElementById("regexPar"),
+    input: document.getElementById("regexInput"),
+    status: document.getElementById("regexStatus"),
+    len: document.getElementById("regexLen"),
+    stars: document.getElementById("regexStars"),
+    hint: document.getElementById("regexHint"),
+    must: document.getElementById("regexMust"),
+    not: document.getElementById("regexNot"),
+    total: document.getElementById("regexTotal"),
+    max: document.getElementById("regexMax"),
+  };
+
+  function renderRegexList(){
+    rEls.list.innerHTML=""; let total=0;
+    REGEX_LEVELS.forEach((_,i)=>{
+      const b=regexStore.best(i); const s=b?starsFor(b.length,REGEX_LEVELS[i].par):0; total+=s;
+      const el=document.createElement("div");
+      el.className="lvl"+(i===regexCur?" active":"")+(b?" solved":"");
+      el.innerHTML=`<div>#${i+1}</div><div class="stars">${b?starStr(s):""}</div>`;
+      el.addEventListener("click",()=>{regexCur=i;regexStore.setCurrent(i);regexStore.save();loadRegex();});
+      rEls.list.appendChild(el);
+    });
+    rEls.total.textContent=total; rEls.max.textContent=REGEX_LEVELS.length*3;
+  }
+
+  function loadRegex(){
+    const L=REGEX_LEVELS[regexCur];
+    rEls.title.textContent=`Level ${regexCur+1} — ${L.title}`;
+    rEls.prompt.innerHTML=L.prompt;
+    rEls.par.textContent=L.par;
+    rEls.hint.classList.remove("show");
+    rEls.input.value=regexStore.best(regexCur)||"";
+    renderRegexList();
+    validateRegex();
+    rEls.input.focus();
+  }
+
+  function renderStrList(container, items, testFn){
+    container.innerHTML="";
+    items.forEach(s=>{
+      const div=document.createElement("div");
+      div.className="item";
+      const shown = s===""?'<em style="color:var(--muted)">(empty)</em>':escapeHtml(s);
+      const {ok,mark}=testFn(s);
+      div.classList.add(ok?"hit":"miss");
+      div.innerHTML=`<span>${shown}</span><span class="mark">${mark}</span>`;
+      container.appendChild(div);
+    });
+  }
+  function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);}
+
+  function validateRegex(){
+    const L=REGEX_LEVELS[regexCur];
+    const src=rEls.input.value;
+    rEls.len.textContent=src.length;
+    if(!src){
+      rEls.status.className="status"; rEls.status.textContent="Type a regex…"; rEls.stars.textContent="";
+      renderStrList(rEls.must,L.must,()=>({ok:false,mark:""}));
+      renderStrList(rEls.not,L.not,()=>({ok:true,mark:""}));
+      return;
+    }
+    let re;
+    try{ re=new RegExp(src); }catch(e){
+      rEls.status.className="status bad"; rEls.status.textContent="Invalid regex: "+e.message; rEls.stars.textContent="";
+      return;
+    }
+    let mustFail=0, notFail=0;
+    renderStrList(rEls.must,L.must,s=>{
+      const ok=re.test(s); if(!ok)mustFail++;
+      return {ok, mark: ok?"match ✓":"should match ✗"};
+    });
+    renderStrList(rEls.not,L.not,s=>{
+      const bad=re.test(s); if(bad)notFail++;
+      return {ok:!bad, mark: bad?"matches ✗":"rejected ✓"};
+    });
+    if(mustFail===0 && notFail===0){
+      const s=starsFor(src.length,L.par);
+      rEls.stars.innerHTML=starStr(s);
+      rEls.status.className="status ok";
+      rEls.status.textContent=`Solved! (${src.length} chars, par ${L.par})`;
+      regexStore.setBest(regexCur,src); regexStore.save(); renderRegexList();
+    } else {
+      rEls.stars.textContent="";
+      rEls.status.className="status bad";
+      const p=[];
+      if(mustFail)p.push(`${mustFail} valid string${mustFail===1?"":"s"} unmatched`);
+      if(notFail)p.push(`${notFail} invalid string${notFail===1?"":"s"} matched`);
+      rEls.status.textContent=p.join(" · ");
+    }
+  }
+  rEls.input.addEventListener("input",validateRegex);
+
+  /* ---------- CSS GAME ---------- */
+  const cssStore = makeStore("css-selector-golf-v1");
+  let cssCur = cssStore.current();
+  const cEls = {
+    list: document.getElementById("cssLevels"),
+    title: document.getElementById("cssTitle"),
+    prompt: document.getElementById("cssPrompt"),
+    par: document.getElementById("cssPar"),
+    input: document.getElementById("cssInput"),
+    status: document.getElementById("cssStatus"),
+    len: document.getElementById("cssLen"),
+    stars: document.getElementById("cssStars"),
+    hint: document.getElementById("cssHint"),
+    stage: document.getElementById("cssStage"),
+    source: document.getElementById("cssSource"),
+    total: document.getElementById("cssTotal"),
+    max: document.getElementById("cssMax"),
+  };
+
+  function renderCssList(){
+    cEls.list.innerHTML=""; let total=0;
+    CSS_LEVELS.forEach((_,i)=>{
+      const b=cssStore.best(i); const s=b?starsFor(b.length,CSS_LEVELS[i].par):0; total+=s;
+      const el=document.createElement("div");
+      el.className="lvl"+(i===cssCur?" active":"")+(b?" solved":"");
+      el.innerHTML=`<div>#${i+1}</div><div class="stars">${b?starStr(s):""}</div>`;
+      el.addEventListener("click",()=>{cssCur=i;cssStore.setCurrent(i);cssStore.save();loadCss();});
+      cEls.list.appendChild(el);
+    });
+    cEls.total.textContent=total; cEls.max.textContent=CSS_LEVELS.length*3;
+  }
+
+  function loadCss(){
+    const L=CSS_LEVELS[cssCur];
+    cEls.title.textContent=`Level ${cssCur+1} — ${L.title}`;
+    cEls.prompt.innerHTML=L.prompt;
+    cEls.par.textContent=L.par;
+    cEls.stage.innerHTML=L.html;
+    cEls.source.textContent=L.html.trim();
+    cEls.hint.classList.remove("show");
+    cEls.input.value=cssStore.best(cssCur)||"";
+    renderCssList();
+    validateCss();
+    cEls.input.focus();
+  }
+
+  function validateCss(){
+    const L=CSS_LEVELS[cssCur];
+    const sel=cEls.input.value;
+    cEls.len.textContent=sel.length;
+    cEls.stage.querySelectorAll(".hit,.miss").forEach(el=>el.classList.remove("hit","miss"));
+    if(!sel.trim()){
+      cEls.status.className="status"; cEls.status.textContent="Type a selector…"; cEls.stars.textContent=""; return;
+    }
+    let matched;
+    try{ matched=Array.from(cEls.stage.querySelectorAll(sel)); }
+    catch(e){ cEls.status.className="status bad"; cEls.status.textContent="Invalid selector: "+e.message; cEls.stars.textContent=""; return; }
+    const goal=new Set(); cEls.stage.querySelectorAll(L.target).forEach(el=>goal.add(el));
+    const matchedSet=new Set(matched);
+    let missing=0, extra=0;
+    goal.forEach(el=>{ if(matchedSet.has(el))el.classList.add("hit"); else{el.classList.add("miss");missing++;} });
+    matched.forEach(el=>{ if(!goal.has(el)){el.classList.add("miss");extra++;} });
+    if(missing===0 && extra===0){
+      const s=starsFor(sel.length,L.par);
+      cEls.stars.innerHTML=starStr(s);
+      cEls.status.className="status ok";
+      cEls.status.textContent=`Solved! ${matched.length} target${matched.length===1?"":"s"} matched. (${sel.length} chars, par ${L.par})`;
+      cssStore.setBest(cssCur,sel); cssStore.save(); renderCssList();
+    } else {
+      cEls.stars.textContent=""; cEls.status.className="status bad";
+      const p=[];
+      if(missing)p.push(`${missing} target${missing===1?"":"s"} missed`);
+      if(extra)p.push(`${extra} extra element${extra===1?"":"s"} matched`);
+      cEls.status.textContent=p.join(" · ");
+    }
+  }
+  cEls.input.addEventListener("input",validateCss);
+
+  /* ---------- tabs, hints, reset, keyboard ---------- */
+  let activeTab="regex";
+  document.querySelectorAll(".tab").forEach(t=>{
+    t.addEventListener("click",()=>{
+      activeTab=t.dataset.tab;
+      document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===t));
+      document.querySelectorAll(".game").forEach(g=>g.classList.remove("active"));
+      document.getElementById("game-"+activeTab).classList.add("active");
+      (activeTab==="regex"?rEls:cEls).input.focus();
+    });
+  });
+
+  document.getElementById("hintBtn").addEventListener("click",()=>{
+    if(activeTab==="regex"){ rEls.hint.textContent="💡 "+REGEX_LEVELS[regexCur].hint; rEls.hint.classList.add("show"); }
+    else { cEls.hint.textContent="💡 "+CSS_LEVELS[cssCur].hint; cEls.hint.classList.add("show"); }
+  });
+
+  document.getElementById("resetBtn").addEventListener("click",()=>{
+    const name=activeTab==="regex"?"Regex Golf":"CSS Selector Golf";
+    if(!confirm(`Reset progress for ${name}?`))return;
+    if(activeTab==="regex"){ regexStore.clear(); regexCur=0; loadRegex(); }
+    else { cssStore.clear(); cssCur=0; loadCss(); }
+  });
+
+  document.addEventListener("keydown",e=>{
+    if(!(e.ctrlKey||e.metaKey))return;
+    if(e.key==="ArrowRight"||e.key==="ArrowLeft"){
+      e.preventDefault();
+      if(activeTab==="regex"){
+        regexCur = e.key==="ArrowRight" ? Math.min(REGEX_LEVELS.length-1,regexCur+1) : Math.max(0,regexCur-1);
+        regexStore.setCurrent(regexCur); regexStore.save(); loadRegex();
+      } else {
+        cssCur = e.key==="ArrowRight" ? Math.min(CSS_LEVELS.length-1,cssCur+1) : Math.max(0,cssCur-1);
+        cssStore.setCurrent(cssCur); cssStore.save(); loadCss();
+      }
+    }
+  });
+
+  loadRegex();
+  loadCss();
+})();
+</script>
+</body>
+</html>
