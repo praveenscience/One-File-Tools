@@ -1,0 +1,1470 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebSocket & SSE Sandbox Client - One File Tools</title>
+    
+    <!-- Premium Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <style>
+      :root {
+        --bg-main: #07090e;
+        --grid-line: rgba(255, 255, 255, 0.02);
+        --panel-bg: rgba(13, 17, 28, 0.7);
+        --panel-border: rgba(255, 255, 255, 0.08);
+        --accent: #0ea5e9;
+        --accent-hover: #0284c7;
+        --accent-glow: rgba(14, 165, 233, 0.25);
+        --text-main: #f8fafc;
+        --text-muted: #94a3b8;
+        --text-dark: #0f172a;
+        --radius-sm: 10px;
+        --radius-md: 16px;
+        --radius-lg: 24px;
+        
+        --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+        --font-display: "Space Grotesk", sans-serif;
+        
+        --status-connected: #10b981;
+        --status-connecting: #f59e0b;
+        --status-disconnected: #ef4444;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg-main);
+        background-image: 
+          linear-gradient(var(--grid-line) 1px, transparent 1px), 
+          linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+        background-size: 32px 32px;
+        color: var(--text-main);
+        min-height: 100vh;
+        padding: 40px 24px 80px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        overflow-y: scroll;
+      }
+
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: rgba(7, 9, 14, 0.5);
+      }
+      ::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.3);
+      }
+
+      .container {
+        width: 100%;
+        max-width: 1280px;
+        display: flex;
+        flex-direction: column;
+        gap: 32px;
+      }
+
+      /* Header */
+      header {
+        text-align: center;
+        margin-bottom: 8px;
+      }
+
+      .eyebrow {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.25em;
+        color: var(--accent);
+        text-transform: uppercase;
+        margin-bottom: 12px;
+        font-weight: 600;
+        display: inline-block;
+        padding: 4px 12px;
+        background: rgba(14, 165, 233, 0.08);
+        border: 1px solid rgba(14, 165, 233, 0.2);
+        border-radius: 100px;
+      }
+
+      .title {
+        font-family: var(--font-display);
+        font-size: clamp(28px, 4vw, 42px);
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        margin-bottom: 12px;
+        background: linear-gradient(135deg, #ffffff 30%, #38bdf8 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .tagline {
+        color: var(--text-muted);
+        font-size: 16px;
+        line-height: 1.6;
+        max-width: 680px;
+        margin: 0 auto;
+      }
+
+      /* Split Layout */
+      .workspace {
+        display: grid;
+        grid-template-columns: 460px 1fr;
+        gap: 28px;
+        align-items: start;
+      }
+
+      @media (max-width: 1024px) {
+        .workspace {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* Cards */
+      .panel {
+        background: var(--panel-bg);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-md);
+        padding: 24px;
+        box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.6);
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      .panel-title {
+        font-family: var(--font-display);
+        font-size: 18px;
+        font-weight: 600;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        padding-bottom: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      /* Connection Fields */
+      .config-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .config-row {
+        display: flex;
+        gap: 10px;
+      }
+
+      .select-input, .text-input {
+        background: #090b11;
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        color: var(--text-main);
+        padding: 10px 14px;
+        font-size: 13px;
+        outline: none;
+        transition: border-color 0.2s;
+        width: 100%;
+      }
+
+      .select-input:focus, .text-input:focus {
+        border-color: var(--accent);
+      }
+
+      .text-input-mono {
+        font-family: var(--font-mono);
+        font-size: 12px;
+      }
+
+      /* Toggle Switches / Sub Tabs */
+      .type-switcher {
+        display: flex;
+        background: #090b11;
+        border: 1px solid var(--panel-border);
+        padding: 3px;
+        border-radius: 8px;
+      }
+
+      .type-tab {
+        flex: 1;
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        padding: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background 0.2s, color 0.2s;
+        text-align: center;
+      }
+
+      .type-tab.active {
+        background: var(--accent);
+        color: #ffffff;
+      }
+
+      /* Buttons */
+      .btn {
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text-main);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 10px 16px;
+        font-family: var(--font-sans);
+        font-weight: 500;
+        font-size: 13px;
+        cursor: pointer;
+        transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
+
+      .btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.2);
+      }
+
+      .btn-accent {
+        background: var(--accent);
+        border-color: var(--accent);
+      }
+
+      .btn-accent:hover {
+        background: var(--accent-hover);
+        border-color: var(--accent-hover);
+        box-shadow: 0 0 16px var(--accent-glow);
+      }
+
+      .btn-disconnect {
+        background: rgba(239, 68, 68, 0.15);
+        border-color: rgba(239, 68, 68, 0.25);
+        color: #ef4444;
+      }
+
+      .btn-disconnect:hover {
+        background: rgba(239, 68, 68, 0.25);
+        border-color: rgba(239, 68, 68, 0.35);
+      }
+
+      .btn-sm {
+        padding: 5px 10px;
+        font-size: 11px;
+        border-radius: 6px;
+      }
+
+      /* Headers / Key Values Grid */
+      .metadata-section {
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        background: rgba(255,255,255,0.01);
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .metadata-title {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .kv-pair {
+        display: grid;
+        grid-template-columns: 1fr 1fr 28px;
+        gap: 6px;
+        align-items: center;
+      }
+
+      /* Message Composer */
+      .composer-editor {
+        width: 100%;
+        height: 120px;
+        background: #090b11;
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        color: var(--text-main);
+        padding: 10px 14px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        line-height: 1.4;
+        resize: vertical;
+        outline: none;
+      }
+
+      .composer-editor:focus {
+        border-color: var(--accent);
+      }
+
+      /* Stats display */
+      .stats-badge-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        background: rgba(9, 11, 17, 0.6);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 14px;
+      }
+
+      .stat-badge {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        align-items: center;
+        text-align: center;
+      }
+
+      .stat-badge-label {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+      }
+
+      .stat-badge-value {
+        font-family: var(--font-display);
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--text-main);
+      }
+
+      /* Glowing Status Indicators */
+      .status-pill {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        text-transform: uppercase;
+        font-weight: 600;
+        background: rgba(255,255,255,0.03);
+        border: 1px solid var(--panel-border);
+        padding: 4px 12px;
+        border-radius: 100px;
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: var(--status-disconnected);
+      }
+
+      .status-dot.connecting {
+        background-color: var(--status-connecting);
+        box-shadow: 0 0 10px var(--status-connecting);
+        animation: pulse 1.2s infinite;
+      }
+
+      .status-dot.connected {
+        background-color: var(--status-connected);
+        box-shadow: 0 0 10px var(--status-connected);
+      }
+
+      .status-dot.disconnected {
+        background-color: var(--status-disconnected);
+      }
+
+      @keyframes pulse {
+        0% { opacity: 0.4; }
+        50% { opacity: 1; }
+        100% { opacity: 0.4; }
+      }
+
+      /* Logger Timeline */
+      .logger-toolbar {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .logger-filters {
+        display: flex;
+        background: #090b11;
+        padding: 3px;
+        border-radius: 8px;
+        border: 1px solid var(--panel-border);
+      }
+
+      .logger-filter-btn {
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        padding: 6px 12px;
+        font-size: 12px;
+        font-weight: 500;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background 0.2s, color 0.2s;
+      }
+
+      .logger-filter-btn.active {
+        background: rgba(255,255,255,0.08);
+        color: var(--text-main);
+      }
+
+      .timeline-container {
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--panel-border);
+        background: #040508;
+        height: 480px;
+        overflow-y: scroll;
+        display: flex;
+        flex-direction: column;
+        padding: 10px;
+      }
+
+      .timeline-item {
+        border-left: 3px solid #334155;
+        padding: 8px 12px;
+        margin-bottom: 8px;
+        background: rgba(13, 17, 28, 0.3);
+        border-radius: 0 6px 6px 0;
+        font-size: 13px;
+        font-family: var(--font-sans);
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+
+      .timeline-item:hover {
+        background: rgba(13, 17, 28, 0.6);
+      }
+
+      .timeline-item.sent {
+        border-left-color: #38bdf8;
+      }
+
+      .timeline-item.received {
+        border-left-color: #06b6d4;
+      }
+
+      .timeline-item.system {
+        border-left-color: #64748b;
+      }
+
+      .timeline-item.error {
+        border-left-color: #ef4444;
+        background: rgba(239, 68, 68, 0.03);
+      }
+
+      .timeline-meta {
+        display: flex;
+        justify-content: space-between;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        color: var(--text-muted);
+      }
+
+      .timeline-header {
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .timeline-payload {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        white-space: pre-wrap;
+        word-break: break-all;
+        color: #e2e8f0;
+        max-height: 40px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .timeline-item.expanded .timeline-payload {
+        max-height: none;
+        overflow: visible;
+      }
+
+      /* JSON formatting inside log */
+      .json-bracket { color: #f8fafc; }
+      .json-key { color: #818cf8; }
+      .json-string { color: #34d399; }
+      .json-number { color: #fb7185; }
+      .json-boolean { color: #fbbf24; }
+
+      /* Limit length of latency chart or items */
+      .keepalive-grid {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 12px;
+        align-items: center;
+      }
+
+      /* Alert card warning */
+      .browser-alert {
+        background: rgba(14, 165, 233, 0.03);
+        border: 1px solid rgba(14, 165, 233, 0.15);
+        color: var(--text-muted);
+        font-size: 12px;
+        padding: 10px 14px;
+        border-radius: 8px;
+        line-height: 1.4;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <span class="eyebrow">Browser & Network</span>
+        <h1 class="title">WebSocket & SSE Sandbox Client</h1>
+        <p class="tagline">
+          Connect, inspect, mock, and debug WebSocket connections and Server-Sent Events (SSE) streams in real time.
+        </p>
+      </header>
+
+      <div class="workspace">
+        <!-- Left Panel: Connection Details & Composer -->
+        <div class="panel">
+          <div class="panel-title">
+            <span>Connection Endpoint</span>
+            <div class="status-pill">
+              <span class="status-dot" id="statusDot"></span>
+              <span id="statusText">Disconnected</span>
+            </div>
+          </div>
+
+          <div class="config-grid">
+            <!-- Connection Type Switcher -->
+            <div class="type-switcher" id="typeSwitcher">
+              <button class="type-tab active" data-type="ws">WebSocket (WS/WSS)</button>
+              <button class="type-tab" data-type="sse">Server-Sent Events (SSE)</button>
+            </div>
+
+            <!-- URL Input -->
+            <div class="config-row">
+              <input type="text" class="text-input" id="connectionUrl" value="wss://echo.websocket.org" placeholder="wss://echo.websocket.org or http://localhost:8080/stream" />
+            </div>
+
+            <!-- WebSocket Browser Alert info -->
+            <div class="browser-alert" id="wsHeaderAlert">
+              <strong>Notice:</strong> Browser specifications do not support setting custom headers for WebSocket connections. You can use subprotocols or query parameters (e.g. <code>?token=val</code>) to authenticate.
+            </div>
+
+            <!-- SSE Authorization Info -->
+            <div class="browser-alert" id="sseHeaderAlert" style="display:none;">
+              <strong>Feature:</strong> Connecting in Header Mode uses a fetch-stream reader, supporting custom headers, POST request payloads, and cookies that standard EventSource objects reject.
+            </div>
+
+            <!-- Protocols (WebSocket Only) -->
+            <div class="metadata-section" id="protocolsSection">
+              <div class="metadata-title">
+                <span>WS Subprotocols</span>
+                <button class="btn btn-sm" id="btnAddProtocol">Add</button>
+              </div>
+              <div id="protocolsContainer" style="display: flex; flex-direction: column; gap: 6px;">
+                <!-- Rendered dynamically -->
+              </div>
+            </div>
+
+            <!-- Custom Headers (SSE Only) -->
+            <div class="metadata-section" id="headersSection" style="display: none;">
+              <div class="metadata-title">
+                <span>HTTP Custom Headers</span>
+                <button class="btn btn-sm" id="btnAddHeader">Add</button>
+              </div>
+              <div id="headersContainer" style="display: flex; flex-direction: column; gap: 6px;">
+                <!-- Rendered dynamically -->
+              </div>
+            </div>
+
+            <!-- Advanced POST request body (SSE Only) -->
+            <div class="metadata-section" id="postSection" style="display: none;">
+              <div class="metadata-title">
+                <span>Request Configuration</span>
+              </div>
+              <div style="display: flex; gap: 8px; margin-bottom: 6px;">
+                <label style="font-size:12px; display:flex; align-items:center; gap:4px; cursor:pointer;">
+                  <input type="radio" name="httpMethod" value="GET" checked /> GET
+                </label>
+                <label style="font-size:12px; display:flex; align-items:center; gap:4px; cursor:pointer;">
+                  <input type="radio" name="httpMethod" value="POST" /> POST
+                </label>
+              </div>
+              <div id="postBodyContainer" style="display:none;">
+                <textarea class="composer-editor" id="postBodyInput" placeholder='POST request body (e.g. JSON string {"query": "test"})' style="height: 60px;"></textarea>
+              </div>
+            </div>
+
+            <!-- Action buttons -->
+            <button class="btn btn-accent" id="btnConnect" style="width: 100%; padding: 12px;">Connect</button>
+          </div>
+
+          <!-- Message Composer (WS Only) -->
+          <div id="composerCard" style="display: flex; flex-direction: column; gap: 14px; border-top: 1px dashed rgba(255,255,255,0.06); padding-top: 20px;">
+            <div class="panel-title" style="border: none; padding-bottom: 0;">
+              <span>Message Composer</span>
+              <div style="width: 130px;">
+                <select class="select-input" id="messagePresetSelect" style="padding: 4px 8px; font-size:11px;">
+                  <option value="" disabled selected>Preset templates</option>
+                  <option value="ping">Ping payload</option>
+                  <option value="subscribe">Subscribe channel</option>
+                  <option value="chat">Chat Message</option>
+                </select>
+              </div>
+            </div>
+
+            <textarea class="composer-editor" id="messagePayload" placeholder='Type message here or compose JSON...'></textarea>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div style="display:flex; gap:8px;">
+                <button class="btn btn-sm" id="btnBeautifyComposer">Format JSON</button>
+                <button class="btn btn-sm" id="btnMinifyComposer">Minify</button>
+              </div>
+              <button class="btn btn-accent" id="btnSendMessage" disabled>Send Message</button>
+            </div>
+          </div>
+
+          <!-- Auto-Ping (WS Only) -->
+          <div id="pingCard" style="display: flex; flex-direction: column; gap: 14px; border-top: 1px dashed rgba(255,255,255,0.06); padding-top: 20px;">
+            <div class="toggle-row" style="display:flex; justify-content:space-between; align-items:center;">
+              <span class="control-label" style="font-family: var(--font-display); font-size: 14px; font-weight:600; color:var(--text-main);">Auto-Ping / Keepalive</span>
+              <input type="checkbox" id="autoPingToggle" />
+            </div>
+
+            <div id="pingDetailsContainer" style="display:none; flex-direction:column; gap:12px;">
+              <div class="keepalive-grid">
+                <span class="stat-badge-label">Interval</span>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <input type="range" style="flex:1;" id="pingIntervalSlider" min="1" max="60" value="10" />
+                  <span id="valPingInterval" style="font-size:12px; font-family:var(--font-mono);">10s</span>
+                </div>
+              </div>
+              <input type="text" class="text-input text-input-mono" id="pingMessageInput" value='{"type":"ping"}' placeholder="Ping message content..." />
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Panel: Timeline & Metrics -->
+        <div class="panel">
+          <div class="panel-title" style="border: none; padding-bottom: 0;">
+            <span>Timeline Log & Metrics</span>
+          </div>
+
+          <!-- Statistics badges grid -->
+          <div class="stats-badge-grid">
+            <div class="stat-badge">
+              <span class="stat-badge-label">Latency</span>
+              <span class="stat-badge-value" id="statLatency">-</span>
+            </div>
+            <div class="stat-badge">
+              <span class="stat-badge-label">Sent</span>
+              <span class="stat-badge-value" id="statSent">0</span>
+            </div>
+            <div class="stat-badge">
+              <span class="stat-badge-label">Received</span>
+              <span class="stat-badge-value" id="statReceived">0</span>
+            </div>
+            <div class="stat-badge">
+              <span class="stat-badge-label">Uptime</span>
+              <span class="stat-badge-value" id="statUptime">0s</span>
+            </div>
+          </div>
+
+          <!-- Logger Controls Toolbar -->
+          <div class="logger-toolbar">
+            <input type="text" class="text-input" id="searchLogs" placeholder="Filter logs by content..." style="padding: 6px 12px; font-size:12px;" />
+            <div class="logger-filters" id="loggerFilters">
+              <button class="logger-filter-btn active" data-filter="all">All</button>
+              <button class="logger-filter-btn" data-filter="sent">Sent</button>
+              <button class="logger-filter-btn" data-filter="received">Received</button>
+              <button class="logger-filter-btn" data-filter="system">System</button>
+            </div>
+          </div>
+
+          <!-- Timeline list container -->
+          <div class="timeline-container" id="timelineContainer">
+            <!-- Timeline items rendered dynamically -->
+          </div>
+
+          <!-- Logger utilities -->
+          <div class="config-row" style="justify-content: flex-end; gap: 12px;">
+            <button class="btn btn-sm" id="btnClearLogs">Clear Log</button>
+            <button class="btn btn-sm" id="btnExportLogs">Export JSON Log</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast message -->
+    <div class="toast" id="toast">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: #0ea5e9;">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+      <span id="toastMessage">Copied to clipboard!</span>
+    </div>
+
+    <script>
+      // ────────────────────────────────────────────────────────
+      // Core Client Diagnostic Engine State
+      // ────────────────────────────────────────────────────────
+      let connectionType = "ws"; // "ws" or "sse"
+      let connectionStatus = "disconnected"; // "disconnected", "connecting", "connected"
+      
+      // Connections instances
+      let wsClient = null;
+      let sseAbortController = null;
+      let sseReader = null;
+
+      // Stats counters
+      let stats = {
+        bytesSent: 0,
+        bytesReceived: 0,
+        messagesSent: 0,
+        messagesReceived: 0,
+        connectedTime: 0,
+        latencySamples: []
+      };
+
+      // Periodic timers
+      let uptimeInterval = null;
+      let autoPingTimeout = null;
+      let latencyTracker = {}; // requestId -> timestamp
+
+      // Logs collection
+      let logs = [];
+      let activeFilter = "all";
+
+      // DOM caching wrappers
+      const connectionUrl = document.getElementById("connectionUrl");
+      const btnConnect = document.getElementById("btnConnect");
+      const statusDot = document.getElementById("statusDot");
+      const statusText = document.getElementById("statusText");
+
+      const typeSwitcher = document.getElementById("typeSwitcher");
+      const wsHeaderAlert = document.getElementById("wsHeaderAlert");
+      const sseHeaderAlert = document.getElementById("sseHeaderAlert");
+
+      const protocolsSection = document.getElementById("protocolsSection");
+      const protocolsContainer = document.getElementById("protocolsContainer");
+      const btnAddProtocol = document.getElementById("btnAddProtocol");
+
+      const headersSection = document.getElementById("headersSection");
+      const headersContainer = document.getElementById("headersContainer");
+      const btnAddHeader = document.getElementById("btnAddHeader");
+
+      const postSection = document.getElementById("postSection");
+      const postBodyContainer = document.getElementById("postBodyContainer");
+      const postBodyInput = document.getElementById("postBodyInput");
+
+      const composerCard = document.getElementById("composerCard");
+      const messagePresetSelect = document.getElementById("messagePresetSelect");
+      const messagePayload = document.getElementById("messagePayload");
+      const btnSendMessage = document.getElementById("btnSendMessage");
+      const btnBeautifyComposer = document.getElementById("btnBeautifyComposer");
+      const btnMinifyComposer = document.getElementById("btnMinifyComposer");
+
+      const pingCard = document.getElementById("pingCard");
+      const autoPingToggle = document.getElementById("autoPingToggle");
+      const pingDetailsContainer = document.getElementById("pingDetailsContainer");
+      const pingIntervalSlider = document.getElementById("pingIntervalSlider");
+      const valPingInterval = document.getElementById("valPingInterval");
+      const pingMessageInput = document.getElementById("pingMessageInput");
+
+      const statLatency = document.getElementById("statLatency");
+      const statSent = document.getElementById("statSent");
+      const statReceived = document.getElementById("statReceived");
+      const statUptime = document.getElementById("statUptime");
+
+      const searchLogs = document.getElementById("searchLogs");
+      const loggerFilters = document.getElementById("loggerFilters");
+      const timelineContainer = document.getElementById("timelineContainer");
+
+      const btnClearLogs = document.getElementById("btnClearLogs");
+      const btnExportLogs = document.getElementById("btnExportLogs");
+
+      const toast = document.getElementById("toast");
+      const toastMessage = document.getElementById("toastMessage");
+
+      // Presets templates
+      const COMPOSER_PRESETS = {
+        ping: '{\n  "type": "ping",\n  "timestamp": ' + Date.now() + '\n}',
+        subscribe: '{\n  "action": "subscribe",\n  "channel": "orders_feed",\n  "auth_token": "client_session_token"\n}',
+        chat: '{\n  "user": "developer_client",\n  "message": "Hello from WebSocket Sandbox Client!"\n}'
+      };
+
+      // ────────────────────────────────────────────────────────
+      // Formatting and HTML Builders
+      // ────────────────────────────────────────────────────────
+      function formatJson(jsonStr) {
+        try {
+          const parsed = JSON.parse(jsonStr);
+          return formatJsonHighlight(parsed);
+        } catch (e) {
+          return escapeHtml(jsonStr); // fallback to raw string
+        }
+      }
+
+      function formatJsonHighlight(obj) {
+        let json = JSON.stringify(obj, null, 2);
+        json = escapeHtml(json);
+        
+        // Highlight JSON matching values
+        return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g, function (match) {
+          let cls = 'json-number';
+          if (/^"/.test(match)) {
+            if (/:$/.test(match)) {
+              cls = 'json-key';
+            } else {
+              cls = 'json-string';
+            }
+          } else if (/true|false/.test(match)) {
+            cls = 'json-boolean';
+          } else if (/null/.test(match)) {
+            cls = 'json-bracket'; // gray null
+          }
+          return '<span class="' + cls + '">' + match + '</span>';
+        });
+      }
+
+      function escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function showToast(message) {
+        toastMessage.textContent = message;
+        toast.classList.add("active");
+        setTimeout(() => {
+          toast.classList.remove("active");
+        }, 2000);
+      }
+
+      // ────────────────────────────────────────────────────────
+      // WebSocket Diagnostic client
+      // ────────────────────────────────────────────────────────
+      function connectWebSocket() {
+        const url = connectionUrl.value.trim();
+        if (!url) {
+          showToast("Please enter a valid WebSocket URL.");
+          return;
+        }
+
+        updateStatus("connecting");
+        addLog("system", "Info", `Connecting to WebSocket: ${url}...`);
+
+        // Read subprotocols
+        const subprotocols = [];
+        document.querySelectorAll(".protocol-input").forEach((input) => {
+          const val = input.value.trim();
+          if (val) subprotocols.push(val);
+        });
+
+        try {
+          if (subprotocols.length > 0) {
+            wsClient = new WebSocket(url, subprotocols);
+          } else {
+            wsClient = new WebSocket(url);
+          }
+        } catch (err) {
+          addLog("error", "Error", `WebSocket creation failed: ${err.message}`);
+          updateStatus("disconnected");
+          return;
+        }
+
+        wsClient.onopen = (e) => {
+          updateStatus("connected");
+          addLog("system", "Info", "WebSocket connection opened successfully.");
+          startTimers();
+          
+          if (autoPingToggle.checked) {
+            scheduleAutoPing();
+          }
+        };
+
+        wsClient.onmessage = (e) => {
+          stats.bytesReceived += e.data.length;
+          stats.messagesReceived++;
+          
+          let parsedData = e.data;
+          
+          // Check for latency ping response matching
+          try {
+            const parsedObj = JSON.parse(e.data);
+            
+            // Ping latency detection
+            if (parsedObj.type === "pong" || parsedObj.action === "pong" || parsedObj.ping_id) {
+              const pingId = parsedObj.ping_id || "default";
+              if (latencyTracker[pingId]) {
+                const rtt = Date.now() - latencyTracker[pingId];
+                stats.latencySamples.push(rtt);
+                if (stats.latencySamples.length > 10) stats.latencySamples.shift();
+                
+                statLatency.textContent = `${rtt}ms`;
+                delete latencyTracker[pingId];
+              }
+            }
+          } catch (err) {}
+
+          addLog("received", "Received Message", e.data);
+          updateStatsDisplay();
+        };
+
+        wsClient.onclose = (e) => {
+          addLog("system", "Info", `WebSocket connection closed. Reason: [${e.code}] ${e.reason || "No reason given"}`);
+          disconnect();
+        };
+
+        wsClient.onerror = (e) => {
+          addLog("error", "Error", "WebSocket encountered an error.");
+          disconnect();
+        };
+      }
+
+      function sendWSMessage(payload) {
+        if (wsClient && wsClient.readyState === WebSocket.OPEN) {
+          wsClient.send(payload);
+          
+          stats.bytesSent += payload.length;
+          stats.messagesSent++;
+          
+          addLog("sent", "Sent Message", payload);
+          updateStatsDisplay();
+        } else {
+          showToast("WebSocket is not connected.");
+        }
+      }
+
+      // ────────────────────────────────────────────────────────
+      // Fetch-based SSE Stream client
+      // ────────────────────────────────────────────────────────
+      async function connectSSE() {
+        const url = connectionUrl.value.trim();
+        if (!url) {
+          showToast("Please enter a valid SSE endpoint URL.");
+          return;
+        }
+
+        updateStatus("connecting");
+        addLog("system", "Info", `Initializing SSE stream reader: ${url}...`);
+
+        // Read Custom Headers
+        const headers = {};
+        document.querySelectorAll(".header-row-pair").forEach((row) => {
+          const keyInput = row.querySelector(".header-key-input");
+          const valInput = row.querySelector(".header-val-input");
+          if (keyInput && valInput) {
+            const k = keyInput.value.trim();
+            const v = valInput.value.trim();
+            if (k) headers[k] = v;
+          }
+        });
+
+        // Determine Http method
+        const method = document.querySelector('input[name="httpMethod"]:checked').value;
+        const postBody = postBodyInput.value.trim();
+
+        sseAbortController = new AbortController();
+        const options = {
+          method: method,
+          headers: headers,
+          signal: sseAbortController.signal
+        };
+
+        if (method === "POST" && postBody) {
+          options.body = postBody;
+          if (!headers["Content-Type"]) {
+            options.headers["Content-Type"] = "application/json";
+          }
+        }
+
+        try {
+          const response = await fetch(url, options);
+          if (!response.ok) {
+            throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
+          }
+
+          updateStatus("connected");
+          addLog("system", "Info", "SSE stream established. Consuming chunks...");
+          startTimers();
+
+          const reader = response.body.getReader();
+          sseReader = reader;
+          const decoder = new TextDecoder("utf-8");
+          let buffer = "";
+
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            const textChunk = decoder.decode(value, { stream: true });
+            stats.bytesReceived += textChunk.length;
+            
+            buffer += textChunk;
+            let parts = buffer.split("\n\n");
+            
+            // Retain last segment in buffer in case it was chunked mid-message
+            buffer = parts.pop();
+
+            for (let chunk of parts) {
+              parseSseChunk(chunk);
+            }
+          }
+
+          addLog("system", "Info", "SSE stream completed by server.");
+          disconnect();
+        } catch (err) {
+          if (err.name === "AbortError") {
+            addLog("system", "Info", "SSE connection aborted by user.");
+          } else {
+            addLog("error", "SSE Error", err.message);
+          }
+          disconnect();
+        }
+      }
+
+      function parseSseChunk(chunk) {
+        const lines = chunk.split("\n");
+        let eventType = "message";
+        let dataLines = [];
+        let eventId = "";
+
+        for (let line of lines) {
+          line = line.trim();
+          if (line.startsWith(":")) {
+            // Comment keepalive heartbeat
+            continue;
+          }
+
+          const colonIndex = line.indexOf(":");
+          if (colonIndex === -1) continue;
+
+          const key = line.substring(0, colonIndex).trim();
+          const val = line.substring(colonIndex + 1).trim();
+
+          if (key === "data") {
+            dataLines.push(val);
+          } else if (key === "event") {
+            eventType = val;
+          } else if (key === "id") {
+            eventId = val;
+          }
+        }
+
+        if (dataLines.length > 0) {
+          const finalData = dataLines.join("\n");
+          stats.messagesReceived++;
+          
+          let headerText = "SSE Message";
+          if (eventType !== "message") {
+            headerText += ` [event: ${eventType}]`;
+          }
+          if (eventId) {
+            headerText += ` (id: ${eventId})`;
+          }
+
+          addLog("received", headerText, finalData);
+          updateStatsDisplay();
+        }
+      }
+
+      // ────────────────────────────────────────────────────────
+      // Connection Timer & Keepalive (Ping) logic
+      // ────────────────────────────────────────────────────────
+      function startTimers() {
+        stats.connectedTime = 0;
+        uptimeInterval = setInterval(() => {
+          stats.connectedTime++;
+          statUptime.textContent = `${stats.connectedTime}s`;
+        }, 1000);
+      }
+
+      function stopTimers() {
+        if (uptimeInterval) {
+          clearInterval(uptimeInterval);
+          uptimeInterval = null;
+        }
+        if (autoPingTimeout) {
+          clearTimeout(autoPingTimeout);
+          autoPingTimeout = null;
+        }
+      }
+
+      function scheduleAutoPing() {
+        if (connectionStatus !== "connected" || connectionType !== "ws") return;
+
+        const interval = parseInt(pingIntervalSlider.value) * 1000;
+        autoPingTimeout = setTimeout(() => {
+          sendAutoPing();
+          scheduleAutoPing();
+        }, interval);
+      }
+
+      function sendAutoPing() {
+        let payload = pingMessageInput.value.trim();
+        const pingId = "ping-" + Math.floor(Math.random() * 100000);
+
+        // Inject ping ID into JSON for response tracking
+        try {
+          const parsed = JSON.parse(payload);
+          parsed.ping_id = pingId;
+          payload = JSON.stringify(parsed);
+        } catch (e) {}
+
+        latencyTracker[pingId] = Date.now();
+        sendWSMessage(payload);
+      }
+
+      function disconnect() {
+        stopTimers();
+        
+        // Teardown WS
+        if (wsClient) {
+          if (wsClient.readyState === WebSocket.OPEN || wsClient.readyState === WebSocket.CONNECTING) {
+            wsClient.close();
+          }
+          wsClient = null;
+        }
+
+        // Teardown SSE
+        if (sseAbortController) {
+          sseAbortController.abort();
+          sseAbortController = null;
+        }
+        if (sseReader) {
+          sseReader.cancel().catch(() => {});
+          sseReader = null;
+        }
+
+        updateStatus("disconnected");
+        latencyTracker = {};
+      }
+
+      function updateStatus(status) {
+        connectionStatus = status;
+        
+        statusDot.className = "status-dot";
+        if (status === "connecting") {
+          statusDot.classList.add("connecting");
+          statusText.textContent = "Connecting";
+          btnConnect.textContent = "Disconnect";
+          btnConnect.className = "btn btn-disconnect";
+          btnSendMessage.disabled = true;
+        } else if (status === "connected") {
+          statusDot.classList.add("connected");
+          statusText.textContent = "Connected";
+          btnConnect.textContent = "Disconnect";
+          btnConnect.className = "btn btn-disconnect";
+          btnSendMessage.disabled = (connectionType === "sse");
+        } else {
+          statusDot.classList.add("disconnected");
+          statusText.textContent = "Disconnected";
+          btnConnect.textContent = "Connect";
+          btnConnect.className = "btn btn-accent";
+          btnSendMessage.disabled = true;
+          statLatency.textContent = "-";
+        }
+      }
+
+      function updateStatsDisplay() {
+        statSent.textContent = stats.messagesSent;
+        statReceived.textContent = stats.messagesReceived;
+      }
+
+      // ────────────────────────────────────────────────────────
+      // Timeline Logger & Filters
+      // ────────────────────────────────────────────────────────
+      function addLog(type, header, payload) {
+        const item = {
+          id: "log-" + Date.now() + "-" + Math.floor(Math.random() * 1000),
+          type: type, // "sent", "received", "system", "error"
+          timestamp: new Date().toLocaleTimeString(),
+          header: header,
+          payload: payload
+        };
+        logs.push(item);
+        renderLogs();
+      }
+
+      function renderLogs() {
+        const searchVal = searchLogs.value.toLowerCase();
+        timelineContainer.innerHTML = "";
+
+        const filtered = logs.filter((log) => {
+          // Tab filters
+          if (activeFilter === "sent" && log.type !== "sent") return false;
+          if (activeFilter === "received" && log.type !== "received") return false;
+          if (activeFilter === "system" && log.type !== "system" && log.type !== "error") return false;
+          
+          // Search input
+          if (searchVal) {
+            const inPayload = log.payload.toLowerCase().includes(searchVal);
+            const inHeader = log.header.toLowerCase().includes(searchVal);
+            return inPayload || inHeader;
+          }
+          
+          return true;
+        });
+
+        filtered.forEach((log) => {
+          const div = document.createElement("div");
+          div.className = `timeline-item ${log.type}`;
+          
+          // Check if payload is valid JSON
+          let isJson = false;
+          let formattedPayload = escapeHtml(log.payload);
+          try {
+            JSON.parse(log.payload);
+            isJson = true;
+          } catch(e){}
+
+          div.innerHTML = `
+            <div class="timeline-meta">
+              <span>${log.timestamp}</span>
+              <span>${log.type.toUpperCase()}</span>
+            </div>
+            <div class="timeline-header">${escapeHtml(log.header)}</div>
+            <div class="timeline-payload">${isJson ? formatJson(log.payload) : formattedPayload}</div>
+          `;
+
+          // Clicking expands full JSON structures
+          div.addEventListener("click", () => {
+            div.classList.toggle("expanded");
+          });
+
+          timelineContainer.appendChild(div);
+        });
+
+        // Auto-scroll to bottom of logs on new item
+        timelineContainer.scrollTop = timelineContainer.scrollHeight;
+      }
+
+      // ────────────────────────────────────────────────────────
+      // Subprotocols & Custom Headers list components
+      // ────────────────────────────────────────────────────────
+      function addProtocolRow(value = "") {
+        const row = document.createElement("div");
+        row.className = "kv-pair";
+        row.innerHTML = `
+          <input type="text" class="text-input text-input-mono protocol-input" value="${escapeHtml(value)}" placeholder="subprotocol-name" style="grid-column: 1 / span 2; padding: 5px 8px;" />
+          <button class="btn btn-sm btn-disconnect btn-remove-row" style="padding:4px; height:28px;">&times;</button>
+        `;
+        
+        row.querySelector(".btn-remove-row").addEventListener("click", () => {
+          row.remove();
+        });
+
+        protocolsContainer.appendChild(row);
+      }
+
+      function addHeaderRow(key = "", val = "") {
+        const row = document.createElement("div");
+        row.className = "kv-pair";
+        row.innerHTML = `
+          <input type="text" class="text-input text-input-mono header-key-input" value="${escapeHtml(key)}" placeholder="Key (e.g. Authorization)" style="padding: 5px 8px;" />
+          <input type="text" class="text-input text-input-mono header-val-input" value="${escapeHtml(val)}" placeholder="Value" style="padding: 5px 8px;" />
+          <button class="btn btn-sm btn-disconnect btn-remove-row" style="padding:4px; height:28px;">&times;</button>
+        `;
+
+        row.querySelector(".btn-remove-row").addEventListener("click", () => {
+          row.remove();
+        });
+
+        headersContainer.appendChild(row);
+      }
+
+      // ────────────────────────────────────────────────────────
+      // UI Bootstrapping & Events
+      // ────────────────────────────────────────────────────────
+      function init() {
+        // Toggle WS vs SSE tabs
+        typeSwitcher.addEventListener("click", (e) => {
+          const tab = e.target.closest(".type-tab");
+          if (tab && connectionStatus === "disconnected") {
+            typeSwitcher.querySelectorAll(".type-tab").forEach(t => t.classList.remove("active"));
+            tab.classList.add("active");
+            
+            connectionType = tab.dataset.type;
+            
+            if (connectionType === "ws") {
+              connectionUrl.value = "wss://echo.websocket.org";
+              wsHeaderAlert.style.display = "block";
+              sseHeaderAlert.style.display = "none";
+              protocolsSection.style.display = "flex";
+              headersSection.style.display = "none";
+              postSection.style.display = "none";
+              composerCard.style.display = "flex";
+              pingCard.style.display = "flex";
+            } else {
+              connectionUrl.value = "https://text-alive-stream.pages.dev/api/stream"; // Demo stream url
+              wsHeaderAlert.style.display = "none";
+              sseHeaderAlert.style.display = "block";
+              protocolsSection.style.display = "none";
+              headersSection.style.display = "flex";
+              postSection.style.display = "flex";
+              composerCard.style.display = "none";
+              pingCard.style.display = "none";
+            }
+          } else if (tab) {
+            showToast("Please disconnect before switching endpoint protocols.");
+          }
+        });
+
+        // POST radio switcher
+        document.querySelectorAll('input[name="httpMethod"]').forEach((radio) => {
+          radio.addEventListener("change", (e) => {
+            postBodyContainer.style.display = e.target.value === "POST" ? "block" : "none";
+          });
+        });
+
+        // Subprotocols & Headers additions
+        btnAddProtocol.addEventListener("click", () => addProtocolRow());
+        btnAddHeader.addEventListener("click", () => addHeaderRow());
+
+        // Connect button
+        btnConnect.addEventListener("click", () => {
+          if (connectionStatus === "disconnected") {
+            stats = {
+              bytesSent: 0,
+              bytesReceived: 0,
+              messagesSent: 0,
+              messagesReceived: 0,
+              connectedTime: 0,
+              latencySamples: []
+            };
+            updateStatsDisplay();
+            
+            if (connectionType === "ws") {
+              connectWebSocket();
+            } else {
+              connectSSE();
+            }
+          } else {
+            disconnect();
+            addLog("system", "Info", "Connection closed by client.");
+          }
+        });
+
+        // Send Message
+        btnSendMessage.addEventListener("click", () => {
+          const payload = messagePayload.value;
+          if (payload) {
+            sendWSMessage(payload);
+          }
+        });
+
+        // Composer Templates Presets
+        messagePresetSelect.addEventListener("change", (e) => {
+          const key = e.target.value;
+          if (COMPOSER_PRESETS[key]) {
+            messagePayload.value = COMPOSER_PRESETS[key];
+          }
+          messagePresetSelect.value = ""; // Reset selector
+        });
+
+        // Format / Minify JSON Composer
+        btnBeautifyComposer.addEventListener("click", () => {
+          const raw = messagePayload.value.trim();
+          if (!raw) return;
+          try {
+            const parsed = JSON.parse(raw);
+            messagePayload.value = JSON.stringify(parsed, null, 2);
+          } catch(e) {
+            showToast("Failed to format: Content is not valid JSON.");
+          }
+        });
+
+        btnMinifyComposer.addEventListener("click", () => {
+          const raw = messagePayload.value.trim();
+          if (!raw) return;
+          try {
+            const parsed = JSON.parse(raw);
+            messagePayload.value = JSON.stringify(parsed);
+          } catch(e) {
+            showToast("Failed to minify: Content is not valid JSON.");
+          }
+        });
+
+        // Auto-ping toggles
+        autoPingToggle.addEventListener("change", (e) => {
+          pingDetailsContainer.style.display = e.target.checked ? "flex" : "none";
+          if (e.target.checked && connectionStatus === "connected") {
+            scheduleAutoPing();
+          } else if (autoPingTimeout) {
+            clearTimeout(autoPingTimeout);
+            autoPingTimeout = null;
+          }
+        });
+
+        pingIntervalSlider.addEventListener("input", (e) => {
+          valPingInterval.textContent = e.target.value + "s";
+        });
+
+        // Search Logs input
+        searchLogs.addEventListener("input", renderLogs);
+
+        // Logger Filters
+        loggerFilters.addEventListener("click", (e) => {
+          const btn = e.target.closest(".logger-filter-btn");
+          if (btn) {
+            loggerFilters.querySelectorAll(".logger-filter-btn").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            activeFilter = btn.dataset.filter;
+            renderLogs();
+          }
+        });
+
+        // Clear and Export logs
+        btnClearLogs.addEventListener("click", () => {
+          logs = [];
+          renderLogs();
+        });
+
+        btnExportLogs.addEventListener("click", () => {
+          if (logs.length === 0) {
+            showToast("Logs are empty.");
+            return;
+          }
+          const content = JSON.stringify(logs, null, 2);
+          const blob = new Blob([content], { type: "application/json" });
+          const link = document.createElement("a");
+          link.href = URL.createObjectURL(blob);
+          link.download = `sandbox-connection-log-${Date.now()}.json`;
+          link.click();
+          URL.revokeObjectURL(link.href);
+        });
+
+        // Defaults placeholders setup
+        addProtocolRow("graphql-ws");
+        addHeaderRow("Authorization", "Bearer token-key-here");
+      }
+
+      window.addEventListener("DOMContentLoaded", init);
+    </script>
+  </body>
+</html>
