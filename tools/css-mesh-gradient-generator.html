@@ -1,0 +1,1571 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CSS Mesh Gradient Generator - One File Tools</title>
+    
+    <!-- Premium Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <style>
+      :root {
+        --bg-main: #0a0b10;
+        --grid-line: rgba(255, 255, 255, 0.02);
+        --panel-bg: rgba(17, 18, 25, 0.75);
+        --panel-border: rgba(255, 255, 255, 0.08);
+        --accent: #d946ef;
+        --accent-hover: #c026d3;
+        --accent-glow: rgba(217, 70, 239, 0.25);
+        --text-main: #f8fafc;
+        --text-muted: #94a3b8;
+        --text-dark: #0f172a;
+        --radius-sm: 10px;
+        --radius-md: 16px;
+        --radius-lg: 24px;
+        
+        --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+        --font-display: "Space Grotesk", sans-serif;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg-main);
+        background-image: 
+          linear-gradient(var(--grid-line) 1px, transparent 1px), 
+          linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+        background-size: 32px 32px;
+        color: var(--text-main);
+        min-height: 100vh;
+        padding: 40px 24px 80px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        overflow-y: scroll;
+      }
+
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: rgba(10, 11, 16, 0.5);
+      }
+      ::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.3);
+      }
+
+      .container {
+        width: 100%;
+        max-width: 1280px;
+        display: flex;
+        flex-direction: column;
+        gap: 32px;
+      }
+
+      /* Header */
+      header {
+        text-align: center;
+        margin-bottom: 8px;
+      }
+
+      .eyebrow {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.25em;
+        color: var(--accent);
+        text-transform: uppercase;
+        margin-bottom: 12px;
+        font-weight: 600;
+        display: inline-block;
+        padding: 4px 12px;
+        background: rgba(217, 70, 239, 0.08);
+        border: 1px solid rgba(217, 70, 239, 0.2);
+        border-radius: 100px;
+      }
+
+      .title {
+        font-family: var(--font-display);
+        font-size: clamp(28px, 4vw, 42px);
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        margin-bottom: 12px;
+        background: linear-gradient(135deg, #ffffff 30%, #f472b6 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .tagline {
+        color: var(--text-muted);
+        font-size: 16px;
+        line-height: 1.6;
+        max-width: 680px;
+        margin: 0 auto;
+      }
+
+      /* Workspace Split */
+      .workspace {
+        display: grid;
+        grid-template-columns: 1fr 380px;
+        gap: 28px;
+        align-items: start;
+      }
+
+      @media (max-width: 1024px) {
+        .workspace {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* Panels */
+      .panel {
+        background: var(--panel-bg);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-md);
+        padding: 24px;
+        box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.6);
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      .panel-title {
+        font-family: var(--font-display);
+        font-size: 18px;
+        font-weight: 600;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        padding-bottom: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      /* Draggable Canvas Box */
+      .canvas-container {
+        position: relative;
+        width: 100%;
+        background-color: #0d0e14;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--panel-border);
+        box-shadow: inset 0 0 40px rgba(0,0,0,0.5);
+        overflow: hidden;
+        aspect-ratio: 16/10;
+        transition: aspect-ratio 0.3s ease;
+      }
+
+      /* Aspect ratios configurations */
+      .canvas-container.ratio-1-1 { aspect-ratio: 1/1; }
+      .canvas-container.ratio-16-9 { aspect-ratio: 16/9; }
+      .canvas-container.ratio-4-3 { aspect-ratio: 4/3; }
+      .canvas-container.ratio-free { height: 500px; aspect-ratio: auto; }
+
+      /* Gradient Layer Stack */
+      .mesh-preview-bg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        transition: background-color 0.3s ease;
+      }
+
+      .gradient-layer {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        top: 0;
+        left: 0;
+        pointer-events: none;
+        transform-origin: center center;
+      }
+
+      .noise-overlay-svg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        mix-blend-mode: overlay;
+        display: none;
+      }
+
+      /* Handles & Guides Overlay SVG */
+      .guides-overlay-svg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 10;
+        overflow: visible;
+        cursor: default;
+      }
+
+      .handle {
+        cursor: grab;
+        transition: r 0.15s ease, stroke-width 0.15s ease;
+      }
+
+      .handle:active {
+        cursor: grabbing;
+      }
+
+      .handle.center-handle {
+        fill-opacity: 1;
+      }
+
+      .handle.center-handle.selected {
+        stroke: #ffffff !important;
+        stroke-width: 3px !important;
+        r: 9px !important;
+      }
+
+      .handle.control-handle {
+        fill: #3b82f6;
+        stroke: #ffffff;
+        stroke-width: 1.5;
+        r: 6;
+      }
+
+      .handle.control-handle-minor {
+        fill: #10b981;
+        stroke: #ffffff;
+        stroke-width: 1.5;
+        r: 6;
+      }
+
+      .guide-line {
+        stroke: rgba(255, 255, 255, 0.25);
+        stroke-width: 1.2;
+        stroke-dasharray: 4,4;
+      }
+
+      .boundary-ellipse {
+        stroke: rgba(255, 255, 255, 0.15);
+        stroke-width: 1;
+        fill: none;
+      }
+
+      .boundary-ellipse.selected {
+        stroke: rgba(255, 255, 255, 0.4);
+        stroke-width: 1.5;
+      }
+
+      /* Controls & Presets */
+      .control-section {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .control-label {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        display: flex;
+        justify-content: space-between;
+      }
+
+      .preset-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+      }
+
+      .preset-card {
+        background: rgba(255,255,255,0.03);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 10px;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        align-items: center;
+        text-align: center;
+        transition: transform 0.2s, border-color 0.2s, background 0.2s;
+      }
+
+      .preset-card:hover {
+        transform: translateY(-2px);
+        border-color: var(--accent);
+        background: rgba(255,255,255,0.05);
+      }
+
+      .preset-thumb {
+        width: 100%;
+        height: 60px;
+        border-radius: 6px;
+        border: 1px solid rgba(255,255,255,0.08);
+      }
+
+      .preset-name {
+        font-size: 12px;
+        font-weight: 500;
+      }
+
+      /* Slider Styling */
+      .slider-input {
+        -webkit-appearance: none;
+        width: 100%;
+        height: 5px;
+        border-radius: 5px;
+        background: rgba(255,255,255,0.1);
+        outline: none;
+      }
+
+      .slider-input::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: var(--accent);
+        cursor: pointer;
+        transition: transform 0.1s;
+      }
+
+      .slider-input::-webkit-slider-thumb:hover {
+        transform: scale(1.2);
+      }
+
+      /* Selectors & Buttons */
+      .select-input, .text-input {
+        background: #0d0e14;
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        color: var(--text-main);
+        padding: 8px 12px;
+        font-size: 13px;
+        outline: none;
+        cursor: pointer;
+        width: 100%;
+        transition: border-color 0.2s;
+      }
+
+      .select-input:focus, .text-input:focus {
+        border-color: var(--accent);
+      }
+
+      .btn {
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text-main);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 10px 16px;
+        font-family: var(--font-sans);
+        font-weight: 500;
+        font-size: 13px;
+        cursor: pointer;
+        transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      .btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.2);
+      }
+
+      .btn-accent {
+        background: var(--accent);
+        border-color: var(--accent);
+      }
+
+      .btn-accent:hover {
+        background: var(--accent-hover);
+        border-color: var(--accent-hover);
+        box-shadow: 0 0 16px var(--accent-glow);
+      }
+
+      .btn-delete {
+        background: rgba(239, 68, 68, 0.1);
+        border-color: rgba(239, 68, 68, 0.2);
+        color: #ef4444;
+      }
+
+      .btn-delete:hover {
+        background: rgba(239, 68, 68, 0.2);
+        border-color: rgba(239, 68, 68, 0.3);
+      }
+
+      /* Color Picker Grid */
+      .color-picker-row {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .color-swatch-btn {
+        width: 38px;
+        height: 38px;
+        border-radius: 8px;
+        border: 2px solid #ffffff;
+        cursor: pointer;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .color-picker-native {
+        position: absolute;
+        top: -10%;
+        left: -10%;
+        width: 120%;
+        height: 120%;
+        border: none;
+        cursor: pointer;
+        opacity: 0;
+      }
+
+      /* Pin Table list */
+      .pin-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-height: 200px;
+        overflow-y: auto;
+        padding-right: 4px;
+      }
+
+      .pin-list-item {
+        background: rgba(255,255,255,0.02);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 8px 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 13px;
+        cursor: pointer;
+        transition: border-color 0.2s;
+      }
+
+      .pin-list-item.selected {
+        border-color: var(--accent);
+        background: rgba(217, 70, 239, 0.05);
+      }
+
+      .pin-list-color {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .pin-list-swatch {
+        width: 14px;
+        height: 14px;
+        border-radius: 4px;
+        border: 1px solid rgba(255,255,255,0.1);
+      }
+
+      /* Export Tabs */
+      .export-tabs {
+        display: flex;
+        border-bottom: 1px solid var(--panel-border);
+        gap: 16px;
+      }
+
+      .export-tab {
+        background: transparent;
+        border: none;
+        border-bottom: 2px solid transparent;
+        color: var(--text-muted);
+        padding: 8px 4px 12px;
+        font-family: var(--font-display);
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: border-color 0.2s, color 0.2s;
+      }
+
+      .export-tab.active {
+        color: var(--accent);
+        border-color: var(--accent);
+        font-weight: 600;
+      }
+
+      .code-container {
+        position: relative;
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+        background: #05060a;
+        border: 1px solid var(--panel-border);
+      }
+
+      .code-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 16px;
+        background: rgba(255, 255, 255, 0.02);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+
+      .code-block {
+        margin: 0;
+        padding: 16px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        line-height: 1.5;
+        overflow-x: auto;
+        color: #e2e8f0;
+        max-height: 240px;
+        white-space: pre-wrap;
+      }
+
+      /* Toast Toast */
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        background: #11121a;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        color: var(--text-main);
+        padding: 12px 24px;
+        border-radius: var(--radius-sm);
+        font-size: 13px;
+        font-weight: 500;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+        z-index: 200;
+        transform: translateY(100px);
+        opacity: 0;
+        transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .toast.active {
+        transform: translateY(0);
+        opacity: 1;
+      }
+
+      /* Toggle Switch */
+      .toggle-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 44px;
+        height: 22px;
+      }
+
+      .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        inset: 0;
+        background-color: rgba(255,255,255,0.1);
+        transition: .3s;
+        border-radius: 34px;
+        border: 1px solid var(--panel-border);
+      }
+
+      .toggle-slider:before {
+        position: absolute;
+        content: "";
+        height: 14px;
+        width: 14px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: .3s;
+        border-radius: 50%;
+      }
+
+      input:checked + .toggle-slider {
+        background-color: var(--accent);
+      }
+
+      input:checked + .toggle-slider:before {
+        transform: translateX(22px);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <span class="eyebrow">CSS Tools</span>
+        <h1 class="title">CSS Mesh Gradient Generator</h1>
+        <p class="tagline">
+          Create, warp, and edit modern fluid mesh gradients visually. Tweak handles to adjust rotation and scale, configure noise, and export ready-to-use CSS/SVG code.
+        </p>
+      </header>
+
+      <div class="workspace">
+        <!-- Left Panel: Canvas Visualizer -->
+        <div class="panel" style="gap: 16px;">
+          <div class="panel-title">
+            <span>Mesh Canvas</span>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn" id="btnToggleGuides" style="padding: 6px 12px; font-size: 11px;">Hide Handles</button>
+              <button class="btn" id="btnRandomize" style="padding: 6px 12px; font-size: 11px;">Randomize</button>
+            </div>
+          </div>
+
+          <div class="canvas-container" id="canvasContainer">
+            <!-- Layers render here -->
+            <div class="mesh-preview-bg" id="meshBg"></div>
+            <div id="meshLayers"></div>
+            
+            <!-- Noise filter Overlay SVG -->
+            <svg class="noise-overlay-svg" id="noiseOverlay" width="100%" height="100%">
+              <rect width="100%" height="100%" filter="url(#turbulence-filter)" />
+            </svg>
+
+            <!-- Vector Guides Overlay SVG -->
+            <svg class="guides-overlay-svg" id="guidesOverlay" viewBox="0 0 100 100" preserveAspectRatio="none">
+              <!-- Grid elements rendered dynamically -->
+            </svg>
+          </div>
+
+          <!-- Bottom Actions -->
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="control-label" style="margin:0;">Aspect Ratio</span>
+              <div style="width: 120px;">
+                <select class="select-input" id="ratioSelect">
+                  <option value="16-9">16:9</option>
+                  <option value="4-3">4:3</option>
+                  <option value="1-1">1:1</option>
+                  <option value="free">Free height</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 12px;">
+              <button class="btn btn-accent" id="btnAddPin">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Add Pin
+              </button>
+              <button class="btn btn-delete" id="btnDeletePin">Delete Selected</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Panel: Configurations & Presets -->
+        <div class="panel">
+          <div class="panel-title">
+            <span>Presets</span>
+          </div>
+          
+          <div class="preset-grid">
+            <div class="preset-card" data-preset="aurora">
+              <div class="preset-thumb" style="background: #030712; background-image: radial-gradient(at 25% 30%, #10b981 0px, transparent 60%), radial-gradient(at 75% 40%, #3b82f6 0px, transparent 65%), radial-gradient(at 40% 80%, #6366f1 0px, transparent 70%);"></div>
+              <span class="preset-name">Aurora Borealis</span>
+            </div>
+            <div class="preset-card" data-preset="sunset">
+              <div class="preset-thumb" style="background: #f97316; background-image: radial-gradient(at 20% 20%, #8b5cf6 0px, transparent 60%), radial-gradient(at 80% 30%, #f43f5e 0px, transparent 70%), radial-gradient(at 50% 80%, #f59e0b 0px, transparent 60%);"></div>
+              <span class="preset-name">Sunset Dreams</span>
+            </div>
+            <div class="preset-card" data-preset="holographic">
+              <div class="preset-thumb" style="background: #e2e8f0; background-image: radial-gradient(at 20% 30%, #38bdf8 0px, transparent 55%), radial-gradient(at 70% 20%, #c084fc 0px, transparent 60%), radial-gradient(at 40% 70%, #f472b6 0px, transparent 50%), radial-gradient(at 80% 75%, #2dd4bf 0px, transparent 55%);"></div>
+              <span class="preset-name">Holographic Pearl</span>
+            </div>
+            <div class="preset-card" data-preset="cottoncandy">
+              <div class="preset-thumb" style="background: #fce7f3; background-image: radial-gradient(at 30% 30%, #bfdbfe 0px, transparent 60%), radial-gradient(at 75% 25%, #fef08a 0px, transparent 60%), radial-gradient(at 50% 75%, #ddd6fe 0px, transparent 60%);"></div>
+              <span class="preset-name">Cotton Candy</span>
+            </div>
+          </div>
+
+          <div class="panel-title" style="margin-top: 10px;">
+            <span>Aesthetics & Properties</span>
+          </div>
+
+          <div class="control-section">
+            <div class="toggle-row">
+              <span class="control-label" style="margin:0;">Grain Noise Overlay</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="noiseToggle" checked />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <div class="control-section" id="noiseIntensitySection">
+              <div class="control-label">
+                <span>Noise Opacity</span>
+                <span id="valNoiseOpacity">0.08</span>
+              </div>
+              <input type="range" class="slider-input" id="noiseOpacitySlider" min="0" max="0.3" step="0.01" value="0.08" />
+            </div>
+
+            <div class="control-section">
+              <div class="control-label">
+                <span>Canvas Base Color</span>
+              </div>
+              <div class="color-picker-row">
+                <div class="color-swatch-btn" id="baseColorSwatch" style="background-color: #030712;">
+                  <input type="color" class="color-picker-native" id="baseColorInput" value="#030712" />
+                </div>
+                <input type="text" class="text-input" id="baseHexInput" value="#030712" style="font-family: var(--font-mono); font-size:12px;" />
+              </div>
+            </div>
+
+            <div class="control-section">
+              <span class="control-label">Active Color Pins</span>
+              <div class="pin-list" id="pinList">
+                <!-- Pins are rendered here -->
+              </div>
+            </div>
+
+            <!-- Selected Pin Details -->
+            <div class="control-section" id="pinDetailsPanel" style="display:none; border-top: 1px dashed rgba(255,255,255,0.06); padding-top: 14px;">
+              <span class="control-label" style="color:var(--accent); font-weight:600;">Selected Pin Settings</span>
+              
+              <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 12px; align-items: center;">
+                <span class="control-label" style="margin:0;">Color</span>
+                <div class="color-picker-row">
+                  <div class="color-swatch-btn" id="pinColorSwatch">
+                    <input type="color" class="color-picker-native" id="pinColorInput" />
+                  </div>
+                  <input type="text" class="text-input" id="pinHexInput" style="font-family: var(--font-mono); font-size:12px;" />
+                </div>
+              </div>
+
+              <div>
+                <div class="control-label">
+                  <span>Pin Opacity</span>
+                  <span id="valPinOpacity">1.0</span>
+                </div>
+                <input type="range" class="slider-input" id="pinOpacitySlider" min="0" max="1" step="0.05" value="1.0" />
+              </div>
+
+              <div>
+                <div class="control-label">
+                  <span>Pin Blend Radius</span>
+                  <span id="valPinRadius">70%</span>
+                </div>
+                <input type="range" class="slider-input" id="pinRadiusSlider" min="10" max="200" step="5" value="70" />
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- Export Panel -->
+      <div class="panel">
+        <div class="panel-title">
+          <span>Export Options</span>
+        </div>
+
+        <div class="export-tabs" id="exportTabs">
+          <button class="export-tab active" data-export="layered">Layered HTML/CSS</button>
+          <button class="export-tab" data-export="single">Single-Class CSS</button>
+          <button class="export-tab" data-export="svg">SVG Code</button>
+        </div>
+
+        <div class="code-container">
+          <div class="code-header">
+            <span id="exportFilename">layered-mesh.html</span>
+            <button class="btn" id="btnCopyCode" style="padding: 4px 8px; font-size: 11px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              Copy Code
+            </button>
+          </div>
+          <pre class="code-block"><code id="codeBlock"></code></pre>
+        </div>
+
+        <div style="display: flex; gap: 12px;">
+          <button class="btn btn-accent" id="btnDownload">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            Download Code File
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div class="toast" id="toast">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: #d946ef;">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+      <span id="toastMessage">Copied to clipboard!</span>
+    </div>
+
+    <!-- Hidden SVG Noise Filter definition -->
+    <svg style="display: none;">
+      <defs>
+        <filter id="turbulence-filter">
+          <feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="4" stitchTiles="stitch" />
+          <feColorMatrix type="matrix" id="noiseColorMatrix" values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0  0 0 0 0.08 0" />
+        </filter>
+      </defs>
+    </svg>
+
+    <script>
+      // ────────────────────────────────────────────────────────
+      // Core State Models
+      // ────────────────────────────────────────────────────────
+      let pins = [];
+      let selectedPinIndex = -1;
+      let baseColor = "#030712";
+      let showGuides = true;
+      let noiseEnabled = true;
+      let noiseOpacity = 0.08;
+      let activeExportFormat = "layered";
+
+      // Mouse drag state
+      let dragInfo = {
+        isDragging: false,
+        pinIndex: -1,
+        handleType: null // "center", "major", "minor"
+      };
+
+      // Built-in presets config
+      const PRESETS = {
+        aurora: {
+          base: "#030712",
+          pins: [
+            { color: "#10B981", x: 25, y: 30, rx: 55, ry: 45, rotation: 15, opacity: 0.85, blendRadius: 70 },
+            { color: "#3B82F6", x: 75, y: 40, rx: 65, ry: 40, rotation: -45, opacity: 0.80, blendRadius: 75 },
+            { color: "#6366F1", x: 40, y: 80, rx: 60, ry: 50, rotation: 60, opacity: 0.90, blendRadius: 80 },
+            { color: "#14B8A6", x: 80, y: 80, rx: 50, ry: 40, rotation: 30, opacity: 0.75, blendRadius: 65 }
+          ]
+        },
+        sunset: {
+          base: "#F97316",
+          pins: [
+            { color: "#8B5CF6", x: 20, y: 25, rx: 70, ry: 55, rotation: 25, opacity: 0.85, blendRadius: 80 },
+            { color: "#F43F5E", x: 80, y: 30, rx: 65, ry: 50, rotation: -30, opacity: 0.90, blendRadius: 70 },
+            { color: "#F59E0B", x: 50, y: 80, rx: 60, ry: 60, rotation: 45, opacity: 0.80, blendRadius: 75 }
+          ]
+        },
+        holographic: {
+          base: "#E2E8F0",
+          pins: [
+            { color: "#38BDF8", x: 20, y: 30, rx: 60, ry: 50, rotation: 0, opacity: 0.85, blendRadius: 65 },
+            { color: "#C084FC", x: 70, y: 20, rx: 75, ry: 55, rotation: 45, opacity: 0.80, blendRadius: 75 },
+            { color: "#F472B6", x: 40, y: 70, rx: 55, ry: 50, rotation: -20, opacity: 0.85, blendRadius: 60 },
+            { color: "#2DD4BF", x: 80, y: 75, rx: 65, ry: 55, rotation: 15, opacity: 0.75, blendRadius: 70 }
+          ]
+        },
+        cottoncandy: {
+          base: "#FCE7F3",
+          pins: [
+            { color: "#BFDBFE", x: 30, y: 30, rx: 70, ry: 60, rotation: 10, opacity: 0.90, blendRadius: 80 },
+            { color: "#FEF08A", x: 75, y: 25, rx: 60, ry: 50, rotation: -15, opacity: 0.85, blendRadius: 70 },
+            { color: "#DDD6FE", x: 50, y: 75, rx: 65, ry: 55, rotation: 30, opacity: 0.90, blendRadius: 75 }
+          ]
+        }
+      };
+
+      // Cached DOM Elements
+      const canvasContainer = document.getElementById("canvasContainer");
+      const meshBg = document.getElementById("meshBg");
+      const meshLayers = document.getElementById("meshLayers");
+      const noiseOverlay = document.getElementById("noiseOverlay");
+      const noiseColorMatrix = document.getElementById("noiseColorMatrix");
+      const guidesOverlay = document.getElementById("guidesOverlay");
+
+      const ratioSelect = document.getElementById("ratioSelect");
+      const btnAddPin = document.getElementById("btnAddPin");
+      const btnDeletePin = document.getElementById("btnDeletePin");
+      const btnToggleGuides = document.getElementById("btnToggleGuides");
+      const btnRandomize = document.getElementById("btnRandomize");
+
+      const noiseToggle = document.getElementById("noiseToggle");
+      const noiseIntensitySection = document.getElementById("noiseIntensitySection");
+      const noiseOpacitySlider = document.getElementById("noiseOpacitySlider");
+      const valNoiseOpacity = document.getElementById("valNoiseOpacity");
+
+      const baseColorSwatch = document.getElementById("baseColorSwatch");
+      const baseColorInput = document.getElementById("baseColorInput");
+      const baseHexInput = document.getElementById("baseHexInput");
+
+      const pinList = document.getElementById("pinList");
+      const pinDetailsPanel = document.getElementById("pinDetailsPanel");
+      const pinColorSwatch = document.getElementById("pinColorSwatch");
+      const pinColorInput = document.getElementById("pinColorInput");
+      const pinHexInput = document.getElementById("pinHexInput");
+      const pinOpacitySlider = document.getElementById("pinOpacitySlider");
+      const valPinOpacity = document.getElementById("valPinOpacity");
+      const pinRadiusSlider = document.getElementById("pinRadiusSlider");
+      const valPinRadius = document.getElementById("valPinRadius");
+
+      const exportTabs = document.getElementById("exportTabs");
+      const exportFilename = document.getElementById("exportFilename");
+      const btnCopyCode = document.getElementById("btnCopyCode");
+      const codeBlock = document.getElementById("codeBlock");
+      const btnDownload = document.getElementById("btnDownload");
+
+      const toast = document.getElementById("toast");
+      const toastMessage = document.getElementById("toastMessage");
+
+      // ────────────────────────────────────────────────────────
+      // Rendering Calculations & Guide Overlay Generators
+      // ────────────────────────────────────────────────────────
+      function updateVisuals() {
+        renderLayers();
+        renderGuides();
+        renderExportCode();
+      }
+
+      function renderLayers() {
+        meshBg.style.backgroundColor = baseColor;
+        meshLayers.innerHTML = "";
+
+        pins.forEach((pin) => {
+          if (pin.opacity <= 0) return;
+          const layer = document.createElement("div");
+          layer.className = "gradient-layer";
+          
+          const scaleX = pin.rx / 50;
+          const scaleY = pin.ry / 50;
+          
+          layer.style.backgroundImage = `radial-gradient(circle, ${pin.color} 0%, transparent ${pin.blendRadius}%)`;
+          layer.style.opacity = pin.opacity;
+          layer.style.transform = `translate(${pin.x - 50}%, ${pin.y - 50}%) rotate(${pin.rotation}deg) scale(${scaleX}, ${scaleY})`;
+          
+          meshLayers.appendChild(layer);
+        });
+
+        // Noise
+        if (noiseEnabled) {
+          noiseOverlay.style.display = "block";
+          noiseColorMatrix.setAttribute("values", `0 0 0 0 0   0 0 0 0 0   0 0 0 0 0  0 0 0 ${noiseOpacity} 0`);
+        } else {
+          noiseOverlay.style.display = "none";
+        }
+      }
+
+      function renderGuides() {
+        guidesOverlay.innerHTML = "";
+        if (!showGuides) return;
+
+        pins.forEach((pin, index) => {
+          const isSelected = index === selectedPinIndex;
+          
+          // Math for handles
+          const rad = (pin.rotation * Math.PI) / 180;
+          const radMinor = rad + Math.PI / 2;
+
+          // Major handle coordinates
+          const hx = pin.x + pin.rx * Math.cos(rad);
+          const hy = pin.y + pin.rx * Math.sin(rad);
+
+          // Minor handle coordinates
+          const hx2 = pin.x + pin.ry * Math.cos(radMinor);
+          const hy2 = pin.y + pin.ry * Math.sin(radMinor);
+
+          // Render group
+          const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+
+          // Draw Ellipse Boundary
+          const ellipse = document.createElementNS("http://www.w3.org/2000/svg", "ellipse");
+          ellipse.setAttribute("cx", pin.x);
+          ellipse.setAttribute("cy", pin.y);
+          ellipse.setAttribute("rx", pin.rx);
+          ellipse.setAttribute("ry", pin.ry);
+          ellipse.setAttribute("transform", `rotate(${pin.rotation}, ${pin.x}, ${pin.y})`);
+          ellipse.setAttribute("class", `boundary-ellipse ${isSelected ? "selected" : ""}`);
+          g.appendChild(ellipse);
+
+          // Draw Lines connecting handles
+          const lineMajor = document.createElementNS("http://www.w3.org/2000/svg", "line");
+          lineMajor.setAttribute("x1", pin.x);
+          lineMajor.setAttribute("y1", pin.y);
+          lineMajor.setAttribute("x2", hx);
+          lineMajor.setAttribute("y2", hy);
+          lineMajor.setAttribute("class", "guide-line");
+          g.appendChild(lineMajor);
+
+          const lineMinor = document.createElementNS("http://www.w3.org/2000/svg", "line");
+          lineMinor.setAttribute("x1", pin.x);
+          lineMinor.setAttribute("y1", pin.y);
+          lineMinor.setAttribute("x2", hx2);
+          lineMinor.setAttribute("y2", hy2);
+          lineMinor.setAttribute("class", "guide-line");
+          g.appendChild(lineMinor);
+
+          // Draw Center Pin handle
+          const cCircle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+          cCircle.setAttribute("cx", pin.x);
+          cCircle.setAttribute("cy", pin.y);
+          cCircle.setAttribute("r", 7.5);
+          cCircle.setAttribute("fill", pin.color);
+          cCircle.setAttribute("stroke", isSelected ? "#ffffff" : "rgba(255,255,255,0.7)");
+          cCircle.setAttribute("stroke-width", isSelected ? "3.5" : "2");
+          cCircle.setAttribute("class", "handle center-handle");
+          cCircle.addEventListener("mousedown", (e) => startDrag(e, index, "center"));
+          cCircle.addEventListener("touchstart", (e) => startDrag(e, index, "center"));
+          g.appendChild(cCircle);
+
+          // Draw Major Control handle (Blue)
+          const hCircle1 = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+          hCircle1.setAttribute("cx", hx);
+          hCircle1.setAttribute("cy", hy);
+          hCircle1.setAttribute("class", "handle control-handle");
+          hCircle1.addEventListener("mousedown", (e) => startDrag(e, index, "major"));
+          hCircle1.addEventListener("touchstart", (e) => startDrag(e, index, "major"));
+          g.appendChild(hCircle1);
+
+          // Draw Minor Control handle (Green)
+          const hCircle2 = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+          hCircle2.setAttribute("cx", hx2);
+          hCircle2.setAttribute("cy", hy2);
+          hCircle2.setAttribute("class", "handle control-handle-minor");
+          hCircle2.addEventListener("mousedown", (e) => startDrag(e, index, "minor"));
+          hCircle2.addEventListener("touchstart", (e) => startDrag(e, index, "minor"));
+          g.appendChild(hCircle2);
+
+          guidesOverlay.appendChild(g);
+        });
+      }
+
+      function loadPreset(presetName) {
+        const data = PRESETS[presetName];
+        if (data) {
+          baseColor = data.base;
+          pins = JSON.parse(JSON.stringify(data.pins));
+          selectedPinIndex = pins.length > 0 ? 0 : -1;
+          
+          baseColorInput.value = baseColor;
+          baseHexInput.value = baseColor;
+          baseColorSwatch.style.backgroundColor = baseColor;
+          
+          renderPinList();
+          updateSelectedPinPanel();
+          updateVisuals();
+        }
+      }
+
+      function randomizePalette() {
+        const randomHex = () => "#" + Math.floor(Math.random()*16777215).toString(16).padStart(6, "0").toUpperCase();
+        baseColor = randomHex();
+        baseColorInput.value = baseColor;
+        baseHexInput.value = baseColor;
+        baseColorSwatch.style.backgroundColor = baseColor;
+
+        pins = [];
+        const numPins = 3 + Math.floor(Math.random() * 3); // 3 to 5 pins
+        for (let i = 0; i < numPins; i++) {
+          pins.push({
+            color: randomHex(),
+            x: 15 + Math.floor(Math.random() * 70),
+            y: 15 + Math.floor(Math.random() * 70),
+            rx: 35 + Math.floor(Math.random() * 45),
+            ry: 25 + Math.floor(Math.random() * 35),
+            rotation: Math.floor(Math.random() * 360) - 180,
+            opacity: 0.7 + Math.random() * 0.3,
+            blendRadius: 55 + Math.floor(Math.random() * 35)
+          });
+        }
+        
+        selectedPinIndex = pins.length > 0 ? 0 : -1;
+        renderPinList();
+        updateSelectedPinPanel();
+        updateVisuals();
+      }
+
+      function renderPinList() {
+        pinList.innerHTML = "";
+        pins.forEach((pin, index) => {
+          const item = document.createElement("div");
+          item.className = `pin-list-item ${index === selectedPinIndex ? "selected" : ""}`;
+          item.innerHTML = `
+            <div class="pin-list-color">
+              <div class="pin-list-swatch" style="background: ${pin.color};"></div>
+              <span>Pin #${index + 1} (${pin.color})</span>
+            </div>
+            <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-muted);">
+              X:${Math.round(pin.x)}% Y:${Math.round(pin.y)}%
+            </span>
+          `;
+          
+          item.addEventListener("click", () => {
+            selectPin(index);
+          });
+          
+          pinList.appendChild(item);
+        });
+      }
+
+      function selectPin(index) {
+        selectedPinIndex = index;
+        renderPinList();
+        updateSelectedPinPanel();
+        renderGuides();
+      }
+
+      function updateSelectedPinPanel() {
+        if (selectedPinIndex === -1 || !pins[selectedPinIndex]) {
+          pinDetailsPanel.style.display = "none";
+          return;
+        }
+
+        const pin = pins[selectedPinIndex];
+        pinDetailsPanel.style.display = "block";
+
+        pinColorInput.value = pin.color;
+        pinHexInput.value = pin.color;
+        pinColorSwatch.style.backgroundColor = pin.color;
+        
+        pinOpacitySlider.value = pin.opacity;
+        valPinOpacity.textContent = pin.opacity.toFixed(2);
+        
+        pinRadiusSlider.value = pin.blendRadius;
+        valPinRadius.textContent = pin.blendRadius + "%";
+      }
+
+      // ────────────────────────────────────────────────────────
+      // Mouse/Touch Drag Handlers
+      // ────────────────────────────────────────────────────────
+      function startDrag(e, pinIndex, handleType) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        selectPin(pinIndex);
+        
+        dragInfo.isDragging = true;
+        dragInfo.pinIndex = pinIndex;
+        dragInfo.handleType = handleType;
+
+        document.addEventListener("mousemove", handleDrag);
+        document.addEventListener("touchmove", handleDrag, { passive: false });
+        
+        document.addEventListener("mouseup", endDrag);
+        document.addEventListener("touchend", endDrag);
+      }
+
+      function handleDrag(e) {
+        if (!dragInfo.isDragging) return;
+        e.preventDefault();
+
+        // Retrieve event coordinates
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+        const rect = canvasContainer.getBoundingClientRect();
+        
+        // Calculate coordinates in percentage space relative to container
+        let mx = ((clientX - rect.left) / rect.width) * 100;
+        let my = ((clientY - rect.top) / rect.height) * 100;
+
+        // Constraints bounds
+        mx = Math.max(-20, Math.min(120, mx));
+        my = Math.max(-20, Math.min(120, my));
+
+        const pin = pins[dragInfo.pinIndex];
+
+        if (dragInfo.handleType === "center") {
+          pin.x = mx;
+          pin.y = my;
+        } else if (dragInfo.handleType === "major") {
+          // Adjust Radius X and Rotation
+          const dx = mx - pin.x;
+          const dy = my - pin.y;
+          
+          pin.rx = Math.max(5, Math.sqrt(dx * dx + dy * dy));
+          pin.rotation = Math.round(Math.atan2(dy, dx) * 180 / Math.PI);
+        } else if (dragInfo.handleType === "minor") {
+          // Adjust Radius Y (constrained perpendicular to major axis angle)
+          const radMajor = (pin.rotation * Math.PI) / 180;
+          
+          // Vector perpendicular to major axis: (-sin, cos)
+          const vx = -Math.sin(radMajor);
+          const vy = Math.cos(radMajor);
+
+          // Vector from center to cursor
+          const dx = mx - pin.x;
+          const dy = my - pin.y;
+
+          // Projected distance
+          const distanceProj = dx * vx + dy * vy;
+          pin.ry = Math.max(5, Math.abs(distanceProj));
+        }
+
+        renderPinList();
+        updateVisuals();
+      }
+
+      function endDrag() {
+        dragInfo.isDragging = false;
+        dragInfo.pinIndex = -1;
+        dragInfo.handleType = null;
+        
+        document.removeEventListener("mousemove", handleDrag);
+        document.removeEventListener("touchmove", handleDrag);
+        document.removeEventListener("mouseup", endDrag);
+        document.removeEventListener("touchend", endDrag);
+      }
+
+      // ────────────────────────────────────────────────────────
+      // Code Exports compiler
+      // ────────────────────────────────────────────────────────
+      function renderExportCode() {
+        let code = "";
+
+        if (activeExportFormat === "layered") {
+          exportFilename.textContent = "layered-mesh.html";
+          
+          // HTML & CSS output
+          code += `<!-- Combined Mesh Gradient Container -->\n`;
+          code += `<div class="mesh-container">\n`;
+          
+          // Background Noise element
+          if (noiseEnabled) {
+            code += `  <div class="mesh-noise"></div>\n`;
+          }
+          
+          pins.forEach((pin, index) => {
+            if (pin.opacity > 0) {
+              code += `  <div class="mesh-layer layer-${index + 1}"></div>\n`;
+            }
+          });
+          code += `</div>\n\n`;
+          
+          // CSS Styling
+          code += `<style>\n`;
+          code += `  .mesh-container {\n`;
+          code += `    position: relative;\n`;
+          code += `    width: 100%;\n`;
+          code += `    height: 500px;\n`;
+          code += `    overflow: hidden;\n`;
+          code += `    background-color: ${baseColor};\n`;
+          code += `  }\n\n`;
+          
+          if (noiseEnabled) {
+            code += `  .mesh-noise {\n`;
+            code += `    position: absolute;\n`;
+            code += `    inset: 0;\n`;
+            code += `    opacity: ${noiseOpacity};\n`;
+            code += `    mix-blend-mode: overlay;\n`;
+            code += `    pointer-events: none;\n`;
+            code += `    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");\n`;
+            code += `  }\n\n`;
+          }
+
+          code += `  .mesh-layer {\n`;
+          code += `    position: absolute;\n`;
+          code += `    width: 100%;\n`;
+          code += `    height: 100%;\n`;
+          code += `    top: 0;\n`;
+          code += `    left: 0;\n`;
+          code += `    transform-origin: center center;\n`;
+          code += `    pointer-events: none;\n`;
+          code += `  }\n\n`;
+
+          pins.forEach((pin, index) => {
+            if (pin.opacity <= 0) return;
+            const scaleX = (pin.rx / 50).toFixed(2);
+            const scaleY = (pin.ry / 50).toFixed(2);
+            
+            code += `  .layer-${index + 1} {\n`;
+            code += `    background-image: radial-gradient(circle, ${pin.color} 0%, transparent ${pin.blendRadius}%);\n`;
+            code += `    opacity: ${pin.opacity.toFixed(2)};\n`;
+            code += `    transform: translate(${Math.round(pin.x - 50)}%, ${Math.round(pin.y - 50)}%) rotate(${pin.rotation}deg) scale(${scaleX}, ${scaleY});\n`;
+            code += `  }\n\n`;
+          });
+          code += `</style>`;
+          
+        } else if (activeExportFormat === "single") {
+          exportFilename.textContent = "single-class.css";
+          
+          // Standard CSS radial-gradient stack (unrotated approximation)
+          code += `.mesh-gradient-bg {\n`;
+          code += `  background-color: ${baseColor};\n`;
+          
+          if (pins.length > 0) {
+            code += `  background-image:\n`;
+            const lines = pins.map((pin, index) => {
+              const comma = index === pins.length - 1 ? ";" : ",";
+              return `    radial-gradient(ellipse ${Math.round(pin.rx)}% ${Math.round(pin.ry)}% at ${Math.round(pin.x)}% ${Math.round(pin.y)}%, ${hexToRgba(pin.color, pin.opacity)} 0%, transparent ${pin.blendRadius}%)${comma}`;
+            });
+            code += lines.join("\n") + "\n";
+          }
+          
+          if (noiseEnabled) {
+            code += `  /* Combined with grain overlay */\n`;
+            code += `  position: relative;\n`;
+            code += `}\n\n`;
+            code += `.mesh-gradient-bg::after {\n`;
+            code += `  content: "";\n`;
+            code += `  position: absolute;\n`;
+            code += `  inset: 0;\n`;
+            code += `  opacity: ${noiseOpacity};\n`;
+            code += `  mix-blend-mode: overlay;\n`;
+            code += `  pointer-events: none;\n`;
+            code += `  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");\n`;
+          }
+          
+          code += `}`;
+          
+        } else if (activeExportFormat === "svg") {
+          exportFilename.textContent = "mesh-gradient.svg";
+          
+          // Pure SVG output
+          code += `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="100%" height="100%">\n`;
+          code += `  <defs>\n`;
+          
+          // Noise filter if enabled
+          if (noiseEnabled) {
+            code += `    <filter id="svg-noise">\n`;
+            code += `      <feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="3" stitchTiles="stitch"/>\n`;
+            code += `      <feColorMatrix type="matrix" values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0  0 0 0 ${noiseOpacity} 0"/>\n`;
+            code += `      <feBlend mode="overlay" in2="SourceGraphic"/>\n`;
+            code += `    </filter>\n`;
+          }
+
+          // Radial Gradients
+          pins.forEach((pin, index) => {
+            const scaleX = (pin.rx / 50).toFixed(3);
+            const scaleY = (pin.ry / 50).toFixed(3);
+            const tX = (pin.x / 100).toFixed(3);
+            const tY = (pin.y / 100).toFixed(3);
+            
+            code += `    <radialGradient id="grad-${index + 1}" cx="50%" cy="50%" r="50%"\n`;
+            code += `      gradientTransform="translate(${tX - 0.5}, ${tY - 0.5}) rotate(${pin.rotation}) scale(${scaleX}, ${scaleY})">\n`;
+            code += `      <stop offset="0%" stop-color="${pin.color}" stop-opacity="${pin.opacity.toFixed(2)}"/>\n`;
+            code += `      <stop offset="${pin.blendRadius}%" stop-color="${pin.color}" stop-opacity="0"/>\n`;
+            code += `    </radialGradient>\n`;
+          });
+          code += `  </defs>\n\n`;
+
+          // Rendering element blocks
+          code += `  <!-- Canvas base background -->\n`;
+          code += `  <rect width="100%" height="100%" fill="${baseColor}"/>\n\n`;
+
+          code += `  <!-- Blend layers -->\n`;
+          pins.forEach((pin, index) => {
+            code += `  <rect width="100%" height="100%" fill="url(#grad-${index + 1})"/>\n`;
+          });
+          
+          if (noiseEnabled) {
+            code += `\n  <!-- Grain overlay -->\n`;
+            code += `  <rect width="100%" height="100%" filter="url(#svg-noise)" opacity="1" style="mix-blend-mode: overlay; pointer-events: none;"/>\n`;
+          }
+
+          code += `</svg>`;
+        }
+
+        codeBlock.textContent = code;
+      }
+
+      function hexToRgba(hex, opacity) {
+        hex = hex.replace("#", "");
+        let r = parseInt(hex.substring(0, 2), 16);
+        let g = parseInt(hex.substring(2, 4), 16);
+        let b = parseInt(hex.substring(4, 6), 16);
+        return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+      }
+
+      function triggerDownload() {
+        const content = codeBlock.textContent;
+        if (!content) return;
+        
+        const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = exportFilename.textContent;
+        link.click();
+        URL.revokeObjectURL(link.href);
+      }
+
+      function showToast(message) {
+        toastMessage.textContent = message;
+        toast.classList.add("active");
+        setTimeout(() => {
+          toast.classList.remove("active");
+        }, 2000);
+      }
+
+      // ────────────────────────────────────────────────────────
+      // Initialization & Events Bindings
+      // ────────────────────────────────────────────────────────
+      function init() {
+        // Load default Aurora preset
+        loadPreset("aurora");
+
+        // Draggable Base Color
+        baseColorInput.addEventListener("input", (e) => {
+          baseColor = e.target.value.toUpperCase();
+          baseHexInput.value = baseColor;
+          baseColorSwatch.style.backgroundColor = baseColor;
+          updateVisuals();
+        });
+
+        baseHexInput.addEventListener("input", (e) => {
+          const val = e.target.value.trim();
+          if (/^#[0-9A-F]{6}$/i.test(val)) {
+            baseColor = val.toUpperCase();
+            baseColorInput.value = baseColor;
+            baseColorSwatch.style.backgroundColor = baseColor;
+            updateVisuals();
+          }
+        });
+
+        // Draggable Pin Color
+        pinColorInput.addEventListener("input", (e) => {
+          if (selectedPinIndex !== -1) {
+            const val = e.target.value.toUpperCase();
+            pins[selectedPinIndex].color = val;
+            pinHexInput.value = val;
+            pinColorSwatch.style.backgroundColor = val;
+            renderPinList();
+            updateVisuals();
+          }
+        });
+
+        pinHexInput.addEventListener("input", (e) => {
+          if (selectedPinIndex !== -1) {
+            const val = e.target.value.trim();
+            if (/^#[0-9A-F]{6}$/i.test(val)) {
+              pins[selectedPinIndex].color = val.toUpperCase();
+              pinColorInput.value = val.toUpperCase();
+              pinColorSwatch.style.backgroundColor = val.toUpperCase();
+              renderPinList();
+              updateVisuals();
+            }
+          }
+        });
+
+        // Active Pin Sliders
+        pinOpacitySlider.addEventListener("input", (e) => {
+          if (selectedPinIndex !== -1) {
+            const val = parseFloat(e.target.value);
+            pins[selectedPinIndex].opacity = val;
+            valPinOpacity.textContent = val.toFixed(2);
+            updateVisuals();
+          }
+        });
+
+        pinRadiusSlider.addEventListener("input", (e) => {
+          if (selectedPinIndex !== -1) {
+            const val = parseInt(e.target.value);
+            pins[selectedPinIndex].blendRadius = val;
+            valPinRadius.textContent = val + "%";
+            updateVisuals();
+          }
+        });
+
+        // Add / Delete Pins
+        btnAddPin.addEventListener("click", () => {
+          const randomHex = "#" + Math.floor(Math.random()*16777215).toString(16).padStart(6, "0").toUpperCase();
+          pins.push({
+            color: randomHex,
+            x: 30 + Math.floor(Math.random() * 40),
+            y: 30 + Math.floor(Math.random() * 40),
+            rx: 50,
+            ry: 40,
+            rotation: 0,
+            opacity: 0.85,
+            blendRadius: 70
+          });
+          selectPin(pins.length - 1);
+          renderPinList();
+          updateVisuals();
+        });
+
+        btnDeletePin.addEventListener("click", () => {
+          if (selectedPinIndex !== -1 && pins.length > 0) {
+            pins.splice(selectedPinIndex, 1);
+            selectedPinIndex = pins.length > 0 ? 0 : -1;
+            renderPinList();
+            updateSelectedPinPanel();
+            updateVisuals();
+          }
+        });
+
+        // Noise controls
+        noiseToggle.addEventListener("change", (e) => {
+          noiseEnabled = e.target.checked;
+          noiseIntensitySection.style.display = noiseEnabled ? "block" : "none";
+          updateVisuals();
+        });
+
+        noiseOpacitySlider.addEventListener("input", (e) => {
+          noiseOpacity = parseFloat(e.target.value);
+          valNoiseOpacity.textContent = noiseOpacity.toFixed(2);
+          updateVisuals();
+        });
+
+        // Ratio selector
+        ratioSelect.addEventListener("change", (e) => {
+          canvasContainer.className = `canvas-container ratio-${e.target.value}`;
+        });
+
+        // Guides Toggle
+        btnToggleGuides.addEventListener("click", () => {
+          showGuides = !showGuides;
+          btnToggleGuides.textContent = showGuides ? "Hide Handles" : "Show Handles";
+          renderGuides();
+        });
+
+        // Randomizer
+        btnRandomize.addEventListener("click", randomizePalette);
+
+        // Preset loading
+        document.querySelectorAll(".preset-card").forEach((card) => {
+          card.addEventListener("click", () => {
+            loadPreset(card.dataset.preset);
+          });
+        });
+
+        // Export tab selectors
+        exportTabs.addEventListener("click", (e) => {
+          const tab = e.target.closest(".export-tab");
+          if (tab) {
+            exportTabs.querySelectorAll(".export-tab").forEach(t => t.classList.remove("active"));
+            tab.classList.add("active");
+            activeExportFormat = tab.dataset.export;
+            updateVisuals();
+          }
+        });
+
+        // Copy / Download Clipboard
+        btnCopyCode.addEventListener("click", () => {
+          const text = codeBlock.textContent;
+          if (text) {
+            navigator.clipboard.writeText(text).then(() => {
+              showToast("Copied to clipboard!");
+            });
+          }
+        });
+
+        btnDownload.addEventListener("click", triggerDownload);
+      }
+
+      window.addEventListener("DOMContentLoaded", init);
+    </script>
+  </body>
+</html>
