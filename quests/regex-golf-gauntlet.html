@@ -1,0 +1,1624 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Regex Golf: The Gauntlet</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛳</text></svg>" />
+
+    <!-- ══════════════════════════════════════════════════════════════
+     REGEX GOLF: THE GAUNTLET
+     Write the shortest regex that matches every green string and
+     rejects every red one. Every pattern is compiled with the real
+     RegExp engine and run live — the engine is the referee.
+     Pure HTML + CSS + vanilla JS. No framework. No build step.
+     ══════════════════════════════════════════════════════════════ -->
+    <link href="https://fonts.googleapis.com/css2?family=Bungee&family=JetBrains+Mono:ital,wght@0,400;0,600;0,800;1,400&display=swap" rel="stylesheet" />
+
+    <style>
+      /* ══════════════════════════════════════════════════════════════
+   THE COURSE AT DUSK
+   Palette: night-fairway green · flag red · sand/par gold ·
+   birdie cyan · terminal cream · scorecard paper.
+   Distinct from the other quests: warm fairway-green + flag-red
+   golf palette on near-black, with a code-terminal input.
+   ══════════════════════════════════════════════════════════════ */
+      :root {
+        --night: #071109;
+        --turf: #0c1a10;
+        --turf-lit: #12271a;
+        --edge: #244a30;
+        --fairway: #4ea86a;
+        --fairway-b: #7fe0a0;
+        --flag: #ff5347;
+        --sand: #e8c069;
+        --birdie: #57e0d8;
+        --cream: #e9e6d6;
+        --ink: #a9c3ac;
+        --ink-dim: #5c7862;
+        --paper: #ece5cf;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        background: radial-gradient(ellipse 130% 90% at 50% -10%, #10241a 0%, transparent 55%), var(--night);
+        color: var(--ink);
+        font-family: "JetBrains Mono", ui-monospace, monospace;
+        font-size: 15px;
+        overflow: hidden;
+      }
+      ::selection {
+        background: #1d3b28;
+        color: var(--fairway-b);
+      }
+      .display {
+        font-family: "Bungee", cursive;
+        letter-spacing: 0.02em;
+      }
+
+      #app {
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        z-index: 10;
+      }
+
+      /* ── HUD ───────────────────────────────────────────────────────── */
+      #hud {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        padding: 9px 16px;
+        border-bottom: 1px solid var(--edge);
+        background: rgba(7, 17, 9, 0.92);
+      }
+      .hud-chip {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        border: 1px solid var(--edge);
+        border-radius: 3px;
+        padding: 4px 9px;
+        color: var(--sand);
+        background: var(--turf);
+      }
+      #holeChip {
+        color: var(--fairway-b);
+      }
+      #parChip {
+        color: var(--sand);
+      }
+      #scoreChip {
+        color: var(--birdie);
+      }
+      #lifeChip {
+        color: var(--flag);
+      }
+      #courseChip {
+        flex: 1;
+        text-align: right;
+        border: none;
+        background: none;
+        color: var(--fairway-b);
+        font-size: 12px;
+        letter-spacing: 0.14em;
+      }
+
+      /* ── Stage ─────────────────────────────────────────────────────── */
+      #stage {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        padding: 12px;
+        gap: 12px;
+        overflow-y: auto;
+      }
+
+      #themeBar {
+        text-align: center;
+        font-family: "Bungee", cursive;
+        font-size: clamp(16px, 3vw, 24px);
+        color: var(--cream);
+        letter-spacing: 0.04em;
+        text-shadow: 0 0 18px rgba(126, 224, 160, 0.25);
+      }
+      #themeSub {
+        text-align: center;
+        font-size: 12px;
+        color: var(--ink-dim);
+        margin-top: -4px;
+      }
+
+      /* Match / reject columns */
+      #columns {
+        display: flex;
+        gap: 14px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      .col {
+        flex: 1;
+        min-width: 200px;
+        max-width: 360px;
+        border: 1px solid var(--edge);
+        border-radius: 8px;
+        background: var(--turf);
+        overflow: hidden;
+      }
+      .col-head {
+        font-size: 10.5px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        padding: 7px 12px;
+        border-bottom: 1px solid var(--edge);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .col-match .col-head {
+        color: var(--fairway-b);
+        background: rgba(78, 168, 106, 0.08);
+      }
+      .col-reject .col-head {
+        color: var(--flag);
+        background: rgba(255, 83, 71, 0.07);
+      }
+      .col-body {
+        padding: 8px 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .str-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        padding: 4px 8px;
+        border-radius: 4px;
+        background: #0a1610;
+        transition:
+          background 0.15s,
+          color 0.15s;
+        word-break: break-all;
+      }
+      .str-row .mark {
+        width: 16px;
+        flex-shrink: 0;
+        text-align: center;
+        font-weight: 800;
+      }
+      .str-row .txt {
+        color: var(--cream);
+      }
+      .str-row.pass {
+        background: rgba(78, 168, 106, 0.16);
+      }
+      .str-row.pass .mark {
+        color: var(--fairway-b);
+      }
+      .str-row.fail {
+        background: rgba(255, 83, 71, 0.14);
+      }
+      .str-row.fail .mark {
+        color: var(--flag);
+      }
+      .str-row.pass.pop {
+        animation: rowpop 0.25s ease;
+      }
+      @keyframes rowpop {
+        40% {
+          transform: scale(1.04);
+        }
+      }
+
+      /* Input console */
+      #console {
+        border: 1px solid var(--edge);
+        border-radius: 8px;
+        background: #060f09;
+        max-width: 740px;
+        width: 100%;
+        margin: 0 auto;
+        padding: 14px 16px;
+        box-shadow: 0 0 34px rgba(0, 0, 0, 0.5);
+      }
+      #inputWrap {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border: 1px solid var(--edge);
+        border-radius: 6px;
+        background: #0a1610;
+        padding: 10px 12px;
+      }
+      #slash {
+        color: var(--fairway);
+        font-size: 22px;
+        font-weight: 800;
+      }
+      #reInput {
+        flex: 1;
+        background: transparent;
+        border: none;
+        outline: none;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 20px;
+        font-weight: 600;
+        color: var(--cream);
+        caret-color: var(--flag);
+        letter-spacing: 0.02em;
+      }
+      #flags {
+        color: var(--ink-dim);
+        font-size: 16px;
+      }
+      #strokeReadout {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 10px;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      #strokes {
+        font-size: 13px;
+        color: var(--ink);
+      }
+      #strokes b {
+        color: var(--cream);
+        font-size: 16px;
+      }
+      #parGauge {
+        flex: 1;
+        min-width: 160px;
+        height: 8px;
+        border: 1px solid var(--edge);
+        border-radius: 4px;
+        background: #0a1610;
+        overflow: hidden;
+        position: relative;
+      }
+      #parFill {
+        height: 100%;
+        width: 0%;
+        background: var(--fairway);
+        transition:
+          width 0.2s,
+          background 0.2s;
+      }
+      #validState {
+        font-size: 12.5px;
+        color: var(--ink-dim);
+        min-width: 130px;
+        text-align: right;
+      }
+      #validState.valid {
+        color: var(--fairway-b);
+      }
+      #validState.invalid {
+        color: var(--flag);
+      }
+      #reError {
+        color: var(--flag);
+        font-size: 12px;
+        min-height: 16px;
+        margin-top: 6px;
+        font-style: italic;
+      }
+
+      #actionRow {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        margin-top: 12px;
+        flex-wrap: wrap;
+      }
+      .btn {
+        font-family: "Bungee", cursive;
+        font-size: 14px;
+        cursor: pointer;
+        border: 2px solid var(--fairway);
+        border-radius: 6px;
+        background: transparent;
+        color: var(--fairway-b);
+        padding: 10px 22px;
+        letter-spacing: 0.04em;
+        transition:
+          background 0.15s,
+          transform 0.08s,
+          opacity 0.2s;
+      }
+      .btn:hover:not(:disabled) {
+        background: rgba(78, 168, 106, 0.14);
+      }
+      .btn:active:not(:disabled) {
+        transform: scale(0.97);
+      }
+      .btn:disabled {
+        opacity: 0.32;
+        cursor: not-allowed;
+      }
+      .btn.gold {
+        border-color: var(--sand);
+        color: var(--sand);
+      }
+      .btn.gold:hover:not(:disabled) {
+        background: rgba(232, 192, 105, 0.14);
+      }
+      .btn.ghost {
+        border-color: var(--edge);
+        color: var(--ink-dim);
+      }
+      .btn.ghost:hover:not(:disabled) {
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--ink);
+      }
+
+      #hintLine {
+        text-align: center;
+        font-size: 12.5px;
+        color: var(--ink-dim);
+        min-height: 18px;
+        margin-top: 8px;
+      }
+      #hintLine b {
+        color: var(--sand);
+      }
+
+      /* Grade splash after sinking a hole */
+      #grade {
+        text-align: center;
+        min-height: 30px;
+      }
+      #grade .g {
+        font-family: "Bungee", cursive;
+        font-size: clamp(22px, 4vw, 34px);
+      }
+      #grade .g.birdie {
+        color: var(--birdie);
+        text-shadow: 0 0 20px rgba(87, 224, 216, 0.4);
+      }
+      #grade .g.par {
+        color: var(--fairway-b);
+      }
+      #grade .g.bogey {
+        color: var(--sand);
+      }
+      #grade .detail {
+        font-size: 12.5px;
+        color: var(--ink-dim);
+        margin-top: 2px;
+      }
+
+      /* ── Log ───────────────────────────────────────────────────────── */
+      #log {
+        height: 96px;
+        border-top: 1px solid var(--edge);
+        background: #050c07;
+        display: flex;
+        flex-direction: column;
+      }
+      #logBar {
+        font-size: 9.5px;
+        letter-spacing: 0.2em;
+        color: var(--ink-dim);
+        padding: 4px 14px;
+        border-bottom: 1px solid var(--edge);
+        text-transform: uppercase;
+      }
+      #logOut {
+        flex: 1;
+        overflow-y: auto;
+        padding: 6px 14px;
+        font-size: 12.5px;
+        line-height: 1.5;
+      }
+      .l-log {
+        color: var(--ink);
+      }
+      .l-ok {
+        color: var(--fairway-b);
+      }
+      .l-bad {
+        color: var(--flag);
+      }
+      .l-sys {
+        color: var(--sand);
+        font-style: italic;
+      }
+      .l-birdie {
+        color: var(--birdie);
+        text-shadow: 0 0 6px rgba(87, 224, 216, 0.4);
+      }
+      .l-dim {
+        color: var(--ink-dim);
+      }
+
+      /* ── Overlays ─────────────────────────────────────────────────── */
+      .overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 60;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 26px;
+        background: rgba(4, 9, 6, 0.95);
+        overflow-y: auto;
+      }
+      .title-main {
+        font-family: "Bungee", cursive;
+        font-size: clamp(30px, 7vw, 68px);
+        color: var(--fairway-b);
+        line-height: 1.05;
+        text-shadow:
+          0 0 30px rgba(126, 224, 160, 0.4),
+          2px 2px 0 var(--flag);
+      }
+      .title-sub {
+        font-size: 12px;
+        letter-spacing: 0.36em;
+        color: var(--ink-dim);
+        text-transform: uppercase;
+        margin: 12px 0 24px;
+      }
+      .story {
+        max-width: 640px;
+        font-size: 14.5px;
+        line-height: 1.75;
+        color: var(--ink);
+        margin: 0 auto 22px;
+        text-align: left;
+      }
+      .story b {
+        color: var(--fairway-b);
+      }
+      .story .flag {
+        color: var(--flag);
+      }
+      .story .gold {
+        color: var(--sand);
+      }
+      .story code {
+        color: var(--paper);
+        background: rgba(126, 224, 160, 0.1);
+        padding: 1px 6px;
+        border-radius: 3px;
+        font-size: 0.92em;
+      }
+      .small-warning {
+        margin-top: 20px;
+        font-size: 10.5px;
+        color: var(--ink-dim);
+      }
+
+      /* Scorecard */
+      .scorecard {
+        background: var(--paper);
+        color: #23301f;
+        border-radius: 8px;
+        padding: 18px 22px;
+        max-width: 560px;
+        width: 100%;
+        margin: 0 auto 22px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+      }
+      .scorecard h3 {
+        font-family: "Bungee", cursive;
+        margin: 0 0 12px;
+        font-size: 18px;
+        color: #1a2417;
+        text-align: center;
+        letter-spacing: 0.04em;
+      }
+      .sc-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      .sc-table th,
+      .sc-table td {
+        border: 1px solid #b9b393;
+        padding: 5px 8px;
+        text-align: center;
+      }
+      .sc-table th {
+        background: #ddd5b8;
+        font-weight: 800;
+      }
+      .sc-table td.under {
+        color: #1f7a3f;
+        font-weight: 800;
+      }
+      .sc-table td.over {
+        color: #b23a2e;
+        font-weight: 800;
+      }
+      .sc-total {
+        display: flex;
+        justify-content: space-around;
+        margin-top: 14px;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      .sc-total .v {
+        font-family: "Bungee", cursive;
+        font-size: 26px;
+        color: #1a2417;
+      }
+      .sc-total .k {
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #5b6b4f;
+        text-align: center;
+      }
+
+      /* Hole transition banner */
+      #holeBanner {
+        position: fixed;
+        inset: 0;
+        z-index: 58;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        opacity: 0;
+        background: radial-gradient(ellipse at center, rgba(7, 17, 9, 0.6), rgba(7, 17, 9, 0.92));
+      }
+      #holeBanner.show {
+        animation: hole-in 1.4s ease;
+      }
+      #holeBanner .hb-num {
+        font-family: "Bungee", cursive;
+        font-size: clamp(28px, 6vw, 54px);
+        color: var(--fairway-b);
+        text-shadow: 0 0 24px rgba(126, 224, 160, 0.4);
+      }
+      #holeBanner .hb-name {
+        font-size: 13px;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        color: var(--sand);
+        margin-top: 8px;
+      }
+      #holeBanner .hb-par {
+        font-size: 12px;
+        color: var(--ink-dim);
+        margin-top: 6px;
+      }
+      @keyframes hole-in {
+        0% {
+          opacity: 0;
+        }
+        22%,
+        72% {
+          opacity: 1;
+        }
+        100% {
+          opacity: 0;
+        }
+      }
+
+      /* ── Effect layers ─────────────────────────────────────────────── */
+      #particles {
+        position: fixed;
+        inset: 0;
+        z-index: 40;
+        pointer-events: none;
+        width: 100%;
+        height: 100%;
+      }
+      #vig {
+        position: fixed;
+        inset: 0;
+        z-index: 41;
+        pointer-events: none;
+        background: radial-gradient(ellipse at center, transparent 55%, rgba(2, 5, 3, 0.88) 100%);
+      }
+      #birdieFlash {
+        position: fixed;
+        inset: 0;
+        z-index: 44;
+        pointer-events: none;
+        background: radial-gradient(ellipse at center, rgba(87, 224, 216, 0.22), transparent 62%);
+        opacity: 0;
+      }
+      #birdieFlash.run {
+        animation: bpulse 0.7s ease-out;
+      }
+      @keyframes bpulse {
+        0% {
+          opacity: 0.8;
+        }
+        100% {
+          opacity: 0;
+        }
+      }
+      .shake {
+        animation: shk 0.4s linear;
+      }
+      @keyframes shk {
+        20% {
+          transform: translate(-4px, 2px);
+        }
+        40% {
+          transform: translate(5px, -2px);
+        }
+        60% {
+          transform: translate(-5px, 1px);
+        }
+        80% {
+          transform: translate(4px, -1px);
+        }
+      }
+
+      #logOut::-webkit-scrollbar {
+        width: 8px;
+      }
+      #logOut::-webkit-scrollbar-thumb {
+        background: #163020;
+        border-radius: 4px;
+      }
+
+      @media (max-width: 720px) {
+        #columns {
+          flex-direction: column;
+          align-items: center;
+        }
+        .col {
+          max-width: 100%;
+          width: 100%;
+        }
+        #reInput {
+          font-size: 17px;
+        }
+        #log {
+          height: 78px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .shake,
+        #birdieFlash.run,
+        #holeBanner.show,
+        .str-row.pass.pop {
+          animation: none !important;
+        }
+        #holeBanner.show {
+          opacity: 1;
+        }
+      }
+      :focus-visible {
+        outline: 2px solid var(--sand);
+        outline-offset: 3px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>
+      <div style="padding: 40px; color: #a9c3ac; font-family: monospace; background: #071109">This course needs JavaScript — the real RegExp engine is the referee.</div>
+    </noscript>
+
+    <canvas id="particles"></canvas>
+    <div id="vig"></div>
+    <div id="birdieFlash"></div>
+    <div id="holeBanner">
+      <div style="text-align: center">
+        <div class="hb-num"></div>
+        <div class="hb-name"></div>
+        <div class="hb-par"></div>
+      </div>
+    </div>
+
+    <script>
+      /* ══════════════════════════════════════════════════════════════════
+   REGEX GOLF: THE GAUNTLET — engine
+   Part A: real RegExp evaluation, verified-par hole generator,
+   audio, particles, effects. The engine judges; nothing is faked.
+   ══════════════════════════════════════════════════════════════════ */
+      "use strict";
+
+      const $ = (s) => document.querySelector(s);
+      const $id = (id) => document.getElementById(id);
+      const REDUCED = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+      const rInt = (n) => Math.floor(Math.random() * n);
+      const pick = (a) => a[rInt(a.length)];
+      const sample = (arr, n) => {
+        const c = arr.slice(),
+          out = [];
+        while (out.length < n && c.length) out.push(c.splice(rInt(c.length), 1)[0]);
+        return out;
+      };
+
+      /* ════════════════════ REAL REGEX EVALUATION ══════════════════════════
+   The player's pattern is compiled with the real RegExp constructor and
+   run against every string. The game stores no answers — it asks the
+   engine. This is the whole honesty guarantee. */
+      function compileRegex(src, flags) {
+        try {
+          return { ok: true, re: new RegExp(src, flags || "") };
+        } catch (e) {
+          return { ok: false, error: e.message.replace(/^.*?:\s*/, "") };
+        }
+      }
+      function solutionWorks(src, greens, reds, flags) {
+        const c = compileRegex(src, flags);
+        if (!c.ok) return false;
+        for (const g of greens) if (!c.re.test(g)) return false;
+        for (const r of reds) if (c.re.test(r)) return false;
+        return true;
+      }
+
+      /* ── WORD BANKS ───────────────────────────────────────────────────── */
+      const ANIMALS = ["cat", "dog", "fox", "owl", "bat", "cow", "ant", "bee", "elk", "ram", "hen", "jay", "koi", "pig", "yak", "eel", "emu", "asp", "doe", "kit"];
+      const FRUITS = ["apple", "mango", "lemon", "grape", "peach", "melon", "berry", "guava", "olive", "plum", "pear", "fig", "lime", "date", "kiwi"];
+      const NAMES = ["alice", "aaron", "brian", "bella", "chloe", "cyril", "diana", "derek", "elena", "ethan", "fiona", "frank", "grace", "henry", "irene", "ivan"];
+      const TECH = ["array", "stack", "queue", "graph", "tuple", "float", "token", "cache", "macro", "yield", "proxy", "slice", "await", "const", "class"];
+      const DOUBLES = ["apple", "berry", "koala", "otter", "llama", "puppy", "jelly", "hobby", "daddy", "offer", "sunny", "funny", "happy", "adder", "seed", "moon", "book", "feed", "wall", "bell"];
+      const NODBL = ["cat", "dog", "fox", "mango", "grape", "alice", "brian", "token", "slice", "proxy", "cyril", "diana", "frank", "grace", "irene", "stack", "tuple"];
+      const NUMS = ["12", "7", "404", "88", "3", "1000", "42", "900", "5", "256", "64", "19", "8", "330", "77"];
+      const NOTNUMS = ["a1", "12a", "x", "hi", "4b4", "cat", "v2", "3d", "a", "00z", "1.5", "-4", "2e", "x9", "p0"];
+      const SHORTW = ["cat", "dog", "fox", "owl", "bee", "ant", "elk", "koi", "hen", "ram", "jay", "cow", "pig", "yak", "bat"];
+      const LONGW = ["mango", "apple", "token", "slice", "proxy", "alice", "brian", "grape", "lemon", "peach", "stack", "queue", "graph"];
+
+      /* ══════════════ THEME GENERATORS — each returns a hole with a
+   VERIFIED reference solution, or null. par := refSolution.length. ══ */
+      const THEMES = [
+        function substringLetter() {
+          const bank = pick([ANIMALS, FRUITS, NAMES, TECH]);
+          const letter = pick("aeioulmnrst".split(""));
+          const withL = bank.filter((w) => w.includes(letter));
+          const without = bank.filter((w) => !w.includes(letter));
+          if (withL.length < 3 || without.length < 4) return null;
+          const greens = sample(withL, 4),
+            reds = sample(without, 4);
+          const ref = letter;
+          if (!solutionWorks(ref, greens, reds)) return null;
+          return { greens, reds, ref, par: ref.length, theme: "Contains \u201c" + letter + "\u201d", hint: "A bare character matches it as a substring. One letter can be enough." };
+        },
+        function startsWith() {
+          const bank = pick([ANIMALS, FRUITS, NAMES, TECH]);
+          const letter = pick("abcdefgp".split(""));
+          const yes = bank.filter((w) => w[0] === letter),
+            no = bank.filter((w) => w[0] !== letter);
+          if (yes.length < 3 || no.length < 4) return null;
+          const greens = sample(yes, Math.min(4, yes.length)),
+            reds = sample(no, 4);
+          const bare = solutionWorks(letter, greens, reds);
+          const ref = bare ? letter : "^" + letter;
+          if (!solutionWorks(ref, greens, reds)) return null;
+          return { greens, reds, ref, par: ref.length, theme: "Starts with \u201c" + letter + "\u201d", hint: bare ? "If no rejected word contains it, a bare letter works." : "^ anchors to the start of the string." };
+        },
+        function endsWith() {
+          const bank = pick([ANIMALS, FRUITS, NAMES, TECH]);
+          const letter = pick("eyxntdol".split(""));
+          const yes = bank.filter((w) => w[w.length - 1] === letter),
+            no = bank.filter((w) => w[w.length - 1] !== letter);
+          if (yes.length < 3 || no.length < 4) return null;
+          const greens = sample(yes, Math.min(4, yes.length)),
+            reds = sample(no, 4);
+          const bare = solutionWorks(letter, greens, reds);
+          const ref = bare ? letter : letter + "$";
+          if (!solutionWorks(ref, greens, reds)) return null;
+          return { greens, reds, ref, par: ref.length, theme: "Ends with \u201c" + letter + "\u201d", hint: bare ? "A bare letter can be enough here." : "$ anchors to the end of the string." };
+        },
+        function doubledLetter() {
+          const greens = sample(DOUBLES, 4),
+            reds = sample(NODBL, 4);
+          const ref = "(.)\\1";
+          if (!solutionWorks(ref, greens, reds)) return null;
+          return { greens, reds, ref, par: ref.length, theme: "Has a doubled letter", hint: "(.)\\1 \u2014 a group capturing any char, then a backreference to it." };
+        },
+        function pureDigits() {
+          const greens = sample(NUMS, 4),
+            reds = sample(NOTNUMS, 4);
+          const ref = "^\\d+$";
+          if (!solutionWorks(ref, greens, reds)) return null;
+          return { greens, reds, ref, par: ref.length, theme: "Only digits", hint: "\\d is a digit, + is one-or-more, ^ and $ anchor the whole string." };
+        },
+        function oneOfSet() {
+          const bank = pick([ANIMALS, FRUITS, TECH]);
+          const chosen = sample(bank, 3),
+            rest = bank.filter((w) => !chosen.includes(w));
+          if (rest.length < 4) return null;
+          const reds = sample(rest, 4);
+          const initials = [...new Set(chosen.map((w) => w[0]))];
+          const classWorks = initials.length <= 3 && solutionWorks("^[" + initials.join("") + "]", chosen, reds);
+          const ref = classWorks ? "^[" + initials.join("") + "]" : chosen.join("|");
+          if (!solutionWorks(ref, chosen, reds)) return null;
+          return { greens: chosen, reds, ref, par: ref.length, theme: classWorks ? "Starts with the right letter" : "One of a set", hint: classWorks ? "[...] is a character class \u2014 any one of the letters inside." : "| means OR. List the alternatives." };
+        },
+        function exactLength() {
+          const greens = sample(SHORTW, 4),
+            reds = sample(LONGW, 4);
+          const ref = "^.{3}$";
+          if (!solutionWorks(ref, greens, reds)) return null;
+          return { greens, reds, ref, par: ref.length, theme: "Exactly 3 letters", hint: ".{3} means any character exactly 3 times; anchors pin the length." };
+        }
+      ];
+
+      /* Tighten par to the TRUE shortest solution we can find, not merely the
+   reference length. Without this, par is often far too generous (e.g. an
+   alternation "tuple|float" when a single "t" works), which breaks the
+   golf premise. We search short candidates over a small alphabet plus a
+   few structural forms; par becomes the shortest that actually validates.
+   The reference stays as a known-good fallback / hint seed. */
+      const PAR_ALPHA = "abcdefghijklmnopqrstuvwxyz0123456789".split("");
+      function tightenPar(hole) {
+        const greens = hole.greens,
+          reds = hole.reds,
+          ref = hole.ref;
+        let best = ref;
+        const consider = (cand) => {
+          if (cand.length < best.length && solutionWorks(cand, greens, reds)) best = cand;
+        };
+        for (const c of PAR_ALPHA) consider(c);
+        for (const c of PAR_ALPHA) {
+          consider("^" + c);
+          consider(c + "$");
+        }
+        for (const c of PAR_ALPHA) for (const d of PAR_ALPHA) consider(c + d);
+        hole.opt = best.length; // the shortest we could find
+        // Par sits a touch above the optimum so the best-known answer earns a
+        // birdie and a merely-good answer makes par. Cushion scales gently.
+        hole.par = best.length + (best.length <= 2 ? 1 : best.length <= 5 ? 2 : 3);
+        hole.best = best;
+        return hole;
+      }
+
+      /* Build a fresh, verified pool for a run, bucketed loosely by par size
+   (proxy for difficulty: shorter par = simpler concept). */
+      function buildPool() {
+        const pool = [];
+        const seen = new Set();
+        let tries = 0;
+        while (tries < 6000 && pool.length < 240) {
+          tries++;
+          const hole = pick(THEMES)();
+          if (!hole) continue;
+          if (!solutionWorks(hole.ref, hole.greens, hole.reds)) continue; // defensive re-check
+          // De-dupe on theme + sorted string sets so a run doesn't repeat a hole.
+          const sig = hole.theme + "|" + hole.greens.slice().sort().join(",") + "|" + hole.reds.slice().sort().join(",");
+          if (seen.has(sig)) continue;
+          seen.add(sig);
+          tightenPar(hole); // set a fair par based on the true shortest solution
+          pool.push(hole);
+        }
+        return pool;
+      }
+      function drawHole(pool, prefer) {
+        // prefer: 'easy' | 'mid' | 'any' — bias by par length.
+        const buckets = { easy: [], mid: [], hard: [] };
+        pool.forEach((h, i) => {
+          const b = h.par <= 2 ? "easy" : h.par <= 4 ? "mid" : "hard";
+          buckets[b].push(i);
+        });
+        let order;
+        if (prefer === "easy") order = ["easy", "mid", "hard"];
+        else if (prefer === "mid") order = ["mid", "hard", "easy"];
+        else order = ["hard", "mid", "easy"];
+        for (const b of order)
+          if (buckets[b].length) {
+            const poolIdx = buckets[b][rInt(buckets[b].length)];
+            return pool.splice(poolIdx, 1)[0];
+          }
+        // Pool ran dry — generate a fresh verified hole on demand. Theme
+        // generators can return null on an unlucky draw, so retry until one
+        // yields a hole whose reference solution provably works.
+        for (let i = 0; i < 400; i++) {
+          const hole = pick(THEMES)();
+          if (hole && solutionWorks(hole.ref, hole.greens, hole.reds)) return tightenPar(hole);
+        }
+        // Absolute last resort: a hand-built hole guaranteed to validate.
+        return tightenPar({ greens: ["7", "42", "100"], reds: ["a", "x1", "hi"], ref: "^\\d+$", theme: "Only digits", hint: "\\d is a digit; + is one-or-more; ^ and $ anchor the whole string." });
+      }
+
+      /* ── AUDIO — synthetic. Calm course ambience + arcade feedback. ──── */
+      const AudioFX = (() => {
+        let ctx = null,
+          amb = null;
+        const ac = () => {
+          if (!ctx) {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (!AC) return null;
+            ctx = new AC();
+          }
+          if (ctx.state === "suspended") ctx.resume();
+          return ctx;
+        };
+        const env = (g, t0, a, peak, d) => {
+          g.gain.setValueAtTime(0.0001, t0);
+          g.gain.exponentialRampToValueAtTime(peak, t0 + a);
+          g.gain.exponentialRampToValueAtTime(0.0001, t0 + a + d);
+        };
+        const osc = (type, f0, f1, dur, peak) => {
+          const c = ac();
+          if (!c) return;
+          const o = c.createOscillator(),
+            g = c.createGain();
+          o.type = type;
+          o.frequency.setValueAtTime(f0, c.currentTime);
+          if (f1) o.frequency.exponentialRampToValueAtTime(f1, c.currentTime + dur);
+          env(g, c.currentTime, 0.006, peak || 0.09, dur);
+          o.connect(g);
+          g.connect(c.destination);
+          o.start();
+          o.stop(c.currentTime + dur + 0.05);
+        };
+        const noise = (dur, peak, freq, type) => {
+          const c = ac();
+          if (!c) return;
+          const b = c.createBuffer(1, Math.floor(c.sampleRate * dur), c.sampleRate);
+          const d = b.getChannelData(0);
+          for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+          const s = c.createBufferSource();
+          s.buffer = b;
+          const f = c.createBiquadFilter();
+          f.type = type || "bandpass";
+          f.frequency.value = freq || 900;
+          const g = c.createGain();
+          env(g, c.currentTime, 0.008, peak || 0.12, dur);
+          s.connect(f);
+          f.connect(g);
+          g.connect(c.destination);
+          s.start();
+        };
+        return {
+          unlock() {
+            ac();
+          },
+          startAmb() {
+            const c = ac();
+            if (!c || amb) return;
+            const o = c.createOscillator();
+            o.type = "sine";
+            o.frequency.value = 62;
+            const lfo = c.createOscillator();
+            lfo.type = "sine";
+            lfo.frequency.value = 0.08;
+            const lg = c.createGain();
+            lg.gain.value = 0.01;
+            const g = c.createGain();
+            g.gain.value = 0.03;
+            lfo.connect(lg);
+            lg.connect(g.gain);
+            o.connect(g);
+            g.connect(c.destination);
+            o.start();
+            lfo.start();
+            amb = { o, lfo, g };
+          },
+          stopAmb() {
+            if (!amb) return;
+            try {
+              amb.g.gain.value = 0;
+              amb.o.stop();
+              amb.lfo.stop();
+            } catch (e) {}
+            amb = null;
+          },
+          key() {
+            osc("square", 320 + rInt(80), null, 0.02, 0.03);
+          },
+          tickPass() {
+            osc("sine", 720, 940, 0.06, 0.05);
+          },
+          valid() {
+            osc("sine", 523, null, 0.1, 0.07);
+            setTimeout(() => osc("sine", 784, null, 0.12, 0.06), 90);
+          },
+          sink() {
+            osc("sine", 440, 660, 0.14, 0.08);
+            noise(0.1, 0.05, 2400);
+          },
+          birdie() {
+            [659, 784, 988, 1319].forEach((f, i) => setTimeout(() => osc("sine", f, null, 0.32, 0.08), i * 90));
+            noise(0.2, 0.05, 3200);
+          },
+          bogey() {
+            osc("triangle", 300, 200, 0.3, 0.08);
+          },
+          lifeLost() {
+            osc("sawtooth", 260, 70, 0.45, 0.13);
+            noise(0.3, 0.09, 500, "lowpass");
+          },
+          holeIn() {
+            [784, 988, 1319, 1568, 2093].forEach((f, i) => setTimeout(() => osc("sine", f, null, 0.4, 0.09), i * 80));
+          },
+          win() {
+            [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => osc("sine", f, null, 0.5, 0.09), i * 150));
+          },
+          lose() {
+            osc("sawtooth", 300, 50, 1.1, 0.13);
+            noise(0.8, 0.09, 400, "lowpass");
+          }
+        };
+      })();
+
+      /* ── PARTICLES — birdie confetti, hole-in-one burst ───────────────── */
+      const Particles = (() => {
+        const cv = $id("particles");
+        const cx = cv.getContext && cv.getContext("2d");
+        let parts = [],
+          running = false;
+        const size = () => {
+          cv.width = innerWidth;
+          cv.height = innerHeight;
+        };
+        addEventListener("resize", size);
+        size();
+        const frame = () => {
+          if (!cx) return;
+          if (!parts.length) {
+            running = false;
+            cx.clearRect(0, 0, cv.width, cv.height);
+            return;
+          }
+          cx.clearRect(0, 0, cv.width, cv.height);
+          parts = parts.filter((p) => p.life > 0);
+          for (const p of parts) {
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += p.g;
+            p.life--;
+            cx.globalAlpha = Math.max(0, p.life / p.max);
+            cx.fillStyle = p.color;
+            cx.fillRect(p.x, p.y, p.s, p.s);
+          }
+          cx.globalAlpha = 1;
+          if (parts.length) requestAnimationFrame(frame);
+          else running = false;
+        };
+        const spawn = (list) => {
+          if (REDUCED || !cx) return;
+          parts = parts.concat(list);
+          if (!running) {
+            running = true;
+            requestAnimationFrame(frame);
+          }
+        };
+        return {
+          confetti(n, colors) {
+            const cs = colors || ["#57e0d8", "#7fe0a0", "#e8c069", "#e9e6d6"];
+            const out = [];
+            for (let i = 0; i < (n || 90); i++) out.push({ x: innerWidth / 2 + (Math.random() - 0.5) * 220, y: innerHeight * 0.5, vx: (Math.random() - 0.5) * 9, vy: -(3 + Math.random() * 8), g: 0.16, s: 3 + Math.random() * 4, life: 70 + Math.random() * 50, max: 120, color: cs[i % cs.length] });
+            spawn(out);
+          },
+          burstAt(sel, color, n) {
+            const el = typeof sel === "string" ? $(sel) : sel;
+            if (!el) return;
+            const b = el.getBoundingClientRect(),
+              x = b.left + b.width / 2,
+              y = b.top + b.height / 2;
+            const out = [];
+            for (let i = 0; i < (n || 20); i++) {
+              const a = Math.random() * 6.28,
+                sp = 1 + Math.random() * 4;
+              out.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: 0.05, s: 2 + Math.random() * 3, life: 30 + Math.random() * 20, max: 50, color });
+            }
+            spawn(out);
+          }
+        };
+      })();
+
+      const FX = {
+        shake() {
+          if (REDUCED) return;
+          const a = $id("app");
+          if (a) {
+            a.classList.add("shake");
+            setTimeout(() => a.classList.remove("shake"), 420);
+          }
+        },
+        birdieFlash() {
+          const f = $id("birdieFlash");
+          f.classList.remove("run");
+          void f.offsetWidth;
+          f.classList.add("run");
+        }
+      };
+    </script>
+
+    <script>
+      /* ══════════════════════════════════════════════════════════════════
+   Part B: game state, course flow, live-evaluating input, scoring.
+   ══════════════════════════════════════════════════════════════════ */
+      "use strict";
+
+      /* Course = sequence of rounds. Each round pulls N holes from the pool
+   with a difficulty bias, and applies scoring rules. */
+      const COURSE = [
+        { name: "The Driving Range", holes: 3, prefer: "easy", gradeMode: "free", lives: false, blurb: "Any working regex clears the hole. Learn the syntax." },
+        { name: "Par Country", holes: 4, prefer: "mid", gradeMode: "par", lives: false, blurb: "Now graded against par. Shorter is better." },
+        { name: "The Back Nine", holes: 4, prefer: "any", gradeMode: "strict", lives: true, blurb: "Under par or lose a life. Learn the terse constructs." },
+        { name: "Bogey-Free Gauntlet", holes: 5, prefer: "any", gradeMode: "gauntlet", lives: true, blurb: "One life. Escalating pars. No room for a bogey." }
+      ];
+
+      const G = {
+        screen: "title",
+        pool: null,
+        roundIndex: 0,
+        holeInRound: 0,
+        hole: null, // current hole {greens, reds, ref, par, theme, hint}
+        lives: 3,
+        solved: false, // current hole cleared, awaiting Next
+        strokesThisHole: 0, // = current regex length when solved
+        hintUsed: false,
+        // scoring
+        totalStrokes: 0,
+        totalPar: 0,
+        holesPlayed: 0,
+        underPar: 0,
+        birdieStreak: 0,
+        bestStreak: 0,
+        scorecard: [], // {hole, theme, par, strokes, grade}
+        startTime: null
+      };
+
+      let logLines = [];
+      function log(type, text) {
+        logLines.push({ type, text });
+        const out = $id("logOut");
+        if (out) {
+          const d = document.createElement("div");
+          d.className = "l-" + type;
+          d.textContent = text;
+          out.appendChild(d);
+          out.scrollTop = out.scrollHeight;
+          while (out.children.length > 80) out.removeChild(out.firstChild);
+        }
+      }
+
+      /* ══════════════════════════════════════════════════════════════════
+   MOUNT play screen
+   ══════════════════════════════════════════════════════════════════ */
+      function mountPlay() {
+        const root = $id("root");
+        root.innerHTML = "";
+        const app = document.createElement("div");
+        app.id = "app";
+        app.innerHTML = '<header id="hud">' + '<span class="hud-chip" id="holeChip"></span>' + '<span class="hud-chip" id="parChip"></span>' + '<span class="hud-chip" id="scoreChip"></span>' + '<span class="hud-chip" id="lifeChip"></span>' + '<span class="hud-chip" id="courseChip"></span>' + "</header>" + '<main id="stage">' + '<div id="themeBar"></div><div id="themeSub"></div>' + '<div id="columns">' + '<div class="col col-match"><div class="col-head"><span>match all</span><span id="matchCount"></span></div><div class="col-body" id="matchBody"></div></div>' + '<div class="col col-reject"><div class="col-head"><span>reject all</span><span id="rejectCount"></span></div><div class="col-body" id="rejectBody"></div></div>' + "</div>" + '<div id="console">' + '<div id="inputWrap"><span id="slash">/</span><input id="reInput" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="type your pattern\u2026" /><span id="flags">/</span></div>' + '<div id="reError"></div>' + '<div id="strokeReadout">' + '<span id="strokes">strokes: <b>0</b></span>' + '<div id="parGauge"><div id="parFill"></div></div>' + '<span id="validState">keep typing\u2026</span>' + "</div>" + '<div id="grade"></div>' + '<div id="actionRow">' + '<button class="btn gold" id="sinkBtn" disabled>sink putt</button>' + '<button class="btn" id="nextBtn" style="display:none">next hole \u2192</button>' + '<button class="btn ghost" id="hintBtn">hint</button>' + "</div>" + '<div id="hintLine"></div>' + "</div>" + "</main>" + '<footer id="log"><div id="logBar">\u25b8 caddie\u2019s notes</div><div id="logOut"></div></footer>';
+        root.appendChild(app);
+
+        const input = $id("reInput");
+        input.addEventListener("input", onType);
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            if (!$id("sinkBtn").disabled) sinkPutt();
+            else if ($id("nextBtn").style.display !== "none") nextHole(false);
+          }
+        });
+        $id("sinkBtn").addEventListener("click", sinkPutt);
+        $id("nextBtn").addEventListener("click", () => nextHole(false));
+        $id("hintBtn").addEventListener("click", useHint);
+
+        const out = $id("logOut");
+        logLines.slice(-30).forEach((l) => {
+          const d = document.createElement("div");
+          d.className = "l-" + l.type;
+          d.textContent = l.text;
+          out.appendChild(d);
+        });
+        out.scrollTop = out.scrollHeight;
+      }
+
+      function renderHUD() {
+        const round = COURSE[G.roundIndex];
+        $id("holeChip").textContent = "HOLE " + (G.holesPlayed + 1);
+        $id("parChip").textContent = G.hole ? "PAR " + G.hole.par : "PAR \u2013";
+        const diff = G.totalStrokes - G.totalPar;
+        const diffStr = diff === 0 ? "E" : diff > 0 ? "+" + diff : String(diff);
+        $id("scoreChip").textContent = "SCORE " + diffStr;
+        const life = $id("lifeChip");
+        if (round.lives) {
+          life.style.display = "";
+          life.textContent = "\u2665 " + G.lives;
+        } else life.style.display = "none";
+        $id("courseChip").textContent = round.name;
+      }
+
+      /* ══════════════════════════════════════════════════════════════════
+   RENDER a hole + live evaluation
+   ══════════════════════════════════════════════════════════════════ */
+      function renderHole() {
+        const hole = G.hole;
+        if (!hole) {
+          // defensive: should never happen now that drawHole always returns a hole
+          log("bad", "internal: no hole to render; drawing a fresh one.");
+          G.hole = drawHole(G.pool, "any");
+          if (!G.hole) return;
+          return renderHole();
+        }
+        $id("themeBar").textContent = hole.theme;
+        $id("themeSub").textContent = "match every green \u00b7 reject every red \u00b7 shortest pattern wins";
+        const mb = $id("matchBody"),
+          rb = $id("rejectBody");
+        mb.innerHTML = "";
+        rb.innerHTML = "";
+        hole.greens.forEach((s, i) => mb.appendChild(strRow(s, "m" + i)));
+        hole.reds.forEach((s, i) => rb.appendChild(strRow(s, "r" + i)));
+        $id("matchCount").textContent = "0/" + hole.greens.length;
+        $id("rejectCount").textContent = "0/" + hole.reds.length;
+        const input = $id("reInput");
+        input.value = "";
+        input.disabled = false;
+        input.focus();
+        $id("grade").innerHTML = "";
+        $id("reError").textContent = "";
+        $id("hintLine").innerHTML = "";
+        $id("sinkBtn").style.display = "";
+        $id("sinkBtn").disabled = true;
+        $id("nextBtn").style.display = "none";
+        $id("hintBtn").disabled = false;
+        G.solved = false;
+        G.hintUsed = false;
+        onType();
+      }
+      function strRow(s, id) {
+        const row = document.createElement("div");
+        row.className = "str-row";
+        row.dataset.id = id;
+        row.dataset.str = s;
+        row.innerHTML = '<span class="mark">\u00b7</span><span class="txt"></span>';
+        row.querySelector(".txt").textContent = s.length ? s : "(empty)";
+        return row;
+      }
+
+      /* The live heartbeat: recompile on every keystroke, mark rows, gate the
+   sink button on true validity as judged by the real engine. */
+      function onType() {
+        if (G.solved) return;
+        const input = $id("reInput");
+        const src = input.value;
+        AudioFX.key();
+        const strokes = src.length;
+        $id("strokes").innerHTML = "strokes: <b>" + strokes + "</b>";
+
+        const err = $id("reError");
+        const rows = [...document.querySelectorAll(".str-row")];
+        if (src === "") {
+          rows.forEach((r) => {
+            r.className = "str-row";
+            r.querySelector(".mark").textContent = "\u00b7";
+          });
+          err.textContent = "";
+          setValid(false, "keep typing\u2026");
+          updateCounts(0, 0);
+          updateGauge(0);
+          return;
+        }
+        const c = compileRegex(src);
+        if (!c.ok) {
+          err.textContent = "\u26a0 " + c.error;
+          rows.forEach((r) => {
+            r.className = "str-row";
+            r.querySelector(".mark").textContent = "\u00b7";
+          });
+          setValid(false, "invalid regex");
+          updateCounts(0, 0);
+          updateGauge(0);
+          return;
+        }
+        err.textContent = "";
+        let matched = 0,
+          rejected = 0;
+        const hole = G.hole;
+        rows.forEach((r) => {
+          const s = r.dataset.str;
+          const isGreen = r.dataset.id[0] === "m";
+          const hit = c.re.test(s);
+          const mark = r.querySelector(".mark");
+          const wasPass = r.classList.contains("pass");
+          if (isGreen) {
+            if (hit) {
+              r.className = "str-row pass";
+              mark.textContent = "\u2713";
+              matched++;
+            } else {
+              r.className = "str-row";
+              mark.textContent = "\u00b7";
+            }
+          } else {
+            if (hit) {
+              r.className = "str-row fail";
+              mark.textContent = "\u2717";
+            } else {
+              r.className = "str-row pass";
+              mark.textContent = "\u2713";
+              rejected++;
+            }
+          }
+          if (r.classList.contains("pass") && !wasPass && !REDUCED) {
+            r.classList.add("pop");
+            AudioFX.tickPass();
+            setTimeout(() => r.classList.remove("pop"), 250);
+          }
+        });
+        updateCounts(matched, rejected);
+        updateGauge(strokes);
+        const valid = matched === hole.greens.length && rejected === hole.reds.length;
+        if (valid) {
+          setValid(true, "\u2713 valid \u2014 sink it!");
+          $id("sinkBtn").disabled = false;
+        } else {
+          setValid(false, matched + rejected + "/" + (hole.greens.length + hole.reds.length) + " correct");
+          $id("sinkBtn").disabled = true;
+        }
+      }
+      function updateCounts(m, r) {
+        const hole = G.hole;
+        $id("matchCount").textContent = m + "/" + hole.greens.length;
+        $id("rejectCount").textContent = r + "/" + hole.reds.length;
+      }
+      function setValid(ok, txt) {
+        const v = $id("validState");
+        v.textContent = txt;
+        v.className = ok ? "valid" : txt.indexOf("invalid") >= 0 || txt.indexOf("correct") >= 0 ? "invalid" : "";
+      }
+      function updateGauge(strokes) {
+        const par = G.hole.par;
+        const fill = $id("parFill");
+        // Fill proportional to strokes relative to 2*par (so par = 50%).
+        const pct = Math.min(100, Math.round((strokes / (par * 2)) * 100));
+        fill.style.width = pct + "%";
+        fill.style.background = strokes === 0 ? "var(--fairway)" : strokes < par ? "var(--birdie)" : strokes === par ? "var(--fairway)" : "var(--sand)";
+        if (strokes > par * 1.6) fill.style.background = "var(--flag)";
+      }
+
+      /* ══════════════════════════════════════════════════════════════════
+   SINK — grade the solved hole
+   ══════════════════════════════════════════════════════════════════ */
+      function sinkPutt() {
+        if (G.solved) return;
+        const input = $id("reInput");
+        const src = input.value;
+        // Re-verify with the real engine (never trust the button alone).
+        if (!solutionWorks(src, G.hole.greens, G.hole.reds)) {
+          setValid(false, "not valid yet");
+          return;
+        }
+        G.solved = true;
+        input.disabled = true;
+        $id("sinkBtn").disabled = true;
+        $id("sinkBtn").style.display = "none";
+        $id("hintBtn").disabled = true;
+
+        const strokes = src.length;
+        const par = G.hole.par;
+        const round = COURSE[G.roundIndex];
+        const diff = strokes - par;
+
+        // Grade. In "free" mode, any solve is celebrated as par-equivalent.
+        let grade, gClass, gLabel;
+        if (round.gradeMode === "free") {
+          grade = "cleared";
+          gClass = "par";
+          gLabel = "CLEARED";
+        } else if (strokes < par) {
+          grade = "birdie";
+          gClass = "birdie";
+          gLabel = diff <= -2 ? "EAGLE!" : "BIRDIE!";
+        } else if (strokes === par) {
+          grade = "par";
+          gClass = "par";
+          gLabel = "PAR";
+        } else {
+          grade = "bogey";
+          gClass = "bogey";
+          gLabel = diff >= 2 ? "DOUBLE BOGEY" : "BOGEY";
+        }
+
+        // Score bookkeeping (free mode counts par as the score so it's neutral).
+        const countedStrokes = round.gradeMode === "free" ? par : strokes;
+        G.totalStrokes += countedStrokes;
+        G.totalPar += par;
+        G.holesPlayed += 1;
+        if (countedStrokes < par) G.underPar += 1;
+
+        // Birdie streak.
+        if (grade === "birdie") {
+          G.birdieStreak += 1;
+          G.bestStreak = Math.max(G.bestStreak, G.birdieStreak);
+        } else G.birdieStreak = 0;
+
+        G.scorecard.push({ hole: G.holesPlayed, theme: G.hole.theme, par, strokes: countedStrokes, grade });
+
+        // Feedback.
+        const gradeEl = $id("grade");
+        const holeInOne = strokes <= par && strokes > 0 && grade === "birdie" && diff <= -2;
+        gradeEl.innerHTML = '<div class="g ' + gClass + '">' + gLabel + '</div><div class="detail">' + "/" + src.replace(/</g, "&lt;").replace(/>/g, "&gt;") + "/ \u2014 " + strokes + " stroke" + (strokes === 1 ? "" : "s") + " vs par " + par + (round.ref && G.hintUsed ? "" : "") + "</div>";
+
+        if (grade === "birdie") {
+          AudioFX.birdie();
+          FX.birdieFlash();
+          Particles.confetti(diff <= -2 ? 130 : 90);
+          log("birdie", gLabel + "  /" + src + "/  " + strokes + " vs par " + par);
+        } else if (grade === "par") {
+          AudioFX.sink();
+          Particles.burstAt("#console", "#7fe0a0", 20);
+          log("ok", "PAR  /" + src + "/  " + strokes + " vs par " + par);
+        } else if (grade === "cleared") {
+          AudioFX.valid();
+          Particles.burstAt("#console", "#7fe0a0", 18);
+          log("ok", "cleared  /" + src + "/  (" + strokes + " strokes)");
+        } else {
+          AudioFX.bogey();
+          log("sys", "bogey  /" + src + "/  " + strokes + " vs par " + par + "  (+" + diff + ")");
+        }
+
+        // Lives: lose one on a bogey in life rounds.
+        if (round.lives && grade === "bogey") {
+          G.lives -= 1;
+          AudioFX.lifeLost();
+          FX.shake();
+          log("bad", "over par \u2014 a life lost. " + G.lives + " remaining.");
+          if (G.lives <= 0) {
+            renderHUD();
+            setTimeout(loseGame, 1100);
+            return;
+          }
+        }
+        renderHUD();
+        $id("nextBtn").style.display = "";
+        $id("nextBtn").focus();
+      }
+
+      function useHint() {
+        if (G.solved || G.hintUsed) return;
+        G.hintUsed = true;
+        $id("hintBtn").disabled = true;
+        $id("hintLine").innerHTML = "<b>caddie:</b> " + G.hole.hint;
+        log("dim", "hint taken.");
+      }
+
+      /* ══════════════════════════════════════════════════════════════════
+   FLOW
+   ══════════════════════════════════════════════════════════════════ */
+      function startRound() {
+        const round = COURSE[G.roundIndex];
+        G.holeInRound = 0;
+        if (round.lives && G.roundIndex === COURSE.length - 1) G.lives = 1; // boss: one life
+        showBanner(round);
+        renderHUD();
+        setTimeout(
+          () => {
+            nextHole(true);
+          },
+          REDUCED ? 200 : 1000
+        );
+      }
+      function nextHole(isFirstOfRound) {
+        if (isFirstOfRound !== true) G.holeInRound += 1;
+        const round = COURSE[G.roundIndex];
+        if (G.holeInRound >= round.holes) {
+          G.roundIndex += 1;
+          if (G.roundIndex >= COURSE.length) {
+            winGame();
+            return;
+          }
+          startRound();
+          return;
+        }
+        G.hole = drawHole(G.pool, round.prefer);
+        renderHUD();
+        renderHole();
+      }
+      function showBanner(round) {
+        const b = $id("holeBanner");
+        const idx = G.roundIndex;
+        b.querySelector(".hb-num").textContent = idx === COURSE.length - 1 ? "\u26f3 FINAL" : "ROUND " + (idx + 1);
+        b.querySelector(".hb-name").textContent = round.name;
+        b.querySelector(".hb-par").textContent = round.blurb;
+        b.classList.remove("show");
+        void b.offsetWidth;
+        b.classList.add("show");
+        log("sys", round.name + " \u2014 " + round.blurb);
+        if (idx === COURSE.length - 1) log("bad", "One life. No bogeys. Good luck.");
+      }
+    </script>
+
+    <script>
+      /* ══════════════════════════════════════════════════════════════════
+   Part C: title, win (scorecard), lose, lifecycle, boot.
+   ══════════════════════════════════════════════════════════════════ */
+      "use strict";
+
+      function showTitle() {
+        G.screen = "title";
+        const root = $id("root");
+        root.innerHTML = "";
+        const ov = document.createElement("div");
+        ov.className = "overlay";
+        ov.innerHTML = '<h1 class="title-main">Regex Golf</h1>' + '<div class="title-sub">the gauntlet</div>' + '<div class="story">' + '<p>Every hole gives you two lists: strings you must <b>match</b> (green) and strings you must <span class="flag">reject</span> (red). Write one regular expression that does both.</p>' + '<p>But matching is only the entry fee. Your score is the <span class="gold">length of your pattern</span> against the hole\u2019s <span class="gold">par</span> \u2014 fewer characters is better, just like golf. <code>[0-9]</code> works, but <code>\\d</code> is two strokes cheaper, and down the stretch those strokes decide everything.</p>' + "<p>Nothing is hand-graded: your pattern is compiled with the real <code>RegExp</code> engine and run against every string live. The engine is the referee.</p>" + "<p>Four rounds, from the forgiving Driving Range to the one-life <b>Bogey-Free Gauntlet</b>. There is always a shorter answer. Go find it.</p>" + "</div>" + '<button class="btn gold" id="teeBtn">\u26f3 tee off</button>' + '<p class="small-warning">\ud83c\udfa7 sound on for the full arcade \u00b7 tip: press Enter to sink or advance \u00b7 there is always a shorter solution</p>';
+        root.appendChild(ov);
+        $id("teeBtn").addEventListener("click", startRun);
+      }
+
+      function startRun() {
+        AudioFX.unlock();
+        AudioFX.startAmb();
+        G.screen = "play";
+        G.pool = buildPool();
+        G.roundIndex = 0;
+        G.holeInRound = 0;
+        G.lives = 3;
+        G.totalStrokes = 0;
+        G.totalPar = 0;
+        G.holesPlayed = 0;
+        G.underPar = 0;
+        G.birdieStreak = 0;
+        G.bestStreak = 0;
+        G.scorecard = [];
+        G.startTime = Date.now();
+        logLines = [];
+        mountPlay();
+        log("sys", "Welcome to the course. The RegExp engine will judge every swing.");
+        startRound();
+      }
+
+      function scorecardHTML() {
+        const rows = G.scorecard
+          .map((r) => {
+            const diff = r.strokes - r.par;
+            const cls = diff < 0 ? "under" : diff > 0 ? "over" : "";
+            const dstr = diff === 0 ? "E" : diff > 0 ? "+" + diff : String(diff);
+            return "<tr><td>" + r.hole + "</td><td style='text-align:left'>" + r.theme + "</td><td>" + r.par + "</td><td>" + r.strokes + "</td><td class='" + cls + "'>" + dstr + "</td></tr>";
+          })
+          .join("");
+        const diff = G.totalStrokes - G.totalPar;
+        const dstr = diff === 0 ? "Even" : diff > 0 ? "+" + diff : String(diff);
+        return '<div class="scorecard"><h3>\u26f3 Scorecard</h3>' + '<table class="sc-table"><thead><tr><th>#</th><th style="text-align:left">Hole</th><th>Par</th><th>You</th><th>+/\u2212</th></tr></thead><tbody>' + rows + "</tbody></table>" + '<div class="sc-total">' + '<div><div class="v">' + dstr + '</div><div class="k">vs par</div></div>' + '<div><div class="v">' + G.underPar + '</div><div class="k">under par</div></div>' + '<div><div class="v">' + G.bestStreak + '</div><div class="k">best birdie streak</div></div>' + '<div><div class="v">' + G.holesPlayed + '</div><div class="k">holes played</div></div>' + "</div></div>";
+      }
+
+      function winGame() {
+        G.screen = "win";
+        AudioFX.stopAmb();
+        AudioFX.win();
+        Particles.confetti(150);
+        setTimeout(() => Particles.confetti(90), 700);
+        const ms = Date.now() - (G.startTime || Date.now());
+        const mm = Math.floor(ms / 60000),
+          ss = Math.floor((ms % 60000) / 1000);
+        const diff = G.totalStrokes - G.totalPar;
+        const verdict = diff < 0 ? "under par \u2014 a true golfer of the regex" : diff === 0 ? "even par \u2014 clean, efficient, exact" : "over par, but the gauntlet is beaten";
+        const root = $id("root");
+        root.innerHTML = "";
+        const ov = document.createElement("div");
+        ov.className = "overlay";
+        ov.innerHTML = '<h1 class="title-main" style="color:var(--birdie)">Clubhouse</h1>' + '<div class="title-sub">the gauntlet is cleared</div>' + '<div class="story" style="text-align:center;max-width:560px"><p>You finished the course ' + mm + "m " + String(ss).padStart(2, "0") + "s in \u2014 <b>" + verdict + "</b>. And you\u2019ll never write <code>[0-9]</code> again when <code>\\d</code> will do.</p></div>" + scorecardHTML() + '<button class="btn gold" id="replayBtn">\u21bb play a new course</button>' + '<p class="small-warning">a fresh set of holes every run \u2014 chase a lower number</p>';
+        root.appendChild(ov);
+        $id("replayBtn").addEventListener("click", startRun);
+      }
+
+      function loseGame() {
+        G.screen = "lose";
+        AudioFX.stopAmb();
+        AudioFX.lose();
+        const round = COURSE[G.roundIndex];
+        const root = $id("root");
+        root.innerHTML = "";
+        const ov = document.createElement("div");
+        ov.className = "overlay";
+        ov.innerHTML = '<h1 class="title-main" style="color:var(--flag)">Out of Lives</h1>' + '<div class="title-sub">the course wins this round</div>' + '<div class="story" style="text-align:center;max-width:560px"><p>You ran out of lives on <b>' + round.name + "</b>. The bogeys caught up. But every hole here has a shorter answer than you think \u2014 come back and find it.</p></div>" + scorecardHTML() + '<button class="btn gold" id="retryBtn">\u21bb back to the tee</button>';
+        root.appendChild(ov);
+        $id("retryBtn").addEventListener("click", startRun);
+      }
+
+      /* ── BOOT ─────────────────────────────────────────────────────────── */
+      showTitle();
+    </script>
+  </body>
+</html>
