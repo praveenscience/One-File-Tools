@@ -1,0 +1,1527 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JSON to Type Definitions Converter - One File Tools</title>
+    
+    <!-- Premium Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <style>
+      :root {
+        --bg-main: #060913;
+        --grid-line: rgba(255, 255, 255, 0.02);
+        --panel-bg: rgba(15, 23, 42, 0.65);
+        --panel-border: rgba(255, 255, 255, 0.08);
+        --accent: #3b82f6;
+        --accent-hover: #2563eb;
+        --accent-glow: rgba(59, 130, 246, 0.25);
+        --text-main: #f8fafc;
+        --text-muted: #94a3b8;
+        --text-dark: #0f172a;
+        --radius-sm: 10px;
+        --radius-md: 16px;
+        --radius-lg: 24px;
+        
+        --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+        --font-display: "Space Grotesk", sans-serif;
+        
+        --badge-pass: #10b981;
+        --badge-pass-bg: rgba(16, 185, 129, 0.12);
+        --badge-fail: #ef4444;
+        --badge-fail-bg: rgba(239, 68, 68, 0.12);
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg-main);
+        background-image: 
+          linear-gradient(var(--grid-line) 1px, transparent 1px), 
+          linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+        background-size: 32px 32px;
+        color: var(--text-main);
+        min-height: 100vh;
+        padding: 40px 24px 80px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: rgba(8, 12, 22, 0.5);
+      }
+      ::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.3);
+      }
+
+      .container {
+        width: 100%;
+        max-width: 1280px;
+        display: flex;
+        flex-direction: column;
+        gap: 32px;
+      }
+
+      /* Header */
+      header {
+        text-align: center;
+        margin-bottom: 8px;
+      }
+
+      .eyebrow {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.25em;
+        color: var(--accent);
+        text-transform: uppercase;
+        margin-bottom: 12px;
+        font-weight: 600;
+        display: inline-block;
+        padding: 4px 12px;
+        background: rgba(59, 130, 246, 0.08);
+        border: 1px solid rgba(59, 130, 246, 0.2);
+        border-radius: 100px;
+      }
+
+      .title {
+        font-family: var(--font-display);
+        font-size: clamp(28px, 4vw, 42px);
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        margin-bottom: 12px;
+        background: linear-gradient(135deg, #ffffff 30%, #93c5fd 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .tagline {
+        color: var(--text-muted);
+        font-size: 16px;
+        line-height: 1.6;
+        max-width: 680px;
+        margin: 0 auto;
+      }
+
+      /* Workspace Split */
+      .workspace {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 28px;
+        align-items: stretch;
+      }
+
+      @media (max-width: 900px) {
+        .workspace {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* Panels */
+      .panel {
+        background: var(--panel-bg);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-md);
+        padding: 24px;
+        box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        padding-bottom: 12px;
+        font-family: var(--font-display);
+        font-size: 18px;
+        font-weight: 600;
+      }
+
+      .panel-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      /* Buttons & Inputs */
+      .btn {
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text-main);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 8px 12px;
+        font-family: var(--font-sans);
+        font-weight: 500;
+        font-size: 12px;
+        cursor: pointer;
+        transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.2);
+      }
+
+      .btn-accent {
+        background: var(--accent);
+        border-color: var(--accent);
+      }
+
+      .btn-accent:hover {
+        background: var(--accent-hover);
+        box-shadow: 0 0 12px var(--accent-glow);
+        border-color: var(--accent-hover);
+      }
+
+      .file-input-wrapper {
+        position: relative;
+        overflow: hidden;
+        display: inline-block;
+      }
+
+      .file-input-wrapper input[type=file] {
+        position: absolute;
+        left: 0;
+        top: 0;
+        opacity: 0;
+        cursor: pointer;
+        width: 100%;
+        height: 100%;
+      }
+
+      /* Textareas & Editors */
+      .editor-wrapper {
+        position: relative;
+        flex: 1;
+        min-height: 480px;
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+        border: 1px solid var(--panel-border);
+        background: #04060d;
+      }
+
+      .editor-textarea {
+        width: 100%;
+        height: 100%;
+        background: transparent;
+        border: none;
+        outline: none;
+        color: #e2e8f0;
+        font-family: var(--font-mono);
+        font-size: 13px;
+        line-height: 1.5;
+        padding: 16px;
+        resize: none;
+        display: block;
+      }
+
+      /* Code Highlight Viewport */
+      .code-viewport {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 16px;
+        overflow: auto;
+        color: #e2e8f0;
+        font-family: var(--font-mono);
+        font-size: 13px;
+        line-height: 1.5;
+        text-align: left;
+        white-space: pre;
+      }
+
+      /* Validation Banners */
+      .status-banner {
+        border-radius: 8px;
+        padding: 12px 16px;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .status-banner.valid {
+        background: var(--badge-pass-bg);
+        border: 1px solid rgba(16, 185, 129, 0.2);
+        color: var(--badge-pass);
+      }
+
+      .status-banner.invalid {
+        background: var(--badge-fail-bg);
+        border: 1px solid rgba(239, 68, 68, 0.2);
+        color: var(--badge-fail);
+        font-family: var(--font-mono);
+        font-size: 12px;
+      }
+
+      /* Settings Sidebar Card */
+      .settings-card {
+        background: rgba(8, 12, 22, 0.4);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 16px;
+      }
+
+      .settings-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+        font-family: var(--font-display);
+        font-size: 14px;
+        font-weight: 600;
+        user-select: none;
+      }
+
+      .settings-grid {
+        margin-top: 16px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+
+      @media (max-width: 600px) {
+        .settings-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .settings-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .settings-label {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+      }
+
+      .settings-input,
+      .settings-select {
+        background: #0a0e1a;
+        border: 1px solid var(--panel-border);
+        border-radius: 6px;
+        color: var(--text-main);
+        padding: 8px 10px;
+        font-size: 13px;
+        outline: none;
+        transition: border-color 0.2s;
+        width: 100%;
+      }
+
+      .settings-input:focus,
+      .settings-select:focus {
+        border-color: var(--accent);
+      }
+
+      .checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: var(--text-main);
+        cursor: pointer;
+        user-select: none;
+      }
+
+      /* Language Select Tab bar */
+      .lang-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        border-bottom: 1px solid var(--panel-border);
+        gap: 6px;
+        margin-bottom: 8px;
+      }
+
+      .lang-tab {
+        background: transparent;
+        border: none;
+        border-bottom: 2px solid transparent;
+        color: var(--text-muted);
+        padding: 8px 12px;
+        font-family: var(--font-display);
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: border-color 0.2s, color 0.2s;
+      }
+
+      .lang-tab:hover {
+        color: var(--text-main);
+      }
+
+      .lang-tab.active {
+        color: var(--accent);
+        border-color: var(--accent);
+        font-weight: 600;
+      }
+
+      /* Toast Notifications */
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        background: #0f172a;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        color: var(--text-main);
+        padding: 12px 24px;
+        border-radius: var(--radius-sm);
+        font-size: 13px;
+        font-weight: 500;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        z-index: 200;
+        transform: translateY(100px);
+        opacity: 0;
+        transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .toast.active {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <span class="eyebrow">JSON & API</span>
+        <h1 class="title">JSON to Type Definitions Converter</h1>
+        <p class="tagline">
+          Convert raw JSON payloads into strongly-typed code definitions for multiple programming languages entirely client-side.
+        </p>
+      </header>
+
+      <div class="workspace">
+        <!-- Left Column: JSON Playground -->
+        <div class="panel">
+          <div class="panel-header">
+            <span>JSON Playground</span>
+            <div class="panel-actions">
+              <div class="file-input-wrapper">
+                <button class="btn">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                  </svg>
+                  Upload File
+                </button>
+                <input type="file" id="fileUpload" accept=".json,application/json" />
+              </div>
+              <button class="btn" id="btnBeautify">Format</button>
+              <button class="btn" id="btnMinify">Minify</button>
+              <button class="btn" id="btnLoadSample">Sample</button>
+              <button class="btn" id="btnClear">Clear</button>
+            </div>
+          </div>
+
+          <div class="editor-wrapper">
+            <textarea class="editor-textarea" id="jsonInput" placeholder="Paste or drop raw JSON here..." spellcheck="false"></textarea>
+          </div>
+
+          <div class="status-banner" id="jsonStatusBanner">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
+        <!-- Right Column: Type Definitions Generator -->
+        <div class="panel">
+          <div class="panel-header" style="border:none; padding-bottom: 0;">
+            <span>Generated Definitions</span>
+          </div>
+
+          <!-- Configuration sidebar -->
+          <div class="settings-card">
+            <div class="settings-toggle" id="settingsToggle">
+              <span>Configuration Controls</span>
+              <svg id="settingsArrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.2s;">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </div>
+            
+            <div class="settings-grid" id="settingsGrid">
+              <div class="settings-group">
+                <label class="settings-label" for="rootNameInput">Root Name</label>
+                <input type="text" class="settings-input" id="rootNameInput" value="RootObject" placeholder="e.g. UserProfile" />
+              </div>
+
+              <div class="settings-group">
+                <label class="settings-label" for="casingSelect">Capitalization Style</label>
+                <select class="settings-select" id="casingSelect">
+                  <option value="original">Original JSON Casing</option>
+                  <option value="camel">camelCase</option>
+                  <option value="pascal">PascalCase</option>
+                  <option value="snake">snake_case</option>
+                </select>
+              </div>
+
+              <div class="settings-group">
+                <label class="settings-label" for="nullSelect">Handle Null As</label>
+                <select class="settings-select" id="nullSelect">
+                  <option value="any">Any / generic type (any)</option>
+                  <option value="null">Explicit Null (null)</option>
+                  <option value="unknown">Unknown type (unknown)</option>
+                  <option value="string">Fallback String (string)</option>
+                </select>
+              </div>
+
+              <div class="settings-group" style="justify-content: flex-end; gap: 8px;">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="optionalCheckbox" />
+                  Make all fields optional
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="detectDatesCheckbox" checked />
+                  Detect ISO Date formats
+                </label>
+                <label class="checkbox-label" id="inlineWrapper">
+                  <input type="checkbox" id="inlineCheckbox" />
+                  Inline Nested Objects
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Language selectors -->
+          <div class="lang-tabs" id="langTabs">
+            <button class="lang-tab active" data-lang="typescript">TypeScript</button>
+            <button class="lang-tab" data-lang="go">Go</button>
+            <button class="lang-tab" data-lang="rust">Rust</button>
+            <button class="lang-tab" data-lang="json_schema">JSON Schema</button>
+            <button class="lang-tab" data-lang="jsdoc">JSDoc</button>
+            <button class="lang-tab" data-lang="python">Python</button>
+            <button class="lang-tab" data-lang="csharp">C#</button>
+          </div>
+
+          <div class="editor-wrapper" style="min-height: 380px;">
+            <pre class="code-viewport" id="codeOutput"></pre>
+          </div>
+
+          <div class="panel-actions" style="justify-content: flex-end;">
+            <button class="btn" id="btnCopy">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              Copy Code
+            </button>
+            <button class="btn btn-accent" id="btnDownload">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              Download File
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div class="toast" id="toast">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: #10b981;">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+      <span id="toastMessage">Copied to clipboard!</span>
+    </div>
+
+    <script>
+      // ────────────────────────────────────────────────────────
+      // Core AST Type Representation Models
+      // ────────────────────────────────────────────────────────
+      class TypeNode {
+        constructor(type, info = {}) {
+          this.type = type; // "string", "number", "integer", "boolean", "null", "array", "object", "union", "any", "date", "reference"
+          this.elementType = info.elementType || null; // for array
+          this.fields = info.fields || null; // for object { key: TypeNode }
+          this.unionTypes = info.unionTypes || null; // for union [TypeNode]
+          this.isOptional = info.isOptional || false;
+          this.objectName = info.objectName || null; // name of extracted object reference
+        }
+      }
+
+      class ConverterContext {
+        constructor(settings) {
+          this.settings = settings;
+          this.extractedObjects = new Map(); // Name -> TypeNode (objects only)
+          this.nameCounters = {};
+        }
+
+        getUniqueName(suggestedName) {
+          let name = toPascalCase(suggestedName);
+          if (!this.nameCounters[name]) {
+            this.nameCounters[name] = 1;
+            return name;
+          }
+          this.nameCounters[name]++;
+          return `${name}${this.nameCounters[name]}`;
+        }
+      }
+
+      // State variables
+      let activeLang = "typescript";
+      let isSettingsOpen = true;
+
+      // DOM elements caching
+      const jsonInput = document.getElementById("jsonInput");
+      const codeOutput = document.getElementById("codeOutput");
+      const jsonStatusBanner = document.getElementById("jsonStatusBanner");
+      
+      const fileUpload = document.getElementById("fileUpload");
+      const btnBeautify = document.getElementById("btnBeautify");
+      const btnMinify = document.getElementById("btnMinify");
+      const btnLoadSample = document.getElementById("btnLoadSample");
+      const btnClear = document.getElementById("btnClear");
+
+      const settingsToggle = document.getElementById("settingsToggle");
+      const settingsGrid = document.getElementById("settingsGrid");
+      const settingsArrow = document.getElementById("settingsArrow");
+
+      const rootNameInput = document.getElementById("rootNameInput");
+      const casingSelect = document.getElementById("casingSelect");
+      const nullSelect = document.getElementById("nullSelect");
+      const optionalCheckbox = document.getElementById("optionalCheckbox");
+      const detectDatesCheckbox = document.getElementById("detectDatesCheckbox");
+      const inlineCheckbox = document.getElementById("inlineCheckbox");
+      const inlineWrapper = document.getElementById("inlineWrapper");
+
+      const langTabs = document.getElementById("langTabs");
+      const btnCopy = document.getElementById("btnCopy");
+      const btnDownload = document.getElementById("btnDownload");
+      
+      const toast = document.getElementById("toast");
+      const toastMessage = document.getElementById("toastMessage");
+
+      // Sample Data payload
+      const SAMPLE_JSON = `{
+  "id": 1042,
+  "name": "Rushabh Mahajan",
+  "active": true,
+  "profile": {
+    "title": "Lead Developer",
+    "joined_at": "2026-03-12T14:32:00Z",
+    "skills": ["JavaScript", "CSS3", "HTML5", "Go"]
+  },
+  "metadata": null,
+  "tags": [
+    { "key": "env", "value": "production" },
+    { "key": "priority", "value": "high", "weight": 9 }
+  ]
+}`;
+
+      // Helper Text-cleaners
+      function toPascalCase(str) {
+        if (!str) return "Root";
+        return str
+          .replace(/[^a-zA-Z0-9]+/g, " ")
+          .split(" ")
+          .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+          .join("");
+      }
+
+      function toCamelCase(str) {
+        if (!str) return "";
+        let pascal = toPascalCase(str);
+        return pascal.charAt(0).toLowerCase() + pascal.slice(1);
+      }
+
+      function toSnakeCase(str) {
+        if (!str) return "";
+        return str
+          .replace(/([A-Z])/g, "_$1")
+          .replace(/[^a-zA-Z0-9]+/g, "_")
+          .toLowerCase()
+          .replace(/^_+|_+$/g, "")
+          .replace(/__+/g, "_");
+      }
+
+      function toGoFieldName(str) {
+        return toPascalCase(str);
+      }
+
+      function toRustFieldName(str) {
+        let cleaned = toSnakeCase(str);
+        const rustKeywords = ["type", "struct", "fn", "let", "use", "impl", "trait", "pub", "match", "loop", "for", "if", "else", "enum", "const", "static", "as", "ref", "mut"];
+        if (rustKeywords.includes(cleaned) || /^\d/.test(cleaned)) {
+          cleaned = `r_${cleaned}`;
+        }
+        return cleaned;
+      }
+
+      function toPythonFieldName(str) {
+        let cleaned = toSnakeCase(str);
+        const pythonKeywords = ["class", "def", "import", "from", "and", "or", "not", "is", "if", "else", "elif", "for", "while", "return", "pass", "break", "continue", "in", "lambda", "try", "except", "finally", "raise", "assert", "global", "nonlocal", "del", "yield", "with", "as"];
+        if (pythonKeywords.includes(cleaned) || /^\d/.test(cleaned)) {
+          cleaned = `_${cleaned}`;
+        }
+        return cleaned;
+      }
+
+      function toCsharpFieldName(str) {
+        return toPascalCase(str);
+      }
+
+      function remapKey(key, style) {
+        if (style === "camel") return toCamelCase(key);
+        if (style === "pascal") return toPascalCase(key);
+        if (style === "snake") return toSnakeCase(key);
+        return key;
+      }
+
+      function escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+      }
+
+      // ────────────────────────────────────────────────────────
+      // Core AST Parser / Schema builders
+      // ────────────────────────────────────────────────────────
+      function analyzeValue(val, keyName, ctx) {
+        if (val === null) {
+          return new TypeNode(ctx.settings.nullAs);
+        }
+        if (typeof val === "string") {
+          if (ctx.settings.detectDates && /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?)?$/.test(val)) {
+            return new TypeNode("date");
+          }
+          return new TypeNode("string");
+        }
+        if (typeof val === "number") {
+          let type = Number.isInteger(val) ? "integer" : "number";
+          return new TypeNode(type);
+        }
+        if (typeof val === "boolean") {
+          return new TypeNode("boolean");
+        }
+        if (Array.isArray(val)) {
+          if (val.length === 0) {
+            return new TypeNode("array", { elementType: new TypeNode("any") });
+          }
+          let itemNodes = val.map(item => analyzeValue(item, keyName + "Item", ctx));
+          let merged = itemNodes.reduce((acc, curr) => mergeNodes(acc, curr, keyName + "Item", ctx), itemNodes[0]);
+          return new TypeNode("array", { elementType: merged });
+        }
+        if (typeof val === "object") {
+          let fields = {};
+          for (let k in val) {
+            fields[k] = analyzeValue(val[k], k, ctx);
+          }
+          
+          let node = new TypeNode("object", { fields });
+          if (!ctx.settings.inlineTypes) {
+            let uniqueName = ctx.getUniqueName(keyName);
+            node.objectName = uniqueName;
+            ctx.extractedObjects.set(uniqueName, node);
+            return new TypeNode("reference", { objectName: uniqueName });
+          }
+          return node;
+        }
+        return new TypeNode("any");
+      }
+
+      function mergeNodes(n1, n2, keyName, ctx) {
+        if (!n1) return n2;
+        if (!n2) return n1;
+
+        if (n1.type === n2.type) {
+          if (n1.type === "array") {
+            return new TypeNode("array", { elementType: mergeNodes(n1.elementType, n2.elementType, keyName, ctx) });
+          }
+          if (n1.type === "object") {
+            let fields = {};
+            let keys = new Set([...Object.keys(n1.fields), ...Object.keys(n2.fields)]);
+            for (let k of keys) {
+              if (n1.fields[k] && n2.fields[k]) {
+                fields[k] = mergeNodes(n1.fields[k], n2.fields[k], k, ctx);
+              } else if (n1.fields[k]) {
+                let clone = cloneNode(n1.fields[k]);
+                clone.isOptional = true;
+                fields[k] = clone;
+              } else {
+                let clone = cloneNode(n2.fields[k]);
+                clone.isOptional = true;
+                fields[k] = clone;
+              }
+            }
+            return new TypeNode("object", { fields });
+          }
+          if (n1.type === "reference") {
+            if (n1.objectName === n2.objectName) return n1;
+            let obj1 = ctx.extractedObjects.get(n1.objectName);
+            let obj2 = ctx.extractedObjects.get(n2.objectName);
+            let mergedObj = mergeNodes(obj1, obj2, keyName, ctx);
+            
+            let newName = ctx.getUniqueName(keyName);
+            mergedObj.objectName = newName;
+            ctx.extractedObjects.set(newName, mergedObj);
+            return new TypeNode("reference", { objectName: newName });
+          }
+          return n1;
+        }
+
+        // Float / Int coercion
+        if ((n1.type === "integer" && n2.type === "number") || (n1.type === "number" && n2.type === "integer")) {
+          return new TypeNode("number");
+        }
+
+        // Merge references/objects
+        if ((n1.type === "reference" || n1.type === "object") && (n2.type === "reference" || n2.type === "object")) {
+          let obj1 = n1.type === "reference" ? ctx.extractedObjects.get(n1.objectName) : n1;
+          let obj2 = n2.type === "reference" ? ctx.extractedObjects.get(n2.objectName) : n2;
+          let mergedObj = mergeNodes(obj1, obj2, keyName, ctx);
+          if (!ctx.settings.inlineTypes) {
+            let newName = ctx.getUniqueName(keyName);
+            mergedObj.objectName = newName;
+            ctx.extractedObjects.set(newName, mergedObj);
+            return new TypeNode("reference", { objectName: newName });
+          }
+          return mergedObj;
+        }
+
+        // Create union
+        let unionTypes = [];
+        if (n1.type === "union") {
+          unionTypes.push(...n1.unionTypes);
+        } else {
+          unionTypes.push(n1);
+        }
+        
+        if (n2.type === "union") {
+          for (let ut of n2.unionTypes) {
+            if (!unionTypes.some(x => x.type === ut.type)) {
+              unionTypes.push(ut);
+            }
+          }
+        } else {
+          if (!unionTypes.some(x => x.type === n2.type)) {
+            unionTypes.push(n2);
+          }
+        }
+        
+        return new TypeNode("union", { unionTypes });
+      }
+
+      function cloneNode(node) {
+        return new TypeNode(node.type, {
+          elementType: node.elementType ? cloneNode(node.elementType) : null,
+          fields: node.fields ? mapFields(node.fields, cloneNode) : null,
+          unionTypes: node.unionTypes ? node.unionTypes.map(cloneNode) : null,
+          isOptional: node.isOptional,
+          objectName: node.objectName
+        });
+      }
+
+      function mapFields(fields, fn) {
+        let res = {};
+        for (let k in fields) {
+          res[k] = fn(fields[k]);
+        }
+        return res;
+      }
+
+      function isFieldOptional(node, ctx) {
+        return ctx.settings.allOptional || node.isOptional;
+      }
+
+      // ────────────────────────────────────────────────────────
+      // Generators for Target Languages
+      // ────────────────────────────────────────────────────────
+      
+      // 1. TypeScript
+      function generateTypeScript(rootNode, ctx) {
+        let output = "";
+        
+        if (!ctx.settings.inlineTypes) {
+          ctx.extractedObjects.forEach((objNode, name) => {
+            output += `export interface ${name} {\n`;
+            for (let k in objNode.fields) {
+              let fieldNode = objNode.fields[k];
+              let displayKey = remapKey(k, ctx.settings.casing);
+              let opt = isFieldOptional(fieldNode, ctx) ? "?" : "";
+              let typeStr = getTypeStringTS(fieldNode, ctx);
+              output += `  ${displayKey}${opt}: ${typeStr};\n`;
+            }
+            output += `}\n\n`;
+          });
+        }
+
+        if (ctx.settings.inlineTypes) {
+          output += `export type ${ctx.settings.rootName} = ${getTypeStringTS(rootNode, ctx)};\n`;
+        } else {
+          if (rootNode.type !== "reference") {
+            output += `export type ${ctx.settings.rootName} = ${getTypeStringTS(rootNode, ctx)};\n`;
+          }
+        }
+        return output.trim();
+      }
+
+      function getTypeStringTS(node, ctx) {
+        switch (node.type) {
+          case "string": return "string";
+          case "number": return "number";
+          case "integer": return "number";
+          case "boolean": return "boolean";
+          case "date": return "Date";
+          case "null": return "null";
+          case "any": return "any";
+          case "unknown": return "unknown";
+          case "reference": return node.objectName;
+          case "array":
+            let elementStr = getTypeStringTS(node.elementType, ctx);
+            if (node.elementType.type === "union") {
+              return `(${elementStr})[]`;
+            }
+            return `${elementStr}[]`;
+          case "union":
+            return node.unionTypes.map(t => getTypeStringTS(t, ctx)).join(" | ");
+          case "object":
+            let s = "{\n";
+            for (let k in node.fields) {
+              let displayKey = remapKey(k, ctx.settings.casing);
+              let opt = isFieldOptional(node.fields[k], ctx) ? "?" : "";
+              let tStr = getTypeStringTS(node.fields[k], ctx).replace(/\n/g, "\n  ");
+              s += `  ${displayKey}${opt}: ${tStr};\n`;
+            }
+            s += "}";
+            return s;
+          default: return "any";
+        }
+      }
+
+      // 2. Go
+      function generateGo(rootNode, ctx) {
+        let output = "package main\n\nimport (\n\t\"time\"\n)\n\n";
+        let hasDate = false;
+        
+        // Scan for date usage to include import
+        ctx.extractedObjects.forEach((objNode) => {
+          for (let k in objNode.fields) {
+            if (objNode.fields[k].type === "date") hasDate = true;
+          }
+        });
+        if (rootNode.type === "date") hasDate = true;
+        if (!hasDate) {
+          output = "package main\n\n";
+        }
+
+        ctx.extractedObjects.forEach((objNode, name) => {
+          output += `type ${name} struct {\n`;
+          for (let k in objNode.fields) {
+            let fieldNode = objNode.fields[k];
+            let goFieldName = toGoFieldName(k);
+            let opt = isFieldOptional(fieldNode, ctx) ? ",omitempty" : "";
+            let typeStr = getTypeStringGo(fieldNode, ctx, isFieldOptional(fieldNode, ctx));
+            output += `\t${goFieldName} ${typeStr} \`json:"${k}${opt}"\`\n`;
+          }
+          output += `}\n\n`;
+        });
+
+        if (rootNode.type !== "reference") {
+          output += `type ${ctx.settings.rootName} ${getTypeStringGo(rootNode, ctx, false)}\n`;
+        }
+        return output.trim();
+      }
+
+      function getTypeStringGo(node, ctx, optional) {
+        let prefix = optional ? "*" : "";
+        switch (node.type) {
+          case "string": return prefix + "string";
+          case "number": return prefix + "float64";
+          case "integer": return prefix + "int";
+          case "boolean": return prefix + "bool";
+          case "date": return prefix + "time.Time";
+          case "null": return "interface{}";
+          case "any": return "interface{}";
+          case "unknown": return "interface{}";
+          case "reference": return prefix + node.objectName;
+          case "array":
+            return `[]${getTypeStringGo(node.elementType, ctx, false)}`;
+          case "union":
+            return "interface{}";
+          case "object":
+            let s = "struct {\n";
+            for (let k in node.fields) {
+              let goFieldName = toGoFieldName(k);
+              let opt = isFieldOptional(node.fields[k], ctx) ? ",omitempty" : "";
+              let tStr = getTypeStringGo(node.fields[k], ctx, isFieldOptional(node.fields[k], ctx));
+              s += `\t${goFieldName} ${tStr} \`json:"${k}${opt}"\`\n`;
+            }
+            s += "}";
+            return prefix + s;
+          default: return "interface{}";
+        }
+      }
+
+      // 3. Rust
+      function generateRust(rootNode, ctx) {
+        let output = "use serde::{Serialize, Deserialize};\n\n";
+
+        ctx.extractedObjects.forEach((objNode, name) => {
+          output += `#[derive(Serialize, Deserialize, Debug)]\n`;
+          output += `pub struct ${name} {\n`;
+          for (let k in objNode.fields) {
+            let fieldNode = objNode.fields[k];
+            let rustFieldName = toRustFieldName(k);
+            let typeStr = getTypeStringRust(fieldNode, ctx, isFieldOptional(fieldNode, ctx));
+            if (rustFieldName !== k) {
+              output += `    #[serde(rename = "${k}")]\n`;
+            }
+            output += `    pub ${rustFieldName}: ${typeStr},\n`;
+          }
+          output += `}\n\n`;
+        });
+
+        if (rootNode.type !== "reference") {
+          output += `pub type ${ctx.settings.rootName} = ${getTypeStringRust(rootNode, ctx, false)};\n`;
+        }
+        return output.trim();
+      }
+
+      function getTypeStringRust(node, ctx, optional) {
+        let baseType = "";
+        switch (node.type) {
+          case "string": baseType = "String"; break;
+          case "number": baseType = "f64"; break;
+          case "integer": baseType = "i64"; break;
+          case "boolean": baseType = "bool"; break;
+          case "date": baseType = "String"; break;
+          case "null": baseType = "serde_json::Value"; break;
+          case "any": baseType = "serde_json::Value"; break;
+          case "unknown": baseType = "serde_json::Value"; break;
+          case "reference": baseType = node.objectName; break;
+          case "array":
+            return `Vec<${getTypeStringRust(node.elementType, ctx, false)}>`;
+          case "union":
+            return "serde_json::Value";
+          case "object":
+            return "std::collections::HashMap<String, serde_json::Value>";
+          default: return "serde_json::Value";
+        }
+        return optional ? `Option<${baseType}>` : baseType;
+      }
+
+      // 4. JSON Schema
+      function generateJsonSchema(rootNode, ctx) {
+        let schema = {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": ctx.settings.rootName,
+          "type": "object"
+        };
+
+        if (!ctx.settings.inlineTypes && ctx.extractedObjects.size > 0) {
+          schema.definitions = {};
+          ctx.extractedObjects.forEach((objNode, name) => {
+            schema.definitions[name] = getJsonSchemaNode(objNode, ctx, false);
+          });
+        }
+
+        let rootSchema = getJsonSchemaNode(rootNode, ctx, true);
+        Object.assign(schema, rootSchema);
+        
+        return JSON.stringify(schema, null, 2);
+      }
+
+      function getJsonSchemaNode(node, ctx, isRoot) {
+        switch (node.type) {
+          case "string": return { type: "string" };
+          case "number": return { type: "number" };
+          case "integer": return { type: "integer" };
+          case "boolean": return { type: "boolean" };
+          case "date": return { type: "string", format: "date-time" };
+          case "null": return { type: "null" };
+          case "any": return {};
+          case "unknown": return {};
+          case "reference":
+            return { "$ref": `#/definitions/${node.objectName}` };
+          case "array":
+            return {
+              type: "array",
+              items: getJsonSchemaNode(node.elementType, ctx, false)
+            };
+          case "union":
+            return {
+              anyOf: node.unionTypes.map(t => getJsonSchemaNode(t, ctx, false))
+            };
+          case "object":
+            let properties = {};
+            let required = [];
+            for (let k in node.fields) {
+              let displayKey = remapKey(k, ctx.settings.casing);
+              properties[displayKey] = getJsonSchemaNode(node.fields[k], ctx, false);
+              if (!isFieldOptional(node.fields[k], ctx)) {
+                required.push(displayKey);
+              }
+            }
+            let res = { type: "object", properties };
+            if (required.length > 0) {
+              res.required = required;
+            }
+            return res;
+          default: return {};
+        }
+      }
+
+      // 5. JSDoc
+      function generateJsDoc(rootNode, ctx) {
+        let output = "";
+
+        ctx.extractedObjects.forEach((objNode, name) => {
+          output += `/**\n * @typedef {Object} ${name}\n`;
+          for (let k in objNode.fields) {
+            let fieldNode = objNode.fields[k];
+            let displayKey = remapKey(k, ctx.settings.casing);
+            let jsdocName = displayKey;
+            if (isFieldOptional(fieldNode, ctx)) {
+              jsdocName = `[${displayKey}]`;
+            }
+            let typeStr = getTypeStringJsDoc(fieldNode, ctx);
+            output += ` * @property {${typeStr}} ${jsdocName}\n`;
+          }
+          output += ` */\n\n`;
+        });
+
+        if (rootNode.type !== "reference") {
+          output += `/**\n * @typedef {${getTypeStringJsDoc(rootNode, ctx)}} ${ctx.settings.rootName}\n */\n`;
+        }
+        return output.trim();
+      }
+
+      function getTypeStringJsDoc(node, ctx) {
+        switch (node.type) {
+          case "string": return "string";
+          case "number": return "number";
+          case "integer": return "number";
+          case "boolean": return "boolean";
+          case "date": return "Date";
+          case "null": return "null";
+          case "any": return "*";
+          case "unknown": return "*";
+          case "reference": return node.objectName;
+          case "array":
+            return `Array.<${getTypeStringJsDoc(node.elementType, ctx)}>`;
+          case "union":
+            return node.unionTypes.map(t => getTypeStringJsDoc(t, ctx)).join("|");
+          case "object":
+            return "Object";
+          default: return "*";
+        }
+      }
+
+      // 6. Python TypedDict
+      function generatePython(rootNode, ctx) {
+        let output = "from typing import TypedDict, List, Optional, Any, Union\n\n";
+
+        ctx.extractedObjects.forEach((objNode, name) => {
+          output += `class ${name}(TypedDict):\n`;
+          let hasFields = false;
+          for (let k in objNode.fields) {
+            hasFields = true;
+            let fieldNode = objNode.fields[k];
+            let pythonFieldName = toPythonFieldName(k);
+            let typeStr = getTypeStringPython(fieldNode, ctx, isFieldOptional(fieldNode, ctx));
+            output += `    ${pythonFieldName}: ${typeStr}\n`;
+          }
+          if (!hasFields) {
+            output += `    pass\n`;
+          }
+          output += `\n`;
+        });
+
+        if (rootNode.type !== "reference") {
+          output += `${ctx.settings.rootName} = ${getTypeStringPython(rootNode, ctx, false)}\n`;
+        }
+        return output.trim();
+      }
+
+      function getTypeStringPython(node, ctx, optional) {
+        let baseType = "";
+        switch (node.type) {
+          case "string": baseType = "str"; break;
+          case "number": baseType = "float"; break;
+          case "integer": baseType = "int"; break;
+          case "boolean": baseType = "bool"; break;
+          case "date": baseType = "str"; break;
+          case "null": baseType = "None"; break;
+          case "any": baseType = "Any"; break;
+          case "unknown": baseType = "Any"; break;
+          case "reference": baseType = node.objectName; break;
+          case "array":
+            return `List[${getTypeStringPython(node.elementType, ctx, false)}]`;
+          case "union":
+            return `Union[${node.unionTypes.map(t => getTypeStringPython(t, ctx, false)).join(", ")}]`;
+          case "object":
+            return "dict";
+          default: return "Any";
+        }
+        return optional ? `Optional[${baseType}]` : baseType;
+      }
+
+      // 7. C# Classes
+      function generateCsharp(rootNode, ctx) {
+        let output = "using System;\nusing System.Collections.Generic;\nusing System.Text.Json.Serialization;\n\n";
+
+        ctx.extractedObjects.forEach((objNode, name) => {
+          output += `public class ${name}\n{\n`;
+          for (let k in objNode.fields) {
+            let fieldNode = objNode.fields[k];
+            let csharpFieldName = toCsharpFieldName(k);
+            let typeStr = getTypeStringCsharp(fieldNode, ctx, isFieldOptional(fieldNode, ctx));
+            
+            output += `    [JsonPropertyName("${k}")]\n`;
+            output += `    public ${typeStr} ${csharpFieldName} { get; set; }\n\n`;
+          }
+          output += `}\n\n`;
+        });
+
+        if (rootNode.type !== "reference") {
+          output += `// Root type definition fallback\n// public class ${ctx.settings.rootName} { ... }\n`;
+        }
+        return output.trim();
+      }
+
+      function getTypeStringCsharp(node, ctx, optional) {
+        let suffix = (optional && ["number", "integer", "boolean", "date"].includes(node.type)) ? "?" : "";
+        switch (node.type) {
+          case "string": return "string";
+          case "number": return "double" + suffix;
+          case "integer": return "int" + suffix;
+          case "boolean": return "bool" + suffix;
+          case "date": return "DateTime" + suffix;
+          case "null": return "object";
+          case "any": return "object";
+          case "unknown": return "object";
+          case "reference": return node.objectName;
+          case "array":
+            return `List<${getTypeStringCsharp(node.elementType, ctx, false)}>`;
+          case "union":
+            return "object";
+          case "object":
+            return "Dictionary<string, object>";
+          default: return "object";
+        }
+      }
+
+      // ────────────────────────────────────────────────────────
+      // Core Controller & UI Orchestration
+      // ────────────────────────────────────────────────────────
+      function showToast(message) {
+        toastMessage.textContent = message;
+        toast.classList.add("active");
+        setTimeout(() => {
+          toast.classList.remove("active");
+        }, 2000);
+      }
+
+      function processConversion() {
+        const valStr = jsonInput.value.trim();
+        
+        // Handle empty payload
+        if (valStr === "") {
+          jsonStatusBanner.className = "status-banner";
+          jsonStatusBanner.innerHTML = `<span>Empty payload. Write or upload a JSON object.</span>`;
+          codeOutput.textContent = "";
+          return;
+        }
+
+        // Validate JSON parsing
+        let parsedVal;
+        try {
+          parsedVal = JSON.parse(valStr);
+          jsonStatusBanner.className = "status-banner valid";
+          jsonStatusBanner.innerHTML = `
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            <span>Valid JSON payload parsed successfully.</span>
+          `;
+        } catch (e) {
+          jsonStatusBanner.className = "status-banner invalid";
+          jsonStatusBanner.innerHTML = `
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <span>Invalid JSON: ${e.message}</span>
+          `;
+          codeOutput.textContent = "";
+          return;
+        }
+
+        // Read Settings
+        const settings = {
+          rootName: rootNameInput.value.trim() || "RootObject",
+          casing: casingSelect.value,
+          nullAs: nullSelect.value,
+          allOptional: optionalCheckbox.checked,
+          detectDates: detectDatesCheckbox.checked,
+          inlineTypes: inlineCheckbox.checked
+        };
+
+        // Create converter execution context
+        const ctx = new ConverterContext(settings);
+        const rootNode = analyzeValue(parsedVal, settings.rootName, ctx);
+
+        // Generate Target Output Code
+        let outputCode = "";
+        switch (activeLang) {
+          case "typescript":
+            outputCode = generateTypeScript(rootNode, ctx);
+            break;
+          case "go":
+            outputCode = generateGo(rootNode, ctx);
+            break;
+          case "rust":
+            outputCode = generateRust(rootNode, ctx);
+            break;
+          case "json_schema":
+            outputCode = generateJsonSchema(rootNode, ctx);
+            break;
+          case "jsdoc":
+            outputCode = generateJsDoc(rootNode, ctx);
+            break;
+          case "python":
+            outputCode = generatePython(rootNode, ctx);
+            break;
+          case "csharp":
+            outputCode = generateCsharp(rootNode, ctx);
+            break;
+        }
+
+        // Highlight and render
+        codeOutput.innerHTML = highlightCode(outputCode, activeLang);
+      }
+
+      // Syntax Highlighter Engine
+      function highlightCode(code, language) {
+        // Escape HTML
+        let escaped = escapeHtml(code);
+        
+        // 1. Comments
+        escaped = escaped.replace(/(\/\*([\s\S]*?)\*\/|\/\/.*$|#.*$)/gm, '<span style="color:#5c6b84;font-style:italic;">$1</span>');
+
+        // 2. String Literals
+        escaped = escaped.replace(/(["'])(.*?)\1/g, '<span style="color:#d8b4fe;">$1$2$1</span>');
+
+        // 3. Keywords & Core types
+        const keywords = [
+          "export", "interface", "type", "struct", "class", "public", "private", "using", "namespace",
+          "import", "from", "def", "TypedDict", "pub", "Option", "List", "dict", "str", "float", "bool",
+          "int", "double", "float64", "string", "number", "boolean", "any", "unknown", "DateTime", "package"
+        ];
+        const kwRegex = new RegExp('\\b(' + keywords.join('|') + ')\\b', 'g');
+        escaped = escaped.replace(kwRegex, '<span style="color:#60a5fa;font-weight:600;">$1</span>');
+
+        // 4. Decorators / Serde / Custom tags
+        escaped = escaped.replace(/(#\[.*?\])/g, '<span style="color:#fbbf24;">$1</span>');
+        escaped = escaped.replace(/(\[JsonPropertyName\(.*?\)\])/g, '<span style="color:#fbbf24;">$1</span>');
+        escaped = escaped.replace(/(`json:".*?"`)/g, '<span style="color:#34d399;">$1</span>');
+
+        return escaped;
+      }
+
+      function beautifyJson() {
+        const raw = jsonInput.value.trim();
+        if (raw === "") return;
+        try {
+          const parsed = JSON.parse(raw);
+          jsonInput.value = JSON.stringify(parsed, null, 2);
+          processConversion();
+        } catch (e) {
+          showToast("Failed to format: Invalid JSON structure.");
+        }
+      }
+
+      function minifyJson() {
+        const raw = jsonInput.value.trim();
+        if (raw === "") return;
+        try {
+          const parsed = JSON.parse(raw);
+          jsonInput.value = JSON.stringify(parsed);
+          processConversion();
+        } catch (e) {
+          showToast("Failed to minify: Invalid JSON structure.");
+        }
+      }
+
+      function downloadCodeFile() {
+        let code = codeOutput.textContent;
+        if (!code) {
+          showToast("Nothing to download.");
+          return;
+        }
+
+        let filename = rootNameInput.value.trim() || "RootObject";
+        let extension = "";
+
+        switch (activeLang) {
+          case "typescript": extension = ".ts"; break;
+          case "go": extension = ".go"; break;
+          case "rust": extension = ".rs"; break;
+          case "json_schema": extension = ".schema.json"; break;
+          case "jsdoc": extension = ".js"; break;
+          case "python": extension = ".py"; break;
+          case "csharp": extension = ".cs"; break;
+        }
+
+        const fullFilename = filename + extension;
+        const blob = new Blob([code], { type: "text/plain;charset=utf-8" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = fullFilename;
+        link.click();
+        URL.revokeObjectURL(link.href);
+      }
+
+      // Event Bindings
+      function init() {
+        // Load Sample Payload
+        jsonInput.value = SAMPLE_JSON;
+        processConversion();
+
+        // Inputs
+        jsonInput.addEventListener("input", processConversion);
+        rootNameInput.addEventListener("input", processConversion);
+        casingSelect.addEventListener("change", processConversion);
+        nullSelect.addEventListener("change", processConversion);
+        optionalCheckbox.addEventListener("change", processConversion);
+        detectDatesCheckbox.addEventListener("change", processConversion);
+        inlineCheckbox.addEventListener("change", processConversion);
+
+        // Sidebar Collapse
+        settingsToggle.addEventListener("click", () => {
+          isSettingsOpen = !isSettingsOpen;
+          if (isSettingsOpen) {
+            settingsGrid.style.display = "grid";
+            settingsArrow.style.transform = "rotate(0deg)";
+          } else {
+            settingsGrid.style.display = "none";
+            settingsArrow.style.transform = "rotate(-90deg)";
+          }
+        });
+
+        // Language Tabs
+        langTabs.addEventListener("click", (e) => {
+          const tab = e.target.closest(".lang-tab");
+          if (tab) {
+            langTabs.querySelectorAll(".lang-tab").forEach(t => t.classList.remove("active"));
+            tab.classList.add("active");
+            activeLang = tab.dataset.lang;
+
+            // Hide/Show Inline Checkbox depending on support
+            if (activeLang === "typescript" || activeLang === "json_schema") {
+              inlineWrapper.style.display = "flex";
+            } else {
+              inlineWrapper.style.display = "none";
+            }
+
+            processConversion();
+          }
+        });
+
+        // Quick Actions
+        btnBeautify.addEventListener("click", beautifyJson);
+        btnMinify.addEventListener("click", minifyJson);
+        
+        btnLoadSample.addEventListener("click", () => {
+          jsonInput.value = SAMPLE_JSON;
+          processConversion();
+        });
+
+        btnClear.addEventListener("click", () => {
+          jsonInput.value = "";
+          processConversion();
+        });
+
+        // File Drag & Drop
+        jsonInput.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          jsonInput.style.borderColor = "var(--accent)";
+        });
+
+        jsonInput.addEventListener("dragleave", () => {
+          jsonInput.style.borderColor = "var(--panel-border)";
+        });
+
+        jsonInput.addEventListener("drop", (e) => {
+          e.preventDefault();
+          jsonInput.style.borderColor = "var(--panel-border)";
+          
+          const file = e.dataTransfer.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              jsonInput.value = event.target.result;
+              processConversion();
+            };
+            reader.readAsText(file);
+          }
+        });
+
+        // File Upload Button
+        fileUpload.addEventListener("change", (e) => {
+          const file = e.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              jsonInput.value = event.target.result;
+              processConversion();
+            };
+            reader.readAsText(file);
+          }
+        });
+
+        // Clipboard Copy
+        btnCopy.addEventListener("click", () => {
+          const code = codeOutput.textContent;
+          if (!code) return;
+          navigator.clipboard.writeText(code).then(() => {
+            showToast("Copied to clipboard!");
+          }).catch(err => {
+            console.error("Clipboard copy failed", err);
+          });
+        });
+
+        // Download Action
+        btnDownload.addEventListener("click", downloadCodeFile);
+      }
+
+      window.addEventListener("DOMContentLoaded", init);
+    </script>
+  </body>
+</html>
