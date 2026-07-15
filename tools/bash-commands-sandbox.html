@@ -447,10 +447,17 @@
             return "";
           },
           rm: (args) => {
-            if (!args[0] || args[0] !== "-rf" || !args[1]) {
-              return `<span class="error">rm: usage: rm -rf &lt;file/directory&gt;</span>`;
+            if (!args[0]) {
+              return `<span class="error">rm: missing operand</span>`;
             }
-            const targetName = args[1];
+            let isRecursive = false;
+            let targetName = args[0];
+            if (args[0].startsWith("-")) {
+              if (!args[1]) return `<span class="error">rm: missing operand</span>`;
+              isRecursive = args[0].includes("r");
+              targetName = args[1];
+            }
+            
             const targetPath = resolvePath(targetName);
             const parts = targetPath.split("/").filter(Boolean);
             const name = parts.pop();
@@ -458,7 +465,13 @@
             const parentNode = getPathNode(parentPath);
 
             if (!parentNode || !parentNode.children[name]) {
+              // If -f was passed, rm shouldn't complain if file doesn't exist.
+              if (args[0].startsWith("-") && args[0].includes("f")) return "";
               return `<span class="error">rm: cannot remove '${targetName}': No such file or directory</span>`;
+            }
+
+            if (parentNode.children[name].type === "directory" && !isRecursive) {
+              return `<span class="error">rm: cannot remove '${targetName}': Is a directory</span>`;
             }
 
             delete parentNode.children[name];
