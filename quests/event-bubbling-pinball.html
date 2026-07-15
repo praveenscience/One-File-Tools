@@ -860,9 +860,7 @@
             <span>Mission Objective</span>
             <span class="status-badge" style="color: var(--neon-yellow); border-color: rgba(255, 234, 0, 0.2)">TABLE OBJECTIVE</span>
           </div>
-          <p class="objective-desc" id="level-objective-text">
-            Guide the event ball bubbling from the target BUTTON to the parent DIV to score 200 pts. Prevent the event from bubbling up to BODY where a reset listener resides.
-          </p>
+          <p class="objective-desc" id="level-objective-text"></p>
         </div>
 
         <!-- Connection fitters installers list -->
@@ -872,9 +870,7 @@
             <span class="status-badge">addEventListener()</span>
           </div>
           
-          <div class="listeners-editor-grid" id="listeners-editor-list">
-            <!-- Populated dynamically per level elements -->
-          </div>
+          <div class="listeners-editor-grid" id="listeners-editor-list"></div>
         </div>
 
         <!-- Telemetry history log terminal -->
@@ -883,11 +879,8 @@
             <span>Event Telemetry Log</span>
             <span style="font-family: var(--font-hud); font-size: 0.75rem;">stdout</span>
           </div>
-          <div class="terminal-log-card" id="terminal-event-log">
-            <!-- Event logs -->
-          </div>
+          <div class="terminal-log-card" id="terminal-event-log"></div>
         </div>
-
       </div>
     </main>
   </div>
@@ -915,6 +908,9 @@
       init() {
         if (!this.ctx) {
           this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (this.ctx.state === 'suspended') {
+          this.ctx.resume();
         }
       },
       playClick() {
@@ -1134,6 +1130,7 @@
       levelIndex: 0,
       activeLevel: null,
       score: 0,
+      levelScore: 0,
       isLaunching: false,
       simulationTimer: null,
       completedLevels: new Set(),
@@ -1157,6 +1154,7 @@
 
       start() {
         document.getElementById('landing-screen').classList.remove('active');
+        sound.init();
       },
 
       loadLevel(idx) {
@@ -1166,9 +1164,9 @@
         
         this.levelIndex = idx;
         this.activeLevel = levels[idx];
-        this.score = 0;
         this.updateScoreDisplay();
         this.isLaunching = false;
+        
         if (this.simulationTimer) {
           clearTimeout(this.simulationTimer);
           this.simulationTimer = null;
@@ -1443,7 +1441,7 @@
       launchBall() {
         if (this.isLaunching) return;
         this.isLaunching = true;
-        this.score = 0;
+        this.levelScore = 0;
         this.updateScoreDisplay();
 
         // Mechanical spring pull launch visual
@@ -1472,8 +1470,7 @@
         // Target click (the deepest node)
         const target = path[path.length - 1];
 
-        // Bubble Phase (upward)
-        for (let i = path.length - 2; i >= 0; i--) {
+        for (let i = path.length - 1; i >= 0; i--) {
           path.push({ name: path[i].name, phase: 'bubble', depth: path[i].depth, r: path[i].r });
         }
 
@@ -1524,6 +1521,7 @@
             sound.playHit(current.depth + 1);
             this.logMessage("STRIKE", `BALL HIT TARGET: <${current.name.toLowerCase()}>! Dispatched Event.`);
             this.score += 100;
+            this.levelScore += 100;
             this.updateScoreDisplay();
             
             // Pulse Target border
@@ -1560,6 +1558,7 @@
                 if (config.stopImmediatePropagation) {
                   this.logMessage("STRIKE", `stopImmediatePropagation() executed! Listener B shielded.`);
                   this.score += 100;
+                  this.levelScore += 100;
                   this.updateScoreDisplay();
                 } else {
                   this.logMessage("ERROR", `Listener B triggered! Security system compromise.`);
@@ -1571,6 +1570,7 @@
               } else {
                 // Award points
                 this.score += 100;
+                this.levelScore += 100;
                 this.updateScoreDisplay();
               }
               listenerScored = true;
@@ -1591,6 +1591,7 @@
           if (this.activeLevel.requiresCapture === current.name && current.phase === 'capture' && config && config.active && config.capture && !listenerScored) {
             this.logMessage("STRIKE", "UL Capture buffer hit! Trap disabled.");
             this.score += 100;
+            this.levelScore += 100;
             this.updateScoreDisplay();
           }
 
@@ -1679,8 +1680,7 @@
           }
         }
 
-        // Verify required score target matched
-        if (this.score >= this.activeLevel.winScore) {
+        if (this.levelScore >= this.activeLevel.winScore) {
           this.completedLevels.add(this.levelIndex);
           this.saveProgress();
           sound.playSuccess();
@@ -1688,7 +1688,7 @@
         } else {
           sound.playFail();
           this.logMessage("ERROR", `Minimum score of ${this.activeLevel.winScore} not reached. Configuration incomplete.`);
-          this.showOutcomeModal(false, `Piping incomplete! You only scored ${this.score} out of the target ${this.activeLevel.winScore} points. Secure more event sensors.`);
+          this.showOutcomeModal(false, `Piping incomplete! You only scored ${this.levelScore} out of the target ${this.activeLevel.winScore} points. Secure more event sensors.`);
         }
       },
 
@@ -1735,7 +1735,12 @@
           this.loadLevel(this.levelIndex + 1);
         } else {
           this.cleanup();
-          window.location.href = '../index.html';
+          this.score = 0;
+          this.levelScore = 0;
+          this.completedLevels.clear();
+          this.saveProgress();
+          this.loadLevel(0);
+          document.getElementById('landing-screen').classList.add('active');
         }
       },
 
@@ -1786,7 +1791,7 @@
             }
           }
         } catch (e) {
-          console.error("Failed to load progress:", e);
+          console.error(e);
         }
       },
 
@@ -1798,7 +1803,7 @@
           };
           localStorage.setItem('event_bubbling_pinball_progress', JSON.stringify(data));
         } catch (e) {
-          console.error("Failed to save progress:", e);
+          console.error(e);
         }
       }
     };
