@@ -52,6 +52,16 @@ export async function onRequestGet(context) {
       });
     }
 
+    const BLOCKED_HOSTNAMES = /^(localhost|127\.|0\.0\.0\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|::1|fc00:|fe80:)/i;
+    if (BLOCKED_HOSTNAMES.test(parsedUrl.hostname)) {
+      return new Response("Forbidden: private addresses are not allowed.", {
+        status: 403,
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8"
+        }
+      });
+    }
+
     // Use a standard browser User-Agent so we are less likely to get blocked by websites
     const headers = new Headers();
     headers.set(
