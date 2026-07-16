@@ -175,6 +175,22 @@ Built for One File Tools.
         background: rgba(239, 68, 68, 0.2);
       }
 
+      .curve-row .copy-btn {
+        background: rgba(56, 189, 248, 0.12);
+        border: 1px solid rgba(56, 189, 248, 0.3);
+        color: #7dd3fc;
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-size: 12px;
+        cursor: pointer;
+        flex-shrink: 0;
+        font-family: var(--font-mono);
+      }
+
+      .curve-row .copy-btn:hover {
+        background: rgba(56, 189, 248, 0.22);
+      }
+
       .btn {
         background: var(--accent);
         color: #030712;
@@ -298,6 +314,50 @@ Built for One File Tools.
         color: var(--text-muted);
       }
 
+      /* Draggable Bézier editor shown under a "custom" curve row. */
+      .bezier-editor {
+        margin: 8px 0 4px 24px;
+        background: rgba(3, 7, 18, 0.5);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 10px;
+      }
+
+      .bezier-editor svg {
+        width: 100%;
+        height: 140px;
+        display: block;
+        touch-action: none;
+      }
+
+      .bezier-editor .handle {
+        cursor: grab;
+      }
+
+      .bezier-editor .handle:active {
+        cursor: grabbing;
+      }
+
+      /* Import / export bar */
+      .io-row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 14px;
+      }
+
+      .io-row input[type="text"] {
+        flex: 1;
+        min-width: 200px;
+        background: rgba(17, 24, 39, 0.8);
+        border: 1px solid var(--panel-border);
+        border-radius: 6px;
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 13px;
+        padding: 8px 10px;
+      }
+
       @media (max-width: 640px) {
         .studio {
           padding: 20px;
@@ -305,6 +365,9 @@ Built for One File Tools.
         .curve-row select,
         .curve-row input[type="text"] {
           min-width: 0;
+        }
+        .bezier-editor {
+          margin-left: 0;
         }
       }
     </style>
@@ -323,6 +386,12 @@ Built for One File Tools.
           <button class="btn-ghost" id="btnAddCurve" type="button">+ Add curve</button>
         </span>
         <div id="curveRows"></div>
+
+        <div class="io-row">
+          <input type="text" id="importInput" placeholder="Paste a cubic-bezier(...) or keyword to import as a new curve" aria-label="Import easing value" />
+          <button class="btn-ghost" id="btnImport" type="button">Import</button>
+          <button class="btn-ghost" id="btnExportPresets" type="button">Export presets (.json)</button>
+        </div>
       </section>
 
       <main class="studio">
@@ -452,6 +521,7 @@ Built for One File Tools.
 
           const select = document.createElement("select");
           select.setAttribute("aria-label", "Easing preset");
+          Object.keys(PRESETS).forEach((key) => {
             const opt = document.createElement("option");
             opt.value = key;
             opt.textContent = key;
@@ -472,13 +542,23 @@ Built for One File Tools.
             customInput.type = "text";
             customInput.value = curve.customValue;
             customInput.placeholder = "cubic-bezier(0.25, 0.1, 0.25, 1)";
-            customInput.setAttribute("aria-label", "Custom easing (cubic-bezier)" );
+            customInput.setAttribute("aria-label", "Custom easing (cubic-bezier)");
+            customInput.dataset.ownerCurveId = String(curve.id);
             customInput.addEventListener("input", () => {
               curve.customValue = customInput.value;
+              renderBezierEditor(curve.id);
               renderAll();
             });
             row.appendChild(customInput);
           }
+
+          const copyBtn = document.createElement("button");
+          copyBtn.type = "button";
+          copyBtn.className = "copy-btn";
+          copyBtn.textContent = "Copy";
+          copyBtn.title = "Copy this curve's CSS easing value";
+          copyBtn.addEventListener("click", () => copyCurveCss(curve, copyBtn));
+          row.appendChild(copyBtn);
 
           const removeBtn = document.createElement("button");
           removeBtn.type = "button";
@@ -489,6 +569,164 @@ Built for One File Tools.
           row.appendChild(removeBtn);
 
           curveRows.appendChild(row);
+
+          if (curve.preset === "custom") {
+            const editorHost = document.createElement("div");
+            editorHost.className = "bezier-editor";
+            editorHost.dataset.curveId = curve.id;
+            curveRows.appendChild(editorHost);
+            renderBezierEditor(curve.id);
+          }
+        });
+      }
+
+      /** Copies a curve's resolved CSS easing value to the clipboard. */
+      async function copyCurveCss(curve, button) {
+        const { cssValue } = resolveCurve(curve);
+        try {
+          await navigator.clipboard.writeText(cssValue);
+          const original = button.textContent;
+          button.textContent = "Copied!";
+          setTimeout(() => {
+            button.textContent = original;
+          }, 1500);
+        } catch {
+          // Clipboard API unavailable/blocked — fail gracefully, no throw.
+          button.textContent = "Copy failed";
+          setTimeout(() => {
+            button.textContent = "Copy";
+          }, 1500);
+        }
+      }
+
+      /**
+       * Renders an interactive SVG editor with two draggable control-point
+       * handles for a "custom" curve, wired to update its customValue live.
+       * The bezier's fixed endpoints (0,0) and (1,1) are drawn for reference
+       * but are not draggable, matching the standard cubic-bezier() spec.
+       */
+      function renderBezierEditor(curveId) {
+        const host = curveRows.querySelector(`.bezier-editor[data-curve-id="${curveId}"]`);
+        const curve = curves.find((c) => c.id === curveId);
+        if (!host || !curve) return;
+
+        const width = 260;
+        const height = 140;
+        const pad = 16;
+
+        function toPixel([x, y]) {
+          return [pad + x * (width - 2 * pad), height - pad - y * (height - 2 * pad)];
+        }
+        function toUnit(px, py) {
+          const x = (px - pad) / (width - 2 * pad);
+          const y = (height - pad - py) / (height - 2 * pad);
+          return [Math.max(0, Math.min(1, x)), Math.max(-1, Math.min(2, y))];
+        }
+
+        const bezier = parseCubicBezier(curve.customValue.trim() || "cubic-bezier(0.25,0.1,0.25,1)") || [0.25, 0.1, 0.25, 1];
+        const [p1x, p1y, p2x, p2y] = bezier;
+        const [x0, y0] = toPixel([0, 0]);
+        const [x3, y3] = toPixel([1, 1]);
+        const [hx1, hy1] = toPixel([p1x, p1y]);
+        const [hx2, hy2] = toPixel([p2x, p2y]);
+
+        host.innerHTML = `
+          <svg viewBox="0 0 ${width} ${height}" aria-label="Draggable cubic-bezier control point editor">
+            <line x1="${x0}" y1="${y0}" x2="${hx1}" y2="${hy1}" stroke="#4b5563" stroke-width="1.5" />
+            <line x1="${x3}" y1="${y3}" x2="${hx2}" y2="${hy2}" stroke="#4b5563" stroke-width="1.5" />
+            <path d="M${x0},${y0} C${hx1},${hy1} ${hx2},${hy2} ${x3},${y3}" fill="none" stroke="#f472b6" stroke-width="2.5" />
+            <circle cx="${x0}" cy="${y0}" r="4" fill="#4b5563" />
+            <circle cx="${x3}" cy="${y3}" r="4" fill="#4b5563" />
+            <circle class="handle" data-point="1" cx="${hx1}" cy="${hy1}" r="7" fill="#38bdf8" />
+            <circle class="handle" data-point="2" cx="${hx2}" cy="${hy2}" r="7" fill="#22c55e" />
+          </svg>
+        `;
+
+        const svg = host.querySelector("svg");
+
+        function pointFromEvent(evt) {
+          const rect = svg.getBoundingClientRect();
+          const scaleX = width / rect.width;
+          const scaleY = height / rect.height;
+          return [(evt.clientX - rect.left) * scaleX, (evt.clientY - rect.top) * scaleY];
+        }
+
+        // Updates the SVG elements in place (no innerHTML rebuild) so an
+        // active pointer-captured drag on a handle isn't interrupted by
+        // destroying/recreating that same element mid-drag.
+        function paintHandles(next) {
+          const [nx1, ny1, nx2, ny2] = next;
+          const [px1, py1] = toPixel([nx1, ny1]);
+          const [px2, py2] = toPixel([nx2, ny2]);
+
+          const lines = svg.querySelectorAll("line");
+          lines[0].setAttribute("x2", px1);
+          lines[0].setAttribute("y2", py1);
+          lines[1].setAttribute("x2", px2);
+          lines[1].setAttribute("y2", py2);
+
+          svg.querySelector("path").setAttribute("d", `M${x0},${y0} C${px1},${py1} ${px2},${py2} ${x3},${y3}`);
+
+          const h1 = svg.querySelector('.handle[data-point="1"]');
+          const h2 = svg.querySelector('.handle[data-point="2"]');
+          h1.setAttribute("cx", px1);
+          h1.setAttribute("cy", py1);
+          h2.setAttribute("cx", px2);
+          h2.setAttribute("cy", py2);
+        }
+
+        function updateFromDrag(pointNum, px, py, commit) {
+          const [ux, uy] = toUnit(px, py);
+          const current = parseCubicBezier(curve.customValue.trim()) || [0.25, 0.1, 0.25, 1];
+          const next = current.slice();
+          const rx = Math.round(ux * 100) / 100;
+          const ry = Math.round(uy * 100) / 100;
+          if (pointNum === 1) {
+            next[0] = rx;
+            next[1] = ry;
+          } else {
+            next[2] = rx;
+            next[3] = ry;
+          }
+          curve.customValue = `cubic-bezier(${next.join(", ")})`;
+          paintHandles(next);
+
+          // Keep the row's text input in sync live, without rebuilding the
+          // editor SVG itself.
+          const textInput = curveRows.querySelector(`input[aria-label="Custom easing (cubic-bezier)"][data-owner-curve-id="${curveId}"]`);
+          if (textInput) textInput.value = curve.customValue;
+
+          if (commit) {
+            renderAll();
+          } else {
+            // Update the shared graph/track live too, but skip re-rendering
+            // this editor's own SVG to avoid interrupting the drag.
+            renderGraph();
+            renderLegend();
+          }
+        }
+
+        svg.querySelectorAll(".handle").forEach((handle) => {
+          handle.addEventListener("pointerdown", (evt) => {
+            evt.preventDefault();
+            const pointNum = Number(handle.dataset.point);
+            handle.setPointerCapture(evt.pointerId);
+
+            function onMove(moveEvt) {
+              const [px, py] = pointFromEvent(moveEvt);
+              updateFromDrag(pointNum, px, py, false);
+            }
+            function onUp(upEvt) {
+              const [px, py] = pointFromEvent(upEvt);
+              updateFromDrag(pointNum, px, py, true);
+              svg.removeEventListener("pointermove", onMove);
+              svg.removeEventListener("pointerup", onUp);
+              svg.removeEventListener("pointercancel", onUp);
+            }
+            svg.addEventListener("pointermove", onMove);
+            svg.addEventListener("pointerup", onUp);
+            svg.addEventListener("pointercancel", onUp);
+          });
         });
       }
 
@@ -503,10 +741,7 @@ Built for One File Tools.
 
         // Baseline grid.
         const grid = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        grid.setAttribute(
-          "d",
-          "M" + padding + "," + (height - padding) + " L" + (width - padding) + "," + (height - padding) + " M" + padding + "," + padding + " L" + padding + "," + (height - padding)
-        );
+        grid.setAttribute("d", "M" + padding + "," + (height - padding) + " L" + (width - padding) + "," + (height - padding) + " M" + padding + "," + padding + " L" + padding + "," + (height - padding));
         grid.setAttribute("stroke", "#374151");
         grid.setAttribute("stroke-width", "1");
         curveGraph.appendChild(grid);
@@ -613,11 +848,73 @@ Built for One File Tools.
         });
       }
 
+      /**
+       * Imports a pasted easing value (a keyword like "ease-in-out" or a
+       * cubic-bezier(...) string) as a new curve. Falls back to treating
+       * unrecognized text as a custom cubic-bezier string, and only adds a
+       * curve if the value parses to something plottable.
+       */
+      function importEasingValue(rawValue) {
+        const value = rawValue.trim();
+        if (!value) return false;
+
+        if (PRESETS[value] !== undefined && value !== "custom") {
+          addCurve(value);
+          return true;
+        }
+
+        const bezier = parseCubicBezier(value);
+        if (!bezier) return false;
+
+        curveIdCounter += 1;
+        curves.push({ id: curveIdCounter, preset: "custom", customValue: value });
+        renderCurveRows();
+        renderAll();
+        return true;
+      }
+
+      /** Exports every current curve as a JSON preset file. */
+      function exportPresets() {
+        const presets = curves.map((curve) => {
+          const { cssValue } = resolveCurve(curve);
+          return { preset: curve.preset, value: cssValue };
+        });
+
+        try {
+          const blob = new Blob([JSON.stringify(presets, null, 2)], { type: "application/json" });
+          const link = document.createElement("a");
+          link.href = URL.createObjectURL(blob);
+          link.download = "easing-presets.json";
+          link.click();
+          URL.revokeObjectURL(link.href);
+        } catch {
+          alert("Failed to export presets in this browser.");
+        }
+      }
+
       btnAddCurve.addEventListener("click", () => addCurve("linear"));
       btnPlay.addEventListener("click", playRace);
       durationRange.addEventListener("input", () => {
         durationValue.textContent = durationRange.value + "ms";
       });
+
+      const importInput = document.getElementById("importInput");
+      const btnImport = document.getElementById("btnImport");
+      const btnExportPresets = document.getElementById("btnExportPresets");
+
+      btnImport.addEventListener("click", () => {
+        const ok = importEasingValue(importInput.value);
+        if (ok) {
+          importInput.value = "";
+        } else {
+          importInput.setAttribute("aria-invalid", "true");
+          setTimeout(() => importInput.removeAttribute("aria-invalid"), 1500);
+        }
+      });
+      importInput.addEventListener("keydown", (evt) => {
+        if (evt.key === "Enter") btnImport.click();
+      });
+      btnExportPresets.addEventListener("click", exportPresets);
 
       // Seed with three contrasting curves so the comparison is meaningful
       // from the first load.
