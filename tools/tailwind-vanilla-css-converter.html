@@ -224,12 +224,56 @@ Built for One File Tools.
         color: var(--text-muted);
       }
 
+      .output-header-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+      }
+
+      .output-actions {
+        display: flex;
+        gap: 8px;
+      }
+
+      .category-comment {
+        color: #6b7280;
+      }
+
+      .live-preview {
+        margin-top: 16px;
+        padding: 24px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px dashed var(--panel-border);
+        border-radius: var(--radius-sm);
+        display: flex;
+        justify-content: center;
+      }
+
+      .preview-box {
+        background: #4b5563;
+        color: white;
+        padding: 8px 12px;
+        border-radius: 4px;
+        font-family: var(--font-sans);
+        font-size: 14px;
+        max-width: 100%;
+      }
+
       @media (max-width: 640px) {
         .studio {
           padding: 20px;
         }
         .selector-row {
           flex-wrap: wrap;
+        }
+        .output-actions {
+          width: 100%;
+        }
+        .output-actions .btn-ghost {
+          flex: 1;
         }
       }
     </style>
@@ -252,13 +296,26 @@ Built for One File Tools.
       </main>
 
       <main class="studio">
-        <span class="section-label">
-          Vanilla CSS
-          <button class="btn-ghost" id="btnCopy" type="button">Copy</button>
-        </span>
+        <div class="output-header-row">
+          <span class="section-label" style="margin-bottom: 0">Vanilla CSS</span>
+          <div class="output-actions">
+            <label style="font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); display: flex; align-items: center; gap: 6px">
+              <input type="checkbox" id="groupByCategory" checked />
+              Group by category
+            </label>
+            <label style="font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); display: flex; align-items: center; gap: 6px">
+              <input type="checkbox" id="minifyOutput" />
+              Minify
+            </label>
+            <button class="btn-ghost" id="btnCopy" type="button">Copy</button>
+          </div>
+        </div>
         <div class="output-container"><code id="cssOutput"></code></div>
         <div class="unmatched" id="unmatchedBox" hidden></div>
-        <p class="hint">Supports common utilities for spacing (<code>p-*</code>, <code>m-*</code>, <code>gap-*</code>), flex/grid layout, sizing, typography, color (a curated palette subset), borders, radius, and shadow. Arbitrary values like <code>w-[220px]</code> and responsive/state prefixes (<code>md:</code>, <code>hover:</code>) are converted using the base utility with a comment noting the prefix, since those need media queries or pseudo-classes that don't fit a single flat rule.</p>
+        <div class="live-preview">
+          <div class="preview-box" id="previewBox">Preview</div>
+        </div>
+        <p class="hint">Supports common utilities for spacing (<code>p-*</code>, <code>m-*</code>, <code>gap-*</code>), flex/grid/typography/effects/filters/transforms/transitions, sizing, color (a curated palette subset), borders, radius, and shadow. Arbitrary values like <code>w-[220px]</code> and responsive/state prefixes (<code>md:</code>, <code>hover:</code>) are converted using the base utility with a comment noting the prefix, since those need media queries or pseudo-classes that don't fit a single flat rule.</p>
       </main>
 
       <p class="footer-note">Part of <a href="https://github.com/praveenscience/One-File-Tools">One File Tools</a>. Runs completely offline.</p>
@@ -276,6 +333,9 @@ Built for One File Tools.
       const cssOutput = document.getElementById("cssOutput");
       const unmatchedBox = document.getElementById("unmatchedBox");
       const btnCopy = document.getElementById("btnCopy");
+      const groupByCategoryToggle = document.getElementById("groupByCategory");
+      const minifyToggle = document.getElementById("minifyOutput");
+      const previewBox = document.getElementById("previewBox");
 
       // Tailwind's default spacing scale (in rem), used for p-*, m-*, gap-*, etc.
       const SPACING = {
@@ -368,61 +428,116 @@ Built for One File Tools.
         none: "none"
       };
 
+      // Tailwind's default duration/timing-function scales, used for transition-*.
+      const DURATION = { 75: "75ms", 100: "100ms", 150: "150ms", 200: "200ms", 300: "300ms", 500: "500ms", 700: "700ms", 1000: "1000ms" };
+      const EASE = {
+        linear: "linear",
+        in: "cubic-bezier(0.4, 0, 1, 1)",
+        out: "cubic-bezier(0, 0, 0.2, 1)",
+        "in-out": "cubic-bezier(0.4, 0, 0.2, 1)"
+      };
+
       /**
        * Converts a single Tailwind utility class (no responsive/state prefix)
-       * into one or more CSS declarations. Returns null when unrecognized.
+       * into a category tag plus one or more CSS declarations. Returns null
+       * when unrecognized. Each result has the shape { category, decls }
+       * where decls is an array of [property, value] pairs.
        */
       function convertClass(cls) {
-        // Flex / display / position keywords.
+        const cat = (category, decls) => ({ category, decls });
+
+        // Layout / flex / grid / typography / position keywords.
         const KEYWORD_MAP = {
-          flex: [["display", "flex"]],
-          "inline-flex": [["display", "inline-flex"]],
-          grid: [["display", "grid"]],
-          block: [["display", "block"]],
-          "inline-block": [["display", "inline-block"]],
-          hidden: [["display", "none"]],
-          "items-center": [["align-items", "center"]],
-          "items-start": [["align-items", "flex-start"]],
-          "items-end": [["align-items", "flex-end"]],
-          "items-stretch": [["align-items", "stretch"]],
-          "justify-center": [["justify-content", "center"]],
-          "justify-between": [["justify-content", "space-between"]],
-          "justify-around": [["justify-content", "space-around"]],
-          "justify-start": [["justify-content", "flex-start"]],
-          "justify-end": [["justify-content", "flex-end"]],
-          "flex-col": [["flex-direction", "column"]],
-          "flex-row": [["flex-direction", "row"]],
-          "flex-wrap": [["flex-wrap", "wrap"]],
-          "flex-nowrap": [["flex-wrap", "nowrap"]],
-          "text-center": [["text-align", "center"]],
-          "text-left": [["text-align", "left"]],
-          "text-right": [["text-align", "right"]],
-          "font-bold": [["font-weight", "700"]],
-          "font-semibold": [["font-weight", "600"]],
-          "font-medium": [["font-weight", "500"]],
-          "font-normal": [["font-weight", "400"]],
-          italic: [["font-style", "italic"]],
-          underline: [["text-decoration", "underline"]],
-          uppercase: [["text-transform", "uppercase"]],
-          lowercase: [["text-transform", "lowercase"]],
-          capitalize: [["text-transform", "capitalize"]],
-          relative: [["position", "relative"]],
-          absolute: [["position", "absolute"]],
-          fixed: [["position", "fixed"]],
-          sticky: [["position", "sticky"]],
-          border: [
+          flex: cat("Flexbox", [["display", "flex"]]),
+          "inline-flex": cat("Flexbox", [["display", "inline-flex"]]),
+          grid: cat("Grid", [["display", "grid"]]),
+          block: cat("Layout", [["display", "block"]]),
+          "inline-block": cat("Layout", [["display", "inline-block"]]),
+          hidden: cat("Layout", [["display", "none"]]),
+          "items-center": cat("Flexbox", [["align-items", "center"]]),
+          "items-start": cat("Flexbox", [["align-items", "flex-start"]]),
+          "items-end": cat("Flexbox", [["align-items", "flex-end"]]),
+          "items-stretch": cat("Flexbox", [["align-items", "stretch"]]),
+          "justify-center": cat("Flexbox", [["justify-content", "center"]]),
+          "justify-between": cat("Flexbox", [["justify-content", "space-between"]]),
+          "justify-around": cat("Flexbox", [["justify-content", "space-around"]]),
+          "justify-start": cat("Flexbox", [["justify-content", "flex-start"]]),
+          "justify-end": cat("Flexbox", [["justify-content", "flex-end"]]),
+          "flex-col": cat("Flexbox", [["flex-direction", "column"]]),
+          "flex-row": cat("Flexbox", [["flex-direction", "row"]]),
+          "flex-wrap": cat("Flexbox", [["flex-wrap", "wrap"]]),
+          "flex-nowrap": cat("Flexbox", [["flex-wrap", "nowrap"]]),
+          "flex-1": cat("Flexbox", [["flex", "1 1 0%"]]),
+          "flex-auto": cat("Flexbox", [["flex", "1 1 auto"]]),
+          "flex-none": cat("Flexbox", [["flex", "none"]]),
+          "grid-flow-row": cat("Grid", [["grid-auto-flow", "row"]]),
+          "grid-flow-col": cat("Grid", [["grid-auto-flow", "column"]]),
+          "place-items-center": cat("Grid", [["place-items", "center"]]),
+          "text-center": cat("Typography", [["text-align", "center"]]),
+          "text-left": cat("Typography", [["text-align", "left"]]),
+          "text-right": cat("Typography", [["text-align", "right"]]),
+          "font-bold": cat("Typography", [["font-weight", "700"]]),
+          "font-semibold": cat("Typography", [["font-weight", "600"]]),
+          "font-medium": cat("Typography", [["font-weight", "500"]]),
+          "font-normal": cat("Typography", [["font-weight", "400"]]),
+          italic: cat("Typography", [["font-style", "italic"]]),
+          underline: cat("Typography", [["text-decoration", "underline"]]),
+          uppercase: cat("Typography", [["text-transform", "uppercase"]]),
+          lowercase: cat("Typography", [["text-transform", "lowercase"]]),
+          capitalize: cat("Typography", [["text-transform", "capitalize"]]),
+          "leading-none": cat("Typography", [["line-height", "1"]]),
+          "leading-tight": cat("Typography", [["line-height", "1.25"]]),
+          "leading-normal": cat("Typography", [["line-height", "1.5"]]),
+          "tracking-tight": cat("Typography", [["letter-spacing", "-0.025em"]]),
+          "tracking-wide": cat("Typography", [["letter-spacing", "0.025em"]]),
+          relative: cat("Layout", [["position", "relative"]]),
+          absolute: cat("Layout", [["position", "absolute"]]),
+          fixed: cat("Layout", [["position", "fixed"]]),
+          sticky: cat("Layout", [["position", "sticky"]]),
+          border: cat("Borders", [
             ["border-width", "1px"],
             ["border-style", "solid"]
-          ],
-          "w-full": [["width", "100%"]],
-          "h-full": [["height", "100%"]],
-          "w-screen": [["width", "100vw"]],
-          "h-screen": [["height", "100vh"]],
-          truncate: [
+          ]),
+          "w-full": cat("Sizing", [["width", "100%"]]),
+          "h-full": cat("Sizing", [["height", "100%"]]),
+          "w-screen": cat("Sizing", [["width", "100vw"]]),
+          "h-screen": cat("Sizing", [["height", "100vh"]]),
+          truncate: cat("Typography", [
             ["overflow", "hidden"],
             ["text-overflow", "ellipsis"],
             ["white-space", "nowrap"]
-          ]
+          ]),
+          // Effects
+          "shadow-inner": cat("Effects", [["box-shadow", "inset 0 2px 4px 0 rgb(0 0 0 / 0.05)"]]),
+          "mix-blend-normal": cat("Effects", [["mix-blend-mode", "normal"]]),
+          "mix-blend-multiply": cat("Effects", [["mix-blend-mode", "multiply"]]),
+          // Filters
+          "blur-none": cat("Filters", [["filter", "blur(0)"]]),
+          blur: cat("Filters", [["filter", "blur(8px)"]]),
+          "blur-sm": cat("Filters", [["filter", "blur(4px)"]]),
+          "blur-lg": cat("Filters", [["filter", "blur(16px)"]]),
+          grayscale: cat("Filters", [["filter", "grayscale(100%)"]]),
+          "backdrop-blur-sm": cat("Filters", [["backdrop-filter", "blur(4px)"]]),
+          "backdrop-blur": cat("Filters", [["backdrop-filter", "blur(8px)"]]),
+          // Transforms
+          "scale-100": cat("Transforms", [["transform", "scale(1)"]]),
+          "scale-95": cat("Transforms", [["transform", "scale(0.95)"]]),
+          "scale-105": cat("Transforms", [["transform", "scale(1.05)"]]),
+          "scale-110": cat("Transforms", [["transform", "scale(1.1)"]]),
+          "rotate-0": cat("Transforms", [["transform", "rotate(0deg)"]]),
+          "rotate-45": cat("Transforms", [["transform", "rotate(45deg)"]]),
+          "rotate-90": cat("Transforms", [["transform", "rotate(90deg)"]]),
+          "rotate-180": cat("Transforms", [["transform", "rotate(180deg)"]]),
+          "translate-x-0": cat("Transforms", [["transform", "translateX(0)"]]),
+          "-translate-x-full": cat("Transforms", [["transform", "translateX(-100%)"]]),
+          "translate-x-full": cat("Transforms", [["transform", "translateX(100%)"]]),
+          // Transitions
+          "transition-none": cat("Transitions", [["transition-property", "none"]]),
+          transition: cat("Transitions", [["transition-property", "color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter"]]),
+          "transition-all": cat("Transitions", [["transition-property", "all"]]),
+          "transition-colors": cat("Transitions", [["transition-property", "color, background-color, border-color, text-decoration-color, fill, stroke"]]),
+          "transition-opacity": cat("Transitions", [["transition-property", "opacity"]]),
+          "transition-transform": cat("Transitions", [["transition-property", "transform"]])
         };
         if (KEYWORD_MAP[cls]) return KEYWORD_MAP[cls];
 
@@ -434,67 +549,79 @@ Built for One File Tools.
           const value = SPACING[scale];
           if (value === undefined) return null;
           const signedValue = neg && value !== "0px" ? "-" + value : value;
-          if (!axis) return [[prop, signedValue]];
+          if (!axis) return cat("Spacing", [[prop, signedValue]]);
           if (axis === "x")
-            return [
+            return cat("Spacing", [
               [prop + "-left", signedValue],
               [prop + "-right", signedValue]
-            ];
+            ]);
           if (axis === "y")
-            return [
+            return cat("Spacing", [
               [prop + "-top", signedValue],
               [prop + "-bottom", signedValue]
-            ];
+            ]);
           const sideMap = { t: "top", r: "right", b: "bottom", l: "left" };
-          return [[prop + "-" + sideMap[axis], signedValue]];
+          return cat("Spacing", [[prop + "-" + sideMap[axis], signedValue]]);
         }
 
         match = cls.match(/^gap-(\d+(?:\.\d+)?|px)$/);
-        if (match && SPACING[match[1]] !== undefined) return [["gap", SPACING[match[1]]]];
+        if (match && SPACING[match[1]] !== undefined) return cat("Grid", [["gap", SPACING[match[1]]]]);
 
         match = cls.match(/^gap-x-(\d+(?:\.\d+)?|px)$/);
-        if (match && SPACING[match[1]] !== undefined) return [["column-gap", SPACING[match[1]]]];
+        if (match && SPACING[match[1]] !== undefined) return cat("Grid", [["column-gap", SPACING[match[1]]]]);
 
         match = cls.match(/^gap-y-(\d+(?:\.\d+)?|px)$/);
-        if (match && SPACING[match[1]] !== undefined) return [["row-gap", SPACING[match[1]]]];
+        if (match && SPACING[match[1]] !== undefined) return cat("Grid", [["row-gap", SPACING[match[1]]]]);
+
+        // Grid columns/rows: grid-cols-*, grid-rows-*.
+        match = cls.match(/^grid-cols-(\d+)$/);
+        if (match) return cat("Grid", [["grid-template-columns", "repeat(" + match[1] + ", minmax(0, 1fr))"]]);
+
+        match = cls.match(/^grid-rows-(\d+)$/);
+        if (match) return cat("Grid", [["grid-template-rows", "repeat(" + match[1] + ", minmax(0, 1fr))"]]);
+
+        match = cls.match(/^col-span-(\d+)$/);
+        if (match) return cat("Grid", [["grid-column", "span " + match[1] + " / span " + match[1]]]);
+
+        match = cls.match(/^row-span-(\d+)$/);
+        if (match) return cat("Grid", [["grid-row", "span " + match[1] + " / span " + match[1]]]);
 
         // Width / height using the spacing scale or fractions.
         match = cls.match(/^(w|h)-(\d+(?:\.\d+)?|px)$/);
         if (match && SPACING[match[2]] !== undefined) {
-          return [[match[1] === "w" ? "width" : "height", SPACING[match[2]]]];
+          return cat("Sizing", [[match[1] === "w" ? "width" : "height", SPACING[match[2]]]]);
         }
         match = cls.match(/^(w|h)-(\d+)\/(\d+)$/);
         if (match) {
           const pct = (parseInt(match[2], 10) / parseInt(match[3], 10)) * 100;
-          return [[match[1] === "w" ? "width" : "height", pct.toFixed(4).replace(/0+$/, "").replace(/\.$/, "") + "%"]];
+          return cat("Sizing", [[match[1] === "w" ? "width" : "height", pct.toFixed(4).replace(/0+$/, "").replace(/\.$/, "") + "%"]]);
         }
 
         // Colors: bg-*, text-*, border-*.
         match = cls.match(/^bg-(.+)$/);
-        if (match && COLORS[match[1]]) return [["background-color", COLORS[match[1]]]];
-
-        match = cls.match(/^text-(.+)$/);
-        if (match && COLORS[match[1]]) return [["color", COLORS[match[1]]]];
+        if (match && COLORS[match[1]]) return cat("Color", [["background-color", COLORS[match[1]]]]);
 
         match = cls.match(/^border-(.+)$/);
-        if (match && COLORS[match[1]]) return [["border-color", COLORS[match[1]]]];
+        if (match && COLORS[match[1]]) return cat("Borders", [["border-color", COLORS[match[1]]]]);
 
-        // Font size (with matching Tailwind line-height).
+        // text-* is ambiguous between color and font-size in real Tailwind;
+        // resolve font-size first (keyword scale), then fall back to color.
         match = cls.match(/^text-(.+)$/);
         if (match && FONT_SIZE[match[1]]) {
           const [size, lineHeight] = FONT_SIZE[match[1]];
-          return [
+          return cat("Typography", [
             ["font-size", size],
             ["line-height", lineHeight]
-          ];
+          ]);
         }
+        if (match && COLORS[match[1]]) return cat("Color", [["color", COLORS[match[1]]]]);
 
         // Border radius: rounded, rounded-md, rounded-t-lg, etc. (corners simplified to full radius).
         match = cls.match(/^rounded(?:-(t|r|b|l|tl|tr|br|bl))?(?:-(.+))?$/);
         if (match && (match[0] === "rounded" || RADIUS[match[2] || "DEFAULT"] !== undefined)) {
           const size = RADIUS[match[2] || "DEFAULT"];
           if (size === undefined) return null;
-          return [["border-radius", size]];
+          return cat("Borders", [["border-radius", size]]);
         }
 
         // Shadow.
@@ -502,29 +629,70 @@ Built for One File Tools.
         if (match) {
           const size = SHADOW[match[1] || "DEFAULT"];
           if (size === undefined) return null;
-          return [["box-shadow", size]];
+          return cat("Effects", [["box-shadow", size]]);
         }
 
         // Opacity.
         match = cls.match(/^opacity-(\d+)$/);
-        if (match) return [["opacity", (parseInt(match[1], 10) / 100).toString()]];
+        if (match) return cat("Effects", [["opacity", (parseInt(match[1], 10) / 100).toString()]]);
 
         // z-index.
         match = cls.match(/^z-(\d+)$/);
-        if (match) return [["z-index", match[1]]];
+        if (match) return cat("Layout", [["z-index", match[1]]]);
+
+        // Filters: blur-*, brightness-*, grayscale-*.
+        match = cls.match(/^brightness-(\d+)$/);
+        if (match) return cat("Filters", [["filter", "brightness(" + parseInt(match[1], 10) / 100 + ")"]]);
+
+        match = cls.match(/^contrast-(\d+)$/);
+        if (match) return cat("Filters", [["filter", "contrast(" + parseInt(match[1], 10) / 100 + ")"]]);
+
+        // Transforms: scale-*, rotate-*, translate-x-*/-y-*.
+        match = cls.match(/^scale-(\d+)$/);
+        if (match) return cat("Transforms", [["transform", "scale(" + parseInt(match[1], 10) / 100 + ")"]]);
+
+        match = cls.match(/^(-?)rotate-(\d+)$/);
+        if (match) return cat("Transforms", [["transform", "rotate(" + (match[1] ? "-" : "") + match[2] + "deg)"]]);
+
+        match = cls.match(/^(-?)translate-(x|y)-(\d+(?:\.\d+)?|px)$/);
+        if (match && SPACING[match[3]] !== undefined) {
+          const axisFn = match[2] === "x" ? "translateX" : "translateY";
+          const value = SPACING[match[3]];
+          const signed = match[1] && value !== "0px" ? "-" + value : value;
+          return cat("Transforms", [["transform", axisFn + "(" + signed + ")"]]);
+        }
+
+        // Transitions: duration-*, ease-*, delay-*.
+        match = cls.match(/^duration-(\d+)$/);
+        if (match && DURATION[match[1]]) return cat("Transitions", [["transition-duration", DURATION[match[1]]]]);
+
+        match = cls.match(/^delay-(\d+)$/);
+        if (match && DURATION[match[1]]) return cat("Transitions", [["transition-delay", DURATION[match[1]]]]);
+
+        match = cls.match(/^ease-(linear|in|out|in-out)$/);
+        if (match && EASE[match[1]]) return cat("Transitions", [["transition-timing-function", EASE[match[1]]]]);
 
         return null;
       }
+
+      // Preferred category display order, used both for grouped output and
+      // to keep unrelated categories visually predictable.
+      const CATEGORY_ORDER = ["Layout", "Flexbox", "Grid", "Sizing", "Spacing", "Typography", "Color", "Borders", "Effects", "Filters", "Transforms", "Transitions"];
 
       /**
        * Parses a class string, converting each token. Tokens with a
        * responsive/state prefix (e.g. "md:", "hover:") are converted using the
        * base utility, with the prefix noted as a trailing comment since a
        * single flat rule can't express a media query or pseudo-class.
+       *
+       * Declarations are deduplicated by CSS property: when two classes set
+       * the same property (e.g. "p-4 p-2"), the later class in the input
+       * wins and the earlier one is dropped, matching how conflicting
+       * utility classes behave when Tailwind's own cascade is bypassed.
        */
       function convertClasses(classString) {
         const tokens = classString.trim().split(/\s+/).filter(Boolean);
-        const declarations = [];
+        const byProp = new Map(); // prop -> declaration (last write wins)
         const unmatched = [];
 
         tokens.forEach((token) => {
@@ -538,25 +706,74 @@ Built for One File Tools.
             return;
           }
 
-          result.forEach(([prop, value]) => {
-            declarations.push({ prop, value, note: prefix ? "from " + prefix + ":" + baseClass : null });
+          result.decls.forEach(([prop, value]) => {
+            byProp.set(prop, { prop, value, category: result.category, note: prefix ? "from " + prefix + ":" + baseClass : null });
           });
         });
 
+        const declarations = Array.from(byProp.values());
         return { declarations, unmatched };
       }
 
-      /** Renders the declarations as a CSS rule block and lists unmatched classes. */
+      /** Groups declarations by category, preserving CATEGORY_ORDER, with any unknown category last. */
+      function groupDeclarations(declarations) {
+        const groups = new Map();
+        declarations.forEach((decl) => {
+          const key = decl.category || "Other";
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key).push(decl);
+        });
+
+        const orderedKeys = [...CATEGORY_ORDER.filter((c) => groups.has(c)), ...[...groups.keys()].filter((c) => !CATEGORY_ORDER.includes(c))];
+        return orderedKeys.map((category) => ({ category, decls: groups.get(category) }));
+      }
+
+      /** Builds the formatted (non-minified) CSS rule text. */
+      function buildFormattedCss(selector, declarations, grouped) {
+        if (declarations.length === 0) return "";
+
+        if (!grouped) {
+          const lines = declarations.map((d) => "  " + d.prop + ": " + d.value + ";" + (d.note ? "  /* " + d.note + " */" : ""));
+          return selector + " {\n" + lines.join("\n") + "\n}";
+        }
+
+        const groups = groupDeclarations(declarations);
+        const blocks = groups.map((g) => {
+          const lines = g.decls.map((d) => "  " + d.prop + ": " + d.value + ";" + (d.note ? "  /* " + d.note + " */" : ""));
+          return "  /* " + g.category + " */\n" + lines.join("\n");
+        });
+        return selector + " {\n" + blocks.join("\n\n") + "\n}";
+      }
+
+      /** Builds a minified single-line version of the CSS rule (no comments). */
+      function buildMinifiedCss(selector, declarations) {
+        if (declarations.length === 0) return "";
+        const body = declarations.map((d) => d.prop + ":" + d.value).join(";");
+        return selector + "{" + body + ";}";
+      }
+
+      /** Applies a curated subset of the converted declarations to the live preview box. */
+      function updatePreview(declarations) {
+        previewBox.removeAttribute("style");
+        previewBox.className = "preview-box";
+        declarations.forEach((d) => {
+          try {
+            previewBox.style.setProperty(d.prop, d.value);
+          } catch {
+            /* Ignore properties the browser can't apply directly (e.g. unsupported shorthand). */
+          }
+        });
+      }
+
+      /** Renders the declarations as a CSS rule block, unmatched list, and live preview. */
       function render() {
         const selector = selectorInput.value.trim() || ".element";
         const { declarations, unmatched } = convertClasses(classInput.value);
 
-        if (declarations.length === 0) {
-          cssOutput.textContent = "";
-        } else {
-          const lines = declarations.map((d) => "  " + d.prop + ": " + d.value + ";" + (d.note ? "  /* " + d.note + " */" : ""));
-          cssOutput.textContent = selector + " {\n" + lines.join("\n") + "\n}";
-        }
+        const grouped = groupByCategoryToggle.checked;
+        const minified = minifyToggle.checked;
+
+        cssOutput.textContent = minified ? buildMinifiedCss(selector, declarations) : buildFormattedCss(selector, declarations, grouped);
 
         if (unmatched.length > 0) {
           unmatchedBox.hidden = false;
@@ -564,16 +781,38 @@ Built for One File Tools.
         } else {
           unmatchedBox.hidden = true;
         }
+
+        updatePreview(declarations);
       }
 
       classInput.addEventListener("input", render);
       selectorInput.addEventListener("input", render);
+      groupByCategoryToggle.addEventListener("change", render);
+      minifyToggle.addEventListener("change", render);
 
-      btnCopy.addEventListener("click", () => {
+      // Minifying and grouping are mutually exclusive presentations of the
+      // same declarations — disable grouping while minified since a
+      // single-line rule has no room for category comments.
+      minifyToggle.addEventListener("change", () => {
+        groupByCategoryToggle.disabled = minifyToggle.checked;
+      });
+
+      btnCopy.addEventListener("click", async () => {
         const text = cssOutput.textContent;
         if (!text) return;
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(text).catch(() => {});
+        try {
+          await navigator.clipboard.writeText(text);
+          const original = btnCopy.textContent;
+          btnCopy.textContent = "Copied!";
+          setTimeout(() => {
+            btnCopy.textContent = original;
+          }, 1500);
+        } catch {
+          // Clipboard API unavailable/blocked — fail gracefully, no throw.
+          btnCopy.textContent = "Copy failed";
+          setTimeout(() => {
+            btnCopy.textContent = "Copy";
+          }, 1500);
         }
       });
 
