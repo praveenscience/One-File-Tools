@@ -267,6 +267,103 @@
         transform: translateY(0);
         opacity: 1;
       }
+      /* Validation states */
+      .url-card.has-error input[name="loc"] {
+        border-color: var(--danger);
+        box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+      }
+      .field-error {
+        color: var(--danger);
+        font-size: 0.75rem;
+        margin-top: 0.25rem;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-size: 0.7rem;
+        font-weight: 600;
+        padding: 0.125rem 0.5rem;
+        border-radius: 999px;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+      }
+      .badge-duplicate {
+        background: #fef3c7;
+        color: #92400e;
+      }
+      .badge-error {
+        background: #fee2e2;
+        color: var(--danger);
+      }
+      .url-card-header-left {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+      /* Stats bar */
+      .stats-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        color: #cbd5e1;
+        font-size: 0.8rem;
+      }
+      .stats-bar strong {
+        color: white;
+      }
+      .stats-bar .stat-warning strong {
+        color: #fbbf24;
+      }
+      .stats-bar .stat-error strong {
+        color: #f87171;
+      }
+      .limit-banner {
+        display: none;
+        align-items: center;
+        gap: 0.5rem;
+        background: #fef3c7;
+        color: #92400e;
+        border: 1px solid #fde68a;
+        border-radius: var(--radius);
+        padding: 0.625rem 0.875rem;
+        font-size: 0.8rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+      }
+      .limit-banner.show {
+        display: flex;
+      }
+      .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+      }
+      /* Responsive tweaks for small screens */
+      @media (max-width: 480px) {
+        body {
+          padding: 1rem;
+        }
+        .url-card [style*="grid-template-columns: 1fr 1fr"] {
+          grid-template-columns: 1fr !important;
+        }
+        .actions-bar {
+          flex-direction: column;
+        }
+        .actions-bar .btn {
+          width: 100%;
+        }
+        .stats-bar {
+          flex-direction: column;
+          gap: 0.375rem;
+        }
+      }
     </style>
   </head>
   <body>
@@ -276,6 +373,10 @@
     </header>
     <div class="layout">
       <div class="controls-pane">
+        <div id="limit-banner" class="limit-banner" role="alert">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"></path></svg>
+          <span id="limit-banner-text"></span>
+        </div>
         <div id="url-list" class="url-list"></div>
 
         <button id="btn-add-url" class="btn btn-outline" style="border-style: dashed; padding: 1rem">
@@ -320,6 +421,12 @@
             sitemap.xml
           </div>
         </div>
+        <div class="stats-bar" id="stats-bar" aria-live="polite">
+          <span>URLs: <strong id="stat-count">0</strong></span>
+          <span>Est. size: <strong id="stat-size">0 B</strong></span>
+          <span class="stat-warning" id="stat-duplicates-wrap" style="display: none">Duplicates: <strong id="stat-duplicates">0</strong></span>
+          <span class="stat-error" id="stat-invalid-wrap" style="display: none">Invalid URLs: <strong id="stat-invalid">0</strong></span>
+        </div>
         <div class="preview-content">
           <pre><code id="xml-output"></code></pre>
         </div>
@@ -355,8 +462,21 @@
         bulkContainer: document.getElementById("bulk-import-container"),
         bulkIcon: document.getElementById("bulk-import-icon"),
         bulkInput: document.getElementById("bulk-urls-input"),
-        btnImportUrls: document.getElementById("btn-import-urls")
+        btnImportUrls: document.getElementById("btn-import-urls"),
+        // Stats + limit banner
+        limitBanner: document.getElementById("limit-banner"),
+        limitBannerText: document.getElementById("limit-banner-text"),
+        statCount: document.getElementById("stat-count"),
+        statSize: document.getElementById("stat-size"),
+        statDuplicates: document.getElementById("stat-duplicates"),
+        statDuplicatesWrap: document.getElementById("stat-duplicates-wrap"),
+        statInvalid: document.getElementById("stat-invalid"),
+        statInvalidWrap: document.getElementById("stat-invalid-wrap")
       };
+
+      // Sitemaps.org / Google-documented limit for a single sitemap file.
+      const SITEMAP_URL_LIMIT = 50000;
+      const SITEMAP_WARNING_THRESHOLD = 0.9; // warn at 90% of the limit
 
       /**
        * CORE LOGIC
@@ -444,52 +564,110 @@
       }
 
       /**
+       * VALIDATION
+       * Normalizes each URL the same way generateXMLString() does, then
+       * flags invalid URLs and duplicates so the UI and stats stay in sync
+       * with what will actually be written to the sitemap.
+       */
+      function normalizeUrl(rawUrl) {
+        let safeUrl = (rawUrl || "").trim();
+        if (safeUrl && !safeUrl.match(/^https?:\/\//)) {
+          safeUrl = "https://" + safeUrl;
+        }
+        return safeUrl;
+      }
+
+      function isValidUrl(candidate) {
+        if (!candidate) return false;
+        try {
+          const parsed = new URL(candidate);
+          return parsed.protocol === "http:" || parsed.protocol === "https:";
+        } catch (err) {
+          return false;
+        }
+      }
+
+      // Returns a map of entry id -> { invalid, duplicate } plus aggregate counts.
+      function computeValidation() {
+        const normalized = sitemapData.map((item) => normalizeUrl(item.loc));
+        const seenCount = {};
+        normalized.forEach((url) => {
+          if (!url) return;
+          const key = url.toLowerCase();
+          seenCount[key] = (seenCount[key] || 0) + 1;
+        });
+
+        const perEntry = {};
+        let invalidCount = 0;
+        let duplicateCount = 0;
+
+        sitemapData.forEach((item, index) => {
+          const url = normalized[index];
+          const invalid = !isValidUrl(url);
+          const duplicate = !invalid && seenCount[url.toLowerCase()] > 1;
+          if (invalid) invalidCount++;
+          if (duplicate) duplicateCount++;
+          perEntry[item.id] = { invalid, duplicate };
+        });
+
+        return { perEntry, invalidCount, duplicateCount };
+      }
+
+      /**
        * UI RENDERING
        */
       function renderAllCards() {
+        const { perEntry } = computeValidation();
+
         DOM.list.innerHTML = sitemapData
-          .map(
-            (item, index) => `
-        <div class="url-card" data-id="${item.id}">
+          .map((item, index) => {
+            const status = perEntry[item.id] || { invalid: false, duplicate: false };
+            const badges = [];
+            if (status.invalid && item.loc.trim()) badges.push('<span class="badge badge-error">Invalid URL</span>');
+            if (status.duplicate) badges.push('<span class="badge badge-duplicate">Duplicate</span>');
+
+            return `
+        <div class="url-card ${status.invalid ? "has-error" : ""}" data-id="${item.id}">
           <div class="url-card-header">
-            URL Entry #${index + 1}
+            <span class="url-card-header-left">URL Entry #${index + 1} ${badges.join(" ")}</span>
             ${
               sitemapData.length > 1
                 ? `
-            <button class="btn-remove" onclick="removeUrlEntry('${item.id}')" aria-label="Remove URL">
+            <button class="btn-remove" onclick="removeUrlEntry('${item.id}')" aria-label="Remove URL entry #${index + 1}">
               <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
             </button>`
                 : ""
             }
           </div>
-          
+
           <div class="input-group">
-            <label>Page URL (loc)</label>
-            <input type="url" name="loc" value="${item.loc}" placeholder="https://www.example.com/page" required />
+            <label for="loc-${item.id}">Page URL (loc)</label>
+            <input type="url" id="loc-${item.id}" name="loc" value="${item.loc}" placeholder="https://www.example.com/page" aria-describedby="loc-error-${item.id}" required />
+            ${status.invalid && item.loc.trim() ? `<p class="field-error" id="loc-error-${item.id}">Enter a valid http(s) URL.</p>` : `<p class="field-error visually-hidden" id="loc-error-${item.id}"></p>`}
           </div>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
             <div class="input-group">
-              <label>Last Modified</label>
-              <input type="date" name="lastmod" value="${item.lastmod}" />
+              <label for="lastmod-${item.id}">Last Modified</label>
+              <input type="date" id="lastmod-${item.id}" name="lastmod" value="${item.lastmod}" />
             </div>
-            
+
             <div class="input-group">
-              <label>Change Frequency</label>
-              <select name="changefreq">
+              <label for="changefreq-${item.id}">Change Frequency</label>
+              <select id="changefreq-${item.id}" name="changefreq">
                 ${["always", "hourly", "daily", "weekly", "monthly", "yearly", "never"].map((freq) => `<option value="${freq}" ${item.changefreq === freq ? "selected" : ""}>${freq.charAt(0).toUpperCase() + freq.slice(1)}</option>`).join("")}
               </select>
             </div>
           </div>
           <div class="input-group" style="margin-top: 0.875rem;">
             <div class="range-header">
-              <label>Priority</label>
+              <label for="priority-${item.id}">Priority</label>
               <span class="priority-val" style="font-weight:600; color:var(--primary); font-size:0.875rem;">${parseFloat(item.priority).toFixed(1)}</span>
             </div>
-            <input type="range" name="priority" min="0.0" max="1.0" step="0.1" value="${item.priority}" />
+            <input type="range" id="priority-${item.id}" name="priority" min="0.0" max="1.0" step="0.1" value="${item.priority}" />
           </div>
         </div>
-      `
-          )
+      `;
+          })
           .join("");
       }
 
@@ -500,11 +678,12 @@
         let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
         xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
         sitemapData.forEach((item) => {
-          // Ensure protocol exists for valid XML (basic validation)
-          let safeUrl = item.loc.trim();
-          if (safeUrl && !safeUrl.match(/^https?:\/\//)) {
-            safeUrl = "https://" + safeUrl;
-          }
+          const safeUrl = normalizeUrl(item.loc);
+          // Skip entries that don't resolve to a valid http(s) URL — invalid
+          // entries are still shown (and flagged) in the form, but should
+          // never be written into the generated sitemap output.
+          if (!isValidUrl(safeUrl)) return;
+
           xml += `  <url>\n`;
           xml += `    <loc>${escapeXml(safeUrl)}</loc>\n`;
           if (item.lastmod) xml += `    <lastmod>${escapeXml(item.lastmod)}</lastmod>\n`;
@@ -516,9 +695,73 @@
         return xml;
       }
 
+      // Formats a byte count as a human-readable size string.
+      function formatBytes(bytes) {
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+      }
+
+      function updateStats(rawXml, validation) {
+        const byteSize = new Blob([rawXml]).size;
+        DOM.statCount.textContent = String(sitemapData.length);
+        DOM.statSize.textContent = formatBytes(byteSize);
+
+        DOM.statDuplicatesWrap.style.display = validation.duplicateCount > 0 ? "" : "none";
+        DOM.statDuplicates.textContent = String(validation.duplicateCount);
+
+        DOM.statInvalidWrap.style.display = validation.invalidCount > 0 ? "" : "none";
+        DOM.statInvalid.textContent = String(validation.invalidCount);
+
+        const ratio = sitemapData.length / SITEMAP_URL_LIMIT;
+        if (sitemapData.length >= SITEMAP_URL_LIMIT) {
+          DOM.limitBannerText.textContent = `This sitemap has reached the ${SITEMAP_URL_LIMIT.toLocaleString()} URL limit per sitemap.org/Google guidelines. Split remaining URLs into an additional sitemap file.`;
+          DOM.limitBanner.classList.add("show");
+        } else if (ratio >= SITEMAP_WARNING_THRESHOLD) {
+          DOM.limitBannerText.textContent = `Approaching the ${SITEMAP_URL_LIMIT.toLocaleString()} URL limit per sitemap (${sitemapData.length.toLocaleString()} so far). Consider splitting into multiple sitemaps soon.`;
+          DOM.limitBanner.classList.add("show");
+        } else {
+          DOM.limitBanner.classList.remove("show");
+        }
+      }
+
       function updatePreview() {
         const rawXml = generateXMLString();
         DOM.output.innerHTML = highlightXML(rawXml);
+        const validation = computeValidation();
+        updateStats(rawXml, validation);
+        updateValidationUI(validation);
+      }
+
+      // Patches badges/error state on existing cards in place (no innerHTML
+      // rebuild) so typing doesn't lose input focus or cursor position.
+      function updateValidationUI(validation) {
+        sitemapData.forEach((item, index) => {
+          const card = DOM.list.querySelector(`.url-card[data-id="${item.id}"]`);
+          if (!card) return;
+
+          const status = validation.perEntry[item.id] || { invalid: false, duplicate: false };
+          card.classList.toggle("has-error", status.invalid);
+
+          const headerLeft = card.querySelector(".url-card-header-left");
+          if (headerLeft) {
+            const badges = [];
+            if (status.invalid && item.loc.trim()) badges.push('<span class="badge badge-error">Invalid URL</span>');
+            if (status.duplicate) badges.push('<span class="badge badge-duplicate">Duplicate</span>');
+            headerLeft.innerHTML = `URL Entry #${index + 1} ${badges.join(" ")}`;
+          }
+
+          const errorEl = card.querySelector(`#loc-error-${item.id}`);
+          if (errorEl) {
+            if (status.invalid && item.loc.trim()) {
+              errorEl.textContent = "Enter a valid http(s) URL.";
+              errorEl.classList.remove("visually-hidden");
+            } else {
+              errorEl.textContent = "";
+              errorEl.classList.add("visually-hidden");
+            }
+          }
+        });
       }
 
       function escapeXml(unsafe) {
