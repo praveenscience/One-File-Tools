@@ -1,0 +1,737 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HTTP Cache-Control Simulator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg-base: #f7f5f0;
+        --bg-surface: #ffffff;
+        --text-primary: #1c1f1e;
+        --text-secondary: #6a706e;
+        --text-tertiary: #a0a5a3;
+        --border-subtle: #e8e5de;
+        --border-strong: #d1cdce;
+        --accent-primary: #3e5a57;
+        --accent-hover: #2f4442;
+        --accent-light: #ebf0ef;
+        --status-network: #3b6b8a;
+        --status-network-bg: #eaf2f8;
+        --status-cache: #4d7a5e;
+        --status-cache-bg: #edf4f0;
+        --status-reval: #9e6b31;
+        --status-reval-bg: #fdf3e7;
+        --radius-sm: 8px;
+        --radius-md: 12px;
+        --radius-lg: 16px;
+        --shadow-sm: 0 2px 8px rgba(28, 31, 30, 0.04);
+        --shadow-md: 0 8px 24px rgba(28, 31, 30, 0.06);
+        --font-sans: "Plus Jakarta Sans", sans-serif;
+        --font-mono: "Fira Code", monospace;
+        --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg-base);
+        color: var(--text-primary);
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+        padding: 48px 32px;
+        min-height: 100vh;
+      }
+
+      .container {
+        max-width: 1280px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 32px;
+      }
+
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        padding-bottom: 24px;
+        border-bottom: 1px solid var(--border-subtle);
+      }
+
+      .title-group h1 {
+        font-size: 28px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        color: var(--text-primary);
+        margin-bottom: 8px;
+      }
+
+      .title-group p {
+        font-size: 15px;
+        color: var(--text-secondary);
+      }
+
+      .clock-display {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-subtle);
+        padding: 12px 24px;
+        border-radius: var(--radius-sm);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        box-shadow: var(--shadow-sm);
+      }
+
+      .clock-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .clock-value {
+        font-family: var(--font-mono);
+        font-size: 16px;
+        font-weight: 500;
+        color: var(--accent-primary);
+      }
+
+      .grid-layout {
+        display: grid;
+        grid-template-columns: 350px 1fr 350px;
+        gap: 24px;
+        align-items: start;
+      }
+
+      .panel {
+        background: var(--bg-surface);
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border-subtle);
+        padding: 24px;
+        box-shadow: var(--shadow-sm);
+      }
+
+      .panel-header {
+        font-size: 14px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--text-primary);
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .form-group {
+        margin-bottom: 20px;
+      }
+
+      .form-group:last-child {
+        margin-bottom: 0;
+      }
+
+      .label {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        margin-bottom: 8px;
+      }
+
+      .input-text {
+        width: 100%;
+        font-family: var(--font-mono);
+        font-size: 13px;
+        padding: 10px 12px;
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-sm);
+        background: var(--bg-base);
+        color: var(--text-primary);
+        transition: var(--transition);
+      }
+
+      .input-text:focus {
+        outline: none;
+        border-color: var(--accent-primary);
+        box-shadow: 0 0 0 3px var(--accent-light);
+      }
+
+      .checkbox-group {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+
+      .checkbox-group input[type="checkbox"] {
+        appearance: none;
+        width: 18px;
+        height: 18px;
+        border: 1px solid var(--border-strong);
+        border-radius: 4px;
+        background: var(--bg-surface);
+        cursor: pointer;
+        position: relative;
+        transition: var(--transition);
+      }
+
+      .checkbox-group input[type="checkbox"]:checked {
+        background: var(--accent-primary);
+        border-color: var(--accent-primary);
+      }
+
+      .checkbox-group input[type="checkbox"]:checked::after {
+        content: "";
+        position: absolute;
+        left: 5px;
+        top: 2px;
+        width: 4px;
+        height: 8px;
+        border: solid white;
+        border-width: 0 2px 2px 0;
+        transform: rotate(45deg);
+      }
+
+      .checkbox-label {
+        font-size: 14px;
+        color: var(--text-primary);
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 10px 16px;
+        font-family: var(--font-sans);
+        font-size: 14px;
+        font-weight: 600;
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        transition: var(--transition);
+        border: none;
+        width: 100%;
+        gap: 8px;
+      }
+
+      .btn-primary {
+        background: var(--accent-primary);
+        color: #fff;
+      }
+
+      .btn-primary:hover {
+        background: var(--accent-hover);
+      }
+
+      .btn-secondary {
+        background: var(--bg-base);
+        color: var(--text-primary);
+        border: 1px solid var(--border-strong);
+      }
+
+      .btn-secondary:hover {
+        background: var(--border-subtle);
+      }
+
+      .time-controls {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        margin-top: 24px;
+      }
+
+      .resource-state {
+        background: var(--bg-base);
+        border-radius: var(--radius-sm);
+        padding: 16px;
+        margin-top: 16px;
+        border: 1px solid var(--border-subtle);
+      }
+
+      .state-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+        font-size: 13px;
+      }
+
+      .state-row:last-child {
+        margin-bottom: 0;
+      }
+
+      .state-key {
+        color: var(--text-secondary);
+      }
+
+      .state-val {
+        font-family: var(--font-mono);
+        color: var(--text-primary);
+        font-weight: 500;
+      }
+
+      .empty-state {
+        text-align: center;
+        color: var(--text-tertiary);
+        font-style: italic;
+        font-size: 14px;
+        padding: 24px 0;
+      }
+
+      .timeline {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .log-entry {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-sm);
+        overflow: hidden;
+        animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+      }
+
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .log-header {
+        padding: 16px 24px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid var(--border-subtle);
+        background: #fcfcfa;
+      }
+
+      .log-title {
+        font-weight: 600;
+        font-size: 15px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .log-badge {
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .badge-network {
+        background: var(--status-network-bg);
+        color: var(--status-network);
+      }
+
+      .badge-cache {
+        background: var(--status-cache-bg);
+        color: var(--status-cache);
+      }
+
+      .badge-reval {
+        background: var(--status-reval-bg);
+        color: var(--status-reval);
+      }
+
+      .log-time {
+        font-family: var(--font-mono);
+        font-size: 13px;
+        color: var(--text-secondary);
+      }
+
+      .log-body {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .log-section {
+        padding: 20px 24px;
+      }
+
+      .log-section:first-child {
+        border-right: 1px solid var(--border-subtle);
+      }
+
+      .log-section-title {
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-secondary);
+        margin-bottom: 12px;
+      }
+
+      .http-code {
+        font-family: var(--font-mono);
+        font-size: 13px;
+        line-height: 1.6;
+        color: var(--text-primary);
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+
+      .http-method {
+        color: #a05a8d;
+        font-weight: 500;
+      }
+      .http-header-key {
+        color: #3b6b8a;
+      }
+      .http-header-val {
+        color: #4d7a5e;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <div class="title-group">
+          <h1>HTTP Cache-Control Simulator</h1>
+          <p>Configure server headers and simulate browser navigation to visualize caching behaviors.</p>
+        </div>
+        <div class="clock-display">
+          <span class="clock-label">Simulated Time</span>
+          <span class="clock-value" id="clockDisplay">T+0s</span>
+        </div>
+      </header>
+
+      <div class="grid-layout">
+        <div class="panel">
+          <div class="panel-header">Server Configuration</div>
+
+          <div class="form-group">
+            <label class="label">Cache-Control Directives</label>
+            <div class="checkbox-group">
+              <input type="checkbox" id="noStore" />
+              <label class="checkbox-label" for="noStore">no-store</label>
+            </div>
+            <div class="checkbox-group">
+              <input type="checkbox" id="noCache" />
+              <label class="checkbox-label" for="noCache">no-cache</label>
+            </div>
+            <div class="checkbox-group">
+              <input type="checkbox" id="mustRevalidate" />
+              <label class="checkbox-label" for="mustRevalidate">must-revalidate</label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="label">max-age (seconds)</label>
+            <input type="number" id="maxAge" class="input-text" value="60" min="0" />
+          </div>
+
+          <div class="resource-state">
+            <div class="state-row">
+              <span class="state-key">Current ETag:</span>
+              <span class="state-val" id="serverEtag">"v1"</span>
+            </div>
+            <div class="state-row">
+              <span class="state-key">Last-Modified:</span>
+              <span class="state-val" id="serverLastModified">T+0s</span>
+            </div>
+            <div class="state-row">
+              <span class="state-key">Resource Data:</span>
+              <span class="state-val" id="serverData">Version 1</span>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 16px">
+            <button class="btn btn-secondary" id="btnUpdateResource">Modify Resource on Server</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">Browser Actions</div>
+
+          <div class="form-group">
+            <button class="btn btn-primary" id="btnFreshLoad" style="margin-bottom: 12px">Normal Navigation (Link Click)</button>
+            <button class="btn btn-secondary" id="btnReload" style="margin-bottom: 12px">Reload (F5)</button>
+            <button class="btn btn-secondary" id="btnBack">Back/Forward Navigation</button>
+          </div>
+
+          <div class="panel-header" style="margin-top: 32px; margin-bottom: 12px">Time Controls</div>
+          <p style="font-size: 13px; color: var(--text-secondary)">Advance time to simulate cache expiration.</p>
+          <div class="time-controls">
+            <button class="btn btn-secondary" onclick="advanceTime(1)">+1s</button>
+            <button class="btn btn-secondary" onclick="advanceTime(10)">+10s</button>
+            <button class="btn btn-secondary" onclick="advanceTime(60)">+60s</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">Browser Cache Storage</div>
+          <div id="cacheStateContainer">
+            <div class="empty-state">Cache is currently empty</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline" id="timelineContainer"></div>
+    </div>
+
+    <script>
+      let clock = 0;
+      let versionCounter = 1;
+
+      const serverState = {
+        etag: '"v1"',
+        lastModified: 0,
+        data: "Version 1"
+      };
+
+      let browserCache = null;
+
+      const clockDisplay = document.getElementById("clockDisplay");
+      const serverEtagDisplay = document.getElementById("serverEtag");
+      const serverLastModifiedDisplay = document.getElementById("serverLastModified");
+      const serverDataDisplay = document.getElementById("serverData");
+      const cacheStateContainer = document.getElementById("cacheStateContainer");
+      const timelineContainer = document.getElementById("timelineContainer");
+
+      function updateDisplays() {
+        clockDisplay.textContent = `T+${clock}s`;
+        serverEtagDisplay.textContent = serverState.etag;
+        serverLastModifiedDisplay.textContent = `T+${serverState.lastModified}s`;
+        serverDataDisplay.textContent = serverState.data;
+        renderCacheState();
+      }
+
+      function advanceTime(seconds) {
+        clock += seconds;
+        updateDisplays();
+      }
+
+      document.getElementById("btnUpdateResource").addEventListener("click", () => {
+        versionCounter++;
+        serverState.etag = `"v${versionCounter}"`;
+        serverState.lastModified = clock;
+        serverState.data = `Version ${versionCounter}`;
+        updateDisplays();
+      });
+
+      function getCacheControlString() {
+        const parts = [];
+        if (document.getElementById("noStore").checked) parts.push("no-store");
+        if (document.getElementById("noCache").checked) parts.push("no-cache");
+        if (document.getElementById("mustRevalidate").checked) parts.push("must-revalidate");
+        const maxAge = document.getElementById("maxAge").value;
+        if (maxAge !== "" && !document.getElementById("noStore").checked) {
+          parts.push(`max-age=${maxAge}`);
+        }
+        return parts.join(", ");
+      }
+
+      function renderCacheState() {
+        if (!browserCache) {
+          cacheStateContainer.innerHTML = `<div class="empty-state">Cache is currently empty</div>`;
+          return;
+        }
+
+        const age = clock - browserCache.cachedAt;
+        const isStale = browserCache.noCache || age >= browserCache.maxAge;
+
+        cacheStateContainer.innerHTML = `
+    <div class="resource-state" style="margin-top: 0;">
+      <div class="state-row">
+        <span class="state-key">Stored Data:</span>
+        <span class="state-val">${browserCache.data}</span>
+      </div>
+      <div class="state-row">
+        <span class="state-key">ETag:</span>
+        <span class="state-val">${browserCache.etag}</span>
+      </div>
+      <div class="state-row">
+        <span class="state-key">Last-Modified:</span>
+        <span class="state-val">T+${browserCache.lastModified}s</span>
+      </div>
+      <div class="state-row">
+        <span class="state-key">Cached At:</span>
+        <span class="state-val">T+${browserCache.cachedAt}s</span>
+      </div>
+      <div class="state-row">
+        <span class="state-key">Current Age:</span>
+        <span class="state-val">${age}s</span>
+      </div>
+      <div class="state-row">
+        <span class="state-key">Freshness:</span>
+        <span class="state-val" style="color: ${isStale ? "#9E6B31" : "#4D7A5E"}">${isStale ? "Stale" : "Fresh"}</span>
+      </div>
+    </div>
+  `;
+      }
+
+      function createLogEntry(type, title, reqHeaders, resHeaders, statusType, statusCode, statusText, body) {
+        const entry = document.createElement("div");
+        entry.className = "log-entry";
+
+        let badgeClass = "";
+        let badgeText = "";
+
+        if (statusType === "cache") {
+          badgeClass = "badge-cache";
+          badgeText = "CACHE HIT";
+        } else if (statusType === "reval") {
+          badgeClass = "badge-reval";
+          badgeText = "REVALIDATED";
+        } else {
+          badgeClass = "badge-network";
+          badgeText = "NETWORK FETCH";
+        }
+
+        const reqHtml = Object.entries(reqHeaders)
+          .map(([k, v]) => `<span class="http-header-key">${k}:</span> <span class="http-header-val">${v}</span>`)
+          .join("\n");
+
+        const resHtml = Object.entries(resHeaders)
+          .map(([k, v]) => `<span class="http-header-key">${k}:</span> <span class="http-header-val">${v}</span>`)
+          .join("\n");
+
+        entry.innerHTML = `
+    <div class="log-header">
+      <div class="log-title">
+        ${title}
+        <span class="log-badge ${badgeClass}">${badgeText}</span>
+      </div>
+      <div class="log-time">T+${clock}s</div>
+    </div>
+    <div class="log-body">
+      <div class="log-section">
+        <div class="log-section-title">Request</div>
+        <div class="http-code"><span class="http-method">GET</span> /resource HTTP/1.1\nHost: example.com\n${reqHtml}</div>
+      </div>
+      <div class="log-section">
+        <div class="log-section-title">Response</div>
+        <div class="http-code">HTTP/1.1 <span style="font-weight:700">${statusCode} ${statusText}</span>\n${resHtml}\n\n${body}</div>
+      </div>
+    </div>
+  `;
+
+        timelineContainer.insertBefore(entry, timelineContainer.firstChild);
+      }
+
+      function simulateRequest(navigationType) {
+        const isNoStore = document.getElementById("noStore").checked;
+        const isNoCache = document.getElementById("noCache").checked;
+        const maxAgeVal = parseInt(document.getElementById("maxAge").value, 10) || 0;
+
+        let reqHeaders = {};
+        let useCache = false;
+        let revalidate = false;
+
+        if (browserCache) {
+          const age = clock - browserCache.cachedAt;
+          const isStale = browserCache.noCache || age >= browserCache.maxAge;
+
+          if (navigationType === "back") {
+            useCache = true;
+            revalidate = false;
+          } else if (navigationType === "reload") {
+            useCache = true;
+            revalidate = true;
+            reqHeaders["Cache-Control"] = "max-age=0";
+          } else {
+            useCache = true;
+            if (isStale) revalidate = true;
+          }
+        }
+
+        if (isNoStore) {
+          useCache = false;
+          revalidate = false;
+          browserCache = null;
+        }
+
+        if (useCache && !revalidate) {
+          createLogEntry(
+            navigationType,
+            `Navigation: ${navigationType}`,
+            { ...reqHeaders },
+            {
+              "Cache-Control": browserCache.cacheControl,
+              ETag: browserCache.etag,
+              "Last-Modified": `T+${browserCache.lastModified}s`
+            },
+            "cache",
+            "200",
+            "OK (from cache)",
+            browserCache.data
+          );
+          updateDisplays();
+          return;
+        }
+
+        if (useCache && revalidate && browserCache) {
+          reqHeaders["If-None-Match"] = browserCache.etag;
+          reqHeaders["If-Modified-Since"] = `T+${browserCache.lastModified}s`;
+        }
+
+        const serverCC = getCacheControlString();
+        const resHeaders = {
+          "Cache-Control": serverCC,
+          ETag: serverState.etag,
+          "Last-Modified": `T+${serverState.lastModified}s`
+        };
+
+        if (useCache && revalidate && reqHeaders["If-None-Match"] === serverState.etag) {
+          if (!isNoStore) {
+            browserCache.cachedAt = clock;
+            browserCache.cacheControl = serverCC;
+            browserCache.maxAge = maxAgeVal;
+            browserCache.noCache = isNoCache;
+          }
+
+          createLogEntry(navigationType, `Navigation: ${navigationType}`, reqHeaders, resHeaders, "reval", "304", "Not Modified", "(body omitted, client uses cached data: " + browserCache.data + ")");
+          updateDisplays();
+          return;
+        }
+
+        if (!isNoStore) {
+          browserCache = {
+            data: serverState.data,
+            etag: serverState.etag,
+            lastModified: serverState.lastModified,
+            cachedAt: clock,
+            cacheControl: serverCC,
+            maxAge: maxAgeVal,
+            noCache: isNoCache
+          };
+        } else {
+          browserCache = null;
+        }
+
+        createLogEntry(navigationType, `Navigation: ${navigationType}`, reqHeaders, resHeaders, "network", "200", "OK", serverState.data);
+
+        updateDisplays();
+      }
+
+      document.getElementById("btnFreshLoad").addEventListener("click", () => simulateRequest("load"));
+      document.getElementById("btnReload").addEventListener("click", () => simulateRequest("reload"));
+      document.getElementById("btnBack").addEventListener("click", () => simulateRequest("back"));
+
+      updateDisplays();
+    </script>
+  </body>
+</html>
