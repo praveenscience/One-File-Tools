@@ -1,0 +1,674 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Canonical URL Checker — One File Tools</title>
+    <meta name="description" content="Analyze HTML to verify canonical URL implementation and identify common SEO issues." />
+    <style>
+      /* ========================================
+       Reset & Base
+       ======================================== */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        line-height: 1.6;
+        padding: 2rem;
+        max-width: 960px;
+        margin: 0 auto;
+        background: #fafafa;
+        color: #1a1a1a;
+      }
+
+      /* ========================================
+       Dark Mode
+       ======================================== */
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: #0a0a0a;
+          color: #e5e5e5;
+        }
+      }
+
+      header {
+        text-align: center;
+        margin-bottom: 2rem;
+      }
+
+      header p {
+        color: #666;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        header p {
+          color: #aaa;
+        }
+      }
+
+      .container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+      }
+
+      .panel {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 12px;
+        padding: 1.5rem;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .panel {
+          background: #161616;
+          border-color: #333;
+        }
+      }
+
+      label {
+        display: block;
+        margin-top: 1rem;
+        margin-bottom: 0.35rem;
+        font-weight: 600;
+      }
+
+      textarea,
+      input {
+        width: 100%;
+        padding: 0.75rem;
+        border-radius: 8px;
+        border: 1px solid #bbb;
+        font-size: 15px;
+      }
+
+      textarea {
+        resize: vertical;
+      }
+
+      input:focus,
+      textarea:focus {
+        outline: 2px solid #1d9bf0;
+        outline-offset: 2px;
+      }
+
+      .buttons {
+        display: flex;
+        gap: 0.75rem;
+        margin-top: 1rem;
+        flex-wrap: wrap;
+      }
+
+      button {
+        padding: 0.8rem 1.2rem;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        background: #1d9bf0;
+        color: white;
+      }
+
+      button:hover {
+        opacity: 0.9;
+      }
+
+      #resetBtn {
+        background: #666;
+      }
+
+      .status {
+        padding: 1rem;
+        border-radius: 10px;
+        text-align: center;
+        font-weight: 600;
+        margin-bottom: 1.5rem;
+      }
+
+      .status.neutral {
+        background: #f3f4f6;
+      }
+
+      .status.success {
+        background: #dcfce7;
+        color: #166534;
+      }
+
+      .status.warning {
+        background: #fee2e2;
+        color: #991b1b;
+      }
+
+      footer {
+        margin-top: 2rem;
+        text-align: center;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .status.neutral {
+          background: #2a2a2a;
+          color: white;
+        }
+
+        .status.success {
+          background: #14532d;
+          color: #dcfce7;
+        }
+
+        .status.warning {
+          background: #7f1d1d;
+          color: #fee2e2;
+        }
+      }
+
+      @media (max-width: 768px) {
+        .container {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* ========================================
+       SEO Health Score
+       ======================================== */
+      .score-card {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem;
+        border-radius: 10px;
+        margin-bottom: 1rem;
+        background: #f3f4f6;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .score-card {
+          background: #2a2a2a;
+        }
+      }
+
+      .score-ring {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 1.1rem;
+        flex-shrink: 0;
+        color: white;
+      }
+
+      .score-ring.good {
+        background: #16a34a;
+      }
+
+      .score-ring.fair {
+        background: #d97706;
+      }
+
+      .score-ring.poor {
+        background: #dc2626;
+      }
+
+      .score-label {
+        font-weight: 600;
+      }
+
+      .score-sub {
+        font-size: 0.85rem;
+        color: #666;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .score-sub {
+          color: #aaa;
+        }
+      }
+
+      /* ========================================
+       Issue List
+       ======================================== */
+      .issue-list {
+        list-style: none;
+        margin: 0 0 1.5rem;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+      }
+
+      .issue {
+        padding: 0.75rem;
+        border-radius: 8px;
+        border-left: 4px solid #999;
+        background: #f9fafb;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .issue {
+          background: #1e1e1e;
+        }
+      }
+
+      .issue.error {
+        border-left-color: #dc2626;
+      }
+
+      .issue.warning {
+        border-left-color: #d97706;
+      }
+
+      .issue.success {
+        border-left-color: #16a34a;
+      }
+
+      .issue-title {
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+      }
+
+      .issue-rec {
+        font-size: 0.9rem;
+        color: #555;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .issue-rec {
+          color: #bbb;
+        }
+      }
+
+      .optional-field {
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px dashed #ccc;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .optional-field {
+          border-top-color: #444;
+        }
+      }
+
+      .helper-text {
+        font-size: 0.85rem;
+        color: #666;
+        margin-top: 0.25rem;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .helper-text {
+          color: #999;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Canonical URL Checker</h1>
+      <p>Analyze HTML to verify canonical tag implementation and identify SEO issues.</p>
+    </header>
+
+    <main>
+      <div class="container">
+        <!-- Left Panel -->
+        <section class="panel">
+          <h2>HTML Input</h2>
+
+          <label for="htmlInput">Paste HTML Source</label>
+
+          <textarea id="htmlInput" rows="16" placeholder="Paste your HTML source or <head> section here..."></textarea>
+
+          <div class="optional-field">
+            <label for="pageUrl">Page URL <span style="font-weight: 400">(optional)</span></label>
+            <input id="pageUrl" type="text" placeholder="https://example.com/current-page" autocomplete="off" />
+            <p class="helper-text">Provide the URL this HTML was fetched from to check for a self-referencing canonical and HTTP/HTTPS consistency.</p>
+          </div>
+
+          <div class="buttons">
+            <button id="exampleBtn">Load Example</button>
+            <button id="analyzeBtn">Analyze</button>
+            <button id="resetBtn">Reset</button>
+          </div>
+        </section>
+
+        <!-- Right Panel -->
+        <section class="panel">
+          <h2>Analysis Result</h2>
+
+          <div id="statusCard" class="status neutral">Waiting for analysis...</div>
+
+          <div id="scoreCard" class="score-card" style="display: none">
+            <div id="scoreRing" class="score-ring good">0</div>
+            <div>
+              <div class="score-label">SEO Health Score</div>
+              <div class="score-sub" id="scoreSub">0 of 0 checks passed</div>
+            </div>
+          </div>
+
+          <ul id="issueList" class="issue-list"></ul>
+
+          <div class="result">
+            <label>Canonical URL</label>
+            <input id="canonicalUrl" readonly placeholder="No canonical URL found" />
+          </div>
+
+          <div class="buttons">
+            <button id="copyBtn">Copy Report</button>
+            <button id="downloadBtn">Download Report (.txt)</button>
+            <button id="downloadJsonBtn">Download Report (.json)</button>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <footer>
+      <p>Part of <a href="https://github.com/praveenscience/One-File-Tools">One File Tools</a></p>
+    </footer>
+
+    <script>
+      const htmlInput = document.getElementById("htmlInput");
+      const pageUrlInput = document.getElementById("pageUrl");
+
+      const analyzeBtn = document.getElementById("analyzeBtn");
+      const exampleBtn = document.getElementById("exampleBtn");
+      const resetBtn = document.getElementById("resetBtn");
+
+      const copyBtn = document.getElementById("copyBtn");
+      const downloadBtn = document.getElementById("downloadBtn");
+      const downloadJsonBtn = document.getElementById("downloadJsonBtn");
+
+      const canonicalUrl = document.getElementById("canonicalUrl");
+      const statusCard = document.getElementById("statusCard");
+      const scoreCard = document.getElementById("scoreCard");
+      const scoreRing = document.getElementById("scoreRing");
+      const scoreSub = document.getElementById("scoreSub");
+      const issueList = document.getElementById("issueList");
+
+      // Holds the most recently generated report so Copy/Download stay in sync.
+      let lastReport = null;
+
+      /**
+       * Runs every canonical-tag check against the parsed document and
+       * returns a structured report: a list of issues (each with a
+       * severity, title, and recommendation) plus the resolved canonical
+       * URL and an overall SEO health score.
+       */
+      function buildReport(html, pageUrl) {
+        const issues = [];
+        const addIssue = (severity, title, rec) => issues.push({ severity, title, recommendation: rec });
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, "text/html");
+
+        const canonicalTags = Array.from(doc.querySelectorAll('link[rel="canonical"]'));
+        const headCanonical = Array.from(doc.head.querySelectorAll('link[rel="canonical"]'));
+
+        let resolvedHref = "";
+
+        // --- Placement: outside <head> ---
+        if (canonicalTags.length && headCanonical.length === 0) {
+          addIssue("error", "Canonical tag outside <head>", "Move the canonical tag inside the <head> section. Canonical tags outside <head> are ignored by most search engines.");
+        }
+
+        // --- Missing ---
+        if (canonicalTags.length === 0) {
+          addIssue("error", "No canonical tag found", 'Add a <link rel="canonical" href="..."> tag inside the <head> section so search engines know the preferred URL for this page.');
+        }
+
+        // --- Multiple canonical tags ---
+        if (canonicalTags.length > 1) {
+          const hrefs = canonicalTags.map((t) => t.getAttribute("href") || "(empty)");
+          addIssue("error", `Multiple canonical tags found (${canonicalTags.length})`, `Only one canonical tag should exist per page. Found: ${hrefs.join(", ")}. Remove all but one.`);
+        }
+
+        if (canonicalTags.length >= 1) {
+          const href = (canonicalTags[0].getAttribute("href") || "").trim();
+          resolvedHref = href;
+
+          if (!href) {
+            addIssue("error", "Empty canonical URL", "The canonical tag exists but its href attribute is empty. Provide a full, absolute URL.");
+          } else if (!/^https?:\/\//i.test(href)) {
+            addIssue("warning", "Relative canonical URL", `Use an absolute URL (including protocol and domain) instead of a relative canonical URL like "${href}". Relative canonicals are more error-prone and not recommended by Google.`);
+          } else {
+            let parsedHref = null;
+            try {
+              parsedHref = new URL(href);
+            } catch {
+              addIssue("error", "Invalid canonical URL", `"${href}" is not a valid absolute URL. Double-check for typos or malformed syntax.`);
+            }
+
+            if (parsedHref) {
+              // --- Canonical chains / self-reference vs a known page URL ---
+              let parsedPage = null;
+              if (pageUrl) {
+                try {
+                  parsedPage = new URL(pageUrl);
+                } catch {
+                  addIssue("warning", "Page URL is not a valid absolute URL", "The optional page URL you provided could not be parsed. Self-reference and protocol checks were skipped.");
+                }
+              }
+
+              if (parsedPage) {
+                const sameUrl = parsedHref.href.replace(/\/$/, "") === parsedPage.href.replace(/\/$/, "");
+                if (!sameUrl) {
+                  addIssue("warning", "Canonical does not self-reference the page URL", `The page at "${parsedPage.href}" declares a canonical pointing to "${parsedHref.href}". This may be intentional (e.g. for duplicate/paginated content) but can also indicate a canonical chain — verify the target page's own canonical also points to itself.`);
+                } else {
+                  addIssue("success", "Canonical self-references the page URL", "The canonical URL matches the page it was found on, which is the expected pattern for a page's primary canonical.");
+                }
+
+                // --- HTTP/HTTPS inconsistency ---
+                if (parsedHref.protocol !== parsedPage.protocol) {
+                  addIssue("warning", "HTTP/HTTPS protocol mismatch", `The page is served over "${parsedPage.protocol}" but the canonical URL uses "${parsedHref.protocol}". Canonical URLs should use the same protocol as the live site (prefer HTTPS).`);
+                }
+              }
+
+              if (parsedHref.protocol !== "https:") {
+                addIssue("warning", "Canonical URL is not HTTPS", "Canonical URLs should point to the HTTPS version of a page when your site supports HTTPS.");
+              }
+
+              if (issues.every((i) => i.severity !== "error")) {
+                addIssue("success", "Canonical tag is well-formed", "Found exactly one canonical tag inside <head>, with a valid absolute URL.");
+              }
+            }
+          }
+        }
+
+        const errorCount = issues.filter((i) => i.severity === "error").length;
+        const warningCount = issues.filter((i) => i.severity === "warning").length;
+        const totalChecks = issues.length || 1;
+        const passedChecks = issues.filter((i) => i.severity === "success").length;
+
+        // Score: start at 100, subtract per error/warning, floor at 0.
+        let score = 100 - errorCount * 30 - warningCount * 12;
+        score = Math.max(0, Math.min(100, score));
+
+        return {
+          canonicalUrl: resolvedHref,
+          issues,
+          score,
+          errorCount,
+          warningCount,
+          totalChecks,
+          passedChecks,
+          overall: errorCount > 0 ? "error" : warningCount > 0 ? "warning" : "success"
+        };
+      }
+
+      function scoreTier(score) {
+        if (score >= 80) return "good";
+        if (score >= 50) return "fair";
+        return "poor";
+      }
+
+      function renderReport(report) {
+        canonicalUrl.value = report.canonicalUrl || "";
+
+        if (report.overall === "success") {
+          statusCard.className = "status success";
+          statusCard.textContent = "Valid Canonical Implementation";
+        } else if (report.overall === "warning") {
+          statusCard.className = "status warning";
+          statusCard.textContent = `${report.warningCount} Warning${report.warningCount === 1 ? "" : "s"} Found`;
+        } else {
+          statusCard.className = "status warning";
+          statusCard.textContent = `${report.errorCount} Issue${report.errorCount === 1 ? "" : "s"} Found`;
+        }
+
+        scoreCard.style.display = "flex";
+        scoreRing.textContent = String(report.score);
+        scoreRing.className = "score-ring " + scoreTier(report.score);
+        scoreSub.textContent = `${report.passedChecks} of ${report.totalChecks} checks passed`;
+
+        issueList.innerHTML = report.issues
+          .map(
+            (issue) => `
+          <li class="issue ${issue.severity}">
+            <div class="issue-title">${issue.severity === "success" ? "✔" : issue.severity === "error" ? "✖" : "⚠"} ${escapeHtml(issue.title)}</div>
+            <div class="issue-rec">${escapeHtml(issue.recommendation)}</div>
+          </li>`
+          )
+          .join("");
+      }
+
+      function escapeHtml(str) {
+        return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+      }
+
+      function resetResultUI(message) {
+        statusCard.className = "status neutral";
+        statusCard.textContent = message;
+        canonicalUrl.value = "";
+        scoreCard.style.display = "none";
+        issueList.innerHTML = "";
+        lastReport = null;
+        copyBtn.disabled = true;
+        downloadBtn.disabled = true;
+        downloadJsonBtn.disabled = true;
+      }
+
+      function analyzeHTML() {
+        const html = htmlInput.value.trim();
+        if (!html) {
+          resetResultUI("Please paste HTML source.");
+          return;
+        }
+
+        const pageUrl = pageUrlInput.value.trim();
+        const report = buildReport(html, pageUrl);
+        report.pageUrl = pageUrl || null;
+        lastReport = report;
+
+        renderReport(report);
+        copyBtn.disabled = false;
+        downloadBtn.disabled = false;
+        downloadJsonBtn.disabled = false;
+      }
+
+      function buildTextReport(report) {
+        const lines = ["Canonical URL Checker Report", "", `SEO Health Score: ${report.score}/100 (${report.passedChecks}/${report.totalChecks} checks passed)`, `Canonical URL: ${report.canonicalUrl || "Not Found"}`, report.pageUrl ? `Page URL: ${report.pageUrl}` : null, "", "Issues & Recommendations:"].filter(Boolean);
+
+        report.issues.forEach((issue) => {
+          lines.push(`- [${issue.severity.toUpperCase()}] ${issue.title}`);
+          lines.push(`  ${issue.recommendation}`);
+        });
+
+        return lines.join("\n");
+      }
+
+      analyzeBtn.addEventListener("click", analyzeHTML);
+      copyBtn.disabled = true;
+      downloadBtn.disabled = true;
+      downloadJsonBtn.disabled = true;
+
+      resetBtn.addEventListener("click", () => {
+        htmlInput.value = "";
+        pageUrlInput.value = "";
+        resetResultUI("Waiting for analysis...");
+      });
+
+      copyBtn.addEventListener("click", async () => {
+        if (!lastReport) return;
+        const report = buildTextReport(lastReport);
+
+        try {
+          await navigator.clipboard.writeText(report);
+
+          const originalText = copyBtn.textContent;
+          const originalColor = copyBtn.style.backgroundColor;
+
+          copyBtn.textContent = "Copied!";
+          copyBtn.style.backgroundColor = "#16a34a";
+
+          setTimeout(() => {
+            copyBtn.textContent = originalText;
+            copyBtn.style.backgroundColor = originalColor || "#1d9bf0";
+          }, 2000);
+        } catch {
+          // Clipboard API unavailable or blocked (e.g. insecure context) —
+          // fail gracefully without breaking the rest of the tool.
+          alert("Failed to copy report. Your browser may have blocked clipboard access.");
+        }
+      });
+
+      downloadBtn.addEventListener("click", () => {
+        if (!lastReport) return;
+        const report = buildTextReport(lastReport);
+
+        try {
+          const blob = new Blob([report], { type: "text/plain" });
+          const link = document.createElement("a");
+          link.href = URL.createObjectURL(blob);
+          link.download = "canonical-url-report.txt";
+          link.click();
+          URL.revokeObjectURL(link.href);
+        } catch {
+          alert("Failed to download the report in this browser.");
+        }
+      });
+
+      downloadJsonBtn.addEventListener("click", () => {
+        if (!lastReport) return;
+
+        try {
+          const blob = new Blob([JSON.stringify(lastReport, null, 2)], { type: "application/json" });
+          const link = document.createElement("a");
+          link.href = URL.createObjectURL(blob);
+          link.download = "canonical-url-report.json";
+          link.click();
+          URL.revokeObjectURL(link.href);
+        } catch {
+          alert("Failed to download the report in this browser.");
+        }
+      });
+
+      exampleBtn.addEventListener("click", () => {
+        htmlInput.value = `<!DOCTYPE html>
+<html>
+<head>
+
+<title>Example</title>
+
+<link rel="canonical" href="https://example.com/page">
+
+</head>
+
+<body>
+
+<h1>Hello World</h1>
+
+</body>
+</html>`;
+        pageUrlInput.value = "https://example.com/page";
+
+        analyzeHTML();
+      });
+    </script>
+  </body>
+</html>
