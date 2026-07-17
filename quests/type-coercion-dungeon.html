@@ -1,0 +1,1285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="color-scheme" content="dark" />
+<meta name="description" content="A JavaScript roguelike where type coercion is the combat system. Predict truthy or falsy before the dungeon coerces you." />
+<title>Type Coercion Dungeon — a JavaScript roguelike</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2305070d'/%3E%3Ctext x='16' y='23' font-size='20' text-anchor='middle' fill='%234fe3d0' font-family='monospace'%3E%3D%3C/text%3E%3C/svg%3E" />
+
+<!-- ══════════════════════════════════════════════════════════════
+     TYPE COERCION DUNGEON — enhanced build
+     A roguelike where JavaScript's coercion rules are the combat.
+     Every enemy is a real expression, evaluated by the real engine.
+     Pure HTML + CSS + vanilla JS. No framework. No build step.
+     ══════════════════════════════════════════════════════════════ -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet" />
+
+<style>
+  /* ══════════════════════════════════════════════════════════════
+     THE COERCION ENGINE
+     Palette: obsidian dungeon black · rune-glass cyan · sigil gold ·
+     truthy emerald · falsy magenta · warning amber · blood damage red.
+     ══════════════════════════════════════════════════════════════ */
+  :root {
+    --void: #05070d;
+    --obsidian: #0b0f1a;
+    --panel: #10162a;
+    --panel-2: #141b34;
+    --edge: #223052;
+    --edge-soft: #1a2440;
+    --rune: #4fe3d0;
+    --rune-dim: #2b7d76;
+    --sigil: #f2c14e;
+    --truthy: #46e39a;
+    --falsy: #ff5ea8;
+    --amber: #ffb454;
+    --blood: #ff4d5e;
+    --ink: #b9c6e6;
+    --ink-dim: #5f6f96;
+    --parchment: #e7e0cf;
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 14px;
+    --sp-1: 4px;
+    --sp-2: 8px;
+    --sp-3: 14px;
+    --sp-4: 20px;
+    --focus: var(--sigil);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background:
+      radial-gradient(ellipse 130% 90% at 50% -15%, #101a33 0%, transparent 55%),
+      radial-gradient(ellipse 90% 60% at 50% 115%, #170e22 0%, transparent 60%),
+      var(--void);
+    color: var(--ink);
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 15px;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: #1c3550; color: var(--rune); }
+  .display { font-family: "Cinzel", Georgia, serif; letter-spacing: 0.03em; }
+  button { font: inherit; color: inherit; }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; border-radius: 2px; }
+
+  /*  App frame */
+  #app { height: 100vh; height: 100dvh; display: flex; flex-direction: column; position: relative; z-index: 10; }
+
+  /*  HUD */
+  #hud {
+    display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap;
+    padding: var(--sp-2) var(--sp-4);
+    border-bottom: 1px solid var(--edge);
+    background: rgba(5, 7, 13, 0.92);
+    backdrop-filter: blur(6px);
+  }
+  .hud-label { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-dim); }
+  #hpWrap { display: flex; align-items: center; gap: var(--sp-2); min-width: 180px; flex: 1; }
+  #hpBar {
+    flex: 1; height: 12px; border: 1px solid var(--edge); border-radius: 2px;
+    background: #070a12; overflow: hidden; position: relative;
+  }
+  #hpFill { height: 100%; transition: width 0.45s ease, background 0.45s ease; background: var(--truthy); }
+  #hpNum { font-size: 12px; width: 74px; text-align: right; color: var(--truthy); font-variant-numeric: tabular-nums; }
+  .hud-chip {
+    font-size: 11px; letter-spacing: 0.08em; border: 1px solid var(--edge); border-radius: var(--radius-sm);
+    padding: 4px 9px; color: var(--sigil); background: var(--panel);
+  }
+  #comboChip { color: var(--rune); border-color: var(--rune-dim); transition: transform 0.1s; }
+  #comboChip.pump { transform: scale(1.18); }
+  #accChip { color: var(--ink); }
+  #floorDots { display: flex; gap: 5px; align-items: center; }
+  #floorDots i {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--edge-soft);
+    box-shadow: none; display: inline-block; transition: background 0.3s, box-shadow 0.3s;
+  }
+  #floorDots i.done { background: var(--truthy); box-shadow: 0 0 6px var(--truthy); }
+  #floorDots i.now { background: var(--rune); box-shadow: 0 0 8px var(--rune); }
+  #floorDots i.boss.now { background: var(--falsy); box-shadow: 0 0 8px var(--falsy); }
+  #helpBtn {
+    margin-left: auto; cursor: pointer; border: 1px solid var(--edge); background: var(--panel);
+    color: var(--ink-dim); border-radius: 50%; width: 26px; height: 26px; font-size: 13px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center; transition: color 0.15s, border-color 0.15s;
+  }
+  #helpBtn:hover { color: var(--rune); border-color: var(--rune-dim); }
+
+  /*  Stage  */
+  #stage { flex: 1; display: flex; flex-direction: column; min-height: 0; position: relative; }
+  #arena {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: var(--sp-4); gap: var(--sp-3); position: relative; overflow: hidden;
+  }
+  #enemyRow { display: flex; align-items: flex-end; gap: 26px; min-height: 132px; flex-wrap: wrap; justify-content: center; }
+  .enemy { display: flex; flex-direction: column; align-items: center; gap: 8px; transition: opacity 0.3s, transform 0.3s; }
+  .enemy.dying { animation: enemy-die 0.5s forwards; }
+  @keyframes enemy-die { to { opacity: 0; transform: translateY(20px) scale(0.7); } }
+  .enemy-sprite { width: 92px; height: 92px; position: relative; filter: drop-shadow(0 0 12px rgba(79, 227, 208, 0.25)); transition: filter 0.3s; }
+  .enemy[data-active="1"] .enemy-sprite { filter: drop-shadow(0 0 18px rgba(79, 227, 208, 0.55)); }
+  .enemy.boss .enemy-sprite { width: 150px; height: 150px; filter: drop-shadow(0 0 22px rgba(255, 94, 168, 0.4)); }
+  .enemy-hpdot { display: flex; gap: 4px; }
+  .enemy-hpdot i { width: 8px; height: 8px; border-radius: 50%; background: var(--falsy); box-shadow: 0 0 6px var(--falsy); display: inline-block; }
+  .enemy-hpdot i.spent { background: #33203a; box-shadow: none; }
+  .enemy-name { font-size: 10.5px; letter-spacing: 0.12em; color: var(--ink-dim); text-transform: uppercase; }
+
+  /* The expression tablet */
+  #tablet {
+    border: 1px solid var(--edge); border-radius: var(--radius-lg);
+    background: radial-gradient(ellipse 90% 70% at 50% 0%, rgba(79, 227, 208, 0.08), transparent 70%), var(--panel);
+    padding: var(--sp-4) 26px; min-width: min(560px, 92vw); max-width: 92vw; text-align: center; position: relative;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(79, 227, 208, 0.05);
+  }
+  #tabletLabel { font-size: 10px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 12px; }
+  #exprText {
+    font-size: clamp(22px, 4.4vw, 40px); font-weight: 800; color: var(--parchment);
+    word-break: break-word; line-height: 1.35; letter-spacing: 0.01em; min-height: 1.35em;
+  }
+  #exprText .tok-val { color: var(--rune); }
+  #exprText .tok-op { color: var(--sigil); }
+  #promptText { margin-top: 12px; font-size: 13px; color: var(--ink-dim); min-height: 18px; }
+  #promptText b { color: var(--amber); }
+
+  /* Answer buttons */
+  #answers { display: flex; gap: 16px; margin-top: 6px; flex-wrap: wrap; justify-content: center; }
+  .answer-btn {
+    font-family: "JetBrains Mono", monospace; font-weight: 800; font-size: 20px; cursor: pointer;
+    border: 2px solid var(--edge); border-radius: var(--radius-md); background: var(--obsidian); color: var(--ink);
+    padding: 14px 40px; letter-spacing: 0.04em; min-width: 150px;
+    transition: transform 0.08s, box-shadow 0.18s, border-color 0.18s, background 0.18s;
+  }
+  .answer-btn[data-kind="true"]:hover, .answer-btn[data-kind="true"]:focus-visible { border-color: var(--truthy); color: var(--truthy); box-shadow: 0 0 20px rgba(70, 227, 154, 0.3); }
+  .answer-btn[data-kind="false"]:hover, .answer-btn[data-kind="false"]:focus-visible { border-color: var(--falsy); color: var(--falsy); box-shadow: 0 0 20px rgba(255, 94, 168, 0.3); }
+  .answer-btn:active { transform: scale(0.96); }
+  .answer-btn.correct { border-color: var(--truthy); color: var(--truthy); background: rgba(70, 227, 154, 0.14); }
+  .answer-btn.wrong { border-color: var(--blood); color: var(--blood); background: rgba(255, 77, 94, 0.14); }
+  .answer-btn:disabled { cursor: default; opacity: 0.9; }
+  .kbd-hint { font-size: 10px; letter-spacing: 0.1em; color: var(--ink-dim); display: block; margin-top: 6px; }
+
+  /* Reveal line after answering */
+  #reveal { min-height: 26px; margin-top: 8px; font-size: 14px; }
+  #reveal .r-ok { color: var(--truthy); }
+  #reveal .r-bad { color: var(--blood); }
+  #reveal code { color: var(--parchment); background: rgba(79, 227, 208, 0.08); padding: 1px 6px; border-radius: 3px; }
+  #reveal .r-why { display: block; margin-top: 4px; color: var(--ink-dim); font-size: 12.5px; }
+
+  /* Spellbook / inventory strip */
+  #spellbook { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 16px; border-top: 1px solid var(--edge); background: rgba(5, 7, 13, 0.9); min-height: 44px; }
+  #spellbook .sb-label { font-size: 9.5px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-dim); }
+  .spell { font-size: 11.5px; border: 1px solid var(--rune-dim); border-radius: var(--radius-sm); padding: 4px 9px; color: var(--rune); background: rgba(79, 227, 208, 0.06); display: flex; align-items: center; gap: 6px; cursor: help; }
+  .spell.locked { color: var(--ink-dim); border-color: var(--edge); background: transparent; }
+  .spell.active { box-shadow: 0 0 10px rgba(79, 227, 208, 0.45); }
+
+  /* Message log */
+  #log { height: 108px; border-top: 1px solid var(--edge); background: #04060b; display: flex; flex-direction: column; }
+  #logBar { font-size: 9.5px; letter-spacing: 0.2em; color: var(--ink-dim); padding: 4px 14px; border-bottom: 1px solid var(--edge); text-transform: uppercase; display: flex; justify-content: space-between; }
+  #logOut { flex: 1; overflow-y: auto; padding: 6px 14px; font-size: 12.5px; line-height: 1.5; }
+  .l-log { color: var(--ink); }
+  .l-ok { color: var(--truthy); }
+  .l-bad { color: var(--blood); }
+  .l-sys { color: var(--sigil); font-style: italic; }
+  .l-engine { color: var(--rune); text-shadow: 0 0 6px rgba(79, 227, 208, 0.4); }
+  .l-dim { color: var(--ink-dim); }
+
+  /*  Overlays  */
+  .overlay {
+    position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; text-align: center; padding: 26px; background: rgba(3, 5, 10, 0.96);
+    overflow-y: auto;
+  }
+  .title-main { font-family: "Cinzel", serif; font-weight: 800; font-size: clamp(34px, 7.5vw, 76px); color: var(--rune); line-height: 1.05;
+    text-shadow: 0 0 30px rgba(79, 227, 208, 0.5), 2px 0 0 rgba(255, 94, 168, 0.35), -2px 0 0 rgba(70, 227, 154, 0.3); }
+  .title-sub { font-size: 12px; letter-spacing: 0.4em; color: var(--ink-dim); text-transform: uppercase; margin: 12px 0 26px; }
+  .story { max-width: 640px; font-size: 14.5px; line-height: 1.8; color: var(--ink); margin: 0 auto 24px; text-align: left; }
+  .story b { color: var(--rune); }
+  .story code { color: var(--parchment); background: rgba(79, 227, 208, 0.09); padding: 1px 6px; border-radius: 3px; font-size: 0.92em; }
+  .story .glow { color: var(--sigil); }
+  .btn {
+    font-family: "Cinzel", serif; font-weight: 700; font-size: 16px; cursor: pointer; border: 2px solid var(--rune);
+    border-radius: var(--radius-sm); background: transparent; color: var(--rune); padding: 11px 26px; letter-spacing: 0.05em;
+    transition: background 0.15s, transform 0.08s; text-shadow: 0 0 12px rgba(79, 227, 208, 0.4);
+  }
+  .btn:hover { background: rgba(79, 227, 208, 0.12); }
+  .btn:active { transform: scale(0.97); }
+  .btn.gold { border-color: var(--sigil); color: var(--sigil); text-shadow: 0 0 12px rgba(242, 193, 78, 0.4); }
+  .btn.gold:hover { background: rgba(242, 193, 78, 0.12); }
+  .btn.ghost { border-color: var(--edge); color: var(--ink-dim); text-shadow: none; }
+  .btn.ghost:hover { background: rgba(185, 198, 230, 0.06); color: var(--ink); }
+  .btn-row { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+  .small-warning { margin-top: 22px; font-size: 10.5px; color: var(--ink-dim); }
+
+  .stat-grid { display: flex; gap: 26px; flex-wrap: wrap; justify-content: center; margin: 8px 0 26px; }
+  .stat { text-align: center; }
+  .stat .v { font-size: 30px; font-weight: 800; color: var(--sigil); }
+  .stat .k { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-dim); margin-top: 2px; }
+
+  /* How-to-play modal */
+  #helpModal { z-index: 70; align-items: flex-start; padding-top: 6vh; }
+  .modal-card {
+    max-width: 620px; width: 92vw; background: var(--panel); border: 1px solid var(--edge); border-radius: var(--radius-lg);
+    padding: 28px 30px; text-align: left; box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  }
+  .modal-card h2 { margin: 0 0 4px; font-family: "Cinzel", serif; color: var(--rune); font-size: 22px; }
+  .modal-card .sub { color: var(--ink-dim); font-size: 12px; letter-spacing: 0.1em; margin-bottom: 18px; text-transform: uppercase; }
+  .modal-card ul { margin: 0 0 18px; padding-left: 20px; line-height: 1.8; font-size: 13.5px; }
+  .modal-card kbd { background: var(--obsidian); border: 1px solid var(--edge); border-radius: 4px; padding: 1px 7px; font-size: 12px; color: var(--sigil); }
+  .modal-close-row { display: flex; justify-content: flex-end; margin-top: 4px; }
+
+  /* Floor transition banner */
+  #floorBanner {
+    position: fixed; inset: 0; z-index: 58; display: flex; align-items: center; justify-content: center;
+    pointer-events: none; opacity: 0;
+    background: radial-gradient(ellipse at center, rgba(5, 7, 13, 0.7), rgba(5, 7, 13, 0.95));
+  }
+  #floorBanner.show { animation: floor-in 1.5s ease; }
+  #floorBanner .fb-inner { text-align: center; }
+  #floorBanner .fb-depth { font-family: "Cinzel", serif; font-size: clamp(30px, 6vw, 58px); font-weight: 800; color: var(--rune); text-shadow: 0 0 26px rgba(79, 227, 208, 0.5); }
+  #floorBanner .fb-name { font-size: 13px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--sigil); margin-top: 8px; }
+  @keyframes floor-in { 0% { opacity: 0; } 20%, 72% { opacity: 1; } 100% { opacity: 0; } }
+
+  /* Toast notifications (spell drops etc.) */
+  #toasts { position: fixed; top: 14px; right: 14px; z-index: 55; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+  .toast {
+    background: var(--panel); border: 1px solid var(--rune-dim); border-radius: var(--radius-md); padding: 9px 14px;
+    font-size: 12px; color: var(--rune); box-shadow: 0 8px 24px rgba(0,0,0,0.4); max-width: 260px;
+    animation: toast-in 0.3s ease, toast-out 0.4s ease 3.2s forwards;
+  }
+  @keyframes toast-in { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: translateX(0); } }
+  @keyframes toast-out { to { opacity: 0; transform: translateX(16px); } }
+
+  /*  Effect layers  */
+  #particles { position: fixed; inset: 0; z-index: 40; pointer-events: none; width: 100%; height: 100%; }
+  #vig { position: fixed; inset: 0; z-index: 41; pointer-events: none; background: radial-gradient(ellipse at center, transparent 52%, rgba(2, 3, 7, 0.9) 100%); }
+  #scan { position: fixed; inset: 0; z-index: 42; pointer-events: none; background: repeating-linear-gradient(to bottom, transparent 0 3px, rgba(0, 0, 0, 0.11) 3px 4px); opacity: 0.6; }
+  #warpFlash { position: fixed; inset: 0; z-index: 44; pointer-events: none; background: radial-gradient(ellipse at center, rgba(79, 227, 208, 0.28), transparent 62%); opacity: 0; }
+  #warpFlash.run { animation: warp-pulse 0.6s ease-out; }
+  @keyframes warp-pulse { 0% { opacity: 0.8; } 100% { opacity: 0; } }
+  #dmgFlash { position: fixed; inset: 0; z-index: 43; pointer-events: none; box-shadow: inset 0 0 120px rgba(255, 77, 94, 0.6); opacity: 0; }
+  #dmgFlash.run { animation: dmg-pulse 0.5s ease-out; }
+  @keyframes dmg-pulse { 0% { opacity: 1; } 100% { opacity: 0; } }
+
+  .shake { animation: shake-kf 0.4s linear; }
+  @keyframes shake-kf { 20% { transform: translate(-4px, 2px); } 40% { transform: translate(5px, -2px); } 60% { transform: translate(-5px, 1px); } 80% { transform: translate(4px, -1px); } }
+  .glitching { animation: glitch-kf 0.13s steps(2) 3; }
+  @keyframes glitch-kf { 50% { filter: hue-rotate(60deg) contrast(1.35); transform: translateX(-3px); } }
+
+  #logOut::-webkit-scrollbar { width: 8px; }
+  #logOut::-webkit-scrollbar-thumb { background: #16233f; border-radius: 4px; }
+
+  @media (max-width: 720px) {
+    #enemyRow { gap: 14px; }
+    .answer-btn { padding: 12px 26px; min-width: 44%; font-size: 18px; }
+    #log { height: 84px; }
+    #hud { gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); }
+    #hpWrap { min-width: 130px; }
+    .modal-card { padding: 22px 18px; }
+  }
+  @media (max-width: 420px) {
+    .answer-btn { min-width: 100%; }
+  }
+  /*  Ambient background glyphs 
+     Slow-drifting coercion tokens behind everything — pure decoration,
+     never intercepts pointer events, and skipped entirely (in JS) when
+     prefers-reduced-motion is set. */
+  #bgGlyphs { position: fixed; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
+  .bg-glyph {
+    position: absolute; bottom: -10vh; left: var(--gx, 50%);
+    font-family: "JetBrains Mono", monospace; font-weight: 700;
+    color: var(--gc, var(--rune)); opacity: 0;
+    text-shadow: 0 0 14px currentColor;
+    animation: glyph-drift var(--gdur, 26s) linear var(--gdelay, 0s) infinite;
+    will-change: transform, opacity;
+  }
+  @keyframes glyph-drift {
+    0%   { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+    8%   { opacity: var(--gop, 0.16); }
+    85%  { opacity: var(--gop, 0.16); }
+    100% { transform: translate(var(--gdx, 40px), -125vh) rotate(var(--grot, 12deg)); opacity: 0; }
+  }
+
+  /*  Subtle idle life  */
+  #tablet { animation: tablet-breathe 5.5s ease-in-out infinite; }
+  @keyframes tablet-breathe {
+    0%, 100% { box-shadow: 0 0 40px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(79, 227, 208, 0.05); }
+    50% { box-shadow: 0 0 54px rgba(79, 227, 208, 0.16), inset 0 0 0 1px rgba(79, 227, 208, 0.1); }
+  }
+  .enemy-sprite { animation: sprite-bob 3.2s ease-in-out infinite; }
+  .enemy:nth-child(2n) .enemy-sprite { animation-delay: -1.1s; }
+  .enemy:nth-child(3n) .enemy-sprite { animation-delay: -2.1s; }
+  @keyframes sprite-bob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #tablet { animation: none; }
+    .enemy-sprite { animation: none; }
+    .shake, .glitching, #warpFlash.run, #dmgFlash.run, #floorBanner.show, .enemy.dying, #comboChip.pump, .toast { animation: none !important; }
+    #floorBanner.show { opacity: 1; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<div id="toasts" aria-live="polite"></div>
+<div id="sr-announcer" class="sr-only" role="status" aria-live="polite"></div>
+<noscript>
+  <div style="padding: 40px; color: #b9c6e6; font-family: monospace; background: #05070d">This quest needs JavaScript enabled to run — the dungeon evaluates real JS expressions live.</div>
+</noscript>
+
+<canvas id="particles" aria-hidden="true"></canvas>
+<div id="bgGlyphs" aria-hidden="true"></div>
+<div id="vig" aria-hidden="true"></div>
+<div id="scan" aria-hidden="true"></div>
+<div id="warpFlash" aria-hidden="true"></div>
+<div id="dmgFlash" aria-hidden="true"></div>
+<div id="floorBanner" aria-hidden="true">
+  <div class="fb-inner">
+    <div class="fb-depth"></div>
+    <div class="fb-name"></div>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════
+   Part A: the REAL evaluator, procedural generator, audio, particles.
+   Nothing about coercion is hand-authored — the browser computes it.
+   ══════════════════════════════════════════════════════════════════ */
+"use strict";
+
+const $ = (s) => document.querySelector(s);
+const $id = (id) => document.getElementById(id);
+const REDUCED = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+const pick = (a) => a[Math.floor(Math.random() * a.length)];
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** Small DOM-builder helper to cut down on repeated innerHTML plumbing. */
+function el(tag, attrs, children) {
+  const node = document.createElement(tag);
+  if (attrs) for (const k in attrs) {
+    if (k === "class") node.className = attrs[k];
+    else if (k === "html") node.innerHTML = attrs[k];
+    else if (k === "text") node.textContent = attrs[k];
+    else if (k.startsWith("on") && typeof attrs[k] === "function") node.addEventListener(k.slice(2), attrs[k]);
+    else node.setAttribute(k, attrs[k]);
+  }
+  (children || []).forEach((c) => c && node.appendChild(c));
+  return node;
+}
+
+function announce(msg) {
+  const a = $id("sr-announcer");
+  if (a) a.textContent = msg;
+}
+
+function toast(msg) {
+  const host = $id("toasts");
+  if (!host) return;
+  const t = el("div", { class: "toast", text: msg });
+  host.appendChild(t);
+  setTimeout(() => t.remove(), 3700);
+}
+
+/* ════════════════════ THE REAL EVALUATION ENGINE ═════════════════════
+   Every expression the player faces is run through the actual JS engine
+   via a strict-mode Function. The dungeon literally cannot lie about
+   coercion, because it isn't storing answers — it's asking JavaScript. */
+function evaluateExpr(exprStr) {
+  try {
+    const fn = new Function('"use strict"; return (' + exprStr + ");");
+    return { ok: true, value: fn() };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+/*  VALUE VOCABULARY & OPERATORS  */
+const VALUES = ["0", "1", "2", "-1", '""', '"0"', '"1"', '"false"', '"true"', '" "', "[]", "[0]", "[1]", "[[]]", "{}", "null", "undefined", "NaN", "true", "false"];
+const EQ_OPS = ["==", "===", "!=", "!=="];
+const CMP_OPS = ["<", ">", "<=", ">="];
+
+/* Naive prediction a coercion-blind beginner might make; divergence from
+   the real answer flags an expression as "surprising" for tier-ranking. */
+function naiveBool(a, op, b) {
+  const same = a === b;
+  switch (op) {
+    case "==": case "===": return same;
+    case "!=": case "!==": return !same;
+    case "<": return a < b;
+    case ">": return a > b;
+    case "<=": return a <= b;
+    case ">=": return a >= b;
+  }
+  return false;
+}
+function tierOf(op, surprising) {
+  if (op === "===" || op === "!==") return surprising ? 2 : 1;
+  return surprising ? 3 : 2;
+}
+
+/* Generate one valid boolean-comparison enemy expression, or null. */
+function genComparison(allowedOps) {
+  const a = pick(VALUES), b = pick(VALUES), op = pick(allowedOps);
+  const expr = a + " " + op + " " + b;
+  const r = evaluateExpr(expr);
+  if (!r.ok || typeof r.value !== "boolean") return null;
+  const surprising = naiveBool(a, op, b) !== r.value;
+  return { expr, answer: r.value, surprising, op, tier: tierOf(op, surprising), a, b };
+}
+
+/* Build a fresh, deduped, tier-bucketed pool for a run. */
+function buildPool() {
+  const seen = new Set();
+  const poolBuild = { 1: [], 2: [], 3: [] };
+  const allOps = EQ_OPS.concat(CMP_OPS);
+  let tries = 0;
+  while (tries < 40000 && (poolBuild[1].length < 60 || poolBuild[2].length < 60 || poolBuild[3].length < 60)) {
+    tries++;
+    const e = genComparison(allOps);
+    if (!e || seen.has(e.expr)) continue;
+    seen.add(e.expr);
+    if (poolBuild[e.tier].length < 120) poolBuild[e.tier].push(e);
+  }
+  return poolBuild;
+}
+
+/* Draw an enemy expression appropriate to the current depth.
+   Deeper floors mix in harder, more surprising tiers. */
+function drawEnemyExpr(pool, depth) {
+  let tier;
+  const roll = Math.random();
+  if (depth <= 1) tier = roll < 0.7 ? 1 : 2;
+  else if (depth <= 3) tier = roll < 0.35 ? 1 : roll < 0.8 ? 2 : 3;
+  else tier = roll < 0.2 ? 1 : roll < 0.55 ? 2 : 3;
+  for (const t of [tier, 2, 3, 1]) {
+    if (pool[t] && pool[t].length) {
+      const idx = Math.floor(Math.random() * pool[t].length);
+      return pool[t].splice(idx, 1)[0]; // consume so a run doesn't repeat
+    }
+  }
+  return genComparison(EQ_OPS.concat(CMP_OPS)) || { expr: "1 === 1", answer: true, surprising: false, op: "===", tier: 1 };
+}
+
+/* A short, honest explanation for the reveal line. Kept general — it
+   never claims more than "here's what JS returned and roughly why". */
+function explain(e) {
+  const op = e.op;
+  if (op === "===" || op === "!==") {
+    return "Strict " + (op === "===" ? "equality" : "inequality") + " compares type and value — no coercion happens here.";
+  }
+  if (op === "==" || op === "!=") {
+    return "Loose " + (op === "==" ? "equality" : "inequality") + " coerces both sides to a common type before comparing.";
+  }
+  return "Relational operators coerce operands to numbers (or compare strings lexically if both are strings).";
+}
+
+/*  AUDIO — synthetic Web Audio. Arcane machine hum + combat SFX. ── */
+const AudioFX = (() => {
+  // NOTE: everything here is closure state, not `this`. AudioFX methods are
+  // frequently called "detached" from the object, e.g.
+  // `(crit ? AudioFX.crit : AudioFX.hit)()`. A detached call has `this` as
+  // `undefined` in strict mode, so any method that read `this.isEnabled()`
+  // or `this._enabled` would throw "Cannot read properties of undefined
+  // (reading 'isEnabled')" the moment it was invoked that way. Using plain
+  // closures instead of `this` makes every method safe to call bound or
+  // unbound, passed as a callback, or destructured.
+  let ctx = null, hum = null, enabled = true;
+  const ac = () => {
+    try {
+      if (!ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        ctx = new AC();
+      }
+      if (ctx.state === "suspended") {
+        // resume() returns a promise that can reject (e.g. blocked by the
+        // browser's autoplay policy); never let that become an unhandled
+        // rejection or a thrown error.
+        const p = ctx.resume();
+        if (p && typeof p.catch === "function") p.catch(() => {});
+      }
+      return ctx;
+    } catch (e) {
+      return null;
+    }
+  };
+  const env = (g, t0, a, peak, d) => {
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(peak, t0 + a);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + a + d);
+  };
+  const osc = (type, f0, f1, dur, peak) => {
+    try {
+      const c = ac(); if (!c) return;
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = type;
+      o.frequency.setValueAtTime(f0, c.currentTime);
+      if (f1) o.frequency.exponentialRampToValueAtTime(f1, c.currentTime + dur);
+      env(g, c.currentTime, 0.006, peak || 0.1, dur);
+      o.connect(g); g.connect(c.destination);
+      o.start(); o.stop(c.currentTime + dur + 0.05);
+    } catch (e) { /* audio is decorative — never let it break gameplay */ }
+  };
+  const noise = (dur, peak, freq, type) => {
+    try {
+      const c = ac(); if (!c) return;
+      const b = c.createBuffer(1, Math.floor(c.sampleRate * dur), c.sampleRate);
+      const d = b.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      const s = c.createBufferSource(); s.buffer = b;
+      const f = c.createBiquadFilter(); f.type = type || "bandpass"; f.frequency.value = freq || 900;
+      const g = c.createGain();
+      env(g, c.currentTime, 0.008, peak || 0.14, dur);
+      s.connect(f); f.connect(g); g.connect(c.destination);
+      s.start();
+    } catch (e) { /* audio is decorative — never let it break gameplay */ }
+  };
+  const isEnabled = () => enabled !== false;
+  const stopHum = () => {
+    if (!hum) return;
+    try { hum.g.gain.value = 0; hum.o1.stop(); hum.o2.stop(); hum.lfo.stop(); } catch (e) {}
+    hum = null;
+  };
+  return {
+    unlock() { ac(); },
+    setEnabled(v) { enabled = v; if (!v) stopHum(); },
+    isEnabled,
+    startHum() {
+      if (!isEnabled()) return;
+      try {
+        const c = ac(); if (!c || hum) return;
+        const o1 = c.createOscillator(); o1.type = "sine"; o1.frequency.value = 48;
+        const o2 = c.createOscillator(); o2.type = "triangle"; o2.frequency.value = 72.1;
+        const lfo = c.createOscillator(); lfo.type = "sine"; lfo.frequency.value = 0.12;
+        const lg = c.createGain(); lg.gain.value = 0.015;
+        const g = c.createGain(); g.gain.value = 0.04;
+        lfo.connect(lg); lg.connect(g.gain);
+        o1.connect(g); o2.connect(g); g.connect(c.destination);
+        o1.start(); o2.start(); lfo.start();
+        hum = { o1, o2, lfo, g };
+      } catch (e) { /* audio is decorative — never let it break gameplay */ }
+    },
+    stopHum,
+    hit() { if (!isEnabled()) return; osc("triangle", 520, 880, 0.12, 0.12); noise(0.08, 0.06, 2600); },
+    crit() { if (!isEnabled()) return; osc("square", 400, 1200, 0.18, 0.13); noise(0.16, 0.1, 3200); },
+    miss() { if (!isEnabled()) return; osc("sawtooth", 260, 70, 0.4, 0.13); noise(0.3, 0.1, 500, "lowpass"); },
+    combo(n) { if (!isEnabled()) return; osc("sine", 440 + Math.min(n, 12) * 55, null, 0.14, 0.09); },
+    warp() { if (!isEnabled()) return; osc("sine", 900, 120, 0.5, 0.1); noise(0.4, 0.08, 1400); },
+    drop() { if (!isEnabled()) return; osc("sine", 660, 990, 0.25, 0.1); setTimeout(() => osc("sine", 990, 1320, 0.2, 0.08), 120); },
+    descend() { if (!isEnabled()) return; osc("sine", 300, 90, 0.7, 0.11); },
+    boss() { if (!isEnabled()) return; osc("sawtooth", 150, 520, 0.6, 0.16); noise(0.6, 0.14, 900); },
+    victory() { if (!isEnabled()) return; [392, 494, 587, 784].forEach((f, i) => setTimeout(() => osc("sine", f, null, 0.5, 0.08), i * 110)); },
+    defeat() { if (!isEnabled()) return; osc("sawtooth", 300, 50, 1.1, 0.14); noise(0.9, 0.1, 400, "lowpass"); }
+  };
+})();
+
+/*  PARTICLES — hit sparks, damage motes, victory burst  */
+const Particles = (() => {
+  const cv = $id("particles");
+  const cx = cv.getContext && cv.getContext("2d");
+  let parts = [], running = false;
+  const size = () => { cv.width = innerWidth; cv.height = innerHeight; };
+  addEventListener("resize", size);
+  size();
+  const frame = () => {
+    if (!cx) return;
+    if (!parts.length) { running = false; cx.clearRect(0, 0, cv.width, cv.height); return; }
+    cx.clearRect(0, 0, cv.width, cv.height);
+    parts = parts.filter((p) => p.life > 0);
+    for (const p of parts) {
+      p.x += p.vx; p.y += p.vy; p.vy += p.g; p.life--;
+      cx.globalAlpha = Math.max(0, p.life / p.max);
+      cx.fillStyle = p.color;
+      cx.beginPath(); cx.arc(p.x, p.y, p.r, 0, 6.28); cx.fill();
+    }
+    cx.globalAlpha = 1;
+    if (parts.length) requestAnimationFrame(frame); else running = false;
+  };
+  const spawn = (list) => {
+    if (REDUCED || !cx) return;
+    parts = parts.concat(list);
+    if (!running) { running = true; requestAnimationFrame(frame); }
+  };
+  const at = (sel) => {
+    const elx = typeof sel === "string" ? $(sel) : sel;
+    if (!elx) return { x: innerWidth / 2, y: innerHeight / 2 };
+    const b = elx.getBoundingClientRect();
+    return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
+  };
+  return {
+    burst(sel, color, n) {
+      const { x, y } = at(sel);
+      const out = [];
+      for (let i = 0; i < (n || 22); i++) {
+        const ang = Math.random() * 6.28, spd = 1 + Math.random() * 4.5;
+        out.push({ x, y, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd, g: 0.05, r: 1.4 + Math.random() * 2.4, life: 26 + Math.random() * 18, max: 40, color });
+      }
+      spawn(out);
+    },
+    rain(color, n) {
+      const out = [];
+      for (let i = 0; i < (n || 60); i++) out.push({ x: Math.random() * innerWidth, y: -10 - Math.random() * 200, vx: (Math.random() - 0.5) * 0.6, vy: 2 + Math.random() * 3, g: 0.02, r: 1.6 + Math.random() * 2.2, life: 140 + Math.random() * 80, max: 200, color });
+      spawn(out);
+    }
+  };
+})();
+
+/*  screen effects  */
+const FX = {
+  shake() { if (REDUCED) return; const a = $id("app"); if (!a) return; a.classList.add("shake"); setTimeout(() => a.classList.remove("shake"), 420); },
+  glitch(elx) { if (REDUCED) return; const t = elx || document.body; t.classList.add("glitching"); setTimeout(() => t.classList.remove("glitching"), 400); },
+  warp() { const f = $id("warpFlash"); f.classList.remove("run"); void f.offsetWidth; f.classList.add("run"); },
+  dmg() { const f = $id("dmgFlash"); f.classList.remove("run"); void f.offsetWidth; f.classList.add("run"); }
+};
+
+/*  Ambient background glyphs 
+   Purely decorative, non-interactive tokens drifting slowly up through
+   the background. Pure CSS-driven (infinite looping keyframe per glyph),
+   so once spawned they need no further JS. Skipped when the visitor has
+   asked for reduced motion, and safe to call if the container is
+   missing for any reason. */
+const BG_GLYPH_TOKENS = ["0", "1", '""', "[]", "{}", "null", "undefined", "NaN", "true", "false", "==", "===", "!=", "!=="];
+const BG_GLYPH_COLORS = ["var(--rune)", "var(--sigil)", "var(--falsy)", "var(--truthy)"];
+function spawnBackgroundGlyphs(count) {
+  const host = $id("bgGlyphs");
+  if (!host || REDUCED) return;
+  host.innerHTML = "";
+  const n = count || 16;
+  for (let i = 0; i < n; i++) {
+    const span = document.createElement("span");
+    span.className = "bg-glyph";
+    span.textContent = pick(BG_GLYPH_TOKENS);
+    const size = 14 + Math.random() * 22;
+    span.style.fontSize = size.toFixed(0) + "px";
+    span.style.setProperty("--gx", (Math.random() * 100).toFixed(1) + "vw");
+    span.style.setProperty("--gc", pick(BG_GLYPH_COLORS));
+    span.style.setProperty("--gdur", (20 + Math.random() * 22).toFixed(1) + "s");
+    span.style.setProperty("--gdelay", (-Math.random() * 34).toFixed(1) + "s");
+    span.style.setProperty("--gdx", (Math.random() * 160 - 80).toFixed(0) + "px");
+    span.style.setProperty("--grot", (Math.random() * 40 - 20).toFixed(0) + "deg");
+    span.style.setProperty("--gop", (0.08 + Math.random() * 0.14).toFixed(2));
+    host.appendChild(span);
+  }
+}
+
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════
+   Part B: game state, floors, combat loop, spellbook, rendering.
+   Plain DOM manipulation — no framework, no vdom needed for this one.
+   ══════════════════════════════════════════════════════════════════ */
+"use strict";
+
+const FLOORS = [
+  { depth: 1, name: "The Shallow Casts", enemies: 3, boss: false },
+  { depth: 2, name: "The Loose Halls", enemies: 4, boss: false },
+  { depth: 3, name: "The Warping Vault", enemies: 4, boss: false },
+  { depth: 4, name: "The Abstract Deep", enemies: 5, boss: false },
+  { depth: 5, name: "The Triple Equals", enemies: 1, boss: true }
+];
+
+/* Operator "spells" the player unlocks. These are passive lenses: when
+   unlocked, the reveal line teaches that operator's coercion rule, and
+   the spell glows when the current expression uses it. Purely additive —
+   they never gate progress, only deepen understanding. */
+const SPELLS = [
+  { id: "boolean", label: "Boolean()", teach: "Boolean(x) shows the raw truthiness of any value — the ultimate ground truth.", relevantOps: [] },
+  { id: "number", label: "Number()", teach: "Number(x) reveals what == and < / > coerce operands to under the hood.", relevantOps: ["==", "!=", "<", ">", "<=", ">="] },
+  { id: "string", label: "String()", teach: "String(x) shows what string-context coercion (like + with a string) produces.", relevantOps: [] },
+  { id: "nullish", label: "?? / ?.", teach: "?? and ?. treat only null and undefined as 'missing' — everything else, even 0 or \"\", is left alone.", relevantOps: [] }
+];
+
+const G = {
+  screen: "title", // title | play | win | lose
+  pool: null,
+  floorIndex: 0,
+  enemiesLeft: 0,
+  enemyTotal: 0,
+  current: null,
+  hp: 100,
+  maxHp: 100,
+  combo: 0,
+  bestCombo: 0,
+  answered: false,
+  spells: [],
+  stats: { faced: 0, correct: 0, floorsCleared: 0 },
+  startTime: null,
+  bossHp: 0,
+  soundOn: true
+};
+
+/*  LOG*/
+let logLines = [];
+function log(type, text) {
+  logLines.push({ type, text });
+  const out = $id("logOut");
+  if (out) {
+    const d = el("div", { class: "l-" + type, text });
+    out.appendChild(d);
+    out.scrollTop = out.scrollHeight;
+    while (out.children.length > 80) out.removeChild(out.firstChild);
+  }
+}
+
+/*  tokenize expr for colored display  */
+const ALL_OPS = new Set(EQ_OPS.concat(CMP_OPS));
+function renderExpr(exprStr) {
+  return exprStr
+    .split(" ")
+    .map((tok) => '<span class="' + (ALL_OPS.has(tok) ? "tok-op" : "tok-val") + '">' + escapeHtml(tok) + "</span>")
+    .join(" ");
+}
+function escapeHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   RENDER — build the play screen once, then update pieces in place.
+   ══════════════════════════════════════════════════════════════════ */
+function mountPlayScreen() {
+  const root = $id("root");
+  root.innerHTML = "";
+
+  const hud = el("header", { id: "hud", role: "region", "aria-label": "Status" }, [
+    el("span", { class: "hud-label" }, [document.createTextNode("Truthiness")]),
+    el("div", { id: "hpWrap" }, [
+      el("div", { id: "hpBar", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": String(G.maxHp), "aria-valuenow": String(Math.round(G.hp)) }, [el("div", { id: "hpFill" })]),
+      el("span", { id: "hpNum" })
+    ]),
+    el("span", { id: "comboChip", class: "hud-chip" }),
+    el("span", { id: "accChip", class: "hud-chip" }),
+    el("span", { id: "floorChip", class: "hud-chip" }),
+    el("span", { id: "depthChip", class: "hud-chip" }),
+    el("div", { id: "floorDots", "aria-hidden": "true" }),
+    el("button", { id: "helpBtn", type: "button", "aria-label": "How to play", title: "How to play", onclick: openHelp, text: "?" })
+  ]);
+
+  const stage = el("main", { id: "stage" }, [
+    el("div", { id: "arena" }, [
+      el("div", { id: "enemyRow", "aria-hidden": "true" }),
+      el("div", { id: "tablet" }, [
+        el("div", { id: "tabletLabel" }, [document.createTextNode("The Coercion Engine speaks")]),
+        el("div", { id: "exprText", "aria-hidden": "true" }),
+        el("div", { id: "promptText" }),
+        el("div", { id: "answers" }, [
+          el("button", { id: "btnTrue", class: "answer-btn", type: "button", "data-kind": "true", "aria-label": "Answer: truthy (true)" }, [document.createTextNode("TRUTHY")]),
+          el("button", { id: "btnFalse", class: "answer-btn", type: "button", "data-kind": "false", "aria-label": "Answer: falsy (false)" }, [document.createTextNode("FALSY")])
+        ]),
+        el("span", { class: "kbd-hint" }, [document.createTextNode("Keys: T / ← / 1 = Truthy · F / → / 2 = Falsy")]),
+        el("div", { id: "reveal", role: "status", "aria-live": "polite" })
+      ])
+    ])
+  ]);
+
+  const spellbook = el("div", { id: "spellbook", role: "region", "aria-label": "Unlocked spells" }, [
+    el("span", { class: "sb-label" }, [document.createTextNode("Spellbook")])
+  ]);
+
+  const logPanel = el("div", { id: "log" }, [
+    el("div", { id: "logBar" }, [document.createTextNode("Dungeon log")]),
+    el("div", { id: "logOut", role: "log", "aria-label": "Combat log" })
+  ]);
+
+  const app = el("div", { id: "app" }, [hud, stage, spellbook, logPanel]);
+  root.appendChild(app);
+
+  $id("btnTrue").addEventListener("click", () => answer(true));
+  $id("btnFalse").addEventListener("click", () => answer(false));
+  renderSpellbook();
+  renderFloorDots();
+  const out = $id("logOut");
+  logLines.slice(-40).forEach((l) => out.appendChild(el("div", { class: "l-" + l.type, text: l.text })));
+  out.scrollTop = out.scrollHeight;
+}
+
+function renderHUD() {
+  const pct = Math.max(0, Math.round((G.hp / G.maxHp) * 100));
+  const fill = $id("hpFill"), num = $id("hpNum"), bar = $id("hpBar");
+  if (fill) {
+    fill.style.width = pct + "%";
+    const color = pct > 60 ? "var(--truthy)" : pct > 30 ? "var(--amber)" : "var(--blood)";
+    fill.style.background = color;
+    if (num) {
+      num.style.color = color;
+      num.textContent = Math.max(0, Math.ceil(G.hp)) + " / " + G.maxHp;
+    }
+    if (bar) bar.setAttribute("aria-valuenow", String(Math.max(0, Math.ceil(G.hp))));
+  }
+  const combo = $id("comboChip");
+  if (combo) combo.textContent = "COMBO ×" + comboMult();
+  const acc = $id("accChip");
+  if (acc) {
+    const pctAcc = G.stats.faced ? Math.round((G.stats.correct / G.stats.faced) * 100) : 100;
+    acc.textContent = "ACC " + pctAcc + "%";
+  }
+  const curFloor = FLOORS[G.floorIndex];
+  const fc = $id("floorChip");
+  if (fc && curFloor) fc.textContent = curFloor.name;
+  const dc = $id("depthChip");
+  if (dc && curFloor) dc.textContent = "DEPTH " + curFloor.depth;
+  renderFloorDots();
+}
+
+function renderFloorDots() {
+  const host = $id("floorDots");
+  if (!host) return;
+  host.innerHTML = "";
+  FLOORS.forEach((f, i) => {
+    const cls = ["", f.boss ? "boss" : ""];
+    if (i < G.floorIndex) cls.push("done");
+    else if (i === G.floorIndex) cls.push("now");
+    host.appendChild(el("i", { class: cls.filter(Boolean).join(" "), title: f.name }));
+  });
+}
+
+function renderSpellbook() {
+  const sb = $id("spellbook");
+  if (!sb) return;
+  [...sb.querySelectorAll(".spell")].forEach((n) => n.remove());
+  SPELLS.forEach((sp) => {
+    const unlocked = G.spells.includes(sp.id);
+    const spanEl = el("span", {
+      class: "spell" + (unlocked ? "" : " locked"),
+      title: unlocked ? sp.teach : "Locked — clear more floors to unlock",
+      "data-spell": sp.id,
+      tabindex: "0"
+    }, [document.createTextNode(unlocked ? sp.label : "🔒 " + sp.label)]);
+    sb.appendChild(spanEl);
+  });
+}
+
+function renderEnemies() {
+  const row = $id("enemyRow");
+  if (!row) return;
+  row.innerHTML = "";
+  const floor = FLOORS[G.floorIndex];
+  if (!floor) return;
+  if (floor.boss) {
+    row.appendChild(makeEnemySprite(true, G.bossHp, 3, "The Triple Equals"));
+    return;
+  }
+  const remaining = G.enemiesLeft, total = G.enemyTotal;
+  for (let i = 0; i < total; i++) {
+    const alive = i < remaining;
+    const spr = makeEnemySprite(false, alive ? 1 : 0, 1, "Coercion wisp");
+    spr.style.opacity = alive ? "1" : "0.18";
+    if (i === total - remaining && alive) spr.dataset.active = "1";
+    row.appendChild(spr);
+  }
+}
+
+function makeEnemySprite(isBoss, hpDots, maxDots, name) {
+  const wrap = el("div", { class: "enemy" + (isBoss ? " boss" : "") });
+  const hue = isBoss ? 320 : 168;
+  const svg = isBoss ? bossSVG() : glyphSVG(hue);
+  const dots = el("div", { class: "enemy-hpdot" },
+    Array.from({ length: maxDots }, (_, i) => el("i", { class: i < hpDots ? "" : "spent" })));
+  wrap.appendChild(el("div", { class: "enemy-sprite", html: svg }));
+  wrap.appendChild(dots);
+  wrap.appendChild(el("div", { class: "enemy-name" }, [document.createTextNode(name)]));
+  return wrap;
+}
+function glyphSVG(hue) {
+  return '<svg viewBox="0 0 92 92" width="92" height="92" aria-hidden="true">' +
+    '<circle cx="46" cy="46" r="34" fill="none" stroke="hsl(' + hue + ',70%,55%)" stroke-width="2" opacity="0.55"/>' +
+    '<circle cx="46" cy="46" r="22" fill="hsl(' + hue + ',70%,14%)" stroke="hsl(' + hue + ',80%,60%)" stroke-width="2"/>' +
+    '<text x="46" y="53" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="22" font-weight="800" fill="hsl(' + hue + ',85%,72%)">?</text>' +
+    "</svg>";
+}
+function bossSVG() {
+  return '<svg viewBox="0 0 150 150" width="150" height="150" aria-hidden="true">' +
+    '<polygon points="75,12 132,45 132,105 75,138 18,105 18,45" fill="#1a0e22" stroke="#ff5ea8" stroke-width="2.5"/>' +
+    '<polygon points="75,34 112,55 112,95 75,116 38,95 38,55" fill="none" stroke="#ff8fc4" stroke-width="1.5" opacity="0.6"/>' +
+    '<text x="75" y="86" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="30" font-weight="800" fill="#ff9ecf">===</text>' +
+    "</svg>";
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   COMBAT
+   ══════════════════════════════════════════════════════════════════ */
+function comboMult() { return 1 + Math.floor(G.combo / 3); }
+
+function nextEnemy() {
+  // Defensive: this runs off a setTimeout, so the screen may have already
+  // moved on (win/lose/new run) by the time it fires. If so, the play
+  // screen's DOM is gone — bail out instead of throwing on null elements.
+  if (G.screen !== "play") return;
+  const floor = FLOORS[G.floorIndex];
+  if (!floor) return;
+  G.current = floor.boss ? drawBossExpr() : drawEnemyExpr(G.pool, floor.depth);
+  G.answered = false;
+  G.stats.faced++;
+  const exprEl = $id("exprText");
+  if (!exprEl) return;
+  exprEl.innerHTML = renderExpr(G.current.expr);
+  const promptEl = $id("promptText");
+  if (promptEl) promptEl.innerHTML = 'Does this evaluate to <b>truthy</b> or <b>falsy</b>? Predict, then commit.';
+  const revealEl = $id("reveal");
+  if (revealEl) revealEl.innerHTML = "";
+  const bt = $id("btnTrue"), bf = $id("btnFalse");
+  [bt, bf].forEach((b) => { if (b) { b.disabled = false; b.className = "answer-btn"; } });
+  announce("New expression: " + G.current.expr);
+  highlightSpellFor(G.current);
+  renderEnemies();
+}
+
+function drawBossExpr() {
+  for (let i = 0; i < 200; i++) {
+    const a = pick(VALUES), b = pick(VALUES), op = pick(["===", "!=="]);
+    if (a === b) continue;
+    const expr = a + " " + op + " " + b;
+    const r = evaluateExpr(expr);
+    if (r.ok && typeof r.value === "boolean") return { expr, answer: r.value, surprising: true, op, tier: 2, a, b };
+  }
+  return { expr: '0 === ""', answer: false, surprising: true, op: "===", a: "0", b: '""', tier: 2 };
+}
+
+function highlightSpellFor(e) {
+  const sb = $id("spellbook");
+  if (!sb) return;
+  [...sb.querySelectorAll(".spell")].forEach((n) => n.classList.remove("active"));
+  const match = SPELLS.find((s) => G.spells.includes(s.id) && s.relevantOps.includes(e.op));
+  if (match) {
+    const n = sb.querySelector('[data-spell="' + match.id + '"]');
+    if (n) n.classList.add("active");
+  }
+}
+
+function answer(guess) {
+  if (G.answered || G.screen !== "play") return;
+  const e = G.current;
+  if (!e) return; // defensive: no live expression to judge, nothing to do
+  G.answered = true;
+  const correct = guess === e.answer;
+  const bt = $id("btnTrue"), bf = $id("btnFalse");
+  if (bt) bt.disabled = true;
+  if (bf) bf.disabled = true;
+  const chosen = guess ? bt : bf;
+  const right = e.answer ? bt : bf;
+
+  if (correct) {
+    if (chosen) chosen.classList.add("correct");
+    G.combo++;
+    G.bestCombo = Math.max(G.bestCombo, G.combo);
+    G.stats.correct++;
+    const mult = comboMult();
+    const crit = mult >= 2;
+    if (crit) AudioFX.crit(); else AudioFX.hit();
+    AudioFX.combo(G.combo);
+    Particles.burst('.enemy[data-active="1"] .enemy-sprite, .enemy.boss .enemy-sprite', crit ? "#f2c14e" : "#4fe3d0", crit ? 34 : 20);
+    const cc = $id("comboChip");
+    if (cc && !REDUCED) { cc.classList.add("pump"); setTimeout(() => cc.classList.remove("pump"), 140); }
+    const revealEl = $id("reveal");
+    if (revealEl) {
+      revealEl.innerHTML = '<span class="r-ok">✓ ' + boolWord(e.answer) + '.</span> <code>' + escapeHtml(e.expr) + "</code>" +
+        '<span class="r-why">' + explain(e) + "</span>";
+    }
+    announce("Correct. " + e.expr + " is " + boolWord(e.answer) + ".");
+    log("ok", "HIT ×" + mult + "  " + e.expr + " → " + e.answer);
+    resolveHit(crit ? 2 : 1);
+  } else {
+    if (chosen) chosen.classList.add("wrong");
+    if (right) right.classList.add("correct");
+    const floor = FLOORS[G.floorIndex];
+    const dmg = 12 + (floor ? floor.depth : 1) * 3 + (e.surprising ? 4 : 0);
+    G.combo = 0;
+    AudioFX.miss();
+    FX.dmg(); FX.shake();
+    Particles.burst("#tablet", "#ff4d5e", 26);
+    G.hp -= dmg;
+    const revealEl = $id("reveal");
+    if (revealEl) {
+      revealEl.innerHTML = '<span class="r-bad">✗ it was ' + boolWord(e.answer) + '.</span> <code>' + escapeHtml(e.expr) + "</code> — took −" + dmg + " truthiness." +
+        '<span class="r-why">' + explain(e) + "</span>";
+    }
+    announce("Wrong. " + e.expr + " is actually " + boolWord(e.answer) + ". You took " + dmg + " damage.");
+    log("bad", "MISS  " + e.expr + " → was " + e.answer + " (−" + dmg + " truthiness)");
+    renderHUD();
+    if (G.hp <= 0) { setTimeout(loseGame, 700); return; }
+    setTimeout(nextEnemy, 1450);
+  }
+}
+function boolWord(b) { return b ? "truthy (true)" : "falsy (false)"; }
+
+function resolveHit(dots) {
+  if (G.screen !== "play") return; // defensive: guard against a stray call after the run ended
+  const floor = FLOORS[G.floorIndex];
+  if (!floor) return;
+  renderHUD();
+  if (floor.boss) {
+    G.bossHp -= dots;
+    if (G.bossHp <= 0) { setTimeout(() => clearFloor(), 900); return; }
+    setTimeout(nextEnemy, 1250);
+    return;
+  }
+  G.enemiesLeft -= 1;
+  const wispEl = $('.enemy[data-active="1"]');
+  if (wispEl && !REDUCED) wispEl.classList.add("dying");
+  if (G.enemiesLeft <= 0) { setTimeout(() => clearFloor(), 900); return; }
+  setTimeout(nextEnemy, 1150);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   FLOOR FLOW
+   ══════════════════════════════════════════════════════════════════ */
+function startFloor() {
+  const floor = FLOORS[G.floorIndex];
+  if (!floor) return; // defensive: shouldn't happen, but never crash on a bad index
+  G.enemyTotal = floor.enemies;
+  G.enemiesLeft = floor.enemies;
+  if (floor.boss) { G.bossHp = 3; AudioFX.boss(); }
+  // Clear the previous floor's expression immediately so it can't linger
+  // on the tablet (or be answered) during the banner delay.
+  G.current = null;
+  G.answered = true;
+  const exprEl = $id("exprText"); if (exprEl) exprEl.innerHTML = "";
+  const promptEl = $id("promptText"); if (promptEl) promptEl.innerHTML = "";
+  const revealEl = $id("reveal"); if (revealEl) revealEl.innerHTML = "";
+  const bt = $id("btnTrue"), bf = $id("btnFalse");
+  if (bt) bt.disabled = true;
+  if (bf) bf.disabled = true;
+  showFloorBanner(floor);
+  renderHUD();
+  setTimeout(() => { nextEnemy(); }, REDUCED ? 200 : 1100);
+}
+
+function clearFloor() {
+  G.stats.floorsCleared++;
+  const floor = FLOORS[G.floorIndex];
+  if (!floor) { winGame(); return; } // defensive: out-of-range means the run is over
+  log("sys", "Floor cleared: " + floor.name + ".");
+  G.hp = Math.min(G.maxHp, G.hp + 12);
+  maybeUnlockSpell();
+  G.floorIndex++;
+  if (G.floorIndex >= FLOORS.length) { winGame(); return; }
+  AudioFX.descend();
+  startFloor();
+}
+
+function maybeUnlockSpell() {
+  const next = SPELLS.find((s) => !G.spells.includes(s.id));
+  if (!next) return;
+  G.spells.push(next.id);
+  AudioFX.drop();
+  Particles.burst("#spellbook", "#4fe3d0", 24);
+  log("engine", "SPELL UNLOCKED: " + next.label + " — " + next.teach);
+  toast("✦ Spell unlocked: " + next.label);
+  renderSpellbook();
+}
+
+function showFloorBanner(floor) {
+  const b = $id("floorBanner");
+  b.querySelector(".fb-depth").textContent = floor.boss ? "⚠ BOSS ⚠" : "Depth " + floor.depth;
+  b.querySelector(".fb-name").textContent = floor.name;
+  b.classList.remove("show");
+  void b.offsetWidth;
+  b.classList.add("show");
+  announce((floor.boss ? "Boss floor: " : "Floor: ") + floor.name);
+  if (floor.boss) log("engine", "The Triple Equals rises. It refuses all coercion — only exact type and value survive its gaze.");
+}
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════
+   Part C: title, help modal, win, lose, run lifecycle, boot.
+   ══════════════════════════════════════════════════════════════════ */
+"use strict";
+
+function showTitle() {
+  G.screen = "title";
+  const root = $id("root");
+  root.innerHTML = "";
+  const ov = el("div", { class: "overlay" }, [
+    el("h1", { class: "title-main" }, [document.createTextNode("Type Coercion"), document.createElement("br"), document.createTextNode("Dungeon")]),
+    el("div", { class: "title-sub" }, [document.createTextNode("a javascript roguelike")]),
+    el("div", { class: "story", html:
+      'You wake inside <b>The Coercion Engine</b> — an ancient machine that judges everything by whether it is <span class="glow">truthy</span> or <span class="glow">falsy</span>. ' +
+      "Its guardians are living expressions: <code>0 == \"\"</code>, <code>[] == false</code>, <code>NaN === NaN</code>. " +
+      "Predict correctly and your blade lands true. Guess wrong, and the Engine's own logic drains your Truthiness. " +
+      "Descend five floors. Survive <b>The Triple Equals</b>." }),
+    el("div", { class: "btn-row" }, [
+      el("button", { class: "btn gold", id: "startBtn", type: "button" }, [document.createTextNode("Descend")]),
+      el("button", { class: "btn ghost", id: "howToBtn", type: "button" }, [document.createTextNode("How to Play")])
+    ]),
+    el("div", { class: "small-warning" }, [document.createTextNode("Every expression is evaluated live by your browser's JS engine — nothing here is scripted.")])
+  ]);
+  root.appendChild(ov);
+  $id("startBtn").addEventListener("click", startRun);
+  $id("howToBtn").addEventListener("click", () => openHelp());
+  $id("startBtn").focus();
+}
+
+function helpBodyHTML() {
+  return (
+    '<h2>How to Play</h2>' +
+    '<div class="sub">Predict the Engine\'s verdict before it lands</div>' +
+    "<ul>" +
+    "<li>Each enemy is a real JavaScript expression like <code>1 == \"1\"</code>. Decide whether it evaluates to <b>truthy</b> or <b>falsy</b>.</li>" +
+    "<li>Correct guesses damage the enemy and build a <b>combo</b> — every 3 in a row raises your multiplier.</li>" +
+    "<li>Wrong guesses drain your <b>Truthiness (HP)</b>. Losing it all ends the run.</li>" +
+    "<li>Clearing a floor heals you a little and may drop a new <b>spell</b> — a passive lens that explains one coercion rule.</li>" +
+    "<li>Floor 5 is <b>The Triple Equals</b>: a boss that only asks strict <code>===</code> / <code>!==</code> questions.</li>" +
+    "</ul>" +
+    "<div class=\"sub\">Controls</div>" +
+    "<ul>" +
+    "<li><kbd>T</kbd> / <kbd>←</kbd> / <kbd>1</kbd> — answer Truthy</li>" +
+    "<li><kbd>F</kbd> / <kbd>→</kbd> / <kbd>2</kbd> — answer Falsy</li>" +
+    "<li><kbd>Esc</kbd> — close this dialog</li>" +
+    "</ul>"
+  );
+}
+
+let lastFocusEl = null;
+function openHelp() {
+  // Guard against double-invocation (double-click, double-tap, a second
+  // trigger firing before this one finished mounting). Without this,
+  // two elements sharing id="helpModal" could exist at once; getElementById
+  // always resolves to the first one, so the second modal's own Close
+  // button would never get its click listener, and it would ignore the
+  // stored focus target, leaving a permanently unclosable dialog on top
+  // of the game (recoverable only by chance via double-pressing Escape).
+  if ($id("helpModal")) return;
+  lastFocusEl = document.activeElement;
+  const ov = el("div", { id: "helpModal", class: "overlay", role: "dialog", "aria-modal": "true", "aria-label": "How to play" }, [
+    el("div", { class: "modal-card", html: helpBodyHTML() })
+  ]);
+  const closeRow = el("div", { class: "modal-close-row" }, [
+    el("button", { class: "btn ghost", id: "helpCloseBtn", type: "button" }, [document.createTextNode("Close")])
+  ]);
+  ov.firstChild.appendChild(closeRow);
+  document.body.appendChild(ov);
+  const closeBtn = ov.querySelector("#helpCloseBtn");
+  if (closeBtn) {
+    closeBtn.addEventListener("click", closeHelp);
+    closeBtn.focus();
+  }
+  ov.addEventListener("click", (e) => { if (e.target === ov) closeHelp(); });
+}
+function closeHelp() {
+  const ov = $id("helpModal");
+  if (ov) ov.remove();
+  // Restore focus to whatever triggered the modal, but only if that
+  // element is still a real, attached, focusable node — it may have been
+  // removed from the DOM (e.g. a screen transition happened while the
+  // modal was open). Falling back to the body keeps focus from silently
+  // vanishing into nowhere.
+  if (lastFocusEl && typeof lastFocusEl.focus === "function" && document.contains(lastFocusEl)) {
+    lastFocusEl.focus();
+  }
+  lastFocusEl = null;
+}
+
+function startRun() {
+  AudioFX.unlock();
+  AudioFX.startHum();
+  G.screen = "play";
+  G.pool = buildPool();
+  G.floorIndex = 0;
+  G.hp = G.maxHp = 100;
+  G.combo = 0;
+  G.bestCombo = 0;
+  G.spells = [];
+  G.stats = { faced: 0, correct: 0, floorsCleared: 0 };
+  G.startTime = Date.now();
+  logLines = [];
+  mountPlayScreen();
+  log("engine", "reality.coerce() is online. The walls rearrange themselves into an answer.");
+  startFloor();
+}
+
+function formatTime(ms) {
+  const mm = Math.floor(ms / 60000), ss = Math.floor((ms % 60000) / 1000);
+  return mm + ":" + String(ss).padStart(2, "0");
+}
+
+function winGame() {
+  G.screen = "win";
+  AudioFX.stopHum();
+  AudioFX.victory();
+  Particles.rain("#46e39a", 80);
+  setTimeout(() => Particles.rain("#f2c14e", 50), 700);
+  const ms = Date.now() - (G.startTime || Date.now());
+  const acc = G.stats.faced ? Math.round((G.stats.correct / G.stats.faced) * 100) : 0;
+  const root = $id("root");
+  root.innerHTML = "";
+  const ov = el("div", { class: "overlay" }, [
+    el("h1", { class: "title-main", style: "color:var(--truthy);text-shadow:0 0 30px rgba(70,227,154,0.5)" }, [document.createTextNode("Coercion")," ",document.createTextNode("Mastered")]),
+    el("div", { class: "title-sub" }, [document.createTextNode("the triple equals falls silent")]),
+    el("div", { class: "stat-grid" }, [
+      statBlock(acc + "%", "Accuracy"),
+      statBlock(String(G.bestCombo), "Best Combo"),
+      statBlock(String(G.spells.length) + "/" + SPELLS.length, "Spells"),
+      statBlock(formatTime(ms), "Time")
+    ]),
+    el("div", { class: "btn-row" }, [
+      el("button", { class: "btn gold", id: "againBtn", type: "button" }, [document.createTextNode("Descend Again")])
+    ])
+  ]);
+  root.appendChild(ov);
+  $id("againBtn").addEventListener("click", startRun);
+  $id("againBtn").focus();
+  announce("You defeated the Triple Equals. Run complete.");
+}
+
+function loseGame() {
+  G.screen = "lose";
+  AudioFX.stopHum();
+  AudioFX.defeat();
+  FX.warp();
+  const acc = G.stats.faced ? Math.round((G.stats.correct / G.stats.faced) * 100) : 0;
+  const floor = FLOORS[G.floorIndex];
+  const root = $id("root");
+  root.innerHTML = "";
+  const ov = el("div", { class: "overlay" }, [
+    el("h1", { class: "title-main", style: "color:var(--falsy);text-shadow:0 0 30px rgba(255,94,168,0.5)" }, [document.createTextNode("Coerced")," ",document.createTextNode("Away")]),
+    el("div", { class: "title-sub" }, [document.createTextNode("fell on " + floor.name)]),
+    el("div", { class: "stat-grid" }, [
+      statBlock(acc + "%", "Accuracy"),
+      statBlock(String(G.bestCombo), "Best Combo"),
+      statBlock(String(G.stats.floorsCleared), "Floors Cleared")
+    ]),
+    el("div", { class: "btn-row" }, [
+      el("button", { class: "btn gold", id: "retryBtn", type: "button" }, [document.createTextNode("Try Again")])
+    ])
+  ]);
+  root.appendChild(ov);
+  $id("retryBtn").addEventListener("click", startRun);
+  $id("retryBtn").focus();
+  announce("The dungeon coerced you away. Run over.");
+}
+
+function statBlock(v, k) {
+  return el("div", { class: "stat" }, [
+    el("div", { class: "v", text: v }),
+    el("div", { class: "k", text: k })
+  ]);
+}
+
+/* keyboard: T / F / ← → and 1 / 2 as answer shortcuts, Esc closes help */
+addEventListener("keydown", (e) => {
+  if ($id("helpModal")) {
+    if (e.key === "Escape") closeHelp();
+    return;
+  }
+  if (G.screen === "title" && (e.key === "Enter" || e.key === " ")) return; // let native button handle it
+  if (G.screen !== "play" || G.answered) return;
+  const k = (e.key || "").toLowerCase();
+  if (k === "t" || k === "arrowleft" || k === "1") { e.preventDefault(); answer(true); }
+  else if (k === "f" || k === "arrowright" || k === "2") { e.preventDefault(); answer(false); }
+});
+
+/*  BOOT */
+spawnBackgroundGlyphs();
+showTitle();
+</script>
+</body>
+</html>
