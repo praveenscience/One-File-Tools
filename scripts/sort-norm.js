@@ -75,6 +75,25 @@ if (Array.isArray(data.quests)) {
   }
 }
 
+// Normalize and sort designs (design-system.json)
+if (Array.isArray(data.designs)) {
+  data.designs.sort((a, b) => a.name.localeCompare(b.name));
+
+  for (const design of data.designs) {
+    if (Array.isArray(design.tags)) {
+      design.tags = [...new Set(design.tags.map(normalizeTag))].sort((a, b) => a.localeCompare(b));
+    }
+
+    if (Array.isArray(design.techStack)) {
+      design.techStack.sort((a, b) => a.localeCompare(b));
+    }
+
+    if (Array.isArray(design.frameworks)) {
+      design.frameworks.sort((a, b) => a.localeCompare(b));
+    }
+  }
+}
+
 // Sort theme arrays (themes.json: { resume: [...], portfolio: [...] })
 for (const pillar of ["resume", "portfolio"]) {
   if (Array.isArray(data[pillar])) {
