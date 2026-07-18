@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CSS Box Model Detective: Margins Edition</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@500;600;700&family=Fira+Code:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-dark: #070b19;
+      --bg-surface: rgba(13, 22, 47, 0.7);
+      --bg-surface-glow: rgba(13, 22, 47, 0.95);
+      --border-color: rgba(0, 229, 255, 0.15);
+      --border-color-glow: rgba(0, 229, 255, 0.4);
+      --neon-cyan: #00e5ff;
+      --neon-purple: #d500f9;
+      --neon-green: #00e676;
+      --neon-red: #ff1744;
+      --font-sci-fi: 'Orbitron', sans-serif;
+      --font-label: 'Rajdhani', sans-serif;
+      --font-code: 'Fira Code', monospace;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin:0; padding:0; }
+    body {
+      background: var(--bg-dark);
+      color:#e2e8f0;
+      display:flex; justify-content:center; align-items:center; height:100vh; font-family:var(--font-label);
+    }
+    .game-wrapper { position:relative; width:90vw; max-width:900px; height:80vh; max-height:600px; background:var(--bg-surface); border:1px solid var(--border-color); border-radius:12px; overflow:hidden; display:flex; flex-direction:column; }
+    .canvas-area { flex:1; position:relative; display:flex; justify-content:center; align-items:center; }
+    .target-box {
+      width:200px; height:200px; background:rgba(0,229,255,0.1); border:2px solid var(--neon-cyan); border-radius:4px; position:relative;
+    }
+    .target-box::after {
+      content:'Target'; position:absolute; inset:0; font-family:var(--font-sci-fi); color:var(--neon-cyan); display:flex; justify-content:center; align-items:center; opacity:0.6;
+    }
+    .control-panel { padding:1rem; background:rgba(13,22,47,0.9); border-top:1px solid var(--border-color); display:grid; grid-template-columns:repeat(auto-fill, minmax(150px,1fr)); gap:0.8rem; }
+    .control-card { background:rgba(10,17,38,0.8); border:1px solid var(--border-color); border-radius:8px; padding:0.8rem; }
+    .control-card label { display:block; font-size:0.85rem; margin-bottom:0.3rem; color:#94a3b8; }
+    .control-card input[type=range] { width:100%; }
+    .error-panel { padding:0.5rem; background:rgba(255,0,0,0.1); color:#ff1744; font-size:0.85rem; min-height:1.2rem; }
+    .screen { position:absolute; inset:0; background:#060916; color:#fff; display:flex; flex-direction:column; justify-content:center; align-items:center; z-index:10; }
+    .screen button { margin-top:1rem; padding:0.6rem 1.2rem; background:var(--neon-cyan); border:none; border-radius:4px; color:#000; font-family:var(--font-sci-fi); cursor:pointer; }
+  </style>
+</head>
+<body>
+  <div class="game-wrapper">
+    <div class="canvas-area">
+      <div class="target-box" id="targetBox"></div>
+    </div>
+    <div class="control-panel" id="controls">
+      <div class="control-card">
+        <label for="marginTop">Margin Top</label>
+        <input type="range" id="marginTop" min="-50" max="100" value="0" />
+      </div>
+      <div class="control-card">
+        <label for="marginRight">Margin Right</label>
+        <input type="range" id="marginRight" min="-50" max="100" value="0" />
+      </div>
+      <div class="control-card">
+        <label for="marginBottom">Margin Bottom</label>
+        <input type="range" id="marginBottom" min="-50" max="100" value="0" />
+      </div>
+      <div class="control-card">
+        <label for="marginLeft">Margin Left</label>
+        <input type="range" id="marginLeft" min="-50" max="100" value="0" />
+      </div>
+      <div class="control-card">
+        <label for="padding">Padding (all)</label>
+        <input type="range" id="padding" min="0" max="50" value="0" />
+      </div>
+      <div class="control-card">
+        <label for="borderWidth">Border Width</label>
+        <input type="range" id="borderWidth" min="0" max="10" value="2" />
+      </div>
+      <div class="control-card">
+        <label for="radius">Border Radius</label>
+        <input type="range" id="radius" min="0" max="30" value="4" />
+      </div>
+    </div>
+    <div class="error-panel" id="errorPanel"></div>
+    <div class="screen" id="introScreen">
+      <h1 class="game-title">Box Model Detective: Margins Edition</h1>
+      <p class="game-desc">Adjust margins, padding, border and radius so the highlighted box aligns perfectly inside the blueprint. Margin collapse rules apply.</p>
+      <button id="startBtn">Start Mission</button>
+    </div>
+  </div>
+  <script>
+    const target = document.getElementById('targetBox');
+    const controls = document.getElementById('controls');
+    const errorPanel = document.getElementById('errorPanel');
+    const intro = document.getElementById('introScreen');
+    const startBtn = document.getElementById('startBtn');
+
+    const levelKey = 'boxModelDetectiveMarginsLevel';
+    const streakKey = 'boxModelDetectiveMarginsStreak';
+    const defaultLevel = {marginTop:20, marginRight:20, marginBottom:20, marginLeft:20, padding:10, borderWidth:2, radius:4};
+
+    function loadProgress(){
+      const saved = localStorage.getItem(levelKey);
+      return saved ? JSON.parse(saved) : defaultLevel;
+    }
+    function saveProgress(state){
+      localStorage.setItem(levelKey, JSON.stringify(state));
+    }
+    function updateBox(){
+      const mt = parseInt(document.getElementById('marginTop').value);
+      const mr = parseInt(document.getElementById('marginRight').value);
+      const mb = parseInt(document.getElementById('marginBottom').value);
+      const ml = parseInt(document.getElementById('marginLeft').value);
+      const pd = parseInt(document.getElementById('padding').value);
+      const bw = parseInt(document.getElementById('borderWidth').value);
+      const rad = parseInt(document.getElementById('radius').value);
+      target.style.marginTop = mt + 'px';
+      target.style.marginRight = mr + 'px';
+      target.style.marginBottom = mb + 'px';
+      target.style.marginLeft = ml + 'px';
+      target.style.padding = pd + 'px';
+      target.style.borderWidth = bw + 'px';
+      target.style.borderRadius = rad + 'px';
+      checkGoal({mt,mr,mb,ml,pd,bw,rad});
+    }
+    function checkGoal(current){
+      const goal = defaultLevel; // for demo use single goal
+      const errors = [];
+      for(const key of Object.keys(goal)){
+        if(Math.abs(current[key] - goal[key]) > 2){ // tolerance
+          errors.push(key);
+        }
+      }
+      if(errors.length===0){
+        errorPanel.textContent = '✅ Perfect alignment!';
+        // update streak
+        const best = parseInt(localStorage.getItem(streakKey)||'0');
+        const newStreak = best+1;
+        localStorage.setItem(streakKey, newStreak);
+        // reset for next level (could load next level config)
+      } else {
+        errorPanel.textContent = '❌ Misaligned edges: ' + errors.join(', ');
+      }
+    }
+    function initControls(){
+      ['marginTop','marginRight','marginBottom','marginLeft','padding','borderWidth','radius'].forEach(id=>{
+        const el = document.getElementById(id);
+        el.addEventListener('input', updateBox);
+      });
+    }
+    startBtn.addEventListener('click',()=>{intro.style.display='none'; initControls(); const prog = loadProgress();
+      document.getElementById('marginTop').value=prog.marginTop;
+      document.getElementById('marginRight').value=prog.marginRight;
+      document.getElementById('marginBottom').value=prog.marginBottom;
+      document.getElementById('marginLeft').value=prog.marginLeft;
+      document.getElementById('padding').value=prog.padding;
+      document.getElementById('borderWidth').value=prog.borderWidth;
+      document.getElementById('radius').value=prog.radius;
+      updateBox();
+    });
+    // keyboard accessibility: arrow keys adjust focused range input
+    controls.addEventListener('keydown', e=>{
+      if(e.target.tagName==='INPUT' && e.target.type==='range'){
+        const step = e.shiftKey?10:1;
+        if(e.key==='ArrowUp' || e.key==='ArrowRight'){
+          e.target.value = Math.min(parseInt(e.target.max), parseInt(e.target.value)+step);
+          e.preventDefault();
+          updateBox();
+        } else if(e.key==='ArrowDown' || e.key==='ArrowLeft'){
+          e.target.value = Math.max(parseInt(e.target.min), parseInt(e.target.value)-step);
+          e.preventDefault();
+          updateBox();
+        }
+      }
+    });
+  </script>
+</body>
+</html>
