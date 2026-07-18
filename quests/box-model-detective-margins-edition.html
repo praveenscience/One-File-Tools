@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CSS Box Model Detective: Margins Edition | CSS Fundamentals Quest</title>
+  <meta name="description" content="A forensic debugging quest where you configure box model values — margins, padding, border, radius — so highlighted elements align perfectly inside a blueprint, accounting for collapse rules and spacing interactions." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ─── Design Tokens ─────────────────────────────────────── */
+    :root {
+      --bg:          #07090f;
+      --bg-surface:  rgba(12, 18, 35, 0.85);
+      --bg-card:     rgba(18, 26, 50, 0.9);
+      --border:      rgba(80, 200, 255, 0.14);
+      --border-glow: rgba(80, 200, 255, 0.4);
+
+      --cyan:        #00d4ff;
+      --cyan-dim:    rgba(0, 212, 255, 0.15);
+      --amber:       #ffb020;
+      --amber-dim:   rgba(255, 176, 32, 0.15);
+      --green:       #00e68a;
+      --green-dim:   rgba(0, 230, 138, 0.15);
+      --red:         #ff4060;
+      --red-dim:     rgba(255, 64, 96, 0.15);
+      --purple:      #b57aff;
+      --purple-dim:  rgba(181, 122, 255, 0.15);
+
+      --font-title:  'Orbitron', sans-serif;
+      --font-label:  'Rajdhani', sans-serif;
+      --font-code:   'Fira Code', monospace;
+
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 16px;
+      --ease:      cubic-bezier(0.4, 0, 0.2, 1);
+
+      --blueprint-bg: #040d1c;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: #dce8f5;
+      font-family: var(--font-label);
+      width: 100vw; height: 100vh;
+      overflow: hidden;
+      display: flex; justify-content: center; align-items: center;
+      position: relative;
+    }
+
+    /* ─── Animated BG ───────────────────────────────────────── */
+    .bg-layer {
+      position: fixed; inset: 0; z-index: 0;
+      background: radial-gradient(ellipse 80% 60% at 20% 80%, rgba(0,80,180,0.18) 0%, transparent 60%),
+                  radial-gradient(ellipse 60% 50% at 80% 20%, rgba(100,0,200,0.12) 0%, transparent 60%);
+    }
+    .bg-grid {
+      position: fixed; inset: 0; z-index: 0;
+      background-image:
+        linear-gradient(rgba(0,168,232,0.10) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,168,232,0.10) 1px, transparent 1px),
+        linear-gradient(rgba(0,168,232,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,168,232,0.04) 1px, transparent 1px);
+      background-size: 80px 80px, 80px 80px, 16px 16px, 16px 16px;
+      opacity: 0.7;
+    }
+
+    /* ─── Main Layout ───────────────────────────────────────── */
+    .shell {
+      position: relative; z-index: 10;
+      width: 98vw; height: 96vh;
+      max-width: 1360px; max-height: 820px;
+      background: var(--bg-surface);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: 0 24px 64px rgba(0,0,0,0.8), inset 0 0 40px rgba(0,212,255,0.04);
+      display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ─── Header ────────────────────────────────────────────── */
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.8rem 1.4rem;
+      background: rgba(5, 10, 24, 0.95);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      gap: 1rem;
+    }
+    .header-left { display: flex; align-items: center; gap: 1rem; }
+    .hub-btn {
+      display: flex; align-items: center; gap: 0.4rem;
+      color: #7a92b0; text-decoration: none;
+      font-family: var(--font-title); font-size: 0.72rem;
+      padding: 0.4rem 0.75rem;
+      border: 1px solid rgba(122,146,176,0.2); border-radius: var(--radius-sm);
+      background: rgba(122,146,176,0.05); transition: all 0.2s var(--ease);
+    }
+    .hub-btn:hover { color: var(--cyan); border-color: var(--cyan); background: var(--cyan-dim); }
+    .hub-btn svg { width: 14px; height: 14px; fill: currentColor; }
+
+    .header-title h1 {
+      font-family: var(--font-title); font-size: 1.1rem; font-weight: 900;
+      letter-spacing: 0.5px; color: #fff;
+      text-shadow: 0 0 18px rgba(0,212,255,0.4);
+    }
+    .header-title span {
+      display: block; font-size: 0.68rem; color: var(--cyan);
+      text-transform: uppercase; letter-spacing: 2px; font-weight: 700;
+    }
+
+    .header-right { display: flex; align-items: center; gap: 0.9rem; }
+    .stat-chip {
+      display: flex; align-items: center; gap: 0.4rem;
+      background: rgba(0,0,0,0.3); border: 1px solid var(--border);
+      border-radius: 8px; padding: 0.28rem 0.65rem;
+      font-family: var(--font-code); font-size: 0.78rem; color: #94a3b8;
+    }
+    .stat-chip .val { color: var(--amber); font-weight: 700; }
+    .stat-chip.streak .val { color: var(--green); }
+
+    .level-nav {
+      display: flex; align-items: center; gap: 0.5rem;
+      background: rgba(0,0,0,0.3); border: 1px solid var(--border);
+      border-radius: 10px; padding: 0.28rem 0.65rem;
+    }
+    .nav-btn {
+      background: none; border: none; color: var(--cyan);
+      cursor: pointer; display: flex; align-items: center;
+      padding: 0.18rem; border-radius: 4px; transition: all 0.15s;
+    }
+    .nav-btn:hover:not(:disabled) { background: var(--cyan-dim); }
+    .nav-btn:disabled { color: #2a3a4a; cursor: not-allowed; }
+    .nav-btn svg { width: 16px; height: 16px; fill: currentColor; }
+    .level-label {
+      font-family: var(--font-title); font-size: 0.72rem; color: #fff;
+      min-width: 76px; text-align: center;
+    }
+    .level-dots { display: flex; gap: 5px; }
+    .level-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.18);
+      transition: all 0.3s; cursor: pointer;
+    }
+    .level-dot.done  { background: var(--green); border-color: var(--green); box-shadow: 0 0 6px var(--green); }
+    .level-dot.active { background: var(--cyan); border-color: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+
+    /* ─── Body 3-col grid ───────────────────────────────────── */
+    .body-layout {
+      display: grid;
+      grid-template-columns: 296px 1fr 272px;
+      flex: 1; overflow: hidden;
+    }
+
+    /* ─── LEFT – Controls ───────────────────────────────────── */
+    .panel-controls {
+      background: var(--bg-card);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      overflow-y: auto; overflow-x: hidden;
+    }
+    .panel-controls::-webkit-scrollbar { width: 4px; }
+    .panel-controls::-webkit-scrollbar-thumb { background: var(--border-glow); border-radius: 4px; }
+
+    .panel-section {
+      padding: 0.85rem 0.95rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .panel-section:last-child { border-bottom: none; }
+
+    .section-title {
+      font-family: var(--font-title); font-size: 0.68rem; color: var(--cyan);
+      text-transform: uppercase; letter-spacing: 2px; margin-bottom: 0.7rem;
+      display: flex; align-items: center; gap: 0.4rem;
+    }
+    .section-title::before {
+      content: ''; width: 3px; height: 11px;
+      background: var(--cyan); border-radius: 2px; display: inline-block;
+    }
+
+    .control-row {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 0.65rem; gap: 0.5rem;
+    }
+    .control-row:last-child { margin-bottom: 0; }
+
+    .ctrl-label {
+      font-family: var(--font-code); font-size: 0.7rem; color: #94a3b8;
+      min-width: 76px; flex-shrink: 0;
+    }
+    .ctrl-label .edge { color: var(--amber); }
+
+    .slider-wrap {
+      display: flex; align-items: center; gap: 0.45rem; flex: 1;
+    }
+    input[type=range] {
+      -webkit-appearance: none; appearance: none;
+      flex: 1; height: 4px; border-radius: 2px; cursor: pointer;
+      background: rgba(255,255,255,0.1); outline: none;
+    }
+    input[type=range].margin-track  { background: linear-gradient(90deg, var(--amber) var(--pct,0%), rgba(255,255,255,0.1) var(--pct,0%)); }
+    input[type=range].padding-track { background: linear-gradient(90deg, var(--green) var(--pct,0%), rgba(255,255,255,0.1) var(--pct,0%)); }
+    input[type=range].border-track  { background: linear-gradient(90deg, var(--cyan) var(--pct,0%), rgba(255,255,255,0.1) var(--pct,0%)); }
+    input[type=range].radius-track  { background: linear-gradient(90deg, var(--purple) var(--pct,0%), rgba(255,255,255,0.1) var(--pct,0%)); }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 13px; height: 13px; border-radius: 50%;
+      border: 2px solid #fff; cursor: pointer; transition: transform 0.15s;
+    }
+    input[type=range].margin-track::-webkit-slider-thumb  { background: var(--amber); }
+    input[type=range].padding-track::-webkit-slider-thumb { background: var(--green); }
+    input[type=range].border-track::-webkit-slider-thumb  { background: var(--cyan); }
+    input[type=range].radius-track::-webkit-slider-thumb  { background: var(--purple); }
+    input[type=range]:hover::-webkit-slider-thumb { transform: scale(1.25); }
+
+    .num-input {
+      font-family: var(--font-code); font-size: 0.72rem;
+      width: 42px; padding: 0.18rem 0.3rem; text-align: center;
+      background: rgba(0,0,0,0.4); border: 1px solid var(--border);
+      border-radius: 4px; color: #fff; outline: none; transition: border-color 0.2s;
+    }
+    .num-input:focus { border-color: var(--cyan); }
+
+    /* Link toggle */
+    .link-toggle {
+      display: flex; align-items: center; gap: 0.5rem;
+      font-family: var(--font-code); font-size: 0.68rem; color: #6a8090;
+      cursor: pointer; user-select: none; margin-bottom: 0.5rem; transition: color 0.15s;
+    }
+    .link-toggle:hover { color: var(--amber); }
+    .toggle-box {
+      width: 14px; height: 14px; border: 1px solid var(--border);
+      border-radius: 3px; display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s; flex-shrink: 0;
+    }
+    .link-toggle.linked .toggle-box { background: var(--amber-dim); border-color: var(--amber); }
+    .link-toggle.linked { color: var(--amber); }
+    .toggle-box svg { width: 10px; height: 10px; fill: var(--amber); display: none; }
+    .link-toggle.linked .toggle-box svg { display: block; }
+
+    /* CSS Preview */
+    .css-preview {
+      font-family: var(--font-code); font-size: 0.67rem; line-height: 1.75;
+      background: rgba(0,0,0,0.35); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 0.55rem 0.75rem;
+      color: #94a3b8; user-select: text;
+      white-space: pre; overflow-x: auto;
+    }
+    .css-prop { color: var(--cyan); }
+    .css-val  { color: var(--amber); }
+
+    /* Buttons */
+    .btn-row { display: flex; gap: 0.5rem; margin-top: 0.65rem; }
+    .btn {
+      flex: 1; padding: 0.5rem; border: 1px solid var(--border);
+      border-radius: var(--radius-sm); background: rgba(0,0,0,0.3);
+      color: #94a3b8; font-family: var(--font-title); font-size: 0.63rem;
+      letter-spacing: 1px; cursor: pointer; transition: all 0.2s var(--ease);
+    }
+    .btn:hover { border-color: rgba(255,255,255,0.3); color: #fff; }
+    .btn-primary { background: var(--cyan-dim); border-color: var(--cyan); color: var(--cyan); }
+    .btn-primary:hover { background: rgba(0,212,255,0.3); box-shadow: 0 0 16px rgba(0,212,255,0.3); }
+
+    /* ─── CENTER – Blueprint ────────────────────────────────── */
+    .panel-blueprint {
+      display: flex; flex-direction: column; overflow: hidden; position: relative;
+    }
+    .blueprint-toolbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.5rem 1rem;
+      border-bottom: 1px solid var(--border);
+      background: rgba(4,8,18,0.6); flex-shrink: 0;
+    }
+    .level-info { font-family: var(--font-title); font-size: 0.78rem; color: #fff; }
+    .level-info span { color: var(--cyan); }
+    .difficulty-badge {
+      font-family: var(--font-code); font-size: 0.63rem; padding: 0.18rem 0.5rem;
+      border-radius: 4px; border: 1px solid; text-transform: uppercase; letter-spacing: 1px;
+    }
+    .diff-easy   { color: var(--green);  border-color: var(--green);  background: var(--green-dim); }
+    .diff-medium { color: var(--amber);  border-color: var(--amber);  background: var(--amber-dim); }
+    .diff-hard   { color: var(--red);    border-color: var(--red);    background: var(--red-dim);   }
+
+    .blueprint-canvas {
+      flex: 1; position: relative; overflow: auto;
+      background: var(--blueprint-bg);
+      background-image:
+        linear-gradient(rgba(0,168,232,0.07) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,168,232,0.07) 1px, transparent 1px),
+        linear-gradient(rgba(0,168,232,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,168,232,0.03) 1px, transparent 1px);
+      background-size: 40px 40px, 40px 40px, 8px 8px, 8px 8px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .blueprint-canvas::-webkit-scrollbar { width: 6px; height: 6px; }
+    .blueprint-canvas::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    .scene { position: relative; }
+
+    /* Target zone */
+    .target-zone {
+      position: absolute;
+      border: 2px dashed rgba(0,212,255,0.55);
+      background: rgba(0,212,255,0.05);
+      border-radius: 4px;
+      pointer-events: none;
+    }
+    .target-zone::before {
+      content: 'TARGET';
+      position: absolute; top: -18px; left: 50%; transform: translateX(-50%);
+      font-family: var(--font-code); font-size: 0.53rem; color: var(--cyan);
+      letter-spacing: 2px; opacity: 0.8; white-space: nowrap;
+    }
+    .target-ruler-h {
+      position: absolute; bottom: -22px; left: 0; right: 0;
+      display: flex; align-items: center; gap: 4px;
+      font-family: var(--font-code); font-size: 0.52rem; color: var(--cyan);
+      justify-content: center;
+    }
+    .target-ruler-h::before,.target-ruler-h::after {
+      content: ''; flex: 1; height: 1px; background: var(--cyan); opacity: 0.35;
+    }
+    .target-ruler-v {
+      position: absolute; right: -36px; top: 0; bottom: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 4px; font-family: var(--font-code); font-size: 0.52rem; color: var(--cyan);
+    }
+    .target-ruler-v::before,.target-ruler-v::after {
+      content: ''; flex: 1; width: 1px; background: var(--cyan); opacity: 0.35;
+    }
+
+    /* The interactive element */
+    .detective-el {
+      position: relative; display: inline-block;
+      background: rgba(255,176,32,0.12);
+      border: 2px solid var(--amber);
+      box-shadow: 0 0 18px rgba(255,176,32,0.18), inset 0 0 18px rgba(255,176,32,0.05);
+      transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
+      min-width: 40px; min-height: 40px;
+    }
+    .detective-el.success {
+      background: rgba(0,230,138,0.14);
+      border-color: var(--green);
+      box-shadow: 0 0 28px rgba(0,230,138,0.4), inset 0 0 18px rgba(0,230,138,0.07);
+      animation: pulse-success 1.2s var(--ease);
+    }
+    @keyframes pulse-success {
+      0%   { box-shadow: 0 0 28px rgba(0,230,138,0.4); }
+      50%  { box-shadow: 0 0 60px rgba(0,230,138,0.8), 0 0 120px rgba(0,230,138,0.3); }
+      100% { box-shadow: 0 0 28px rgba(0,230,138,0.4); }
+    }
+    .detective-el.error-flash { animation: flash-err 0.4s ease; }
+    @keyframes flash-err {
+      0%,100% { border-color: var(--amber); }
+      50% { border-color: var(--red); box-shadow: 0 0 28px rgba(255,64,96,0.6); }
+    }
+
+    .el-inner {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      height: 100%; pointer-events: none;
+      font-family: var(--font-code); font-size: 0.63rem; color: rgba(255,176,32,0.8);
+      gap: 2px;
+    }
+    .el-inner .el-name { font-size: 0.58rem; opacity: 0.55; }
+
+    /* Collapse callout badge */
+    .collapse-badge {
+      position: absolute; left: 50%; transform: translateX(-50%);
+      background: rgba(181,122,255,0.12); border: 1px solid var(--purple);
+      border-radius: 4px; padding: 2px 8px;
+      font-family: var(--font-code); font-size: 0.54rem; color: var(--purple);
+      white-space: nowrap; pointer-events: none;
+      animation: badge-pulse 2s ease-in-out infinite;
+      z-index: 10;
+    }
+    @keyframes badge-pulse {
+      0%,100% { opacity: 0.8; } 50% { opacity: 1; box-shadow: 0 0 10px rgba(181,122,255,0.4); }
+    }
+
+    /* ─── RIGHT – Feedback ──────────────────────────────────── */
+    .panel-feedback {
+      background: var(--bg-card);
+      border-left: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      overflow-y: auto; overflow-x: hidden;
+    }
+    .panel-feedback::-webkit-scrollbar { width: 4px; }
+    .panel-feedback::-webkit-scrollbar-thumb { background: var(--border-glow); border-radius: 4px; }
+
+    .level-desc {
+      padding: 0.85rem 0.95rem;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.78rem; line-height: 1.6; color: #7a92b0;
+    }
+    .level-desc strong { color: #c0d4f0; }
+    .level-desc .level-goal {
+      font-family: var(--font-title); font-size: 0.65rem; color: var(--cyan);
+      text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 0.45rem;
+    }
+
+    .error-panel { padding: 0.85rem 0.95rem; border-bottom: 1px solid var(--border); }
+    .error-title {
+      font-family: var(--font-title); font-size: 0.65rem; color: var(--red);
+      text-transform: uppercase; letter-spacing: 2px;
+      display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.6rem;
+    }
+    .error-title.ok { color: var(--green); }
+    .error-title svg { width: 12px; height: 12px; fill: currentColor; }
+    .error-list { list-style: none; display: flex; flex-direction: column; gap: 0.4rem; }
+    .error-item {
+      display: flex; align-items: flex-start; gap: 0.45rem;
+      font-family: var(--font-code); font-size: 0.67rem; line-height: 1.5;
+      padding: 0.35rem 0.45rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(255,64,96,0.2);
+      background: rgba(255,64,96,0.05);
+      color: #c0a0a0; transition: all 0.3s;
+    }
+    .error-item.ok { border-color: rgba(0,230,138,0.2); background: rgba(0,230,138,0.05); color: #7ab09a; }
+    .error-item .edge-tag {
+      font-size: 0.58rem; padding: 0.08rem 0.3rem; border-radius: 3px;
+      background: rgba(255,64,96,0.18); color: var(--red); flex-shrink: 0;
+    }
+    .error-item.ok .edge-tag { background: rgba(0,230,138,0.15); color: var(--green); }
+    .error-item .diff { color: var(--red); font-weight: 700; }
+    .error-item.ok .diff { color: var(--green); }
+
+    .accuracy-wrap { padding: 0.85rem 0.95rem; border-bottom: 1px solid var(--border); }
+    .accuracy-label {
+      font-family: var(--font-title); font-size: 0.63rem; color: #6a8090;
+      text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 0.38rem;
+      display: flex; justify-content: space-between;
+    }
+    .accuracy-label .pct { color: var(--cyan); }
+    .accuracy-bar-bg { height: 7px; background: rgba(255,255,255,0.07); border-radius: 4px; overflow: hidden; }
+    .accuracy-bar {
+      height: 100%; border-radius: 4px;
+      background: linear-gradient(90deg, var(--red), var(--amber), var(--green));
+      background-size: 300% 100%;
+      transition: width 0.4s var(--ease), background-position 0.4s;
+    }
+
+    .insight-panel { padding: 0.85rem 0.95rem; border-bottom: 1px solid var(--border); }
+    .insight-title {
+      font-family: var(--font-title); font-size: 0.65rem; color: var(--purple);
+      text-transform: uppercase; letter-spacing: 1.5px;
+      display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.5rem;
+    }
+    .insight-box {
+      font-size: 0.73rem; line-height: 1.65; color: #7a92b0;
+      background: rgba(181,122,255,0.05); border: 1px solid rgba(181,122,255,0.15);
+      border-radius: var(--radius-sm); padding: 0.55rem 0.65rem;
+    }
+    .insight-box strong { color: var(--purple); }
+    .insight-box code {
+      font-family: var(--font-code); font-size: 0.66rem;
+      background: rgba(0,0,0,0.3); padding: 0 3px; border-radius: 3px; color: var(--amber);
+    }
+
+    .progress-wrap { padding: 0.85rem 0.95rem; }
+    .progress-title {
+      font-family: var(--font-title); font-size: 0.63rem; color: #6a8090;
+      text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 0.5rem;
+    }
+    .progress-list { display: flex; flex-direction: column; gap: 0.28rem; }
+    .progress-item {
+      display: flex; align-items: center; gap: 0.45rem;
+      font-family: var(--font-code); font-size: 0.68rem; color: #4a6070;
+      padding: 0.28rem 0.45rem; border-radius: 4px;
+      border: 1px solid rgba(255,255,255,0.04); cursor: pointer;
+      transition: all 0.25s;
+    }
+    .progress-item:hover { color: #94a3b8; border-color: rgba(255,255,255,0.1); }
+    .progress-item.done  { color: var(--green); border-color: rgba(0,230,138,0.2); background: rgba(0,230,138,0.04); }
+    .progress-item.active { color: var(--amber); border-color: rgba(255,176,32,0.3); background: rgba(255,176,32,0.05); }
+    .progress-item .pi-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: 0.7; flex-shrink: 0; }
+
+    /* ─── SUCCESS OVERLAY ───────────────────────────────────── */
+    .success-overlay {
+      position: absolute; inset: 0; z-index: 100;
+      background: rgba(4,13,28,0.88);
+      backdrop-filter: blur(8px);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 0.9rem; opacity: 0; pointer-events: none;
+      transition: opacity 0.4s var(--ease);
+    }
+    .success-overlay.show { opacity: 1; pointer-events: auto; }
+    .success-icon { font-size: 3rem; animation: bounce-in 0.5s var(--ease); }
+    @keyframes bounce-in {
+      0%   { transform: scale(0); opacity: 0; }
+      60%  { transform: scale(1.2); opacity: 1; }
+      100% { transform: scale(1); }
+    }
+    .success-title {
+      font-family: var(--font-title); font-size: 1.4rem; font-weight: 900;
+      color: var(--green); text-shadow: 0 0 30px rgba(0,230,138,0.6); letter-spacing: 2px;
+    }
+    .success-msg { font-size: 0.88rem; color: #7a92b0; max-width: 340px; text-align: center; line-height: 1.5; }
+    .success-btns { display: flex; gap: 0.7rem; margin-top: 0.4rem; }
+    .s-btn {
+      padding: 0.6rem 1.4rem; border-radius: var(--radius-sm);
+      font-family: var(--font-title); font-size: 0.72rem; letter-spacing: 1px;
+      cursor: pointer; border: 1px solid; transition: all 0.2s;
+    }
+    .s-btn-next { background: var(--green-dim); border-color: var(--green); color: var(--green); }
+    .s-btn-next:hover { background: rgba(0,230,138,0.3); box-shadow: 0 0 20px rgba(0,230,138,0.4); }
+    .s-btn-retry { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.2); color: #94a3b8; }
+    .s-btn-retry:hover { border-color: rgba(255,255,255,0.4); color: #fff; }
+
+    /* ─── ALL DONE OVERLAY ──────────────────────────────────── */
+    .alldone-overlay {
+      position: absolute; inset: 0; z-index: 200;
+      background: rgba(4,9,20,0.93);
+      backdrop-filter: blur(14px);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 0.85rem; opacity: 0; pointer-events: none;
+      transition: opacity 0.5s;
+    }
+    .alldone-overlay.show { opacity: 1; pointer-events: auto; }
+    .alldone-trophy { font-size: 4rem; animation: bounce-in 0.6s var(--ease); }
+    .alldone-title {
+      font-family: var(--font-title); font-size: 1.7rem; font-weight: 900;
+      color: var(--amber); text-shadow: 0 0 40px rgba(255,176,32,0.7); letter-spacing: 3px;
+    }
+    .alldone-sub { font-size: 0.88rem; color: #7a92b0; max-width: 400px; text-align: center; line-height: 1.6; }
+    .alldone-stats { display: flex; gap: 2rem; margin-top: 0.4rem; }
+    .alldone-stat { display: flex; flex-direction: column; align-items: center; font-family: var(--font-code); }
+    .alldone-stat .n { font-size: 1.8rem; font-weight: 700; color: var(--cyan); }
+    .alldone-stat .l { font-size: 0.66rem; color: #6a8090; text-transform: uppercase; letter-spacing: 1px; }
+    .alldone-restart {
+      margin-top: 0.4rem; padding: 0.65rem 1.8rem;
+      background: var(--amber-dim); border: 1px solid var(--amber); border-radius: var(--radius-sm);
+      color: var(--amber); font-family: var(--font-title); font-size: 0.75rem; letter-spacing: 1px;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .alldone-restart:hover { background: rgba(255,176,32,0.3); box-shadow: 0 0 20px rgba(255,176,32,0.4); }
+
+    /* ─── Responsive ────────────────────────────────────────── */
+    @media (max-width: 900px) {
+      .body-layout { grid-template-columns: 256px 1fr; }
+      .panel-feedback { display: none; }
+    }
+    @media (max-width: 640px) {
+      .body-layout { grid-template-columns: 1fr; }
+      .panel-controls { display: none; }
+    }
+  </style>
+</head>
+<body>
+<div class="bg-layer"></div>
+<div class="bg-grid"></div>
+
+<div class="shell" id="shell">
+
+  <!-- ═══ HEADER ═══════════════════════════════════════════════ -->
+  <header>
+    <div class="header-left">
+      <a href="../index.html" class="hub-btn" aria-label="Back to Hub">
+        <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+        Hub
+      </a>
+      <div class="header-title">
+        <h1>Box Model Detective</h1>
+        <span>Margins Edition · CSS Fundamentals</span>
+      </div>
+    </div>
+
+    <div class="level-nav" role="navigation" aria-label="Level navigation">
+      <button class="nav-btn" id="prevBtn" aria-label="Previous level" disabled>
+        <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+      </button>
+      <div class="level-label" id="levelLabel">LEVEL 1 / 6</div>
+      <div class="level-dots" id="levelDots" aria-label="Level progress"></div>
+      <button class="nav-btn" id="nextBtn" aria-label="Next level">
+        <svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+      </button>
+    </div>
+
+    <div class="header-right">
+      <div class="stat-chip" role="status" aria-label="Score">🔍 Score: <span class="val" id="scoreVal">0</span></div>
+      <div class="stat-chip streak" role="status" aria-label="Best streak">🔥 Streak: <span class="val" id="streakVal">0</span></div>
+    </div>
+  </header>
+
+  <!-- ═══ BODY ═════════════════════════════════════════════════ -->
+  <div class="body-layout">
+
+    <!-- LEFT: Controls -->
+    <aside class="panel-controls" aria-label="Box model controls">
+
+      <div class="panel-section">
+        <div class="section-title">Margin</div>
+        <label class="link-toggle linked" id="marginLinkToggle" role="checkbox" aria-checked="true" tabindex="0">
+          <div class="toggle-box">
+            <svg viewBox="0 0 24 24"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5z"/></svg>
+          </div>
+          Link all sides
+        </label>
+        <div class="control-row">
+          <span class="ctrl-label"><span class="edge">↑</span> Top</span>
+          <div class="slider-wrap">
+            <input type="range" class="margin-track" min="0" max="80" value="0" id="mTop" aria-label="Margin top" />
+            <input type="number" class="num-input" min="0" max="80" value="0" id="mTopN" aria-label="Margin top px" />
+          </div>
+        </div>
+        <div class="control-row">
+          <span class="ctrl-label"><span class="edge">→</span> Right</span>
+          <div class="slider-wrap">
+            <input type="range" class="margin-track" min="0" max="80" value="0" id="mRight" aria-label="Margin right" />
+            <input type="number" class="num-input" min="0" max="80" value="0" id="mRightN" aria-label="Margin right px" />
+          </div>
+        </div>
+        <div class="control-row">
+          <span class="ctrl-label"><span class="edge">↓</span> Bottom</span>
+          <div class="slider-wrap">
+            <input type="range" class="margin-track" min="0" max="80" value="0" id="mBottom" aria-label="Margin bottom" />
+            <input type="number" class="num-input" min="0" max="80" value="0" id="mBottomN" aria-label="Margin bottom px" />
+          </div>
+        </div>
+        <div class="control-row">
+          <span class="ctrl-label"><span class="edge">←</span> Left</span>
+          <div class="slider-wrap">
+            <input type="range" class="margin-track" min="0" max="80" value="0" id="mLeft" aria-label="Margin left" />
+            <input type="number" class="num-input" min="0" max="80" value="0" id="mLeftN" aria-label="Margin left px" />
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <div class="section-title">Padding</div>
+        <div class="control-row">
+          <span class="ctrl-label">All</span>
+          <div class="slider-wrap">
+            <input type="range" class="padding-track" min="0" max="60" value="0" id="padAll" aria-label="Padding all" />
+            <input type="number" class="num-input" min="0" max="60" value="0" id="padAllN" aria-label="Padding all px" />
+          </div>
+        </div>
+        <div class="control-row">
+          <span class="ctrl-label" style="color:var(--green)">↑↓ Vert</span>
+          <div class="slider-wrap">
+            <input type="range" class="padding-track" min="0" max="60" value="0" id="padV" aria-label="Padding vertical" />
+            <input type="number" class="num-input" min="0" max="60" value="0" id="padVN" aria-label="Padding vertical px" />
+          </div>
+        </div>
+        <div class="control-row">
+          <span class="ctrl-label" style="color:var(--green)">←→ Horiz</span>
+          <div class="slider-wrap">
+            <input type="range" class="padding-track" min="0" max="60" value="0" id="padH" aria-label="Padding horizontal" />
+            <input type="number" class="num-input" min="0" max="60" value="0" id="padHN" aria-label="Padding horizontal px" />
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <div class="section-title">Border &amp; Radius</div>
+        <div class="control-row">
+          <span class="ctrl-label">Border W</span>
+          <div class="slider-wrap">
+            <input type="range" class="border-track" min="0" max="16" value="2" id="borderW" aria-label="Border width" />
+            <input type="number" class="num-input" min="0" max="16" value="2" id="borderWN" aria-label="Border width px" />
+          </div>
+        </div>
+        <div class="control-row">
+          <span class="ctrl-label">Radius</span>
+          <div class="slider-wrap">
+            <input type="range" class="radius-track" min="0" max="50" value="0" id="radius" aria-label="Border radius" />
+            <input type="number" class="num-input" min="0" max="50" value="0" id="radiusN" aria-label="Border radius px" />
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <div class="section-title">Live CSS</div>
+        <div class="css-preview" id="cssPreview" aria-live="polite" aria-label="Generated CSS"></div>
+      </div>
+
+      <div class="panel-section">
+        <div class="btn-row">
+          <button class="btn" id="resetBtn">Reset</button>
+          <button class="btn btn-primary" id="checkBtn">Check ↵</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- CENTER: Blueprint -->
+    <main class="panel-blueprint" aria-label="Blueprint canvas">
+      <div class="blueprint-toolbar">
+        <div class="level-info">Mission: <span id="missionName">—</span></div>
+        <div class="difficulty-badge diff-easy" id="diffBadge">Easy</div>
+      </div>
+      <div class="blueprint-canvas" id="blueprintCanvas">
+        <div class="scene" id="scene"></div>
+      </div>
+
+      <!-- Level success overlay -->
+      <div class="success-overlay" id="successOverlay" role="dialog" aria-modal="true" aria-label="Level complete" aria-live="assertive">
+        <div class="success-icon">🎯</div>
+        <div class="success-title">CASE SOLVED!</div>
+        <div class="success-msg" id="successMsg">Perfect alignment. The element fits the blueprint exactly.</div>
+        <div class="success-btns">
+          <button class="s-btn s-btn-retry" id="retryBtn">Try Again</button>
+          <button class="s-btn s-btn-next" id="nextLevelBtn">Next Level →</button>
+        </div>
+      </div>
+
+      <!-- All done overlay -->
+      <div class="alldone-overlay" id="alldoneOverlay" role="dialog" aria-modal="true" aria-label="All levels complete" aria-live="assertive">
+        <div class="alldone-trophy">🏆</div>
+        <div class="alldone-title">CASE CLOSED</div>
+        <div class="alldone-sub">You've cracked every margin mystery in the book, Detective. The box model holds no secrets from you anymore.</div>
+        <div class="alldone-stats">
+          <div class="alldone-stat"><div class="n" id="finalScore">0</div><div class="l">Score</div></div>
+          <div class="alldone-stat"><div class="n" id="finalStreak">0</div><div class="l">Best Streak</div></div>
+          <div class="alldone-stat"><div class="n" id="finalLevels">6</div><div class="l">Levels</div></div>
+        </div>
+        <button class="alldone-restart" id="restartBtn">🔄 Play Again</button>
+      </div>
+    </main>
+
+    <!-- RIGHT: Feedback -->
+    <aside class="panel-feedback" aria-label="Feedback panel">
+      <div class="level-desc">
+        <div class="level-goal">Objective</div>
+        <p id="levelDescText">Loading…</p>
+      </div>
+
+      <div class="accuracy-wrap">
+        <div class="accuracy-label">Accuracy <span class="pct" id="accuracyPct">0%</span></div>
+        <div class="accuracy-bar-bg">
+          <div class="accuracy-bar" id="accuracyBar" style="width:0%;background-position:100% 0"></div>
+        </div>
+      </div>
+
+      <div class="error-panel">
+        <div class="error-title" id="errorTitle">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+          Edge Errors
+        </div>
+        <ul class="error-list" id="errorList" aria-live="polite"></ul>
+      </div>
+
+      <div class="insight-panel">
+        <div class="insight-title">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 017 7c0 3.13-2.05 5.78-5 6.71V17h-4v-1.29C7.05 14.78 5 12.13 5 9a7 7 0 017-7zm3 18H9v1h6v-1zm0-2H9v1h6v-1z"/></svg>
+          Margin Insight
+        </div>
+        <div class="insight-box" id="insightBox">
+          Adjust the controls on the left and click <strong>Check</strong> to see margin collapse diagnostics.
+        </div>
+      </div>
+
+      <div class="progress-wrap">
+        <div class="progress-title">Level Progress</div>
+        <div class="progress-list" id="progressList"></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════
+   LEVELS
+══════════════════════════════════════════════════════════ */
+const LEVELS = [
+  {
+    id: 1, name: "The Square Alibi", difficulty: "Easy",
+    description: "A lone suspect element sits in the blueprint. Set equal margins on all sides so it lands perfectly centred inside the target frame.",
+    goal: "Set <strong>margin: 24px</strong> on all four sides to centre the amber element.",
+    insight: "Equal margins on all sides keep an element equidistant from its containing edges — the foundation of box-model reasoning.",
+    solution: { mTop:24, mRight:24, mBottom:24, mLeft:24, padV:0, padH:0, borderW:2, radius:0 },
+    tolerance: 3, scene: "single-centred", collapseDemo: false,
+  },
+  {
+    id: 2, name: "Asymmetric Witness", difficulty: "Easy",
+    description: "The element must fit an off-centre slot. Different margins are needed on each side. Analyse the blueprint rulers and solve the mismatch.",
+    goal: "Set <strong>Top 40px · Right 16px · Bottom 8px · Left 60px</strong> to match the offset target.",
+    insight: "Individual margin values let you push an element asymmetrically. Use the rulers on the blueprint to read the required distance from each edge.",
+    solution: { mTop:40, mRight:16, mBottom:8, mLeft:60, padV:0, padH:0, borderW:2, radius:0 },
+    tolerance: 3, scene: "single-offset", collapseDemo: false,
+  },
+  {
+    id: 3, name: "The Collapsing Testimony", difficulty: "Medium",
+    description: "Two stacked elements are siblings. The gap between them is NOT their combined margins — it collapses to the larger value. Set margins so the visible gap equals exactly 32px.",
+    goal: "Give Element A <strong>margin-bottom: 32px</strong> and Element B <strong>margin-top: 20px</strong>. The collapsed gap = 32px.",
+    insight: "<strong>Margin Collapse:</strong> When two block siblings' vertical margins meet, they collapse into a single margin equal to the <em>larger</em> value — not the sum. Here: <code>max(32, 20) = 32px</code> gap, not 52px.",
+    solution: { mTop:20, mRight:0, mBottom:32, mLeft:0, padV:0, padH:0, borderW:2, radius:0 },
+    tolerance: 3, scene: "two-stack-collapse", collapseDemo: true,
+  },
+  {
+    id: 4, name: "Padding's Shadow", difficulty: "Medium",
+    description: "The target has both inner padding and outer margins. The element's content area and its full layout box must both align to the blueprint frame.",
+    goal: "Set <strong>margin: 20px</strong>, <strong>padding: 16px</strong>, and <strong>border: 2px</strong> so the total layout box matches the target.",
+    insight: "Total element space = content + padding + border + margin. The dashed blueprint line is your <em>margin edge</em>; the inner solid line is the <em>border edge</em>.",
+    solution: { mTop:20, mRight:20, mBottom:20, mLeft:20, padV:16, padH:16, borderW:2, radius:0 },
+    tolerance: 3, scene: "padding-margin", collapseDemo: false,
+  },
+  {
+    id: 5, name: "Rounded Suspect", difficulty: "Hard",
+    description: "An organic shape must land inside a curved blueprint. You need matching border-radius, correct padding, and asymmetric margins to close the case.",
+    goal: "Set <strong>margin-top: 30px, margin-left: 50px</strong>, <strong>padding: 20px</strong>, <strong>border: 3px</strong>, <strong>border-radius: 24px</strong>.",
+    insight: "<code>border-radius</code> is visual only — it does not affect how margin, padding, or border contribute to the layout box. Collision detection uses rectangular boxes regardless of radius.",
+    solution: { mTop:30, mRight:24, mBottom:24, mLeft:50, padV:20, padH:20, borderW:3, radius:24 },
+    tolerance: 4, scene: "rounded", collapseDemo: false,
+  },
+  {
+    id: 6, name: "The Final Dossier", difficulty: "Hard",
+    description: "A multi-element scene with a collapsing pair above a padded box. Solve all spacing relationships simultaneously to seal the case.",
+    goal: "Land both elements in their targets with <strong>collapse-aware margins</strong> and correct <strong>padding + border + radius</strong>.",
+    insight: "<strong>Collapse is prevented</strong> by adding <code>padding</code>, <code>border</code>, or <code>overflow: hidden</code> to a parent — or by using <code>flex</code>/<code>grid</code> layout. Knowing this lets you control collapse deliberately.",
+    solution: { mTop:28, mRight:12, mBottom:28, mLeft:12, padV:14, padH:14, borderW:2, radius:8 },
+    tolerance: 4, scene: "multi-complex", collapseDemo: true,
+  },
+];
+
+const TOTAL = LEVELS.length;
+
+/* ══════════════════════════════════════════════════════════
+   STATE
+══════════════════════════════════════════════════════════ */
+let state = {
+  level: 0, score: 0, streak: 0, bestStreak: 0,
+  solved: new Array(TOTAL).fill(false),
+  mTop:0, mRight:0, mBottom:0, mLeft:0,
+  padV:0, padH:0, borderW:2, radius:0,
+  marginLinked: true,
+};
+
+function saveProgress() {
+  try { localStorage.setItem('bmd_v1', JSON.stringify({ score:state.score, bestStreak:state.bestStreak, solved:state.solved, level:state.level })); } catch(e){}
+}
+function loadProgress() {
+  try {
+    const p = JSON.parse(localStorage.getItem('bmd_v1'));
+    if (!p) return;
+    state.score = p.score||0; state.bestStreak = p.bestStreak||0;
+    state.solved = p.solved||new Array(TOTAL).fill(false);
+    state.level  = p.level||0;
+  } catch(e){}
+}
+
+/* ══════════════════════════════════════════════════════════
+   DOM refs
+══════════════════════════════════════════════════════════ */
+const $ = id => document.getElementById(id);
+const mTopEl=$('mTop'),mTopN=$('mTopN');
+const mRightEl=$('mRight'),mRightN=$('mRightN');
+const mBottomEl=$('mBottom'),mBottomN=$('mBottomN');
+const mLeftEl=$('mLeft'),mLeftN=$('mLeftN');
+const padAllEl=$('padAll'),padAllN=$('padAllN');
+const padVEl=$('padV'),padVN=$('padVN');
+const padHEl=$('padH'),padHN=$('padHN');
+const borderWEl=$('borderW'),borderWN=$('borderWN');
+const radiusEl=$('radius'),radiusN=$('radiusN');
+
+/* ══════════════════════════════════════════════════════════
+   SLIDER FILL
+══════════════════════════════════════════════════════════ */
+function setFill(s) {
+  const pct = ((+s.value - +s.min) / (+s.max - +s.min) * 100).toFixed(1) + '%';
+  s.style.setProperty('--pct', pct);
+}
+function bindPair(slider, numEl, onChange) {
+  const sync = src => {
+    const v = Math.max(+slider.min, Math.min(+slider.max, +src.value));
+    slider.value = v; numEl.value = v; setFill(slider);
+    if (onChange) onChange(v);
+  };
+  slider.addEventListener('input', () => sync(slider));
+  numEl.addEventListener('input',  () => sync(numEl));
+  numEl.addEventListener('change', () => sync(numEl));
+  setFill(slider);
+}
+
+/* ══════════════════════════════════════════════════════════
+   MARGIN LINK
+══════════════════════════════════════════════════════════ */
+const marginLinkToggle = $('marginLinkToggle');
+marginLinkToggle.addEventListener('click', toggleLink);
+marginLinkToggle.addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' '){e.preventDefault();toggleLink();}});
+function toggleLink() {
+  state.marginLinked = !state.marginLinked;
+  marginLinkToggle.classList.toggle('linked', state.marginLinked);
+  marginLinkToggle.setAttribute('aria-checked', state.marginLinked);
+}
+function setAllMargins(v) {
+  state.mTop=state.mRight=state.mBottom=state.mLeft=v;
+  [mTopEl,mRightEl,mBottomEl,mLeftEl].forEach(s=>{s.value=v;setFill(s);});
+  [mTopN,mRightN,mBottomN,mLeftN].forEach(n=>n.value=v);
+}
+
+function onMarginChange(key, v) {
+  state[key] = v;
+  if (state.marginLinked) setAllMargins(v);
+  liveUpdate();
+}
+
+bindPair(mTopEl,    mTopN,    v => onMarginChange('mTop',    v));
+bindPair(mRightEl,  mRightN,  v => onMarginChange('mRight',  v));
+bindPair(mBottomEl, mBottomN, v => onMarginChange('mBottom', v));
+bindPair(mLeftEl,   mLeftN,   v => onMarginChange('mLeft',   v));
+
+function onPadAllChange(v) {
+  state.padV=state.padH=v;
+  padVEl.value=v; padVN.value=v; setFill(padVEl);
+  padHEl.value=v; padHN.value=v; setFill(padHEl);
+  liveUpdate();
+}
+bindPair(padAllEl, padAllN, onPadAllChange);
+bindPair(padVEl, padVN, v => { state.padV=v; liveUpdate(); });
+bindPair(padHEl, padHN, v => { state.padH=v; liveUpdate(); });
+bindPair(borderWEl, borderWN, v => { state.borderW=v; liveUpdate(); });
+bindPair(radiusEl, radiusN, v => { state.radius=v; liveUpdate(); });
+
+/* ══════════════════════════════════════════════════════════
+   CSS PREVIEW
+══════════════════════════════════════════════════════════ */
+function updateCSSPreview() {
+  const s = state;
+  const mSame = s.mTop===s.mRight && s.mRight===s.mBottom && s.mBottom===s.mLeft;
+  const mStr = mSame ? `${s.mTop}px` : `${s.mTop}px ${s.mRight}px ${s.mBottom}px ${s.mLeft}px`;
+  const pStr = s.padV===s.padH ? `${s.padV}px` : `${s.padV}px ${s.padH}px`;
+  $('cssPreview').innerHTML =
+    `<span class="css-prop">margin</span>: <span class="css-val">${mStr}</span>;\n` +
+    `<span class="css-prop">padding</span>: <span class="css-val">${pStr}</span>;\n` +
+    `<span class="css-prop">border-width</span>: <span class="css-val">${s.borderW}px</span>;\n` +
+    `<span class="css-prop">border-radius</span>: <span class="css-val">${s.radius}px</span>;`;
+}
+
+/* ══════════════════════════════════════════════════════════
+   SCENE BUILDING
+══════════════════════════════════════════════════════════ */
+function buildScene(idx) {
+  const scene = $('scene'); scene.innerHTML = '';
+  const lv = LEVELS[idx];
+
+  if (lv.scene === 'single-centred') {
+    scene.style.cssText = 'width:380px;height:320px;';
+    scene.appendChild(mkTarget(120, 120, 0, 'CENTRE'));
+    const t = scene.lastChild;
+    t.style.top='100px'; t.style.left='130px';
+    scene.appendChild(mkEl('a','El'));
+  }
+
+  if (lv.scene === 'single-offset') {
+    scene.style.cssText = 'width:420px;height:320px;';
+    const tz = mkTarget(140, 100, 0, '');
+    tz.style.top='40px'; tz.style.left='60px';
+    scene.appendChild(tz);
+    scene.appendChild(mkEl('a','El'));
+  }
+
+  if (lv.scene === 'two-stack-collapse') {
+    scene.style.cssText = 'width:380px;height:360px;';
+    const tzA = mkTarget(220, 60, 0, 'ELEM A');
+    tzA.style.top='30px'; tzA.style.left='80px';
+    const tzB = mkTarget(220, 60, 0, 'ELEM B');
+    tzB.style.top='122px'; tzB.style.left='80px';
+    scene.appendChild(tzA); scene.appendChild(tzB);
+    const badge = mkBadge('⚡ Margin Collapse Active');
+    badge.style.top='96px';
+    scene.appendChild(badge);
+    const elA = mkEl('a','A'); elA.style.cssText='position:absolute;top:30px;left:80px;width:180px;height:60px;';
+    const elB = mkEl('b','B'); elB.style.cssText='position:absolute;width:180px;height:60px;';
+    scene.appendChild(elA); scene.appendChild(elB);
+  }
+
+  if (lv.scene === 'padding-margin') {
+    scene.style.cssText = 'width:380px;height:300px;';
+    const tz = mkTarget(160, 160, 0, '');
+    tz.style.top='70px'; tz.style.left='110px';
+    scene.appendChild(tz);
+    scene.appendChild(mkEl('a','El'));
+  }
+
+  if (lv.scene === 'rounded') {
+    scene.style.cssText = 'width:400px;height:310px;';
+    const tz = mkTarget(160, 130, 24, '');
+    tz.style.borderRadius='24px'; tz.style.top='90px'; tz.style.left='90px';
+    scene.appendChild(tz);
+    scene.appendChild(mkEl('a','El'));
+  }
+
+  if (lv.scene === 'multi-complex') {
+    scene.style.cssText = 'width:400px;height:400px;';
+    const tzA = mkTarget(200, 70, 0, 'BOX A');
+    tzA.style.top='40px'; tzA.style.left='100px';
+    const tzB = mkTarget(200, 100, 8, 'BOX B');
+    tzB.style.top='138px'; tzB.style.left='100px';
+    scene.appendChild(tzA); scene.appendChild(tzB);
+    const badge = mkBadge('⚡ Collapse zone');
+    badge.style.top='112px';
+    scene.appendChild(badge);
+    const elA = mkEl('a','A'); elA.style.cssText='position:absolute;top:40px;left:100px;width:160px;height:46px;';
+    const elB = mkEl('b','B'); elB.style.cssText='position:absolute;width:160px;height:60px;';
+    scene.appendChild(elA); scene.appendChild(elB);
+  }
+}
+
+function mkTarget(w, h, r, label) {
+  const d = document.createElement('div');
+  d.className = 'target-zone';
+  d.style.cssText = `width:${w}px;height:${h}px;position:absolute;`;
+  if (r) d.style.borderRadius = r+'px';
+  const rh = document.createElement('div'); rh.className='target-ruler-h'; rh.textContent=w+'px';
+  const rv = document.createElement('div'); rv.className='target-ruler-v'; rv.textContent=h+'px';
+  d.appendChild(rh); d.appendChild(rv);
+  return d;
+}
+function mkEl(suffix, label) {
+  const d = document.createElement('div');
+  d.className = 'detective-el'; d.id = 'dEl_'+suffix;
+  const inner = document.createElement('div');
+  inner.className = 'el-inner';
+  inner.innerHTML = `<span>${label}</span><span class="el-name">.element</span>`;
+  d.appendChild(inner);
+  return d;
+}
+function mkBadge(text) {
+  const d = document.createElement('div');
+  d.className = 'collapse-badge'; d.style.position='absolute';
+  d.textContent = text;
+  return d;
+}
+
+/* ══════════════════════════════════════════════════════════
+   LIVE UPDATE – apply CSS to elements
+══════════════════════════════════════════════════════════ */
+const SCENE_SIZES = {
+  'single-centred':    [{ w:80,  h:80  }],
+  'single-offset':     [{ w:100, h:60  }],
+  'two-stack-collapse':[{ w:180, h:60  }, { w:180, h:60  }],
+  'padding-margin':    [{ w:100, h:100 }],
+  'rounded':           [{ w:100, h:90  }],
+  'multi-complex':     [{ w:156, h:46  }, { w:156, h:60  }],
+};
+
+function liveUpdate() {
+  const s = state;
+  const scene = LEVELS[s.level].scene;
+  const sizes = SCENE_SIZES[scene] || [];
+  const els = document.querySelectorAll('.detective-el');
+  els.forEach((el, i) => {
+    el.style.margin    = `${s.mTop}px ${s.mRight}px ${s.mBottom}px ${s.mLeft}px`;
+    el.style.padding   = `${s.padV}px ${s.padH}px`;
+    el.style.borderWidth = s.borderW+'px';
+    el.style.borderStyle = 'solid';
+    el.style.borderRadius = s.radius+'px';
+    if (sizes[i]) { el.style.width=sizes[i].w+'px'; el.style.height=sizes[i].h+'px'; }
+  });
+  updateCSSPreview();
+  runCheck(false);
+}
+
+/* ══════════════════════════════════════════════════════════
+   CHECK / ACCURACY
+══════════════════════════════════════════════════════════ */
+function runCheck(explicit) {
+  const lv = LEVELS[state.level];
+  const sol = lv.solution; const s = state; const tol = lv.tolerance;
+
+  const checks = [
+    { edge:'margin-top',    got:s.mTop,   want:sol.mTop    },
+    { edge:'margin-right',  got:s.mRight,  want:sol.mRight  },
+    { edge:'margin-bottom', got:s.mBottom, want:sol.mBottom },
+    { edge:'margin-left',   got:s.mLeft,   want:sol.mLeft   },
+    { edge:'padding-V',     got:s.padV,   want:sol.padV    },
+    { edge:'padding-H',     got:s.padH,   want:sol.padH    },
+    { edge:'border-width',  got:s.borderW, want:sol.borderW },
+    { edge:'border-radius', got:s.radius,  want:sol.radius  },
+  ];
+
+  let correct = 0;
+  const ul = $('errorList'); ul.innerHTML = '';
+  checks.forEach(c => {
+    const ok = Math.abs(c.got - c.want) <= tol;
+    if (ok) correct++;
+    const diff = c.got - c.want;
+    const li = document.createElement('li');
+    li.className = 'error-item' + (ok?' ok':'');
+    li.innerHTML = `<span class="edge-tag">${c.edge}</span>
+      <span>${ok ? `✓ ${c.got}px` : `got <strong>${c.got}px</strong>, need ~${c.want}px (<span class="diff">${diff>0?'+':''}${diff}</span>)`}</span>`;
+    ul.appendChild(li);
+  });
+
+  const pct = Math.round(correct / checks.length * 100);
+  const bar = $('accuracyBar');
+  bar.style.width = pct+'%';
+  bar.style.backgroundPosition = (100-pct)+'% 0';
+  $('accuracyPct').textContent = pct+'%';
+
+  const allOk = correct === checks.length;
+  const et = $('errorTitle');
+  et.className = 'error-title' + (allOk?' ok':'');
+  et.innerHTML = allOk
+    ? `<svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg> All Clear`
+    : `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg> Edge Errors`;
+
+  document.querySelectorAll('.detective-el').forEach(el => el.classList.toggle('success', allOk));
+
+  // Collapse insight
+  const ib = $('insightBox');
+  let ins = lv.insight;
+  if (lv.collapseDemo) {
+    const collapsed = Math.max(s.mTop, s.mBottom);
+    ins += `<br><br><strong>Current collapsed gap:</strong> <code>${collapsed}px</code> (max of bottom ${s.mBottom}px & top ${s.mTop}px)`;
+  }
+  ib.innerHTML = ins;
+
+  if (explicit && allOk) levelSuccess();
+  else if (explicit && !allOk) {
+    document.querySelectorAll('.detective-el').forEach(el => {
+      el.classList.remove('error-flash'); void el.offsetWidth; el.classList.add('error-flash');
+    });
+    playTone(220, 0.07, 'sawtooth');
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   SUCCESS FLOW
+══════════════════════════════════════════════════════════ */
+function levelSuccess() {
+  if (!state.solved[state.level]) {
+    state.solved[state.level] = true;
+    const pts = { Easy:100, Medium:200, Hard:300 }[LEVELS[state.level].difficulty] || 100;
+    state.score += pts;
+    state.streak++;
+    if (state.streak > state.bestStreak) state.bestStreak = state.streak;
+    updateScoreUI(); saveProgress();
+    playSuccess();
+  }
+  $('successMsg').textContent = `${LEVELS[state.level].name} solved. The box model doesn't lie.`;
+  $('successOverlay').classList.add('show');
+  updateProgressList(); updateDots();
+}
+function updateScoreUI() {
+  $('scoreVal').textContent  = state.score;
+  $('streakVal').textContent = state.bestStreak;
+}
+
+/* ══════════════════════════════════════════════════════════
+   LOAD LEVEL
+══════════════════════════════════════════════════════════ */
+function loadLevel(idx) {
+  state.level = idx;
+  $('successOverlay').classList.remove('show');
+  const lv = LEVELS[idx];
+
+  // Reset sliders
+  state.mTop=state.mRight=state.mBottom=state.mLeft=0;
+  state.padV=state.padH=0; state.borderW=2; state.radius=0;
+  [mTopEl,mRightEl,mBottomEl,mLeftEl].forEach(s=>{s.value=0;setFill(s);});
+  [mTopN,mRightN,mBottomN,mLeftN].forEach(n=>n.value=0);
+  padAllEl.value=0; padAllN.value=0; setFill(padAllEl);
+  padVEl.value=0; padVN.value=0; setFill(padVEl);
+  padHEl.value=0; padHN.value=0; setFill(padHEl);
+  borderWEl.value=2; borderWN.value=2; setFill(borderWEl);
+  radiusEl.value=0; radiusN.value=0; setFill(radiusEl);
+
+  $('levelLabel').textContent = `LEVEL ${idx+1} / ${TOTAL}`;
+  $('missionName').textContent = lv.name;
+  $('levelDescText').innerHTML = lv.description;
+
+  const db = $('diffBadge');
+  db.textContent = lv.difficulty;
+  db.className = 'difficulty-badge diff-'+lv.difficulty.toLowerCase();
+
+  $('prevBtn').disabled = idx === 0;
+  $('nextBtn').disabled = idx === TOTAL-1;
+
+  $('insightBox').innerHTML = 'Adjust the controls on the left and click <strong>Check</strong> to see margin collapse diagnostics.';
+
+  buildScene(idx);
+  updateDots(); updateProgressList();
+  liveUpdate();
+}
+
+/* ══════════════════════════════════════════════════════════
+   DOTS & PROGRESS LIST
+══════════════════════════════════════════════════════════ */
+function updateDots() {
+  const c = $('levelDots'); c.innerHTML = '';
+  for (let i=0; i<TOTAL; i++) {
+    const d = document.createElement('div');
+    d.className = 'level-dot' + (state.solved[i]?' done':i===state.level?' active':'');
+    d.setAttribute('aria-label', `Level ${i+1}${state.solved[i]?' complete':i===state.level?' current':''}`);
+    d.addEventListener('click', () => loadLevel(i));
+    c.appendChild(d);
+  }
+}
+function updateProgressList() {
+  const ul = $('progressList'); ul.innerHTML = '';
+  LEVELS.forEach((lv,i) => {
+    const li = document.createElement('div');
+    li.className = 'progress-item' + (state.solved[i]?' done':i===state.level?' active':'');
+    li.innerHTML = `<div class="pi-dot"></div>${lv.name}`;
+    li.addEventListener('click', () => loadLevel(i));
+    ul.appendChild(li);
+  });
+}
+
+/* ══════════════════════════════════════════════════════════
+   BUTTON HANDLERS
+══════════════════════════════════════════════════════════ */
+$('checkBtn').addEventListener('click',  () => runCheck(true));
+$('resetBtn').addEventListener('click',  () => loadLevel(state.level));
+$('prevBtn').addEventListener('click',   () => { if(state.level>0) loadLevel(state.level-1); });
+$('nextBtn').addEventListener('click',   () => { if(state.level<TOTAL-1) loadLevel(state.level+1); });
+$('retryBtn').addEventListener('click',  () => { $('successOverlay').classList.remove('show'); loadLevel(state.level); });
+$('nextLevelBtn').addEventListener('click', () => {
+  $('successOverlay').classList.remove('show');
+  if (state.level < TOTAL-1) loadLevel(state.level+1); else showAllDone();
+});
+$('restartBtn').addEventListener('click', () => {
+  $('alldoneOverlay').classList.remove('show');
+  state.score=0; state.streak=0; state.bestStreak=0;
+  state.solved=new Array(TOTAL).fill(false);
+  updateScoreUI(); saveProgress(); loadLevel(0);
+});
+
+function showAllDone() {
+  $('finalScore').textContent  = state.score;
+  $('finalStreak').textContent = state.bestStreak;
+  $('finalLevels').textContent = TOTAL;
+  $('alldoneOverlay').classList.add('show');
+}
+
+/* ══════════════════════════════════════════════════════════
+   KEYBOARD
+══════════════════════════════════════════════════════════ */
+document.addEventListener('keydown', e => {
+  if (e.target.tagName==='INPUT') return;
+  if (e.key==='Enter'||e.key===' ') { e.preventDefault(); runCheck(true); }
+  if (e.key==='ArrowRight' && state.level<TOTAL-1) loadLevel(state.level+1);
+  if (e.key==='ArrowLeft'  && state.level>0)       loadLevel(state.level-1);
+  if (e.key.toLowerCase()==='r') loadLevel(state.level);
+});
+
+/* ══════════════════════════════════════════════════════════
+   WEB AUDIO SFX
+══════════════════════════════════════════════════════════ */
+let audioCtx=null;
+function getCtx(){if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();return audioCtx;}
+function playTone(freq,vol,type,dur=0.15){
+  try{const ctx=getCtx();const o=ctx.createOscillator();const g=ctx.createGain();
+  o.connect(g);g.connect(ctx.destination);o.type=type;o.frequency.value=freq;
+  g.gain.setValueAtTime(vol,ctx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+dur);
+  o.start();o.stop(ctx.currentTime+dur);}catch(e){}}
+function playSuccess(){[440,554,659,880].forEach((f,i)=>setTimeout(()=>playTone(f,0.1,'sine',0.25),i*80));}
+
+/* ══════════════════════════════════════════════════════════
+   INIT
+══════════════════════════════════════════════════════════ */
+loadProgress();
+updateScoreUI();
+loadLevel(state.level);
+</script>
+</body>
+</html>
