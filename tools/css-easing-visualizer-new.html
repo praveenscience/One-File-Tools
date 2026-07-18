@@ -1,0 +1,934 @@
+<!--
+CSS Easing Visualizer
+Single-file client-side tool to compare multiple CSS easing curves
+side-by-side, with synced animated previews and curve graphs.
+Differentiated from the Animation Cubic-Bezier Editor (which edits ONE
+custom curve): this tool is for COMPARING several named/custom easings
+against each other at once.
+Built for One File Tools.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CSS Easing Visualizer - One File Tools</title>
+    <meta name="description" content="Compare multiple CSS easing curves side-by-side on a shared graph and in an animated race preview." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <style>
+      :root {
+        --bg: #030712;
+        --grid-line: #111827;
+        --panel: rgba(17, 24, 39, 0.7);
+        --panel-border: #1f2937;
+        --accent: #f472b6;
+        --accent-hover: #ec4899;
+        --accent-glow: rgba(244, 114, 182, 0.15);
+        --text: #f9fafb;
+        --text-muted: #9ca3af;
+        --text-dim: #4b5563;
+        --radius-sm: 12px;
+        --radius-md: 20px;
+        --font-sans: "Inter", system-ui, sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+        --font-display: "Space Grotesk", sans-serif;
+        --color-weak: #ef4444;
+
+        --curve-1: #f472b6;
+        --curve-2: #38bdf8;
+        --curve-3: #22c55e;
+        --curve-4: #f59e0b;
+        --curve-5: #a78bfa;
+        --curve-6: #fb7185;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg);
+        background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+        background-size: 32px 32px;
+        color: var(--text);
+        padding: 48px 20px 80px;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+      }
+
+      .app {
+        width: 100%;
+        max-width: 920px;
+      }
+
+      .hero {
+        text-align: center;
+        margin-bottom: 32px;
+      }
+
+      .eyebrow {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        letter-spacing: 0.2em;
+        color: var(--accent);
+        text-transform: uppercase;
+        margin-bottom: 12px;
+        font-weight: 500;
+      }
+
+      .wordmark {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: clamp(26px, 5vw, 38px);
+        letter-spacing: -0.02em;
+        margin-bottom: 12px;
+      }
+
+      .tagline {
+        color: var(--text-muted);
+        font-size: 15px;
+        line-height: 1.5;
+        max-width: 600px;
+        margin: 0 auto;
+      }
+
+      .studio {
+        background: var(--panel);
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-md);
+        padding: 28px;
+        box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.5);
+        margin-bottom: 24px;
+      }
+
+      .section-label {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 14px;
+      }
+
+      .curve-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: rgba(3, 7, 18, 0.5);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 10px 12px;
+        margin-bottom: 10px;
+      }
+
+      .swatch {
+        width: 14px;
+        height: 14px;
+        border-radius: 4px;
+        flex-shrink: 0;
+      }
+
+      .curve-row select,
+      .curve-row input[type="text"] {
+        background: rgba(17, 24, 39, 0.8);
+        border: 1px solid var(--panel-border);
+        border-radius: 6px;
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 13px;
+        padding: 8px 10px;
+      }
+
+      .curve-row select {
+        min-width: 160px;
+      }
+
+      .curve-row input[type="text"] {
+        flex: 1;
+        min-width: 140px;
+      }
+
+      .curve-row .remove-btn {
+        background: rgba(239, 68, 68, 0.12);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        color: #fca5a5;
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-size: 12px;
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+
+      .curve-row .remove-btn:hover {
+        background: rgba(239, 68, 68, 0.2);
+      }
+
+      .curve-row .copy-btn {
+        background: rgba(56, 189, 248, 0.12);
+        border: 1px solid rgba(56, 189, 248, 0.3);
+        color: #7dd3fc;
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-size: 12px;
+        cursor: pointer;
+        flex-shrink: 0;
+        font-family: var(--font-mono);
+      }
+
+      .curve-row .copy-btn:hover {
+        background: rgba(56, 189, 248, 0.22);
+      }
+
+      .btn {
+        background: var(--accent);
+        color: #030712;
+        border: none;
+        border-radius: 8px;
+        padding: 10px 18px;
+        font-family: var(--font-sans);
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .btn:hover {
+        background: var(--accent-hover);
+      }
+
+      .btn-ghost {
+        background: rgba(31, 41, 55, 0.6);
+        border: 1px solid var(--panel-border);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 10px 18px;
+        font-family: var(--font-sans);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .btn-ghost:hover {
+        background: rgba(55, 65, 81, 0.8);
+      }
+
+      .actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 6px;
+        flex-wrap: wrap;
+      }
+
+      .duration-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 16px;
+      }
+
+      .duration-row label {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--text-dim);
+      }
+
+      .duration-row input[type="range"] {
+        flex: 1;
+      }
+
+      /* Graph: SVG plotting each curve's progress(t) over time. */
+      .graph-container {
+        background: rgba(3, 7, 18, 0.5);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 16px;
+      }
+
+      #curveGraph {
+        width: 100%;
+        height: 220px;
+        display: block;
+      }
+
+      .legend {
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+        margin-top: 12px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      /* Race track: one lane per curve, ball animates left to right. */
+      .track {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 16px;
+      }
+
+      .lane {
+        position: relative;
+        height: 32px;
+        background: rgba(3, 7, 18, 0.4);
+        border: 1px solid var(--panel-border);
+        border-radius: 99px;
+      }
+
+      .ball {
+        position: absolute;
+        top: 4px;
+        left: 0;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        transform: translateX(0);
+      }
+
+      .footer-note {
+        text-align: center;
+        color: var(--text-dim);
+        font-size: 13px;
+        margin-top: 8px;
+      }
+
+      .footer-note a {
+        color: var(--text-muted);
+      }
+
+      /* Draggable Bézier editor shown under a "custom" curve row. */
+      .bezier-editor {
+        margin: 8px 0 4px 24px;
+        background: rgba(3, 7, 18, 0.5);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 10px;
+      }
+
+      .bezier-editor svg {
+        width: 100%;
+        height: 140px;
+        display: block;
+        touch-action: none;
+      }
+
+      .bezier-editor .handle {
+        cursor: grab;
+      }
+
+      .bezier-editor .handle:active {
+        cursor: grabbing;
+      }
+
+      /* Import / export bar */
+      .io-row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 14px;
+      }
+
+      .io-row input[type="text"] {
+        flex: 1;
+        min-width: 200px;
+        background: rgba(17, 24, 39, 0.8);
+        border: 1px solid var(--panel-border);
+        border-radius: 6px;
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 13px;
+        padding: 8px 10px;
+      }
+
+      @media (max-width: 640px) {
+        .studio {
+          padding: 20px;
+        }
+        .curve-row select,
+        .curve-row input[type="text"] {
+          min-width: 0;
+        }
+        .bezier-editor {
+          margin-left: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="hero">
+        <div class="eyebrow">CSS Tools</div>
+        <h1 class="wordmark">CSS Easing Visualizer</h1>
+        <p class="tagline">Compare multiple easing curves side-by-side — see their shape on a shared graph and watch them race in an animated preview, so you can pick the right feel instead of guessing.</p>
+      </header>
+
+      <section class="studio">
+        <span class="section-label">
+          Curves to compare
+          <button class="btn-ghost" id="btnAddCurve" type="button">+ Add curve</button>
+        </span>
+        <div id="curveRows"></div>
+
+        <div class="io-row">
+          <input type="text" id="importInput" placeholder="Paste a cubic-bezier(...) or keyword to import as a new curve" aria-label="Import easing value" />
+          <button class="btn-ghost" id="btnImport" type="button">Import</button>
+          <button class="btn-ghost" id="btnExportPresets" type="button">Export presets (.json)</button>
+        </div>
+      </section>
+
+      <main class="studio">
+        <span class="section-label">Curve graph — progress over time</span>
+        <div class="graph-container">
+          <svg id="curveGraph" viewBox="0 0 400 220" preserveAspectRatio="none"></svg>
+        </div>
+        <div class="legend" id="legend"></div>
+
+        <div class="duration-row">
+          <label for="durationRange">Duration</label>
+          <input type="range" id="durationRange" min="200" max="3000" step="100" value="1000" />
+          <span id="durationValue">1000ms</span>
+        </div>
+        <div class="actions">
+          <button class="btn" id="btnPlay" type="button">▶ Play race</button>
+        </div>
+
+        <div class="track" id="track"></div>
+      </main>
+
+      <p class="footer-note">Part of <a href="https://github.com/praveenscience/One-File-Tools">One File Tools</a>. Runs completely offline.</p>
+    </div>
+
+    <script>
+      /* ==========================================================
+         CSS Easing Visualizer
+         Vanilla JS + SVG + Web Animations API, no dependencies.
+         ========================================================== */
+
+      const curveRows = document.getElementById("curveRows");
+      const btnAddCurve = document.getElementById("btnAddCurve");
+      const curveGraph = document.getElementById("curveGraph");
+      const legend = document.getElementById("legend");
+      const durationRange = document.getElementById("durationRange");
+      const durationValue = document.getElementById("durationValue");
+      const btnPlay = document.getElementById("btnPlay");
+      const track = document.getElementById("track");
+
+      const PRESETS = {
+        linear: "linear",
+        ease: "ease",
+        "ease-in": "ease-in",
+        "ease-out": "ease-out",
+        "ease-in-out": "ease-in-out",
+        "back-out": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+        "bounce-ish": "cubic-bezier(0.68, -0.55, 0.27, 1.55)",
+        "sharp-in": "cubic-bezier(0.4, 0, 1, 1)",
+        custom: null
+      };
+
+      const COLORS = ["var(--curve-1)", "var(--curve-2)", "var(--curve-3)", "var(--curve-4)", "var(--curve-5)", "var(--curve-6)"];
+
+      let curveIdCounter = 0;
+      // Each curve: { id, preset, customValue }
+      let curves = [];
+
+      /** Parses a cubic-bezier(...) string into its 4 numeric control points. */
+      function parseCubicBezier(value) {
+        const match = value.match(/cubic-bezier\(([^)]+)\)/);
+        if (!match) return null;
+        const parts = match[1].split(",").map((n) => parseFloat(n.trim()));
+        if (parts.length !== 4 || parts.some(isNaN)) return null;
+        return parts;
+      }
+
+      // Standard easing keywords mapped to their cubic-bezier equivalents so we
+      // can plot them on the same graph as custom curves.
+      const KEYWORD_BEZIER = {
+        linear: [0, 0, 1, 1],
+        ease: [0.25, 0.1, 0.25, 1],
+        "ease-in": [0.42, 0, 1, 1],
+        "ease-out": [0, 0, 0.58, 1],
+        "ease-in-out": [0.42, 0, 0.58, 1]
+      };
+
+      /** Cubic bezier evaluation at parameter t, returning [x, y]. */
+      function bezierPoint(t, p1, p2) {
+        const [x1, y1] = p1;
+        const [x2, y2] = p2;
+        const mt = 1 - t;
+        const x = 3 * mt * mt * t * x1 + 3 * mt * t * t * x2 + t * t * t;
+        const y = 3 * mt * mt * t * y1 + 3 * mt * t * t * y2 + t * t * t;
+        return [x, y];
+      }
+
+      /** Resolves a curve's effective CSS easing value and its bezier points for plotting. */
+      function resolveCurve(curve) {
+        let cssValue;
+        if (curve.preset === "custom") {
+          cssValue = curve.customValue.trim() || "linear";
+        } else {
+          cssValue = PRESETS[curve.preset];
+        }
+
+        let bezier = KEYWORD_BEZIER[cssValue] || parseCubicBezier(cssValue);
+        if (!bezier) bezier = KEYWORD_BEZIER.linear; // Fallback if unparseable.
+        return { cssValue, bezier };
+      }
+
+      /** Adds a new curve row with the next color in the palette. */
+      function addCurve(initialPreset) {
+        curveIdCounter += 1;
+        curves.push({ id: curveIdCounter, preset: initialPreset || "ease-out", customValue: "cubic-bezier(0.25, 0.1, 0.25, 1)" });
+        renderCurveRows();
+        renderAll();
+      }
+
+      /** Removes a curve, keeping at least one on screen. */
+      function removeCurve(id) {
+        if (curves.length <= 1) return;
+        curves = curves.filter((c) => c.id !== id);
+        renderCurveRows();
+        renderAll();
+      }
+
+      /** Rebuilds the editable list of curve rows. */
+      function renderCurveRows() {
+        curveRows.innerHTML = "";
+        curves.forEach((curve, index) => {
+          const row = document.createElement("div");
+          row.className = "curve-row";
+
+          const swatch = document.createElement("span");
+          swatch.className = "swatch";
+          swatch.style.background = COLORS[index % COLORS.length];
+
+          const select = document.createElement("select");
+          select.setAttribute("aria-label", "Easing preset");
+          Object.keys(PRESETS).forEach((key) => {
+            const opt = document.createElement("option");
+            opt.value = key;
+            opt.textContent = key;
+            if (key === curve.preset) opt.selected = true;
+            select.appendChild(opt);
+          });
+          select.addEventListener("change", () => {
+            curve.preset = select.value;
+            renderCurveRows();
+            renderAll();
+          });
+
+          row.appendChild(swatch);
+          row.appendChild(select);
+
+          if (curve.preset === "custom") {
+            const customInput = document.createElement("input");
+            customInput.type = "text";
+            customInput.value = curve.customValue;
+            customInput.placeholder = "cubic-bezier(0.25, 0.1, 0.25, 1)";
+            customInput.setAttribute("aria-label", "Custom easing (cubic-bezier)");
+            customInput.dataset.ownerCurveId = String(curve.id);
+            customInput.addEventListener("input", () => {
+              curve.customValue = customInput.value;
+              renderBezierEditor(curve.id);
+              renderAll();
+            });
+            row.appendChild(customInput);
+          }
+
+          const copyBtn = document.createElement("button");
+          copyBtn.type = "button";
+          copyBtn.className = "copy-btn";
+          copyBtn.textContent = "Copy";
+          copyBtn.title = "Copy this curve's CSS easing value";
+          copyBtn.addEventListener("click", () => copyCurveCss(curve, copyBtn));
+          row.appendChild(copyBtn);
+
+          const removeBtn = document.createElement("button");
+          removeBtn.type = "button";
+          removeBtn.className = "remove-btn";
+          removeBtn.textContent = "Remove";
+          removeBtn.disabled = curves.length <= 1;
+          removeBtn.addEventListener("click", () => removeCurve(curve.id));
+          row.appendChild(removeBtn);
+
+          curveRows.appendChild(row);
+
+          if (curve.preset === "custom") {
+            const editorHost = document.createElement("div");
+            editorHost.className = "bezier-editor";
+            editorHost.dataset.curveId = curve.id;
+            curveRows.appendChild(editorHost);
+            renderBezierEditor(curve.id);
+          }
+        });
+      }
+
+      /** Copies a curve's resolved CSS easing value to the clipboard. */
+      async function copyCurveCss(curve, button) {
+        const { cssValue } = resolveCurve(curve);
+        try {
+          await navigator.clipboard.writeText(cssValue);
+          const original = button.textContent;
+          button.textContent = "Copied!";
+          setTimeout(() => {
+            button.textContent = original;
+          }, 1500);
+        } catch {
+          // Clipboard API unavailable/blocked — fail gracefully, no throw.
+          button.textContent = "Copy failed";
+          setTimeout(() => {
+            button.textContent = "Copy";
+          }, 1500);
+        }
+      }
+
+      /**
+       * Renders an interactive SVG editor with two draggable control-point
+       * handles for a "custom" curve, wired to update its customValue live.
+       * The bezier's fixed endpoints (0,0) and (1,1) are drawn for reference
+       * but are not draggable, matching the standard cubic-bezier() spec.
+       */
+      function renderBezierEditor(curveId) {
+        const host = curveRows.querySelector(`.bezier-editor[data-curve-id="${curveId}"]`);
+        const curve = curves.find((c) => c.id === curveId);
+        if (!host || !curve) return;
+
+        const width = 260;
+        const height = 140;
+        const pad = 16;
+
+        function toPixel([x, y]) {
+          return [pad + x * (width - 2 * pad), height - pad - y * (height - 2 * pad)];
+        }
+        function toUnit(px, py) {
+          const x = (px - pad) / (width - 2 * pad);
+          const y = (height - pad - py) / (height - 2 * pad);
+          return [Math.max(0, Math.min(1, x)), Math.max(-1, Math.min(2, y))];
+        }
+
+        const bezier = parseCubicBezier(curve.customValue.trim() || "cubic-bezier(0.25,0.1,0.25,1)") || [0.25, 0.1, 0.25, 1];
+        const [p1x, p1y, p2x, p2y] = bezier;
+        const [x0, y0] = toPixel([0, 0]);
+        const [x3, y3] = toPixel([1, 1]);
+        const [hx1, hy1] = toPixel([p1x, p1y]);
+        const [hx2, hy2] = toPixel([p2x, p2y]);
+
+        host.innerHTML = `
+          <svg viewBox="0 0 ${width} ${height}" aria-label="Draggable cubic-bezier control point editor">
+            <line x1="${x0}" y1="${y0}" x2="${hx1}" y2="${hy1}" stroke="#4b5563" stroke-width="1.5" />
+            <line x1="${x3}" y1="${y3}" x2="${hx2}" y2="${hy2}" stroke="#4b5563" stroke-width="1.5" />
+            <path d="M${x0},${y0} C${hx1},${hy1} ${hx2},${hy2} ${x3},${y3}" fill="none" stroke="#f472b6" stroke-width="2.5" />
+            <circle cx="${x0}" cy="${y0}" r="4" fill="#4b5563" />
+            <circle cx="${x3}" cy="${y3}" r="4" fill="#4b5563" />
+            <circle class="handle" data-point="1" cx="${hx1}" cy="${hy1}" r="7" fill="#38bdf8" />
+            <circle class="handle" data-point="2" cx="${hx2}" cy="${hy2}" r="7" fill="#22c55e" />
+          </svg>
+        `;
+
+        const svg = host.querySelector("svg");
+
+        function pointFromEvent(evt) {
+          const rect = svg.getBoundingClientRect();
+          const scaleX = width / rect.width;
+          const scaleY = height / rect.height;
+          return [(evt.clientX - rect.left) * scaleX, (evt.clientY - rect.top) * scaleY];
+        }
+
+        // Updates the SVG elements in place (no innerHTML rebuild) so an
+        // active pointer-captured drag on a handle isn't interrupted by
+        // destroying/recreating that same element mid-drag.
+        function paintHandles(next) {
+          const [nx1, ny1, nx2, ny2] = next;
+          const [px1, py1] = toPixel([nx1, ny1]);
+          const [px2, py2] = toPixel([nx2, ny2]);
+
+          const lines = svg.querySelectorAll("line");
+          lines[0].setAttribute("x2", px1);
+          lines[0].setAttribute("y2", py1);
+          lines[1].setAttribute("x2", px2);
+          lines[1].setAttribute("y2", py2);
+
+          svg.querySelector("path").setAttribute("d", `M${x0},${y0} C${px1},${py1} ${px2},${py2} ${x3},${y3}`);
+
+          const h1 = svg.querySelector('.handle[data-point="1"]');
+          const h2 = svg.querySelector('.handle[data-point="2"]');
+          h1.setAttribute("cx", px1);
+          h1.setAttribute("cy", py1);
+          h2.setAttribute("cx", px2);
+          h2.setAttribute("cy", py2);
+        }
+
+        function updateFromDrag(pointNum, px, py, commit) {
+          const [ux, uy] = toUnit(px, py);
+          const current = parseCubicBezier(curve.customValue.trim()) || [0.25, 0.1, 0.25, 1];
+          const next = current.slice();
+          const rx = Math.round(ux * 100) / 100;
+          const ry = Math.round(uy * 100) / 100;
+          if (pointNum === 1) {
+            next[0] = rx;
+            next[1] = ry;
+          } else {
+            next[2] = rx;
+            next[3] = ry;
+          }
+          curve.customValue = `cubic-bezier(${next.join(", ")})`;
+          paintHandles(next);
+
+          // Keep the row's text input in sync live, without rebuilding the
+          // editor SVG itself.
+          const textInput = curveRows.querySelector(`input[aria-label="Custom easing (cubic-bezier)"][data-owner-curve-id="${curveId}"]`);
+          if (textInput) textInput.value = curve.customValue;
+
+          if (commit) {
+            renderAll();
+          } else {
+            // Update the shared graph/track live too, but skip re-rendering
+            // this editor's own SVG to avoid interrupting the drag.
+            renderGraph();
+            renderLegend();
+          }
+        }
+
+        svg.querySelectorAll(".handle").forEach((handle) => {
+          handle.addEventListener("pointerdown", (evt) => {
+            evt.preventDefault();
+            const pointNum = Number(handle.dataset.point);
+            handle.setPointerCapture(evt.pointerId);
+
+            function onMove(moveEvt) {
+              const [px, py] = pointFromEvent(moveEvt);
+              updateFromDrag(pointNum, px, py, false);
+            }
+            function onUp(upEvt) {
+              const [px, py] = pointFromEvent(upEvt);
+              updateFromDrag(pointNum, px, py, true);
+              svg.removeEventListener("pointermove", onMove);
+              svg.removeEventListener("pointerup", onUp);
+              svg.removeEventListener("pointercancel", onUp);
+            }
+            svg.addEventListener("pointermove", onMove);
+            svg.addEventListener("pointerup", onUp);
+            svg.addEventListener("pointercancel", onUp);
+          });
+        });
+      }
+
+      /** Draws every curve's progress-over-time graph as an SVG polyline. */
+      function renderGraph() {
+        const width = 400;
+        const height = 220;
+        const padding = 10;
+
+        curveGraph.innerHTML = "";
+        curveGraph.setAttribute("viewBox", "0 0 " + width + " " + height);
+
+        // Baseline grid.
+        const grid = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        grid.setAttribute("d", "M" + padding + "," + (height - padding) + " L" + (width - padding) + "," + (height - padding) + " M" + padding + "," + padding + " L" + padding + "," + (height - padding));
+        grid.setAttribute("stroke", "#374151");
+        grid.setAttribute("stroke-width", "1");
+        curveGraph.appendChild(grid);
+
+        curves.forEach((curve, index) => {
+          const { bezier } = resolveCurve(curve);
+          const p1 = [bezier[0], bezier[1]];
+          const p2 = [bezier[2], bezier[3]];
+
+          const points = [];
+          const steps = 60;
+          for (let i = 0; i <= steps; i++) {
+            const xTarget = i / steps;
+
+            // For CSS easing curves, x is time; invert x(t) to get y(x).
+            let lo = 0;
+            let hi = 1;
+            let y = 0;
+            for (let iter = 0; iter < 14; iter++) {
+              const mid = (lo + hi) / 2;
+              const [xMid, yMid] = bezierPoint(mid, p1, p2);
+              y = yMid;
+              if (xMid < xTarget) lo = mid;
+              else hi = mid;
+            }
+
+            const px = padding + xTarget * (width - 2 * padding);
+            // y can overshoot [0,1] for back/bounce curves — clamp to the
+            // visible plot area while keeping the curve's shape recognizable.
+            const clampedY = Math.max(-0.3, Math.min(1.3, y));
+            const py = height - padding - ((clampedY + 0.3) / 1.6) * (height - 2 * padding);
+            points.push(px.toFixed(1) + "," + py.toFixed(1));
+          }
+
+          const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+          polyline.setAttribute("points", points.join(" "));
+          polyline.setAttribute("fill", "none");
+          polyline.setAttribute("stroke", COLORS[index % COLORS.length].replace("var(", "").replace(")", ""));
+          polyline.setAttribute("stroke-width", "2.5");
+          // Resolve the CSS variable to a real color for the SVG stroke.
+          const cssVarName = COLORS[index % COLORS.length].match(/--[a-z0-9-]+/)[0];
+          const resolved = getComputedStyle(document.documentElement).getPropertyValue(cssVarName).trim();
+          polyline.setAttribute("stroke", resolved);
+          curveGraph.appendChild(polyline);
+        });
+      }
+
+      /** Renders the color-coded legend beneath the graph. */
+      function renderLegend() {
+        legend.innerHTML = "";
+        curves.forEach((curve, index) => {
+          const item = document.createElement("div");
+          item.className = "legend-item";
+          const swatch = document.createElement("span");
+          swatch.className = "swatch";
+          swatch.style.background = COLORS[index % COLORS.length];
+          const label = document.createElement("span");
+          const { cssValue } = resolveCurve(curve);
+          label.textContent = curve.preset === "custom" ? cssValue : curve.preset + " → " + cssValue;
+          item.appendChild(swatch);
+          item.appendChild(label);
+          legend.appendChild(item);
+        });
+      }
+
+      /** Rebuilds the race-track lanes (one ball per curve). */
+      function renderTrack() {
+        track.innerHTML = "";
+        curves.forEach((curve, index) => {
+          const lane = document.createElement("div");
+          lane.className = "lane";
+          const ball = document.createElement("div");
+          ball.className = "ball";
+          ball.style.background = COLORS[index % COLORS.length];
+          ball.dataset.curveId = curve.id;
+          lane.appendChild(ball);
+          track.appendChild(lane);
+        });
+      }
+
+      function renderAll() {
+        renderGraph();
+        renderLegend();
+        renderTrack();
+      }
+
+      /** Plays every ball's animation simultaneously using the Web Animations API. */
+      function playRace() {
+        const duration = parseInt(durationRange.value, 10);
+        const balls = track.querySelectorAll(".ball");
+        const trackWidth = track.clientWidth - 24; // Subtract ball width.
+
+        balls.forEach((ball) => {
+          const curve = curves.find((c) => String(c.id) === ball.dataset.curveId);
+          if (!curve) return;
+          const { cssValue } = resolveCurve(curve);
+
+          ball.getAnimations().forEach((anim) => anim.cancel());
+          try {
+            ball.animate([{ transform: "translateX(0px)" }, { transform: "translateX(" + trackWidth + "px)" }], {
+              duration,
+              easing: cssValue,
+              fill: "forwards"
+            });
+          } catch (e) {
+            ball.animate([{ transform: "translateX(0px)" }, { transform: "translateX(" + trackWidth + "px)" }], {
+              duration,
+              easing: "linear",
+              fill: "forwards"
+            });
+          }
+        });
+      }
+
+      /**
+       * Imports a pasted easing value (a keyword like "ease-in-out" or a
+       * cubic-bezier(...) string) as a new curve. Falls back to treating
+       * unrecognized text as a custom cubic-bezier string, and only adds a
+       * curve if the value parses to something plottable.
+       */
+      function importEasingValue(rawValue) {
+        const value = rawValue.trim();
+        if (!value) return false;
+
+        if (PRESETS[value] !== undefined && value !== "custom") {
+          addCurve(value);
+          return true;
+        }
+
+        const bezier = parseCubicBezier(value);
+        if (!bezier) return false;
+
+        curveIdCounter += 1;
+        curves.push({ id: curveIdCounter, preset: "custom", customValue: value });
+        renderCurveRows();
+        renderAll();
+        return true;
+      }
+
+      /** Exports every current curve as a JSON preset file. */
+      function exportPresets() {
+        const presets = curves.map((curve) => {
+          const { cssValue } = resolveCurve(curve);
+          return { preset: curve.preset, value: cssValue };
+        });
+
+        try {
+          const blob = new Blob([JSON.stringify(presets, null, 2)], { type: "application/json" });
+          const link = document.createElement("a");
+          link.href = URL.createObjectURL(blob);
+          link.download = "easing-presets.json";
+          link.click();
+          URL.revokeObjectURL(link.href);
+        } catch {
+          alert("Failed to export presets in this browser.");
+        }
+      }
+
+      btnAddCurve.addEventListener("click", () => addCurve("linear"));
+      btnPlay.addEventListener("click", playRace);
+      durationRange.addEventListener("input", () => {
+        durationValue.textContent = durationRange.value + "ms";
+      });
+
+      const importInput = document.getElementById("importInput");
+      const btnImport = document.getElementById("btnImport");
+      const btnExportPresets = document.getElementById("btnExportPresets");
+
+      btnImport.addEventListener("click", () => {
+        const ok = importEasingValue(importInput.value);
+        if (ok) {
+          importInput.value = "";
+        } else {
+          importInput.setAttribute("aria-invalid", "true");
+          setTimeout(() => importInput.removeAttribute("aria-invalid"), 1500);
+        }
+      });
+      importInput.addEventListener("keydown", (evt) => {
+        if (evt.key === "Enter") btnImport.click();
+      });
+      btnExportPresets.addEventListener("click", exportPresets);
+
+      // Seed with three contrasting curves so the comparison is meaningful
+      // from the first load.
+      addCurve("ease-out");
+      addCurve("linear");
+      addCurve("back-out");
+    </script>
+  </body>
+</html>
