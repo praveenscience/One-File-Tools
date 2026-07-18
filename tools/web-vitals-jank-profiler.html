@@ -1,0 +1,704 @@
+<!doctype html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AuraVitals // Web Vitals Jank Profiler</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              serif: ['"Instrument Serif"', "serif"],
+              sans: ['"Plus Jakarta Sans"', "sans-serif"],
+              mono: ['"JetBrains Mono"', "monospace"]
+            },
+            colors: {
+              ebony: "#090A0C",
+              panel: "#111317",
+              surface: "#181B21",
+              borderWarm: "rgba(233, 228, 219, 0.06)",
+              champagne: "#E9E4DB",
+              goldAccent: "#C28E36",
+              sage: "#6E8E76",
+              terracotta: "#B85A4B",
+              ochre: "#D99B43"
+            }
+          }
+        }
+      };
+    </script>
+
+    <style>
+      body {
+        background-color: #090a0c;
+        color: #e9e4db;
+        font-family: "Plus Jakarta Sans", sans-serif;
+        overflow-x: hidden;
+      }
+
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #090a0c;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #181b21;
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #c28e36;
+      }
+
+      .text-glowing-green {
+        text-shadow: 0 0 12px rgba(110, 142, 118, 0.4);
+      }
+      .text-glowing-red {
+        text-shadow: 0 0 12px rgba(184, 90, 75, 0.4);
+      }
+      .text-glowing-gold {
+        text-shadow: 0 0 12px rgba(194, 142, 54, 0.4);
+      }
+
+      @keyframes layoutShiftHard {
+        0% {
+          margin-top: 0px;
+        }
+        50% {
+          margin-top: 75px;
+        }
+        100% {
+          margin-top: 0px;
+        }
+      }
+      .force-shift {
+        animation: layoutShiftHard 0.4s ease-in-out;
+      }
+    </style>
+  </head>
+  <body class="h-full flex flex-col antialiased">
+    <header class="border-b border-borderWarm px-8 py-5 flex justify-between items-center bg-ebony/80 backdrop-blur-md sticky top-0 z-50">
+      <div class="flex items-center gap-4">
+        <span class="font-serif text-3xl italic tracking-wide text-champagne">AuraVitals</span>
+        <div class="h-4 w-[1px] bg-borderWarm"></div>
+        <span class="text-xs uppercase tracking-[0.2em] text-champagne/40 font-medium">Browser Network Engine</span>
+      </div>
+
+      <div class="flex items-center gap-8 text-xs font-mono">
+        <div class="flex items-center gap-2">
+          <span class="inline-block w-2 h-2 rounded-full bg-sage animate-pulse"></span>
+          <span class="text-champagne/40">ENGINE STATUS:</span>
+          <span class="text-sage font-medium tracking-wider">ACTIVE</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <i data-lucide="cpu" class="w-3.5 h-3.5 text-champagne/40"></i>
+          <span class="text-champagne/40">FPS:</span>
+          <span id="live-fps" class="text-champagne font-bold">60</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <i data-lucide="activity" class="w-3.5 h-3.5 text-champagne/40"></i>
+          <span class="text-champagne/40">LONG TASKS:</span>
+          <span id="global-longtasks-count" class="text-champagne">0</span>
+        </div>
+        <button onclick="resetAllMetrics()" class="flex items-center gap-1.5 px-3 py-1.5 rounded bg-surface border border-borderWarm hover:border-goldAccent/40 transition text-champagne/80 hover:text-champagne">
+          <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+          <span>Reset Profiler</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="flex-1 grid grid-cols-12 overflow-hidden">
+      <section class="col-span-4 border-r border-borderWarm flex flex-col overflow-y-auto bg-panel/30">
+        <div class="p-8 border-b border-borderWarm">
+          <span class="text-xs font-mono uppercase tracking-[0.2em] text-goldAccent block mb-2">Chaos Engineering Lab</span>
+          <h2 class="font-serif text-4xl text-champagne mb-4 italic">Simulate Real Jank</h2>
+          <p class="text-sm text-champagne/60 leading-relaxed mb-6">Trigger exact browser thread blockages and layout thrashing vectors below. Interact with the live sandbox pane to monitor impact on core UX metrics.</p>
+
+          <div class="space-y-4">
+            <div class="p-4 rounded-xl bg-surface border border-borderWarm hover:border-borderWarm/80 transition group">
+              <div class="flex justify-between items-start mb-2">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="zap-off" class="w-4 h-4 text-terracotta"></i>
+                  <h3 class="text-sm font-semibold tracking-wide text-champagne">Block Main Thread (INP / Long Task)</h3>
+                </div>
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-terracotta/10 text-terracotta border border-terracotta/20">JS Block</span>
+              </div>
+              <p class="text-xs text-champagne/50 mb-3">Runs a heavy continuous synchronous loop for 350ms, freezing browser event loops entirely.</p>
+              <button onclick="triggerLongTask()" class="w-full py-2 rounded bg-terracotta/10 hover:bg-terracotta/20 border border-terracotta/30 text-terracotta text-xs font-semibold tracking-wide transition">Inject 350ms Long Task</button>
+            </div>
+
+            <div class="p-4 rounded-xl bg-surface border border-borderWarm hover:border-borderWarm/80 transition group">
+              <div class="flex justify-between items-start mb-2">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="layers" class="w-4 h-4 text-ochre"></i>
+                  <h3 class="text-sm font-semibold tracking-wide text-champagne">Force Cumulative Layout Shift (CLS)</h3>
+                </div>
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-ochre/10 text-ochre border border-ochre/20">Visual Shift</span>
+              </div>
+              <p class="text-xs text-champagne/50 mb-3">Dynamically inserts layout elements without dimensions, causing structural layout jumps.</p>
+              <button onclick="triggerLayoutShift()" class="w-full py-2 rounded bg-ochre/10 hover:bg-ochre/20 border border-ochre/30 text-ochre text-xs font-semibold tracking-wide transition">Induce Layout Shift</button>
+            </div>
+
+            <div class="p-4 rounded-xl bg-surface border border-borderWarm hover:border-borderWarm/80 transition group">
+              <div class="flex justify-between items-start mb-2">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="refresh-cw" class="w-4 h-4 text-goldAccent"></i>
+                  <h3 class="text-sm font-semibold tracking-wide text-champagne">Forced Layout Thrashing (Reflow Loop)</h3>
+                </div>
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-goldAccent/10 text-goldAccent border border-goldAccent/20">Style Recalc</span>
+              </div>
+              <p class="text-xs text-champagne/50 mb-3">Iteratively writes widths and forces geometric reads across 400 nodes inside a tight block.</p>
+              <button onclick="triggerLayoutThrash()" class="w-full py-2 rounded bg-goldAccent/10 hover:bg-goldAccent/20 border border-goldAccent/30 text-goldAccent text-xs font-semibold tracking-wide transition">Execute Thrash Loop</button>
+            </div>
+
+            <div class="p-4 rounded-xl bg-surface border border-borderWarm hover:border-borderWarm/80 transition group">
+              <div class="flex justify-between items-start mb-2">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="image" class="w-4 h-4 text-sage"></i>
+                  <h3 class="text-sm font-semibold tracking-wide text-champagne">Simulate Dynamic LCP Element</h3>
+                </div>
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-sage/10 text-sage border border-sage/20">Paint Asset</span>
+              </div>
+              <p class="text-xs text-champagne/50 mb-3">Asynchronously injects a heavy high-res visual element into DOM view to register an updated LCP.</p>
+              <button onclick="triggerLcpElement()" class="w-full py-2 rounded bg-sage/10 hover:bg-sage/20 border border-sage/30 text-sage text-xs font-semibold tracking-wide transition">Inject Heavy Paint Node</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-8 flex-1 flex flex-col justify-between">
+          <div>
+            <span class="text-xs font-mono uppercase tracking-[0.2em] text-champagne/40 block mb-2">Live Embedded Interface</span>
+            <h3 class="font-serif text-2xl text-champagne italic mb-4">Interactive Sandbox Pane</h3>
+
+            <div id="sandbox-pane" class="relative min-h-[220px] bg-surface rounded-xl border border-borderWarm p-6 flex flex-col justify-between overflow-hidden transition-all duration-300">
+              <div id="sandbox-shift-target" class="transition-all duration-200">
+                <div class="flex justify-between items-center mb-4">
+                  <span class="text-[10px] tracking-wider uppercase font-mono px-2 py-1 rounded bg-ebony text-champagne/60 border border-borderWarm">Sandbox Env</span>
+                  <div class="flex gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-red-500/40"></span>
+                    <span class="w-2 h-2 rounded-full bg-yellow-500/40"></span>
+                    <span class="w-2 h-2 rounded-full bg-green-500/40"></span>
+                  </div>
+                </div>
+
+                <p class="text-xs text-champagne/70 mb-4 font-sans leading-relaxed">Use the input matrix controls below while long tasks run to force highly realistic Interaction to Next Paint (INP) degradations.</p>
+              </div>
+
+              <div id="sandbox-dynamic-injection-zone" class="w-full text-xs transition-all duration-300"></div>
+
+              <div class="grid grid-cols-2 gap-3 mt-auto pt-4 border-t border-borderWarm/40">
+                <button id="sandbox-click-btn" class="py-2.5 rounded bg-champagne text-ebony font-medium text-xs hover:bg-white transition flex items-center justify-center gap-2 active:scale-95">
+                  <i data-lucide="mouse-pointer" class="w-3.5 h-3.5"></i>
+                  <span>Click Matrix</span>
+                </button>
+                <input id="sandbox-input" type="text" placeholder="Type inside to log latency..." class="px-3 py-2.5 bg-ebony rounded border border-borderWarm text-xs font-mono text-champagne focus:outline-none focus:border-goldAccent transition" />
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 text-[11px] font-mono text-champagne/40 flex items-center gap-2 justify-center">
+            <i data-lucide="info" class="w-3 h-3"></i>
+            <span>All inputs tracked instantly by PerformanceObserver.</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="col-span-8 flex flex-col overflow-y-auto">
+        <div class="p-8 border-b border-borderWarm bg-panel/10">
+          <span class="text-xs font-mono uppercase tracking-[0.2em] text-champagne/40 block mb-6">Real-Time Web Vital Monitors</span>
+
+          <div class="grid grid-cols-3 gap-6">
+            <div id="card-inp" class="p-6 rounded-2xl bg-panel border border-borderWarm flex flex-col justify-between transition relative overflow-hidden group">
+              <div class="absolute top-0 left-0 w-full h-[2px] bg-sage" id="bar-inp"></div>
+              <div>
+                <div class="flex justify-between items-start mb-4">
+                  <span class="text-xs tracking-widest font-mono text-champagne/50">INTERACTION TO NEXT PAINT</span>
+                  <i data-lucide="pointer" class="w-4 h-4 text-champagne/40"></i>
+                </div>
+                <div class="flex items-baseline gap-1 mb-2">
+                  <span id="val-inp" class="text-5xl font-serif text-sage font-bold tracking-tight text-glowing-green">0</span>
+                  <span class="text-xs font-mono text-champagne/40">ms</span>
+                </div>
+              </div>
+              <div class="mt-4 pt-4 border-t border-borderWarm/30 flex justify-between items-center text-xs font-mono">
+                <span class="text-champagne/40">Status Rating:</span>
+                <span id="status-inp" class="text-sage uppercase font-semibold">Good</span>
+              </div>
+            </div>
+
+            <div id="card-lcp" class="p-6 rounded-2xl bg-panel border border-borderWarm flex flex-col justify-between transition relative overflow-hidden group">
+              <div class="absolute top-0 left-0 w-full h-[2px] bg-sage" id="bar-lcp"></div>
+              <div>
+                <div class="flex justify-between items-start mb-4">
+                  <span class="text-xs tracking-widest font-mono text-champagne/50">LARGEST CONTENTFUL PAINT</span>
+                  <i data-lucide="maximize" class="w-4 h-4 text-champagne/40"></i>
+                </div>
+                <div class="flex items-baseline gap-1 mb-2">
+                  <span id="val-lcp" class="text-5xl font-serif text-sage font-bold tracking-tight text-glowing-green">0</span>
+                  <span class="text-xs font-mono text-champagne/40">ms</span>
+                </div>
+              </div>
+              <div class="mt-4 pt-4 border-t border-borderWarm/30 flex justify-between items-center text-xs font-mono">
+                <span class="text-champagne/40">DOM Target:</span>
+                <span id="target-lcp" class="text-champagne/60 truncate max-w-[120px]">None Detected</span>
+              </div>
+            </div>
+
+            <div id="card-cls" class="p-6 rounded-2xl bg-panel border border-borderWarm flex flex-col justify-between transition relative overflow-hidden group">
+              <div class="absolute top-0 left-0 w-full h-[2px] bg-sage" id="bar-cls"></div>
+              <div>
+                <div class="flex justify-between items-start mb-4">
+                  <span class="text-xs tracking-widest font-mono text-champagne/50">CUMULATIVE LAYOUT SHIFT</span>
+                  <i data-lucide="layout" class="w-4 h-4 text-champagne/40"></i>
+                </div>
+                <div class="flex items-baseline gap-1 mb-2">
+                  <span id="val-cls" class="text-5xl font-serif text-sage font-bold tracking-tight text-glowing-green">0.000</span>
+                </div>
+              </div>
+              <div class="mt-4 pt-4 border-t border-borderWarm/30 flex justify-between items-center text-xs font-mono">
+                <span class="text-champagne/40">Shift Events:</span>
+                <span id="count-cls" class="text-champagne/60">0 total</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-8 border-b border-borderWarm grid grid-cols-12 gap-8 items-center">
+          <div class="col-span-8">
+            <span class="text-xs font-mono uppercase tracking-[0.2em] text-champagne/40 block mb-4">Main Thread Availability Analytics</span>
+            <div class="bg-panel rounded-xl border border-borderWarm p-6 w-full h-[240px] relative">
+              <canvas id="fpsChart" class="w-full h-full"></canvas>
+            </div>
+          </div>
+          <div class="col-span-4 space-y-4">
+            <span class="text-xs font-mono uppercase tracking-[0.2em] text-champagne/40 block">Performance Benchmarks</span>
+
+            <div class="p-4 rounded-xl bg-surface border border-borderWarm">
+              <div class="flex justify-between items-center text-xs font-mono mb-2">
+                <span class="text-champagne/60">INP Thresholds</span>
+              </div>
+              <div class="w-full bg-ebony h-2 rounded overflow-hidden flex">
+                <div class="w-2/4 bg-sage h-full"></div>
+                <div class="w-1/4 bg-ochre h-full"></div>
+                <div class="w-1/4 bg-terracotta h-full"></div>
+              </div>
+              <div class="flex justify-between text-[10px] font-mono mt-1 text-champagne/40">
+                <span>Good (&lt;200ms)</span>
+                <span>Poor (&gt;500ms)</span>
+              </div>
+            </div>
+
+            <div class="p-4 rounded-xl bg-surface border border-borderWarm">
+              <div class="flex justify-between items-center text-xs font-mono mb-2">
+                <span class="text-champagne/60">CLS Thresholds</span>
+              </div>
+              <div class="w-full bg-ebony h-2 rounded overflow-hidden flex">
+                <div class="w-1/3 bg-sage h-full"></div>
+                <div class="w-1/3 bg-ochre h-full"></div>
+                <div class="w-1/3 bg-terracotta h-full"></div>
+              </div>
+              <div class="flex justify-between text-[10px] font-mono mt-1 text-champagne/40">
+                <span>Good (&lt;0.1)</span>
+                <span>Poor (&gt;0.25)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-8 flex-1 flex flex-col min-h-[300px]">
+          <div class="flex justify-between items-center mb-4">
+            <div class="flex items-center gap-3">
+              <i data-lucide="terminal" class="w-4 h-4 text-goldAccent"></i>
+              <span class="text-xs font-mono uppercase tracking-[0.2em] text-champagne/80">Real-Time Engine Telemetry Stream</span>
+            </div>
+            <button onclick="clearTelemetryLog()" class="text-xs text-champagne/40 hover:text-goldAccent transition font-mono flex items-center gap-1">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              <span>Clear Log</span>
+            </button>
+          </div>
+
+          <div id="telemetry-log" class="flex-1 w-full bg-panel rounded-xl border border-borderWarm p-5 font-mono text-xs overflow-y-auto space-y-2.5 shadow-inner select-text">
+            <div class="text-champagne/30">Web Vital Performance Observers loaded successfully...</div>
+            <div class="text-champagne/30">Awaiting telemetry capture events from active sandbox...</div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      let frameTimes = [];
+      let lastFrameTime = performance.now();
+      let globalFps = 60;
+      let longTaskCounter = 0;
+
+      let metricsState = {
+        inp: 0,
+        lcp: 0,
+        cls: 0,
+        clsCount: 0
+      };
+
+      lucide.createIcons();
+
+      const ctx = document.getElementById("fpsChart").getContext("2d");
+      const fpsChart = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels: Array.from({ length: 40 }, (_, i) => i),
+          datasets: [
+            {
+              label: "Main Thread Availability (FPS Target)",
+              data: Array(40).fill(60),
+              borderColor: "#6E8E76",
+              borderWidth: 1.5,
+              pointRadius: 0,
+              fill: true,
+              backgroundColor: "rgba(110, 142, 118, 0.04)",
+              tension: 0.3
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { display: false },
+            y: {
+              min: 0,
+              max: 75,
+              grid: { color: "rgba(233, 228, 219, 0.03)" },
+              ticks: { color: "rgba(233, 228, 219, 0.4)", font: { family: "JetBrains Mono", size: 10 } }
+            }
+          }
+        }
+      });
+
+      function runFpsEngine() {
+        const now = performance.now();
+        const delta = Math.max(now - lastFrameTime, 1);
+        lastFrameTime = now;
+
+        const currentFps = Math.min(Math.round(1000 / delta), 60);
+
+        frameTimes.push(currentFps);
+        if (frameTimes.length > 40) frameTimes.shift();
+
+        globalFps = Math.round(frameTimes.reduce((a, b) => a + b, 0) / frameTimes.length);
+        document.getElementById("live-fps").innerText = globalFps;
+
+        const fpsTextNode = document.getElementById("live-fps");
+        if (globalFps < 35) {
+          fpsTextNode.className = "text-terracotta font-bold text-glowing-red";
+        } else if (globalFps < 50) {
+          fpsTextNode.className = "text-ochre font-bold text-glowing-gold";
+        } else {
+          fpsTextNode.className = "text-champagne font-bold";
+        }
+
+        fpsChart.data.datasets[0].data = [...frameTimes];
+        if (globalFps < 45) {
+          fpsChart.data.datasets[0].borderColor = "#B85A4B";
+          fpsChart.data.datasets[0].backgroundColor = "rgba(184, 90, 75, 0.04)";
+        } else {
+          fpsChart.data.datasets[0].borderColor = "#6E8E76";
+          fpsChart.data.datasets[0].backgroundColor = "rgba(110, 142, 118, 0.04)";
+        }
+        fpsChart.update("none");
+
+        requestAnimationFrame(runFpsEngine);
+      }
+      requestAnimationFrame(runFpsEngine);
+
+      try {
+        const inpObserver = new PerformanceObserver((list) => {
+          const entries = list.getEntries();
+          entries.forEach((entry) => {
+            if (entry.interactionId) {
+              const duration = entry.duration;
+              if (duration > metricsState.inp) {
+                metricsState.inp = duration;
+                updateInpUi(duration, entry.name || entry.type);
+              }
+            }
+          });
+        });
+        inpObserver.observe({ type: "event", buffered: true, durationThreshold: 16 });
+      } catch (e) {}
+
+      try {
+        let sessionValue = 0;
+        let sessionEntries = [];
+        const clsObserver = new PerformanceObserver((list) => {
+          list.getEntries().forEach((entry) => {
+            if (!entry.hadRecentInput) {
+              metricsState.clsCount++;
+              metricsState.cls += entry.value;
+              updateClsUi(metricsState.cls);
+
+              logTelemetry(`[LAYOUT SHIFT] Value: ${entry.value.toFixed(4)} | Target Elements: ${entry.sources.length}`, "ochre");
+            }
+          });
+        });
+        clsObserver.observe({ type: "layout-shift", buffered: true });
+      } catch (e) {}
+
+      try {
+        const lcpObserver = new PerformanceObserver((list) => {
+          const entries = list.getEntries();
+          const lastEntry = entries[entries.length - 1];
+          metricsState.lcp = lastEntry.renderTime || lastEntry.loadTime || lastEntry.startTime;
+          updateLcpUi(metricsState.lcp, lastEntry.element ? lastEntry.element.tagName.toLowerCase() : "unknown");
+
+          logTelemetry(`[LCP EVENT] Element Paint: ${metricsState.lcp.toFixed(1)}ms | Type: ${lastEntry.id || "Node Asset"}`, "sage");
+        });
+        lcpObserver.observe({ type: "largest-contentful-paint", buffered: true });
+      } catch (e) {}
+
+      try {
+        const longTaskObserver = new PerformanceObserver((list) => {
+          list.getEntries().forEach((entry) => {
+            longTaskCounter++;
+            document.getElementById("global-longtasks-count").innerText = longTaskCounter;
+            logTelemetry(`[LONG TASK DETECTED] Duration: ${entry.duration.toFixed(1)}ms | Main thread entirely frozen.`, "terracotta");
+          });
+        });
+        longTaskObserver.observe({ type: "longtask", buffered: true });
+      } catch (e) {}
+
+      function updateInpUi(score, type) {
+        const valNode = document.getElementById("val-inp");
+        const statusNode = document.getElementById("status-inp");
+        const barNode = document.getElementById("bar-inp");
+        const cardNode = document.getElementById("card-inp");
+
+        valNode.innerText = Math.round(score);
+
+        if (score <= 200) {
+          statusNode.innerText = `Good (${type})`;
+          statusNode.className = "text-sage uppercase font-semibold";
+          valNode.className = "text-5xl font-serif text-sage font-bold tracking-tight text-glowing-green";
+          barNode.className = "absolute top-0 left-0 w-full h-[2px] bg-sage";
+        } else if (score <= 500) {
+          statusNode.innerText = `Needs Imp. (${type})`;
+          statusNode.className = "text-ochre uppercase font-semibold";
+          valNode.className = "text-5xl font-serif text-ochre font-bold tracking-tight text-glowing-gold";
+          barNode.className = "absolute top-0 left-0 w-full h-[2px] bg-ochre";
+        } else {
+          statusNode.innerText = `Poor (${type})`;
+          statusNode.className = "text-terracotta uppercase font-semibold";
+          valNode.className = "text-5xl font-serif text-terracotta font-bold tracking-tight text-glowing-red";
+          barNode.className = "absolute top-0 left-0 w-full h-[2px] bg-terracotta";
+          cardNode.classList.add("border-terracotta/40");
+          setTimeout(() => cardNode.classList.remove("border-terracotta/40"), 600);
+        }
+        logTelemetry(`[INP ENGAGEMENT] Metric updated dynamically to ${Math.round(score)}ms via interaction state.`, "champagne");
+      }
+
+      function updateClsUi(score) {
+        const valNode = document.getElementById("val-cls");
+        const countNode = document.getElementById("count-cls");
+        const barNode = document.getElementById("bar-cls");
+
+        valNode.innerText = score.toFixed(4);
+        countNode.innerText = `${metricsState.clsCount} mutations`;
+
+        if (score <= 0.1) {
+          valNode.className = "text-5xl font-serif text-sage font-bold tracking-tight text-glowing-green";
+          barNode.className = "absolute top-0 left-0 w-full h-[2px] bg-sage";
+        } else if (score <= 0.25) {
+          valNode.className = "text-5xl font-serif text-ochre font-bold tracking-tight text-glowing-gold";
+          barNode.className = "absolute top-0 left-0 w-full h-[2px] bg-ochre";
+        } else {
+          valNode.className = "text-5xl font-serif text-terracotta font-bold tracking-tight text-glowing-red";
+          barNode.className = "absolute top-0 left-0 w-full h-[2px] bg-terracotta";
+        }
+      }
+
+      function updateLcpUi(score, target) {
+        const valNode = document.getElementById("val-lcp");
+        const targetNode = document.getElementById("target-lcp");
+        const barNode = document.getElementById("bar-lcp");
+
+        valNode.innerText = Math.round(score);
+        targetNode.innerText = `<${target}>`;
+
+        if (score <= 2500) {
+          valNode.className = "text-5xl font-serif text-sage font-bold tracking-tight text-glowing-green";
+          barNode.className = "absolute top-0 left-0 w-full h-[2px] bg-sage";
+        } else if (score <= 4000) {
+          valNode.className = "text-5xl font-serif text-ochre font-bold tracking-tight text-glowing-gold";
+          barNode.className = "absolute top-0 left-0 w-full h-[2px] bg-ochre";
+        } else {
+          valNode.className = "text-5xl font-serif text-terracotta font-bold tracking-tight text-glowing-red";
+          barNode.className = "absolute top-0 left-0 w-full h-[2px] bg-terracotta";
+        }
+      }
+
+      function triggerLongTask() {
+        logTelemetry("[CONTROL] Initiating synthetic synchronous main-thread block execution...", "champagne");
+        const targetDuration = 350;
+        const start = performance.now();
+
+        while (performance.now() - start < targetDuration) {}
+
+        logTelemetry(`[CONTROL] Loop terminated. Thread control reclaimed in ${(performance.now() - start).toFixed(1)}ms.`, "champagne");
+      }
+
+      function triggerLayoutShift() {
+        const container = document.getElementById("sandbox-dynamic-injection-zone");
+
+        const shifterElement = document.createElement("div");
+        shifterElement.className = "bg-ochre/10 border border-ochre/30 text-ochre p-3 rounded mb-3 transition-all";
+        shifterElement.innerHTML = `
+                <div class="flex justify-between items-center">
+                    <span class="font-mono font-bold">[!] Layout Disruption Node</span>
+                    <button onclick="this.parentElement.parentElement.remove()" class="hover:text-white">×</button>
+                </div>
+            `;
+
+        container.prepend(shifterElement);
+
+        const target = document.getElementById("sandbox-shift-target");
+        target.classList.add("force-shift");
+        setTimeout(() => target.classList.remove("force-shift"), 400);
+      }
+
+      function triggerLayoutThrash() {
+        logTelemetry("[CONTROL] Spawning 400 temporary layout calculation cells...", "champagne");
+        const container = document.getElementById("sandbox-dynamic-injection-zone");
+
+        const fragments = document.createDocumentFragment();
+        const elements = [];
+        for (let i = 0; i < 200; i++) {
+          const el = document.createElement("div");
+          el.style.width = "100%";
+          el.style.height = "2px";
+          el.style.backgroundColor = "rgba(194, 142, 54, 0.1)";
+          fragments.appendChild(el);
+          elements.push(el);
+        }
+        container.appendChild(fragments);
+
+        const start = performance.now();
+        elements.forEach((el, index) => {
+          const currentWidth = container.offsetWidth;
+          el.style.width = currentWidth + (index % 10) + "px";
+        });
+        const duration = performance.now() - start;
+
+        logTelemetry(`[THRASH COMPLETE] Reflow cycle forced instantly across DOM pool tree. Execution: ${duration.toFixed(2)}ms`, "goldAccent");
+
+        setTimeout(() => {
+          if (container.contains(fragments)) {
+            elements.forEach((el) => {
+              if (el.parentNode) el.parentNode.removeChild(el);
+            });
+          }
+        }, 1000);
+      }
+
+      function triggerLcpElement() {
+        logTelemetry("[CONTROL] Initializing heavy media asset node inject schedule...", "champagne");
+        const container = document.getElementById("sandbox-dynamic-injection-zone");
+
+        const existing = document.getElementById("heavy-lcp-node");
+        if (existing) existing.remove();
+
+        const lcpBlock = document.createElement("div");
+        lcpBlock.id = "heavy-lcp-node";
+        lcpBlock.className = "w-full min-h-[100px] bg-sage/10 border border-sage/30 rounded p-4 text-sage mt-2 flex flex-col justify-between";
+        lcpBlock.innerHTML = `
+                <div class="flex items-center gap-2">
+                    <i data-lucide="image" class="w-4 h-4"></i>
+                    <span class="font-mono font-bold">Largest Contentful Paint (LCP Target Element)</span>
+                </div>
+                <p class="text-[11px] text-champagne/60 mt-2">
+                    This element holds significant pixel volume footprint. The performance engine flags this entry vector once render confirmation lands.
+                </p>
+            `;
+        container.appendChild(lcpBlock);
+        lucide.createIcons({ root: lcpBlock });
+      }
+
+      function logTelemetry(message, toneClass = "champagne") {
+        const logContainer = document.getElementById("telemetry-log");
+
+        if (logContainer.children.length > 50) {
+          logContainer.removeChild(logContainer.firstElementChild);
+        }
+
+        const timestamp = new Date().toISOString().slice(11, 23);
+
+        let colorHex = "#E9E4DB";
+        if (toneClass === "sage") colorHex = "#6E8E76";
+        if (toneClass === "terracotta") colorHex = "#B85A4B";
+        if (toneClass === "ochre") colorHex = "#D99B43";
+        if (toneClass === "goldAccent") colorHex = "#C28E36";
+
+        const logLine = document.createElement("div");
+        logLine.className = `transition-all opacity-0`;
+        logLine.style.color = colorHex;
+        logLine.innerHTML = `<span class="text-champagne/30">[${timestamp}]</span> ${message}`;
+
+        logContainer.appendChild(logLine);
+
+        setTimeout(() => logLine.classList.remove("opacity-0"), 10);
+
+        logContainer.scrollTop = logContainer.scrollHeight;
+      }
+
+      function clearTelemetryLog() {
+        document.getElementById("telemetry-log").innerHTML = `<div class="text-champagne/30">Stream logs cleared successfully. Awaiting performance runtime capture...</div>`;
+      }
+
+      function resetAllMetrics() {
+        metricsState = { inp: 0, lcp: 0, cls: 0, clsCount: 0 };
+        longTaskCounter = 0;
+        document.getElementById("global-longtasks-count").innerText = 0;
+        document.getElementById("sandbox-dynamic-injection-zone").innerHTML = "";
+
+        updateInpUi(0, "Reset");
+        updateClsUi(0);
+        updateLcpUi(0, "None");
+
+        clearTelemetryLog();
+        logTelemetry("[SYSTEM] Metric storage environments flushed completely.", "sage");
+      }
+
+      const clickBtn = document.getElementById("sandbox-click-btn");
+      const inputField = document.getElementById("sandbox-input");
+
+      clickBtn.addEventListener("click", (e) => {
+        logTelemetry(`[INTERACTION] 'click' captured on Matrix Element`, "champagne");
+
+        const originalContent = clickBtn.innerHTML;
+        clickBtn.innerHTML = `
+                <i data-lucide="check-circle" class="w-3.5 h-3.5 text-sage"></i>
+                <span class="text-sage">Captured</span>
+            `;
+        lucide.createIcons({ root: clickBtn });
+
+        setTimeout(() => {
+          clickBtn.innerHTML = originalContent;
+          lucide.createIcons({ root: clickBtn });
+        }, 600);
+      });
+
+      inputField.addEventListener("input", (e) => {
+        logTelemetry(`[INTERACTION] 'input' sequence key logs recorded`, "champagne");
+      });
+    </script>
+  </body>
+</html>
