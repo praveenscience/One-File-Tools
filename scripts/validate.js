@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Validates data consistency across tools, quests, and quizzes.
+ * Validates data consistency across tools, quests, quizzes, and design-system.
  * Checks for missing files, bad categories, duplicates, orphans, fake screenshots, and case mismatches.
  *
  * Usage: node scripts/validate.js
@@ -77,6 +77,7 @@ console.log("Validating One File Tools...\n");
 check("tools", "tools.json", "tools", "Tools");
 check("quests", "quests.json", "quests", "Quests");
 check("quizzes", "quizzes.json", "quizzes", "Quizzes");
+check("design-system", "design-system.json", "designs", "Design System");
 
 console.log("");
 if (issues.length === 0) {

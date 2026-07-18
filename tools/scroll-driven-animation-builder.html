@@ -877,9 +877,10 @@
       }
       state = freshStateFromPreset("reveal");
 
-      const SUPPORTS_SCROLL_TIMELINE = CSS.supports("animation-timeline: scroll()");
+      const SUPPORTS_SCROLL_TIMELINE = typeof CSS !== "undefined" && CSS.supports("animation-timeline: scroll()");
 
       function el(html) {
+        fallbackAttached = false;
         document.getElementById("app").innerHTML = html;
       }
       function esc(s) {
@@ -927,7 +928,7 @@
       function buildAnimationCSS() {
         const timelineName = state.mode === "view" ? "view()" : "scroll(nearest block)";
         const rangeLine = state.mode === "view" ? `  animation-range: ${state.range.start}% ${state.range.end}%;` : `  animation-range: ${state.range.start}% ${state.range.end}%;`;
-        return `.reel-subject {\n  animation-name: reel-sequence;\n  animation-timeline: ${timelineName};\n${rangeLine}\n  animation-fill-mode: both;\n}`;
+        return `.reel-subject {\n  animation-name: reel-sequence;\n  animation-duration: auto;\n  animation-timeline: ${timelineName};\n${rangeLine}\n  animation-fill-mode: both;\n}`;
       }
 
       function buildFullCSS() {
@@ -1185,6 +1186,9 @@
         if (!scroller) return;
         if (fallbackAttached) return;
         fallbackAttached = true;
+        scroller._fallbackCleanup = () => {
+          fallbackAttached = false;
+        };
         scroller.addEventListener("scroll", () => {
           const max = scroller.scrollHeight - scroller.clientHeight;
           const pct = max > 0 ? (scroller.scrollTop / max) * 100 : 0;
@@ -1208,7 +1212,8 @@
           const a = sorted[i],
             b = sorted[i + 1];
           if (pct >= a.pct && pct <= b.pct) {
-            const t = (pct - a.pct) / (b.pct - a.pct);
+            const denom = b.pct - a.pct;
+            const t = denom === 0 ? 0 : (pct - a.pct) / denom;
             const out = {};
             Object.keys(a.props).forEach((k) => {
               out[k] = a.props[k] + (b.props[k] - a.props[k]) * t;
@@ -1290,10 +1295,6 @@
         document.body.removeChild(ta);
         cb();
       }
-
-      document.addEventListener("input", (e) => {
-        if (e.target.matches(".prop-field input[type=range]")) return;
-      });
 
       render();
     </script>

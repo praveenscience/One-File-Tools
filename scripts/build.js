@@ -37,6 +37,12 @@ const quizzesDataRaw = fs.existsSync(quizzesPath) ? JSON.parse(fs.readFileSync(q
 const quizCategories = quizzesDataRaw.categories || [];
 const quizzes = quizzesDataRaw.quizzes || [];
 
+// Design System registry is optional — build should not fail if it doesn't exist yet.
+const dsPath = path.join(rootDir, "data", "design-system.json");
+const dsDataRaw = fs.existsSync(dsPath) ? JSON.parse(fs.readFileSync(dsPath, "utf-8")) : { categories: [], designs: [] };
+const dsCategories = dsDataRaw.categories || [];
+const designs = dsDataRaw.designs || [];
+
 // ──────────────────────────────────────────────
 // Helpers
 // ──────────────────────────────────────────────
@@ -158,6 +164,10 @@ function quizThumbnailExists(quizId) {
   return fs.existsSync(path.join(rootDir, "quizzes", quizId + ".png"));
 }
 
+function dsThumbnailExists(dsId) {
+  return fs.existsSync(path.join(rootDir, "design-system", dsId + ".png"));
+}
+
 // ──────────────────────────────────────────────
 // Build tool data
 // ──────────────────────────────────────────────
@@ -267,6 +277,41 @@ quizCategories.forEach((c) => { quizCountByCategory[c.id] = 0; });
 quizzesDataBuilt.forEach((q) => { if (quizCountByCategory[q.category] !== undefined) quizCountByCategory[q.category]++; });
 
 // ──────────────────────────────────────────────
+// Build design-system data
+// ──────────────────────────────────────────────
+
+const dsCategoryMap = {};
+dsCategories.forEach((c) => {
+  dsCategoryMap[c.id] = c;
+});
+
+const dsDataBuilt = designs.map((d) => ({
+  id: d.id,
+  name: d.name,
+  shortDescription: d.shortDescription,
+  longDescriptionHtml: markdownToHtml(d.longDescription),
+  category: d.category,
+  categoryName: dsCategoryMap[d.category]?.name || d.category,
+  categoryIcon: dsCategoryMap[d.category]?.icon || "",
+  tags: d.tags || [],
+  techStack: d.techStack || [],
+  frameworks: d.frameworks || [],
+  difficulty: d.difficulty || "Easy",
+  status: d.status || "idea",
+  hasThumbnail: dsThumbnailExists(d.id),
+  file: `design-system/${d.id}.html`,
+  thumbnail: `design-system/${d.id}.png`,
+  github: `${site.github}/blob/main/design-system/${d.id}.html`,
+  live: `${site.url}/design-system/${d.id}`
+}));
+
+const totalDsCount = dsDataBuilt.length;
+
+const dsCountByCategory = {};
+dsCategories.forEach((c) => { dsCountByCategory[c.id] = 0; });
+dsDataBuilt.forEach((d) => { if (dsCountByCategory[d.category] !== undefined) dsCountByCategory[d.category]++; });
+
+// ──────────────────────────────────────────────
 // Template-based index.html generation
 // ──────────────────────────────────────────────
 
@@ -320,6 +365,13 @@ function buildPillarCards() {
       count: totalQuizCount + " quiz" + (totalQuizCount === 1 ? "" : "zes"),
       desc: "Quick multiple-choice challenges to test your Git, CSS, JS, and general knowledge.",
       icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>'
+    },
+    {
+      id: "design-system",
+      title: "One File Design System",
+      count: totalDsCount + " design" + (totalDsCount === 1 ? "" : "s"),
+      desc: "Premium UI showcases \u2014 dashboards, landing pages, and components built with CSS frameworks and JS libraries via CDN.",
+      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'
     },
     {
       id: "soon",
@@ -468,6 +520,51 @@ function buildQuizCards() {
   }).join("\n");
 }
 
+// ── Build design-system filter pills (static HTML) ──
+
+function buildDsFilterPills() {
+  const pills = ['              <button class="pill" type="button" data-cat="all" aria-pressed="true"><span class="pi" aria-hidden="true">▦</span> All <span class="pill-count">(' + totalDsCount + ')</span></button>'];
+  dsCategories.forEach((c) => {
+    const count = dsCountByCategory[c.id] || 0;
+    if (count === 0) return;
+    pills.push('              <button class="pill" type="button" data-cat="' + escapeAttr(c.id) + '" aria-pressed="false"><span class="pi" aria-hidden="true">' + c.icon + '</span> ' + escapeHtml(c.name) + ' <span class="pill-count">(' + count + ')</span></button>');
+  });
+  return pills.join("\n");
+}
+
+// ── Build design-system cards (static HTML) ──
+
+function buildDsCards() {
+  return dsDataBuilt.map((d) => {
+    const cat = dsCategoryMap[d.category];
+    const diff = d.difficulty.toLowerCase();
+    const searchData = (d.name + " " + d.shortDescription + " " + d.tags.join(" ") + " " + d.frameworks.join(" ")).toLowerCase();
+    const liveUrl = site.url + "/design-system/" + d.id;
+
+    const thumbHtml = d.hasThumbnail
+      ? '<img class="card-thumb" src="design-system/' + escapeAttr(d.id) + '.png" alt="' + escapeAttr(d.name) + '" loading="lazy" />'
+      : '<div class="card-thumb-placeholder">' + (cat ? cat.icon : '') + '</div>';
+
+    const frameworkBadges = d.frameworks.length
+      ? '<div class="card-frameworks">' + d.frameworks.map((f) => '<span class="badge-fw">' + escapeHtml(f) + '</span>').join('') + '</div>'
+      : '';
+
+    return '            <article class="card" data-id="' + escapeAttr(d.id) + '" data-category="' + escapeAttr(d.category) + '" data-search="' + escapeAttr(searchData) + '" tabindex="0" role="button" aria-label="View details for ' + escapeAttr(d.name) + '">' +
+      thumbHtml +
+      '<div class="card-body">' +
+      '<div class="card-top"><h4>' + escapeHtml(d.name) + '</h4>' +
+      '<span class="badge-cat"><span aria-hidden="true">' + (cat ? cat.icon : '') + '</span> ' + escapeHtml(d.categoryName) + '</span></div>' +
+      '<p class="desc">' + escapeHtml(d.shortDescription) + '</p>' +
+      frameworkBadges +
+      '<div class="path mono">design-system/' + escapeHtml(d.id) + '.html</div>' +
+      '<div class="card-foot">' +
+      '<span class="badge-diff ' + diff + '">' + escapeHtml(d.difficulty) + '</span>' +
+      '<span class="card-links">' +
+      '<a class="link-btn primary" href="' + escapeAttr(liveUrl) + '" target="_blank" rel="noopener noreferrer" data-nomodal>Preview <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg></a>' +
+      '</span></div></div></article>';
+  }).join("\n");
+}
+
 // ── Build resume/portfolio showcase cards (static HTML) ──
 
 function buildThemeCard(t, glyph) {
@@ -530,6 +627,11 @@ const quizzesJson = JSON.stringify(quizzesDataBuilt.map((q) => ({
   category: q.category, tags: q.tags, techStack: q.techStack, difficulty: q.difficulty
 })));
 const quizCategoriesJson = JSON.stringify(quizCategories.map((c) => ({ id: c.id, name: c.name, icon: c.icon })));
+const dsJson = JSON.stringify(dsDataBuilt.map((d) => ({
+  id: d.id, name: d.name, shortDescription: d.shortDescription, longDescription: designs.find((x) => x.id === d.id)?.longDescription || "",
+  category: d.category, tags: d.tags, techStack: d.techStack, frameworks: d.frameworks, difficulty: d.difficulty
+})));
+const dsCategoriesJson = JSON.stringify(dsCategories.map((c) => ({ id: c.id, name: c.name, icon: c.icon })));
 
 // ── Inject into template ──
 
@@ -552,6 +654,9 @@ let html = template
   .replace(/\{\{QUIZ_COUNT\}\}/g, String(totalQuizCount))
   .replace("{{QUIZ_FILTER_PILLS}}", buildQuizFilterPills())
   .replace("{{QUIZ_CARDS}}", buildQuizCards())
+  .replace(/\{\{DS_COUNT\}\}/g, String(totalDsCount))
+  .replace("{{DS_FILTER_PILLS}}", buildDsFilterPills())
+  .replace("{{DS_CARDS}}", buildDsCards())
   .replace("{{SITE_JSON}}", siteJson)
   .replace("{{CATEGORIES_JSON}}", categoriesJson)
   .replace("{{TOOLS_JSON}}", toolsJson)
@@ -560,7 +665,9 @@ let html = template
   .replace("{{QUESTS_JSON}}", questsJson)
   .replace("{{QUEST_CATEGORIES_JSON}}", questCategoriesJson)
   .replace("{{QUIZZES_JSON}}", quizzesJson)
-  .replace("{{QUIZ_CATEGORIES_JSON}}", quizCategoriesJson);
+  .replace("{{QUIZ_CATEGORIES_JSON}}", quizCategoriesJson)
+  .replace("{{DS_JSON}}", dsJson)
+  .replace("{{DS_CATEGORIES_JSON}}", dsCategoriesJson);
 
 // ──────────────────────────────────────────────
 // Write output
@@ -573,5 +680,6 @@ console.log("Built index.html successfully.");
 console.log("  " + totalCount + " tools across " + categories.length + " categories (" + liveCount + " live, " + (totalCount - liveCount) + " ideas)");
 console.log("  " + totalQuestCount + " quests across " + questCategories.length + " categories");
 console.log("  " + totalQuizCount + " quizzes across " + quizCategories.length + " categories");
+console.log("  " + totalDsCount + " designs across " + dsCategories.length + " categories");
 console.log("  Template: " + templatePath);
 console.log("  Output: " + outPath);

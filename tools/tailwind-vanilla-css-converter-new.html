@@ -616,12 +616,35 @@ Built for One File Tools.
         }
         if (match && COLORS[match[1]]) return cat("Color", [["color", COLORS[match[1]]]]);
 
-        // Border radius: rounded, rounded-md, rounded-t-lg, etc. (corners simplified to full radius).
+        // Border radius: rounded, rounded-md, rounded-t-lg, etc.
         match = cls.match(/^rounded(?:-(t|r|b|l|tl|tr|br|bl))?(?:-(.+))?$/);
         if (match && (match[0] === "rounded" || RADIUS[match[2] || "DEFAULT"] !== undefined)) {
           const size = RADIUS[match[2] || "DEFAULT"];
           if (size === undefined) return null;
-          return cat("Borders", [["border-radius", size]]);
+          const side = match[1];
+          const SIDE_MAP = {
+            t: [
+              ["border-top-left-radius", size],
+              ["border-top-right-radius", size]
+            ],
+            r: [
+              ["border-top-right-radius", size],
+              ["border-bottom-right-radius", size]
+            ],
+            b: [
+              ["border-bottom-left-radius", size],
+              ["border-bottom-right-radius", size]
+            ],
+            l: [
+              ["border-top-left-radius", size],
+              ["border-bottom-left-radius", size]
+            ],
+            tl: [["border-top-left-radius", size]],
+            tr: [["border-top-right-radius", size]],
+            br: [["border-bottom-right-radius", size]],
+            bl: [["border-bottom-left-radius", size]]
+          };
+          return cat("Borders", side && SIDE_MAP[side] ? SIDE_MAP[side] : [["border-radius", size]]);
         }
 
         // Shadow.
@@ -707,7 +730,12 @@ Built for One File Tools.
           }
 
           result.decls.forEach(([prop, value]) => {
-            byProp.set(prop, { prop, value, category: result.category, note: prefix ? "from " + prefix + ":" + baseClass : null });
+            if ((prop === "filter" || prop === "transform") && byProp.has(prop)) {
+              const existing = byProp.get(prop);
+              existing.value = existing.value + " " + value;
+            } else {
+              byProp.set(prop, { prop, value, category: result.category, note: prefix ? "from " + prefix + ":" + baseClass : null });
+            }
           });
         });
 
@@ -777,7 +805,14 @@ Built for One File Tools.
 
         if (unmatched.length > 0) {
           unmatchedBox.hidden = false;
-          unmatchedBox.innerHTML = "Not recognized (skipped): " + unmatched.map((c) => "<code>" + c + "</code>").join(", ");
+          unmatchedBox.textContent = "";
+          unmatchedBox.appendChild(document.createTextNode("Not recognized (skipped): "));
+          unmatched.forEach((c, i) => {
+            if (i > 0) unmatchedBox.appendChild(document.createTextNode(", "));
+            const code = document.createElement("code");
+            code.textContent = c;
+            unmatchedBox.appendChild(code);
+          });
         } else {
           unmatchedBox.hidden = true;
         }
