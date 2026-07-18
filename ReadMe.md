@@ -83,90 +83,95 @@ Every tool in this collection is a standalone `.html` file containing all the HT
 | 54 | [Git Command Explainer](tools/git-command-explainer.html) | Developer Utilities | Explain any Git command in plain English, with full flag-by-flag breakdowns for the most commonly used commands. | [Try it](https://one-file-tools.pages.dev/tools/git-command-explainer) |
 | 55 | [Git Ignore Generator](tools/git-ignore-generator.html) | Developer Utilities | Generate boilerplate .gitignore files for various technologies instantly, offline. | [Try it](https://one-file-tools.pages.dev/tools/git-ignore-generator) |
 | 56 | [GitHub Profile README Generator](tools/github-profile-readme-generator.html) | Developer Utilities | Generate a professional GitHub profile README with live stats and an editable preview. | [Try it](https://one-file-tools.pages.dev/tools/github-profile-readme-generator) |
-| 57 | [GitHub Token Validator (Glassmorphism)](tools/github-token-validator-glassmorphism.html) | Developer Utilities | Glassmorphism-themed GitHub Token Validator tool that allows users to validate GitHub Personal Access Tokens directly in the browser. | [Try it](https://one-file-tools.pages.dev/tools/github-token-validator-glassmorphism) |
-| 58 | [GitHub Token Validator (Modern)](tools/github-token-validator-modern.html) | Developer Utilities | Validate GitHub Personal Access Tokens with a sleek, modern interface. Token never leaves your browser. | [Try it](https://one-file-tools.pages.dev/tools/github-token-validator-modern) |
-| 59 | [GitHub Token Validator (Terminal)](tools/github-token-validator-terminal.html) | Developer Utilities | Validate GitHub Personal Access Tokens with a terminal-style UI that displays user identity and scopes. | [Try it](https://one-file-tools.pages.dev/tools/github-token-validator-terminal) |
-| 60 | [GitHub Token Validator GitHub Style](tools/github-token-validator-github.html) | Developer Utilities | Validate GitHub Personal Access Tokens with a clean, modern, and responsive card-based interface GitHub style. | [Try it](https://one-file-tools.pages.dev/tools/github-token-validator-github) |
-| 61 | [GitHub Token Validator Plain](tools/github-token-validator-plain.html) | Developer Utilities | Validate GitHub Personal Access Tokens with a clean, straightforward interface. | [Try it](https://one-file-tools.pages.dev/tools/github-token-validator-plain) |
-| 62 | [GitHub Token Validator Retro](tools/github-token-validator-retro.html) | Developer Utilities | Validate GitHub Personal Access Tokens with a retro terminal themed interface. | [Try it](https://one-file-tools.pages.dev/tools/github-token-validator-retro) |
-| 63 | [Glassmorphism Generator](tools/glassmorphism-generator.html) | CSS Tools | Generate sleek, frosted-glass UI effects for your components. | [Try it](https://one-file-tools.pages.dev/tools/glassmorphism-generator) |
-| 64 | [Gradient Builder](tools/gradient-builder.html) | Color Tools | Visually build linear or radial CSS gradients with multiple color stops and copy-ready CSS. | [Try it](https://one-file-tools.pages.dev/tools/gradient-builder) |
-| 65 | [Grid Areas Architect](tools/grid-areas-architect.html) | CSS Tools | A visual designer for CSS grid-template-areas that validates rectangular constraints and generates production-ready layout code. | [Try it](https://one-file-tools.pages.dev/tools/grid-areas-architect) |
-| 66 | [Hash Generator](tools/hash-generator.html) | Developer Utilities | Generate SHA-1, SHA-256 and SHA-512 hashes instantly in your browser. | [Try it](https://one-file-tools.pages.dev/tools/hash-generator) |
-| 67 | [Hash Generator (v2)](tools/hash-generator-new.html) | Developer Utilities | Generate and verify MD5, SHA-1, SHA-256, SHA-384, and SHA-512 hashes for text or files entirely in the browser. | [Try it](https://one-file-tools.pages.dev/tools/hash-generator-new) |
-| 68 | [Heading Structure Visualizer](tools/heading-structure-visualizer.html) | Accessibility | Visualize a page's heading hierarchy and catch skipped levels, missing or duplicate H1s. | [Try it](https://one-file-tools.pages.dev/tools/heading-structure-visualizer) |
-| 69 | [Hreflang Tag Generator](tools/hreflang-tag-generator.html) | Web & SEO | Generate valid hreflang link tags for multilingual and multi-regional websites. | [Try it](https://one-file-tools.pages.dev/tools/hreflang-tag-generator) |
-| 70 | [HTML Entity Converter](tools/html-entity-converter.html) | Text & Content | Encode text into named, decimal, or hex HTML entities, or decode entities back into readable text. | [Try it](https://one-file-tools.pages.dev/tools/html-entity-converter) |
-| 71 | [HTTP Cache-Control Simulator](tools/http-cache-simulator.html) | Developer Utilities | An interactive playground to simulate and test HTTP headers like Cache-Control, ETag, and Last-Modified across different browser navigation states. | [Try it](https://one-file-tools.pages.dev/tools/http-cache-simulator) |
-| 72 | [HTTP Header Builder & Canonicalization Checker](tools/http-header-builder-canonical-checker.html) | Developer Utilities | Construct HTTP headers interactively while verifying correctness, format, duplicates, and casing to generate canonical header blocks. | [Try it](https://one-file-tools.pages.dev/tools/http-header-builder-canonical-checker) |
-| 73 | [HTTP Header Inspector](tools/http-header-inspector.html) | Browser & Network | Send a request to any URL and inspect its HTTP response headers, status code, and timing. | [Try it](https://one-file-tools.pages.dev/tools/http-header-inspector) |
-| 74 | [HTTP Header Inspector (v2)](tools/http-header-inspector-v2.html) | Browser & Network | Inspect HTTP response headers, understand their purpose, and analyze security, caching, CORS, and performance information. | [Try it](https://one-file-tools.pages.dev/tools/http-header-inspector-v2) |
-| 75 | [HTTP Request Header Builder](tools/http-request-header-builder.html) | JSON & API | Create, validate, organize, preview, import, and export HTTP request headers locally in your browser. | [Try it](https://one-file-tools.pages.dev/tools/http-request-header-builder) |
-| 76 | [Image Dimension Checker](tools/image-dimension-checker.html) | Image Tools | Inspect an image's width, height, aspect ratio, orientation, size, format, and megapixels locally. | [Try it](https://one-file-tools.pages.dev/tools/image-dimension-checker) |
-| 77 | [Image Metadata Viewer](tools/image-metadata-viewer.html) | Image Tools | Extract and view EXIF, GPS, and other hidden metadata locally without uploading your images. | [Try it](https://one-file-tools.pages.dev/tools/image-metadata-viewer) |
-| 78 | [JSON CSV Converter](tools/json-csv-converter.html) | JSON & API | Convert between JSON and CSV formats with bidirectional conversion and custom delimiters. | [Try it](https://one-file-tools.pages.dev/tools/json-csv-converter) |
-| 79 | [JSON Diff Viewer](tools/json-diff-viewer.html) | JSON & API | Compare two JSON objects semantically with added, removed, and modified value highlighting. | [Try it](https://one-file-tools.pages.dev/tools/json-diff-viewer) |
-| 80 | [JSON Formatter](tools/json-formatter.html) | JSON & API | Format, validate, and minify JSON locally in your browser. | [Try it](https://one-file-tools.pages.dev/tools/json-formatter) |
-| 81 | [JSON Path Explorer](tools/json-path-explorer.html) | JSON & API | Paste a JSON document, build/test JSONPath expressions, and preview matching nodes/values offline. | [Try it](https://one-file-tools.pages.dev/tools/json-path-explorer) |
-| 82 | [JSON Schema Validator](tools/json-schema-validator.html) | JSON & API | Validate JSON data against a JSON Schema. | [Try it](https://one-file-tools.pages.dev/tools/json-schema-validator) |
-| 83 | [JSON to CSV Converter](tools/json-csv-bidirectional-converter.html) | JSON & API | Convert between JSON and CSV formats instantly. | [Try it](https://one-file-tools.pages.dev/tools/json-csv-bidirectional-converter) |
-| 84 | [JSON to Type Definitions Converter](tools/json-to-types-converter.html) | JSON & API | Convert raw JSON payloads into strongly-typed definitions for TypeScript, Go, Rust, JSON Schema, JSDoc, Python, or C#. | [Try it](https://one-file-tools.pages.dev/tools/json-to-types-converter) |
-| 85 | [JSON-LD / Schema.org Generator](tools/jsonld-schema-generator.html) | Web & SEO | Generate Schema.org JSON-LD structured data with live preview, copy, and download support. | [Try it](https://one-file-tools.pages.dev/tools/jsonld-schema-generator) |
-| 86 | [JSON-LD Schema.org Generator](tools/jsonld-schema-generator-new.html) | Web & SEO | Generate Schema.org JSON-LD structured data with live preview, copy, and download support. | [Try it](https://one-file-tools.pages.dev/tools/jsonld-schema-generator-new) |
-| 87 | [JWT Decoder](tools/jwt-decoder.html) | JSON & API | Decode and inspect JSON Web Tokens — header, payload, claims, and expiry — entirely in your browser. | [Try it](https://one-file-tools.pages.dev/tools/jwt-decoder) |
-| 88 | [Local A11y Snapshot Scanner](tools/a11y-snapshot-scanner.html) | Accessibility | Paste HTML and get a prioritized offline accessibility audit (labels, headings, ARIA hints, contrast guidance). | [Try it](https://one-file-tools.pages.dev/tools/a11y-snapshot-scanner) |
-| 89 | [LocalStorage Explorer](tools/localstorage-explorer.html) | Browser & Network | Browse, search, edit, import, and export localStorage entries for the current origin. | [Try it](https://one-file-tools.pages.dev/tools/localstorage-explorer) |
-| 90 | [Lorem Ipsum Generator](tools/lorem-ipsum-generator.html) | Text & Content | Generate placeholder lorem ipsum text for designs and mockups. | [Try it](https://one-file-tools.pages.dev/tools/lorem-ipsum-generator) |
-| 91 | [Markdown Previewer](tools/markdown-previewer.html) | Text & Content | Write and preview Markdown in real time, offline. | [Try it](https://one-file-tools.pages.dev/tools/markdown-previewer) |
-| 92 | [Markdown Table Generator](tools/markdown-table-generator.html) | Text & Content | Generate Markdown tables easily with this visual tool. | [Try it](https://one-file-tools.pages.dev/tools/markdown-table-generator) |
-| 93 | [Meta Tag Generator](tools/meta-tag-generator.html) | Web & SEO | Generate essential HTML meta tags with a live preview and copy-ready code. | [Try it](https://one-file-tools.pages.dev/tools/meta-tag-generator) |
-| 94 | [Neumorphism Generator](tools/neumorphism-generator.html) | CSS Tools | Create soft, extruded UI elements with customizable neumorphic shadows. | [Try it](https://one-file-tools.pages.dev/tools/neumorphism-generator) |
-| 95 | [OCR Text Extractor](tools/ocr-text-extractor.html) | Text & Content | Extract text from images entirely offline using client-side OCR. | [Try it](https://one-file-tools.pages.dev/tools/ocr-text-extractor) |
-| 96 | [Open Graph Checker](tools/open-graph-checker.html) | Web & SEO | Validate Open Graph tags from any public URL with social previews, health score, and JSON export. | [Try it](https://one-file-tools.pages.dev/tools/open-graph-checker) |
-| 97 | [Open Graph Debugger & Meta Diff](tools/og-meta-diff-preview.html) | Web & SEO | Compare og:* tags with expected profile schemas, audit tag limits or conflicts, and preview social sharing layout cards. | [Try it](https://one-file-tools.pages.dev/tools/og-meta-diff-preview) |
-| 98 | [Open Graph Generator](tools/open-graph-generator.html) | Web & SEO | Generate Open Graph meta tags with a live tri-platform preview (Facebook, Twitter, LinkedIn) and copy-ready HTML. | [Try it](https://one-file-tools.pages.dev/tools/open-graph-generator) |
-| 99 | [Open Graph Inspector](tools/open-graph-inspector.html) | Web & SEO | Analyze meta tags, social previews, and SEO metadata for any URL with actionable scores. | [Try it](https://one-file-tools.pages.dev/tools/open-graph-inspector) |
-| 100 | [Palette Generator](tools/palette-generator.html) | Color Tools | Generate unique, collision-free variation color schemes based on color theory metrics, offline. | [Try it](https://one-file-tools.pages.dev/tools/palette-generator) |
-| 101 | [Password Generator](tools/password-generator.html) | Developer Utilities | Generate highly secure, cryptographic random passwords instantly. 100% offline, privacy guaranteed. | [Try it](https://one-file-tools.pages.dev/tools/password-generator) |
-| 102 | [Privacy Policy Generator](tools/privacy-policy-generator.html) | Web & SEO | Generate customizable privacy policies for websites and apps with live preview, copy, and download. | [Try it](https://one-file-tools.pages.dev/tools/privacy-policy-generator) |
-| 103 | [Procedural Pixel Art Generator](tools/procedural-animator.html) | Image Tools | Generate symmetrical retro 8-bit sprites using cellular automata and random noise. | [Try it](https://one-file-tools.pages.dev/tools/procedural-animator) |
-| 104 | [QR Code Generator](tools/qr-code-generator.html) | Developer Utilities | Instantly generate customizable, high-quality QR codes offline. | [Try it](https://one-file-tools.pages.dev/tools/qr-code-generator) |
-| 105 | [Query String Builder](tools/query-string-builder.html) | JSON & API | Build and parse URL query strings visually, with support for duplicate keys and full URL assembly. | [Try it](https://one-file-tools.pages.dev/tools/query-string-builder) |
-| 106 | [Radii - Border Radius Generator](tools/border-radius-generator.html) | CSS Tools | Visually create CSS border-radius values with live preview, presets, and copy-ready CSS output. | [Try it](https://one-file-tools.pages.dev/tools/border-radius-generator) |
-| 107 | [README Template Generator](tools/readme-template-generator.html) | Text & Content | Generate a professional GitHub README.md with customizable sections. Copy or download instantly. | [Try it](https://one-file-tools.pages.dev/tools/readme-template-generator) |
-| 108 | [Regex Playground](tools/regex-playground.html) | Developer Utilities | Test regular expressions against custom text with live highlighting and replacement. | [Try it](https://one-file-tools.pages.dev/tools/regex-playground) |
-| 109 | [Regexa — Pattern Workbench](tools/regex-tester.html) | Developer Utilities | A polished regex testing workbench with live matching, flag toggles, and match group inspection. | [Try it](https://one-file-tools.pages.dev/tools/regex-tester) |
-| 110 | [Responsive Breakpoint Tester](tools/responsive-breakpoint-tester.html) | Web & SEO | Test responsive layouts instantly via URL or raw HTML sandbox with intelligent scaling. | [Try it](https://one-file-tools.pages.dev/tools/responsive-breakpoint-tester) |
-| 111 | [Responsive Image Simulator](tools/responsive-image-simulator.html) | Image Tools | Preview a srcset/sizes image at common device breakpoints and see which source the browser selects. | [Try it](https://one-file-tools.pages.dev/tools/responsive-image-simulator) |
-| 112 | [Robots.txt Generator](tools/robots-txt-generator.html) | Web & SEO | Visually build, manage, and export standard-compliant robots.txt files with live syntax highlighting. | [Try it](https://one-file-tools.pages.dev/tools/robots-txt-generator) |
-| 113 | [Screen Resolution Tester](tools/screen-resolution-tester.html) | Browser & Network | Test your website at different screen resolutions. | [Try it](https://one-file-tools.pages.dev/tools/screen-resolution-tester) |
-| 114 | [Scroll Driven Animation Timeline Builder](tools/scroll-driven-animation-builder.html) | CSS Tools | A visual editor to generate pure CSS scroll-driven animations using animation-timeline: scroll() and view(). | [Try it](https://one-file-tools.pages.dev/tools/scroll-driven-animation-builder) |
-| 115 | [Security Header Coach](tools/security-header-coach.html) | Web & SEO | Build/validate recommended security headers (especially CSP) with rule explanations and safe templates. | [Try it](https://one-file-tools.pages.dev/tools/security-header-coach) |
-| 116 | [Sitemap Generator](tools/sitemap-generator.html) | Web & SEO | A standalone Sitemap Generator that helps users create valid XML sitemaps for websites entirely offline. | [Try it](https://one-file-tools.pages.dev/tools/sitemap-generator) |
-| 117 | [Sitemap Generator](tools/sitemap-generator-new.html) | Web & SEO | Generate valid XML sitemaps instantly. Offline, fast, and secure. | [Try it](https://one-file-tools.pages.dev/tools/sitemap-generator-new) |
-| 118 | [Slug Generator](tools/slug-generator.html) | Web & SEO | Convert any text into a clean, SEO-friendly URL slug with customizable formatting. | [Try it](https://one-file-tools.pages.dev/tools/slug-generator) |
-| 119 | [SQL to MongoDB Translator](tools/sql-to-mongodb-translator.html) | Developer Utilities | Translate standard SQL queries instantly into MongoDB Aggregation Pipeline JSON arrays. | [Try it](https://one-file-tools.pages.dev/tools/sql-to-mongodb-translator) |
-| 120 | [SQLite File Browser & Query Runner](tools/sqlite-file-browser.html) | Developer Utilities | A serverless, WASM-powered SQLite database browser. Drag in a .sqlite file to browse tables, run real SQL queries, and export results entirely offline. | [Try it](https://one-file-tools.pages.dev/tools/sqlite-file-browser) |
-| 121 | [SVG Optimizer](tools/svg-optimizer.html) | Image Tools | Compress and optimize raw SVG code by removing unnecessary metadata, empty tags, and comments. | [Try it](https://one-file-tools.pages.dev/tools/svg-optimizer) |
-| 122 | [SVG Previewer](tools/svg-previewer.html) | Image Tools | Paste raw SVG markup and preview it instantly, with validation and quick export options. | [Try it](https://one-file-tools.pages.dev/tools/svg-previewer) |
-| 123 | [Tailwind → Vanilla CSS Converter](tools/tailwind-vanilla-css-converter.html) | CSS Tools | Paste Tailwind utility classes and get the equivalent hand-written CSS rule. | [Try it](https://one-file-tools.pages.dev/tools/tailwind-vanilla-css-converter) |
-| 124 | [Tailwind Color Finder](tools/tailwind-color-finder.html) | Color Tools | Find the closest matching Tailwind CSS color and shade for any HEX, RGB, or HSL input. | [Try it](https://one-file-tools.pages.dev/tools/tailwind-color-finder) |
-| 125 | [Tailwind to Vanilla CSS Converter](tools/tailwind-vanilla-css-converter-new.html) | CSS Tools | Paste Tailwind utility classes and get the equivalent hand-written CSS rule. | [Try it](https://one-file-tools.pages.dev/tools/tailwind-vanilla-css-converter-new) |
-| 126 | [Target Grade Forecaster](tools/target-grade-forecaster.html) | Developer Utilities | Calculate your current average and find out exactly what you need on the final. | [Try it](https://one-file-tools.pages.dev/tools/target-grade-forecaster) |
-| 127 | [Text Diff Viewer](tools/text-diff-viewer.html) | Text & Content | Compare two blocks of text and see line-level and word-level differences, side-by-side or unified. | [Try it](https://one-file-tools.pages.dev/tools/text-diff-viewer) |
-| 128 | [Timestamp Converter](tools/timestamp-converter.html) | Developer Utilities | Convert Unix timestamps to human-readable dates and back, with local time, UTC, and relative time. | [Try it](https://one-file-tools.pages.dev/tools/timestamp-converter) |
-| 129 | [Twitter / X Card Preview](tools/twitter-x-card-preview.html) | Web & SEO | Preview how Twitter/X cards appear with live updates for Summary and Summary Large Image layouts. | [Try it](https://one-file-tools.pages.dev/tools/twitter-x-card-preview) |
-| 130 | [Unicode Inspector](tools/unicode-inspector.html) | Text & Content | Inspect every character's Unicode code point, UTF-8/UTF-16 bytes, category, and escape sequences. | [Try it](https://one-file-tools.pages.dev/tools/unicode-inspector) |
-| 131 | [URL Encoder / Decoder](tools/url-encoder-decoder.html) | JSON & API | Encode and decode URLs or percent-encoded strings instantly using native browser APIs. | [Try it](https://one-file-tools.pages.dev/tools/url-encoder-decoder) |
-| 132 | [User Agent Parser](tools/user-agent-parser.html) | Browser & Network | Parse any User-Agent string into a readable breakdown of browser, engine, OS, device, and CPU architecture. | [Try it](https://one-file-tools.pages.dev/tools/user-agent-parser) |
-| 133 | [UUID Generator](tools/uuid-generator.html) | Developer Utilities | Generate random v4 UUIDs instantly, offline. | [Try it](https://one-file-tools.pages.dev/tools/uuid-generator) |
-| 134 | [Viewport / Screen Info](tools/viewport-screen-info.html) | Browser & Network | Live browser, screen, and viewport details — resize or rotate to see them update in real time. | [Try it](https://one-file-tools.pages.dev/tools/viewport-screen-info) |
-| 135 | [Visual Turing Machine](tools/visual-turing-machine.html) | Developer Utilities | A compiler and visual simulator engine for Turing Machine rules (State / Read / Write / Move / Next). | [Try it](https://one-file-tools.pages.dev/tools/visual-turing-machine) |
-| 136 | [WebSocket & SSE Sandbox Client](tools/websocket-sse-sandbox.html) | Browser & Network | A developer client to connect to, inspect, send messages to, and debug WebSocket connections and Server-Sent Events (SSE) streams in real time. | [Try it](https://one-file-tools.pages.dev/tools/websocket-sse-sandbox) |
-| 137 | [Word / Character Counter](tools/word-character-counter.html) | Text & Content | Real-time word, character, and sentence counter for text of any length. | [Try it](https://one-file-tools.pages.dev/tools/word-character-counter) |
-| 138 | [YAML / JSON Converter](tools/yaml-json-converter.html) | JSON & API | Convert between YAML and JSON in either direction, with validation and pretty-printed output. | [Try it](https://one-file-tools.pages.dev/tools/yaml-json-converter) |
+| 57 | [GitHub Token Validator (Glass)](tools/github-token-validator-glass.html) | Developer Utilities | Validate GitHub Personal Access Tokens against the GitHub API with a sleek glass-themed UI. | [Try it](https://one-file-tools.pages.dev/tools/github-token-validator-glass) |
+| 58 | [GitHub Token Validator (Glassmorphism)](tools/github-token-validator-glassmorphism.html) | Developer Utilities | Glassmorphism-themed GitHub Token Validator tool that allows users to validate GitHub Personal Access Tokens directly in the browser. | [Try it](https://one-file-tools.pages.dev/tools/github-token-validator-glassmorphism) |
+| 59 | [GitHub Token Validator (Modern)](tools/github-token-validator-modern.html) | Developer Utilities | Validate GitHub Personal Access Tokens with a sleek, modern interface. Token never leaves your browser. | [Try it](https://one-file-tools.pages.dev/tools/github-token-validator-modern) |
+| 60 | [GitHub Token Validator (Terminal)](tools/github-token-validator-terminal.html) | Developer Utilities | Validate GitHub Personal Access Tokens with a terminal-style UI that displays user identity and scopes. | [Try it](https://one-file-tools.pages.dev/tools/github-token-validator-terminal) |
+| 61 | [GitHub Token Validator GitHub Style](tools/github-token-validator-github.html) | Developer Utilities | Validate GitHub Personal Access Tokens with a clean, modern, and responsive card-based interface GitHub style. | [Try it](https://one-file-tools.pages.dev/tools/github-token-validator-github) |
+| 62 | [GitHub Token Validator Plain](tools/github-token-validator-plain.html) | Developer Utilities | Validate GitHub Personal Access Tokens with a clean, straightforward interface. | [Try it](https://one-file-tools.pages.dev/tools/github-token-validator-plain) |
+| 63 | [GitHub Token Validator Retro](tools/github-token-validator-retro.html) | Developer Utilities | Validate GitHub Personal Access Tokens with a retro terminal themed interface. | [Try it](https://one-file-tools.pages.dev/tools/github-token-validator-retro) |
+| 64 | [Glassmorphism Generator](tools/glassmorphism-generator.html) | CSS Tools | Generate sleek, frosted-glass UI effects for your components. | [Try it](https://one-file-tools.pages.dev/tools/glassmorphism-generator) |
+| 65 | [Gradient Builder](tools/gradient-builder.html) | Color Tools | Visually build linear or radial CSS gradients with multiple color stops and copy-ready CSS. | [Try it](https://one-file-tools.pages.dev/tools/gradient-builder) |
+| 66 | [Grid Areas Architect](tools/grid-areas-architect.html) | CSS Tools | A visual designer for CSS grid-template-areas that validates rectangular constraints and generates production-ready layout code. | [Try it](https://one-file-tools.pages.dev/tools/grid-areas-architect) |
+| 67 | [Hash Generator](tools/hash-generator.html) | Developer Utilities | Generate SHA-1, SHA-256 and SHA-512 hashes instantly in your browser. | [Try it](https://one-file-tools.pages.dev/tools/hash-generator) |
+| 68 | [Hash Generator (v2)](tools/hash-generator-new.html) | Developer Utilities | Generate and verify MD5, SHA-1, SHA-256, SHA-384, and SHA-512 hashes for text or files entirely in the browser. | [Try it](https://one-file-tools.pages.dev/tools/hash-generator-new) |
+| 69 | [Heading Structure Visualizer](tools/heading-structure-visualizer.html) | Accessibility | Visualize a page's heading hierarchy and catch skipped levels, missing or duplicate H1s. | [Try it](https://one-file-tools.pages.dev/tools/heading-structure-visualizer) |
+| 70 | [Hreflang Tag Generator](tools/hreflang-tag-generator.html) | Web & SEO | Generate valid hreflang link tags for multilingual and multi-regional websites. | [Try it](https://one-file-tools.pages.dev/tools/hreflang-tag-generator) |
+| 71 | [HTML Entity Converter](tools/html-entity-converter.html) | Text & Content | Encode text into named, decimal, or hex HTML entities, or decode entities back into readable text. | [Try it](https://one-file-tools.pages.dev/tools/html-entity-converter) |
+| 72 | [HTTP Cache-Control Simulator](tools/http-cache-simulator.html) | Developer Utilities | An interactive playground to simulate and test HTTP headers like Cache-Control, ETag, and Last-Modified across different browser navigation states. | [Try it](https://one-file-tools.pages.dev/tools/http-cache-simulator) |
+| 73 | [HTTP Header Builder & Canonicalization Checker](tools/http-header-builder-canonical-checker.html) | Developer Utilities | Construct HTTP headers interactively while verifying correctness, format, duplicates, and casing to generate canonical header blocks. | [Try it](https://one-file-tools.pages.dev/tools/http-header-builder-canonical-checker) |
+| 74 | [HTTP Header Inspector](tools/http-header-inspector.html) | Browser & Network | Send a request to any URL and inspect its HTTP response headers, status code, and timing. | [Try it](https://one-file-tools.pages.dev/tools/http-header-inspector) |
+| 75 | [HTTP Header Inspector (v2)](tools/http-header-inspector-v2.html) | Browser & Network | Inspect HTTP response headers, understand their purpose, and analyze security, caching, CORS, and performance information. | [Try it](https://one-file-tools.pages.dev/tools/http-header-inspector-v2) |
+| 76 | [HTTP Request Header Builder](tools/http-request-header-builder.html) | JSON & API | Create, validate, organize, preview, import, and export HTTP request headers locally in your browser. | [Try it](https://one-file-tools.pages.dev/tools/http-request-header-builder) |
+| 77 | [Image Dimension Checker](tools/image-dimension-checker.html) | Image Tools | Inspect an image's width, height, aspect ratio, orientation, size, format, and megapixels locally. | [Try it](https://one-file-tools.pages.dev/tools/image-dimension-checker) |
+| 78 | [Image Metadata Viewer](tools/image-metadata-viewer.html) | Image Tools | Extract and view EXIF, GPS, and other hidden metadata locally without uploading your images. | [Try it](https://one-file-tools.pages.dev/tools/image-metadata-viewer) |
+| 79 | [JSON CSV Converter](tools/json-csv-converter.html) | JSON & API | Convert between JSON and CSV formats with bidirectional conversion and custom delimiters. | [Try it](https://one-file-tools.pages.dev/tools/json-csv-converter) |
+| 80 | [JSON Diff Viewer](tools/json-diff-viewer.html) | JSON & API | Compare two JSON objects semantically with added, removed, and modified value highlighting. | [Try it](https://one-file-tools.pages.dev/tools/json-diff-viewer) |
+| 81 | [JSON Formatter](tools/json-formatter.html) | JSON & API | Format, validate, and minify JSON locally in your browser. | [Try it](https://one-file-tools.pages.dev/tools/json-formatter) |
+| 82 | [JSON Path Explorer](tools/json-path-explorer.html) | JSON & API | Paste a JSON document, build/test JSONPath expressions, and preview matching nodes/values offline. | [Try it](https://one-file-tools.pages.dev/tools/json-path-explorer) |
+| 83 | [JSON Schema Validator](tools/json-schema-validator.html) | JSON & API | Validate JSON data against a JSON Schema. | [Try it](https://one-file-tools.pages.dev/tools/json-schema-validator) |
+| 84 | [JSON Schema Validator](tools/json-schema-validator-v2.html) | JSON & API | Validate JSON data against JSON Schema with live error reporting, syntax highlighting, and detailed validation results. | [Try it](https://one-file-tools.pages.dev/tools/json-schema-validator-v2) |
+| 85 | [JSON to CSV Converter](tools/json-csv-bidirectional-converter.html) | JSON & API | Convert between JSON and CSV formats instantly. | [Try it](https://one-file-tools.pages.dev/tools/json-csv-bidirectional-converter) |
+| 86 | [JSON to Type Definitions Converter](tools/json-to-types-converter.html) | JSON & API | Convert raw JSON payloads into strongly-typed definitions for TypeScript, Go, Rust, JSON Schema, JSDoc, Python, or C#. | [Try it](https://one-file-tools.pages.dev/tools/json-to-types-converter) |
+| 87 | [JSON-LD / Schema.org Generator](tools/jsonld-schema-generator.html) | Web & SEO | Generate Schema.org JSON-LD structured data with live preview, copy, and download support. | [Try it](https://one-file-tools.pages.dev/tools/jsonld-schema-generator) |
+| 88 | [JSON-LD Schema.org Generator](tools/jsonld-schema-generator-new.html) | Web & SEO | Generate Schema.org JSON-LD structured data with live preview, copy, and download support. | [Try it](https://one-file-tools.pages.dev/tools/jsonld-schema-generator-new) |
+| 89 | [JWT Decoder](tools/jwt-decoder.html) | JSON & API | Decode and inspect JSON Web Tokens — header, payload, claims, and expiry — entirely in your browser. | [Try it](https://one-file-tools.pages.dev/tools/jwt-decoder) |
+| 90 | [Local A11y Snapshot Scanner](tools/a11y-snapshot-scanner.html) | Accessibility | Paste HTML and get a prioritized offline accessibility audit (labels, headings, ARIA hints, contrast guidance). | [Try it](https://one-file-tools.pages.dev/tools/a11y-snapshot-scanner) |
+| 91 | [LocalStorage Explorer](tools/localstorage-explorer.html) | Browser & Network | Browse, search, edit, import, and export localStorage entries for the current origin. | [Try it](https://one-file-tools.pages.dev/tools/localstorage-explorer) |
+| 92 | [Lorem Ipsum Generator](tools/lorem-ipsum-generator.html) | Text & Content | Generate placeholder lorem ipsum text for designs and mockups. | [Try it](https://one-file-tools.pages.dev/tools/lorem-ipsum-generator) |
+| 93 | [Markdown Previewer](tools/markdown-previewer.html) | Text & Content | Write and preview Markdown in real time, offline. | [Try it](https://one-file-tools.pages.dev/tools/markdown-previewer) |
+| 94 | [Markdown Table Generator](tools/markdown-table-generator.html) | Text & Content | Generate Markdown tables easily with this visual tool. | [Try it](https://one-file-tools.pages.dev/tools/markdown-table-generator) |
+| 95 | [Markdown Table Generator (Girly)](tools/markdown-table-generator-girly.html) | Text & Content | A cute pink-themed Markdown table generator with live preview and one-click copy. | [Try it](https://one-file-tools.pages.dev/tools/markdown-table-generator-girly) |
+| 96 | [Meta Tag Generator](tools/meta-tag-generator.html) | Web & SEO | Generate essential HTML meta tags with a live preview and copy-ready code. | [Try it](https://one-file-tools.pages.dev/tools/meta-tag-generator) |
+| 97 | [Neumorphism Generator](tools/neumorphism-generator.html) | CSS Tools | Create soft, extruded UI elements with customizable neumorphic shadows. | [Try it](https://one-file-tools.pages.dev/tools/neumorphism-generator) |
+| 98 | [OCR Text Extractor](tools/ocr-text-extractor.html) | Text & Content | Extract text from images entirely offline using client-side OCR. | [Try it](https://one-file-tools.pages.dev/tools/ocr-text-extractor) |
+| 99 | [Open Graph Checker](tools/open-graph-checker.html) | Web & SEO | Validate Open Graph tags from any public URL with social previews, health score, and JSON export. | [Try it](https://one-file-tools.pages.dev/tools/open-graph-checker) |
+| 100 | [Open Graph Debugger & Meta Diff](tools/og-meta-diff-preview.html) | Web & SEO | Compare og:* tags with expected profile schemas, audit tag limits or conflicts, and preview social sharing layout cards. | [Try it](https://one-file-tools.pages.dev/tools/og-meta-diff-preview) |
+| 101 | [Open Graph Generator](tools/open-graph-generator.html) | Web & SEO | Generate Open Graph meta tags with a live tri-platform preview (Facebook, Twitter, LinkedIn) and copy-ready HTML. | [Try it](https://one-file-tools.pages.dev/tools/open-graph-generator) |
+| 102 | [Open Graph Inspector](tools/open-graph-inspector.html) | Web & SEO | Analyze meta tags, social previews, and SEO metadata for any URL with actionable scores. | [Try it](https://one-file-tools.pages.dev/tools/open-graph-inspector) |
+| 103 | [Palette Generator](tools/palette-generator.html) | Color Tools | Generate unique, collision-free variation color schemes based on color theory metrics, offline. | [Try it](https://one-file-tools.pages.dev/tools/palette-generator) |
+| 104 | [Password Generator](tools/password-generator.html) | Developer Utilities | Generate highly secure, cryptographic random passwords instantly. 100% offline, privacy guaranteed. | [Try it](https://one-file-tools.pages.dev/tools/password-generator) |
+| 105 | [Privacy Policy Generator](tools/privacy-policy-generator.html) | Web & SEO | Generate customizable privacy policies for websites and apps with live preview, copy, and download. | [Try it](https://one-file-tools.pages.dev/tools/privacy-policy-generator) |
+| 106 | [Procedural Pixel Art Generator](tools/procedural-animator.html) | Image Tools | Generate symmetrical retro 8-bit sprites using cellular automata and random noise. | [Try it](https://one-file-tools.pages.dev/tools/procedural-animator) |
+| 107 | [QR Code Generator](tools/qr-code-generator.html) | Developer Utilities | Instantly generate customizable, high-quality QR codes offline. | [Try it](https://one-file-tools.pages.dev/tools/qr-code-generator) |
+| 108 | [Query String Builder](tools/query-string-builder.html) | JSON & API | Build and parse URL query strings visually, with support for duplicate keys and full URL assembly. | [Try it](https://one-file-tools.pages.dev/tools/query-string-builder) |
+| 109 | [Radii - Border Radius Generator](tools/border-radius-generator.html) | CSS Tools | Visually create CSS border-radius values with live preview, presets, and copy-ready CSS output. | [Try it](https://one-file-tools.pages.dev/tools/border-radius-generator) |
+| 110 | [RADIX — Base Converter](tools/binary-decimal-converter-v2.html) | Developer Utilities | A modern base converter with real-time conversion, bit manipulation, and light/dark mode. | [Try it](https://one-file-tools.pages.dev/tools/binary-decimal-converter-v2) |
+| 111 | [README Template Generator](tools/readme-template-generator.html) | Text & Content | Generate a professional GitHub README.md with customizable sections. Copy or download instantly. | [Try it](https://one-file-tools.pages.dev/tools/readme-template-generator) |
+| 112 | [Regex Playground](tools/regex-playground.html) | Developer Utilities | Test regular expressions against custom text with live highlighting and replacement. | [Try it](https://one-file-tools.pages.dev/tools/regex-playground) |
+| 113 | [Regexa — Pattern Workbench](tools/regex-tester.html) | Developer Utilities | A polished regex testing workbench with live matching, flag toggles, and match group inspection. | [Try it](https://one-file-tools.pages.dev/tools/regex-tester) |
+| 114 | [Responsive Breakpoint Tester](tools/responsive-breakpoint-tester.html) | Web & SEO | Test responsive layouts instantly via URL or raw HTML sandbox with intelligent scaling. | [Try it](https://one-file-tools.pages.dev/tools/responsive-breakpoint-tester) |
+| 115 | [Responsive Image Simulator](tools/responsive-image-simulator.html) | Image Tools | Preview a srcset/sizes image at common device breakpoints and see which source the browser selects. | [Try it](https://one-file-tools.pages.dev/tools/responsive-image-simulator) |
+| 116 | [Robots.txt Generator](tools/robots-txt-generator.html) | Web & SEO | Visually build, manage, and export standard-compliant robots.txt files with live syntax highlighting. | [Try it](https://one-file-tools.pages.dev/tools/robots-txt-generator) |
+| 117 | [Screen Resolution Tester](tools/screen-resolution-tester.html) | Browser & Network | Test your website at different screen resolutions. | [Try it](https://one-file-tools.pages.dev/tools/screen-resolution-tester) |
+| 118 | [Scroll Driven Animation Timeline Builder](tools/scroll-driven-animation-builder.html) | CSS Tools | A visual editor to generate pure CSS scroll-driven animations using animation-timeline: scroll() and view(). | [Try it](https://one-file-tools.pages.dev/tools/scroll-driven-animation-builder) |
+| 119 | [Security Header Coach](tools/security-header-coach.html) | Web & SEO | Build/validate recommended security headers (especially CSP) with rule explanations and safe templates. | [Try it](https://one-file-tools.pages.dev/tools/security-header-coach) |
+| 120 | [Sitemap Generator](tools/sitemap-generator.html) | Web & SEO | A standalone Sitemap Generator that helps users create valid XML sitemaps for websites entirely offline. | [Try it](https://one-file-tools.pages.dev/tools/sitemap-generator) |
+| 121 | [Sitemap Generator](tools/sitemap-generator-new.html) | Web & SEO | Generate valid XML sitemaps instantly. Offline, fast, and secure. | [Try it](https://one-file-tools.pages.dev/tools/sitemap-generator-new) |
+| 122 | [Slug Generator](tools/slug-generator.html) | Web & SEO | Convert any text into a clean, SEO-friendly URL slug with customizable formatting. | [Try it](https://one-file-tools.pages.dev/tools/slug-generator) |
+| 123 | [Source Map Explorer](tools/source-map-explorer.html) | Developer Utilities | A serverless bundle size analyzer that decodes raw source maps and VLQ data to map byte weights to original source files. | [Try it](https://one-file-tools.pages.dev/tools/source-map-explorer) |
+| 124 | [SQL to MongoDB Translator](tools/sql-to-mongodb-translator.html) | Developer Utilities | Translate standard SQL queries instantly into MongoDB Aggregation Pipeline JSON arrays. | [Try it](https://one-file-tools.pages.dev/tools/sql-to-mongodb-translator) |
+| 125 | [SQLite File Browser & Query Runner](tools/sqlite-file-browser.html) | Developer Utilities | A serverless, WASM-powered SQLite database browser. Drag in a .sqlite file to browse tables, run real SQL queries, and export results entirely offline. | [Try it](https://one-file-tools.pages.dev/tools/sqlite-file-browser) |
+| 126 | [SVG Optimizer](tools/svg-optimizer.html) | Image Tools | Compress and optimize raw SVG code by removing unnecessary metadata, empty tags, and comments. | [Try it](https://one-file-tools.pages.dev/tools/svg-optimizer) |
+| 127 | [SVG Previewer](tools/svg-previewer.html) | Image Tools | Paste raw SVG markup and preview it instantly, with validation and quick export options. | [Try it](https://one-file-tools.pages.dev/tools/svg-previewer) |
+| 128 | [Tailwind → Vanilla CSS Converter](tools/tailwind-vanilla-css-converter.html) | CSS Tools | Paste Tailwind utility classes and get the equivalent hand-written CSS rule. | [Try it](https://one-file-tools.pages.dev/tools/tailwind-vanilla-css-converter) |
+| 129 | [Tailwind Color Finder](tools/tailwind-color-finder.html) | Color Tools | Find the closest matching Tailwind CSS color and shade for any HEX, RGB, or HSL input. | [Try it](https://one-file-tools.pages.dev/tools/tailwind-color-finder) |
+| 130 | [Tailwind to Vanilla CSS Converter](tools/tailwind-vanilla-css-converter-new.html) | CSS Tools | Paste Tailwind utility classes and get the equivalent hand-written CSS rule. | [Try it](https://one-file-tools.pages.dev/tools/tailwind-vanilla-css-converter-new) |
+| 131 | [Target Grade Forecaster](tools/target-grade-forecaster.html) | Developer Utilities | Calculate your current average and find out exactly what you need on the final. | [Try it](https://one-file-tools.pages.dev/tools/target-grade-forecaster) |
+| 132 | [Text Diff Viewer](tools/text-diff-viewer.html) | Text & Content | Compare two blocks of text and see line-level and word-level differences, side-by-side or unified. | [Try it](https://one-file-tools.pages.dev/tools/text-diff-viewer) |
+| 133 | [Timestamp Converter](tools/timestamp-converter.html) | Developer Utilities | Convert Unix timestamps to human-readable dates and back, with local time, UTC, and relative time. | [Try it](https://one-file-tools.pages.dev/tools/timestamp-converter) |
+| 134 | [Twitter / X Card Preview](tools/twitter-x-card-preview.html) | Web & SEO | Preview how Twitter/X cards appear with live updates for Summary and Summary Large Image layouts. | [Try it](https://one-file-tools.pages.dev/tools/twitter-x-card-preview) |
+| 135 | [Unicode Inspector](tools/unicode-inspector.html) | Text & Content | Inspect every character's Unicode code point, UTF-8/UTF-16 bytes, category, and escape sequences. | [Try it](https://one-file-tools.pages.dev/tools/unicode-inspector) |
+| 136 | [URL Encoder / Decoder](tools/url-encoder-decoder.html) | JSON & API | Encode and decode URLs or percent-encoded strings instantly using native browser APIs. | [Try it](https://one-file-tools.pages.dev/tools/url-encoder-decoder) |
+| 137 | [User Agent Parser](tools/user-agent-parser.html) | Browser & Network | Parse any User-Agent string into a readable breakdown of browser, engine, OS, device, and CPU architecture. | [Try it](https://one-file-tools.pages.dev/tools/user-agent-parser) |
+| 138 | [UUID Generator](tools/uuid-generator.html) | Developer Utilities | Generate random v4 UUIDs instantly, offline. | [Try it](https://one-file-tools.pages.dev/tools/uuid-generator) |
+| 139 | [Viewport / Screen Info](tools/viewport-screen-info.html) | Browser & Network | Live browser, screen, and viewport details — resize or rotate to see them update in real time. | [Try it](https://one-file-tools.pages.dev/tools/viewport-screen-info) |
+| 140 | [Visual Turing Machine](tools/visual-turing-machine.html) | Developer Utilities | A compiler and visual simulator engine for Turing Machine rules (State / Read / Write / Move / Next). | [Try it](https://one-file-tools.pages.dev/tools/visual-turing-machine) |
+| 141 | [WebSocket & SSE Sandbox Client](tools/websocket-sse-sandbox.html) | Browser & Network | A developer client to connect to, inspect, send messages to, and debug WebSocket connections and Server-Sent Events (SSE) streams in real time. | [Try it](https://one-file-tools.pages.dev/tools/websocket-sse-sandbox) |
+| 142 | [Word / Character Counter](tools/word-character-counter.html) | Text & Content | Real-time word, character, and sentence counter for text of any length. | [Try it](https://one-file-tools.pages.dev/tools/word-character-counter) |
+| 143 | [YAML / JSON Converter](tools/yaml-json-converter.html) | JSON & API | Convert between YAML and JSON in either direction, with validation and pretty-printed output. | [Try it](https://one-file-tools.pages.dev/tools/yaml-json-converter) |
 
-> **Want to see your tool here?** Check out the [Contributing Guide](Contributing.md) and pick an idea from the [Ideas Board](#ideas-board).
+> **Want to see your tool here?** Use the [Contribution Wizard](https://one-file-tools.pages.dev/new) for a guided walkthrough, or check the [Contributing Guide](Contributing.md) and pick an idea from the [Ideas Board](#ideas-board).
 
 ## Ideas Board
 
@@ -350,6 +355,50 @@ Quests are playable, gamified lessons — single HTML files that teach through i
 | API Design Review — spot the REST anti-patterns in mock API designs            | Easy       |
 | Accessibility Audit Quest — find and fix a11y issues in broken HTML snippets   | Medium     |
 
+### Design System — Premium UI Showcases
+
+Single-file UI showcases built with CSS frameworks and JS libraries via CDN. Show off your frontend creativity — dashboards, landing pages, components, and more. See the [Design System Contributing Guide](design-system/Contributing.md) for details.
+
+#### Dashboards
+
+| Idea                                                                           | Difficulty |
+| ------------------------------------------------------------------------------ | ---------- |
+| Analytics Dashboard — charts, stats cards, and a responsive sidebar            | Medium     |
+| DevOps Monitor — real-time-style service health, uptime graphs, and alerts     | Hard       |
+| Project Management Board — Kanban columns with drag-and-drop cards             | Medium     |
+
+#### Landing Pages
+
+| Idea                                                                           | Difficulty |
+| ------------------------------------------------------------------------------ | ---------- |
+| SaaS Pricing Page — tiered pricing cards with toggle and feature comparison    | Easy       |
+| Developer Tool Landing — hero, features grid, testimonials, and CTA            | Medium     |
+| Event Conference Page — schedule, speakers, venue map, and registration CTA    | Medium     |
+
+#### Components
+
+| Idea                                                                           | Difficulty |
+| ------------------------------------------------------------------------------ | ---------- |
+| Form Components Library — inputs, selects, toggles, date pickers, validation  | Medium     |
+| Notification System — toast, banner, modal, and inline alert patterns          | Easy       |
+| Data Table — sortable, filterable, paginated table with bulk actions           | Hard       |
+
+#### E-Commerce
+
+| Idea                                                                           | Difficulty |
+| ------------------------------------------------------------------------------ | ---------- |
+| Product Page — image gallery, size picker, reviews, and add-to-cart            | Medium     |
+| Shopping Cart — item list, quantity controls, promo code, and order summary    | Medium     |
+| Checkout Flow — multi-step form with progress indicator and validation         | Hard       |
+
+#### Portfolios & Social
+
+| Idea                                                                           | Difficulty |
+| ------------------------------------------------------------------------------ | ---------- |
+| Developer Portfolio — projects grid, skills, timeline, and contact form        | Medium     |
+| Social Feed — posts, comments, likes, and infinite scroll feel                 | Medium     |
+| Chat Interface — message bubbles, typing indicator, and emoji picker           | Hard       |
+
 > **Don't see your idea?** Use the [New Tool Idea](https://github.com/praveenscience/One-File-Tools/issues/new?template=new-tool-idea.yml) issue template to propose it!
 >
 > **Difficulty labels are assigned by the maintainer** ([@praveenscience](https://github.com/praveenscience)) and are slightly negotiable, feel free to discuss in your issue or PR.
@@ -406,11 +455,12 @@ One-File-Tools/
 │   ├── tools.json        # Tool registry (metadata for landing page)
 │   ├── themes.json       # Theme registry (resume/portfolio metadata)
 │   ├── quests.json       # Quest registry (interactive learning games)
-│   └── quizzes.json      # Quiz registry (multiple-choice challenges)
+│   ├── quizzes.json      # Quiz registry (multiple-choice challenges)
+│   └── design-system.json # Design System registry (UI showcases)
 ├── scripts/              # Build tooling
 │   ├── build.js          # Generates index.html (landing page)
 │   ├── theme-gen.js      # Generates resume/portfolio HTML from .hbs + profile.json
-│   ├── sort-norm.js      # Sorts and normalizes tools.json
+│   ├── sort-norm.js      # Sorts and normalizes JSON registries
 │   ├── sync-readme.js    # Auto-syncs the Available Tools table in ReadMe.md
 │   └── index-template.txt # Landing page template (used by build.js)
 ├── tools/                # Pillar 1: Single-file developer tools
@@ -427,7 +477,10 @@ One-File-Tools/
 │   └── Contributing.md   # Quest-specific contribution guide
 ├── quizzes/              # Pillar 5: Quick multiple-choice challenges
 │   └── Contributing.md   # Quiz-specific contribution guide
+├── design-system/        # Pillar 6: Premium UI showcases with CSS/JS frameworks
+│   └── Contributing.md   # Design System contribution guide
 ├── Contributing.md       # Contribution guide
+├── new.html              # Interactive contribution wizard
 ├── index.html            # Generated: landing page (gitignored)
 ├── ReadMe.md             # This file
 ├── package.json
@@ -455,7 +508,7 @@ This repository is a proud participant in **[Social Summer of Code (SSoC)](https
 1. Browse the [Ideas Board](#ideas-board) or the [Issues](https://github.com/praveenscience/One-File-Tools/issues) tab
 2. Pick an issue labeled `Easy` or `Medium`
 3. Comment on the issue to get assigned
-4. Follow the [Contributing Guide](Contributing.md) to submit your PR
+4. Use the [Contribution Wizard](https://one-file-tools.pages.dev/new) or follow the [Contributing Guide](Contributing.md) to submit your PR
 5. Get your PR reviewed, merged, and earn your contribution points
 
 ### Contribution labels

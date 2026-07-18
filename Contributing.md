@@ -4,6 +4,8 @@ Thank you for your interest in contributing! Whether you’re here through **SSo
 
 This guide will walk you through everything you need to know.
 
+> **New to contributing?** Try the [Contribution Wizard](https://one-file-tools.pages.dev/new) — an interactive walkthrough that generates the exact JSON, commands, and PR template for you.
+
 ---
 
 ## Table of Contents
@@ -14,6 +16,7 @@ This guide will walk you through everything you need to know.
 - [Building a New Tool](#building-a-new-tool)
 - [Enhancing an Existing Tool](#enhancing-an-existing-tool)
 - [Contributing a Resume or Portfolio Theme](#contributing-a-resume-or-portfolio-theme)
+- [Contributing a Design System Showcase](#contributing-a-design-system-showcase)
 - [Tool Requirements](#tool-requirements)
 - [File Naming Convention](#file-naming-convention)
 - [Code Style](#code-style)
@@ -49,6 +52,7 @@ Every pull request should fall into one of these categories:
 | **New Tool**      | Build a tool from the [Ideas Board](ReadMe.md#ideas-board) or propose your own. | `Easy` / `Medium` |
 | **Enhancement**   | Improve an existing tool - UI, UX, features, accessibility, performance.        | `Easy` / `Medium` |
 | **Bug Fix**       | Fix something that’s broken.                                                    | `Easy` / `Medium` |
+| **Design System** | Build a premium UI showcase — dashboards, landing pages, components.            | `Easy` / `Medium` |
 | **Documentation** | Improve docs, add code comments, fix typos.                                     | `Easy`            |
 
 ---
@@ -398,6 +402,31 @@ git commit -m "Add: resume theme — minimal"
 ```
 
 > **Note:** Don't commit the generated `.html` files — they are rebuilt by `scripts/theme-gen.js`.
+
+---
+
+## Contributing a Design System Showcase
+
+The **Design System** pillar is for premium UI showcases — dashboards, landing pages, e-commerce layouts, components, and more. Unlike tools (which solve a problem) or themes (which render profile data), designs are purely about **creative UI craft** using modern CSS frameworks and JS libraries via CDN.
+
+For the full step-by-step guide, field reference, valid categories, and design requirements, see **[`design-system/Contributing.md`](design-system/Contributing.md)**.
+
+### Quick overview
+
+1. Create a single `.html` file in `design-system/` using any CSS framework (Tailwind, Bootstrap, Bulma) or JS library (Alpine.js, Chart.js, HTMX) via CDN.
+2. Register it in `data/design-system.json` with fields like `id`, `name`, `category`, `frameworks`, etc.
+3. Add a screenshot as `design-system/your-design-name.png`.
+4. Run `node scripts/sort-norm.js data/design-system.json` and `node scripts/build.js` to verify.
+
+### Valid categories
+
+`components`, `dashboards`, `e-commerce`, `landing-pages`, `portfolios`, `social`
+
+### Branch naming
+
+```bash
+git checkout -b add/design-name
+```
 
 ---
 
