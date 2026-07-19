@@ -1,0 +1,1370 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CIE 1931 Chromaticity Analytics</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Playfair+Display:ital@0;1&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg-core: #09090b;
+        --bg-panel: #121214;
+        --bg-card: #18181b;
+        --border-subtle: #27272a;
+        --text-primary: #f4f4f5;
+        --text-secondary: #a1a1aa;
+        --text-tertiary: #71717a;
+        --color-srgb: #a1a1aa;
+        --color-p3: #f4f4f5;
+        --color-rec: #71717a;
+        --pill-in-bg: rgba(52, 211, 153, 0.08);
+        --pill-in-border: rgba(52, 211, 153, 0.25);
+        --pill-in-text: #34d399;
+        --pill-out-bg: rgba(248, 113, 113, 0.08);
+        --pill-out-border: rgba(248, 113, 113, 0.25);
+        --pill-out-text: #f87171;
+        --font-sans: "Plus Jakarta Sans", sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+        --font-serif: "Playfair Display", serif;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        user-select: none;
+      }
+
+      body {
+        background-color: var(--bg-core);
+        color: var(--text-primary);
+        font-family: var(--font-sans);
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        padding: 48px 20px;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .layout-container {
+        max-width: 1200px;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 32px;
+      }
+
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--border-subtle);
+      }
+
+      .title-group h1 {
+        font-family: var(--font-sans);
+        font-size: 28px;
+        font-weight: 500;
+        letter-spacing: -0.02em;
+        margin-bottom: 8px;
+      }
+
+      .title-group p {
+        color: var(--text-secondary);
+        font-size: 14px;
+        font-weight: 300;
+      }
+
+      .btn-icon {
+        background: transparent;
+        border: 1px solid var(--border-subtle);
+        color: var(--text-secondary);
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-family: var(--font-mono);
+        font-size: 14px;
+      }
+
+      .btn-icon:hover {
+        border-color: var(--text-primary);
+        color: var(--text-primary);
+      }
+
+      .main-dashboard {
+        display: grid;
+        grid-template-columns: 580px 1fr;
+        gap: 40px;
+        align-items: start;
+      }
+
+      .canvas-wrapper {
+        position: relative;
+        width: 100%;
+        height: 600px;
+        border-radius: 12px;
+        background: var(--bg-panel);
+        border: 1px solid var(--border-subtle);
+        overflow: hidden;
+        cursor: crosshair;
+      }
+
+      canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      #layer-mesh {
+        z-index: 1;
+      }
+      #layer-grid {
+        z-index: 2;
+        pointer-events: none;
+      }
+      #layer-labels {
+        z-index: 3;
+        pointer-events: none;
+      }
+      #layer-vectors {
+        z-index: 4;
+        pointer-events: none;
+      }
+      #layer-interactive {
+        z-index: 5;
+      }
+
+      .controls-pane {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      .data-card {
+        background: var(--bg-panel);
+        border: 1px solid var(--border-subtle);
+        border-radius: 12px;
+        padding: 32px;
+      }
+
+      .color-identity {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        margin-bottom: 32px;
+      }
+
+      .swatch-display {
+        width: 64px;
+        height: 64px;
+        border-radius: 8px;
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+        transition: background-color 0.1s ease;
+      }
+
+      .coordinates-display {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .coord-row {
+        font-family: var(--font-mono);
+        font-size: 14px;
+        display: flex;
+        gap: 16px;
+        align-items: center;
+      }
+
+      .coord-label {
+        color: var(--text-tertiary);
+      }
+
+      .slider-container {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      .slider-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .slider-wrapper span:first-child {
+        width: 16px;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-tertiary);
+      }
+
+      .slider-wrapper span:last-child {
+        width: 32px;
+        font-family: var(--font-mono);
+        font-size: 13px;
+        color: var(--text-secondary);
+        text-align: right;
+      }
+
+      input[type="range"] {
+        -webkit-appearance: none;
+        flex: 1;
+        height: 2px;
+        background: var(--border-subtle);
+        outline: none;
+      }
+
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: var(--text-primary);
+        cursor: pointer;
+        transition: transform 0.1s;
+      }
+
+      input[type="range"]::-webkit-slider-thumb:active {
+        transform: scale(1.3);
+      }
+
+      .input-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+      }
+
+      .input-field {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .input-field label {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.15em;
+        color: var(--text-tertiary);
+        font-weight: 600;
+      }
+
+      .input-field input {
+        background: transparent;
+        border: none;
+        border-bottom: 1px solid var(--border-subtle);
+        color: var(--text-primary);
+        font-family: var(--font-mono);
+        font-size: 14px;
+        padding: 4px 0 8px 0;
+        user-select: text;
+      }
+
+      .input-field input:focus {
+        outline: none;
+        border-bottom-color: var(--text-secondary);
+      }
+
+      .profile-toggles {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .toggle-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+      }
+
+      .toggle-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .toggle-marker {
+        width: 6px;
+        height: 6px;
+        border-radius: 1px;
+      }
+
+      .toggle-label {
+        font-size: 13px;
+        color: var(--text-secondary);
+      }
+
+      .switch-track {
+        position: relative;
+        width: 36px;
+        height: 20px;
+        background: var(--bg-core);
+        border: 1px solid var(--border-subtle);
+        border-radius: 10px;
+        transition: 0.2s;
+      }
+
+      .switch-thumb {
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 14px;
+        height: 14px;
+        background: var(--text-tertiary);
+        border-radius: 50%;
+        transition: 0.2s;
+      }
+
+      input[type="checkbox"] {
+        display: none;
+      }
+
+      input[type="checkbox"]:checked + .toggle-row .switch-track {
+        background: var(--text-primary);
+        border-color: var(--text-primary);
+      }
+
+      input[type="checkbox"]:checked + .toggle-row .switch-thumb {
+        transform: translateX(16px);
+        background: var(--bg-core);
+      }
+
+      input[type="checkbox"]:checked + .toggle-row .toggle-label {
+        color: var(--text-primary);
+      }
+
+      .analysis-panel {
+        background: var(--bg-panel);
+        border: 1px solid var(--border-subtle);
+        border-radius: 12px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .analysis-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 24px 32px;
+        border-bottom: 1px solid var(--border-subtle);
+      }
+
+      .analysis-title {
+        font-family: var(--font-serif);
+        font-size: 28px;
+        color: var(--text-primary);
+        font-style: italic;
+        font-weight: 400;
+        letter-spacing: 0.02em;
+      }
+
+      .pill-container {
+        display: flex;
+        gap: 12px;
+      }
+
+      .status-pill {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+
+      .status-pill .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+      }
+
+      .pill-in {
+        background: var(--pill-in-bg);
+        border: 1px solid var(--pill-in-border);
+        color: var(--pill-in-text);
+      }
+
+      .pill-in .dot {
+        background: var(--pill-in-text);
+        box-shadow: 0 0 6px var(--pill-in-text);
+      }
+
+      .pill-out {
+        background: var(--pill-out-bg);
+        border: 1px solid var(--pill-out-border);
+        color: var(--pill-out-text);
+      }
+
+      .pill-out .dot {
+        background: var(--pill-out-text);
+        box-shadow: 0 0 6px var(--pill-out-text);
+      }
+
+      .analysis-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+      }
+
+      .metric-col {
+        padding: 32px;
+        display: flex;
+        flex-direction: column;
+        border-right: 1px solid var(--border-subtle);
+      }
+
+      .metric-col:last-child {
+        border-right: none;
+      }
+
+      .metric-label {
+        font-size: 10px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--text-tertiary);
+        font-weight: 600;
+        margin-bottom: 20px;
+      }
+
+      .metric-value {
+        font-family: var(--font-mono);
+        font-size: 22px;
+        color: var(--text-primary);
+        margin-bottom: 20px;
+        line-height: 1.4;
+        word-break: break-word;
+      }
+
+      .metric-desc {
+        font-size: 12px;
+        line-height: 1.6;
+        color: var(--text-secondary);
+      }
+
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(9, 9, 11, 0.85);
+        backdrop-filter: blur(12px);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 100;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.4s ease;
+      }
+
+      .modal-overlay.active {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .modal-content {
+        background: var(--bg-card);
+        border: 1px solid var(--border-subtle);
+        border-radius: 24px;
+        width: 500px;
+        padding: 48px;
+        transform: translateY(20px);
+        transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+        box-shadow: 0 40px 80px rgba(0, 0, 0, 0.8);
+      }
+
+      .modal-overlay.active .modal-content {
+        transform: translateY(0);
+      }
+
+      .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 32px;
+      }
+
+      .modal-header h2 {
+        font-size: 24px;
+        font-weight: 400;
+        font-family: var(--font-serif);
+        font-style: italic;
+      }
+
+      .close-btn {
+        background: none;
+        border: none;
+        color: var(--text-secondary);
+        font-size: 24px;
+        cursor: pointer;
+        transition: color 0.2s;
+      }
+
+      .close-btn:hover {
+        color: var(--text-primary);
+      }
+
+      .prose {
+        color: var(--text-secondary);
+        font-size: 14px;
+        line-height: 1.7;
+        font-weight: 300;
+      }
+
+      .prose p {
+        margin-bottom: 16px;
+      }
+
+      .prose strong {
+        color: var(--text-primary);
+        font-weight: 500;
+      }
+
+      #compute-loader {
+        position: absolute;
+        inset: 0;
+        background: var(--bg-panel);
+        z-index: 10;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color: var(--text-primary);
+        font-size: 11px;
+        font-family: var(--font-mono);
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        transition: opacity 0.5s ease;
+      }
+
+      .hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="layout-container">
+      <header class="header">
+        <div class="title-group">
+          <h1>CIE 1931 Chromaticity Analytics</h1>
+          <p>Chromaticity Gamut</p>
+        </div>
+        <button class="btn-icon" id="btn-info">i</button>
+      </header>
+
+      <main class="main-dashboard">
+        <div class="canvas-wrapper" id="interaction-layer">
+          <div id="compute-loader">Computing Spectrum...</div>
+          <canvas id="layer-mesh"></canvas>
+          <canvas id="layer-grid"></canvas>
+          <canvas id="layer-labels"></canvas>
+          <canvas id="layer-vectors"></canvas>
+          <canvas id="layer-interactive"></canvas>
+        </div>
+
+        <div class="controls-pane">
+          <div class="data-card">
+            <div class="color-identity">
+              <div class="swatch-display" id="color-preview"></div>
+              <div class="coordinates-display">
+                <div class="coord-row"><span class="coord-label">x</span><span id="txt-x">0.3127</span></div>
+                <div class="coord-row"><span class="coord-label">y</span><span id="txt-y">0.3290</span></div>
+              </div>
+            </div>
+
+            <div class="slider-container">
+              <div class="slider-wrapper">
+                <span>R</span>
+                <input type="range" id="inp-r" min="0" max="255" value="255" />
+                <span id="txt-r">255</span>
+              </div>
+              <div class="slider-wrapper">
+                <span>G</span>
+                <input type="range" id="inp-g" min="0" max="255" value="255" />
+                <span id="txt-g">255</span>
+              </div>
+              <div class="slider-wrapper">
+                <span>B</span>
+                <input type="range" id="inp-b" min="0" max="255" value="255" />
+                <span id="txt-b">255</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="data-card input-grid">
+            <div class="input-field">
+              <label>HEX Coordinate</label>
+              <input type="text" id="inp-hex" value="#FFFFFF" spellcheck="false" />
+            </div>
+            <div class="input-field">
+              <label>HSL Coordinate</label>
+              <input type="text" id="inp-hsl" value="0, 0%, 100%" spellcheck="false" />
+            </div>
+          </div>
+
+          <div class="data-card">
+            <div class="profile-toggles">
+              <label>
+                <input type="checkbox" id="chk-srgb" checked />
+                <div class="toggle-row">
+                  <div class="toggle-info">
+                    <div class="toggle-marker" style="background: var(--color-srgb)"></div>
+                    <span class="toggle-label">sRGB Gamut</span>
+                  </div>
+                  <div class="switch-track"><div class="switch-thumb"></div></div>
+                </div>
+              </label>
+              <label>
+                <input type="checkbox" id="chk-p3" checked />
+                <div class="toggle-row">
+                  <div class="toggle-info">
+                    <div class="toggle-marker" style="background: var(--color-p3)"></div>
+                    <span class="toggle-label">Display P3 Gamut</span>
+                  </div>
+                  <div class="switch-track"><div class="switch-thumb"></div></div>
+                </div>
+              </label>
+              <label>
+                <input type="checkbox" id="chk-rec" />
+                <div class="toggle-row">
+                  <div class="toggle-info">
+                    <div class="toggle-marker" style="background: var(--color-rec)"></div>
+                    <span class="toggle-label">Rec.2020 Gamut</span>
+                  </div>
+                  <div class="switch-track"><div class="switch-thumb"></div></div>
+                </div>
+              </label>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <div class="analysis-panel">
+        <div class="analysis-header">
+          <h2 class="analysis-title">Reading the sample</h2>
+          <div class="pill-container">
+            <div class="status-pill pill-in" id="pill-srgb">
+              <div class="dot"></div>
+              SRGB &middot; <span id="pill-txt-srgb">in gamut</span>
+            </div>
+            <div class="status-pill pill-in" id="pill-p3">
+              <div class="dot"></div>
+              P3 &middot; <span id="pill-txt-p3">in gamut</span>
+            </div>
+            <div class="status-pill pill-out" id="pill-rec">
+              <div class="dot"></div>
+              REC2020 &middot; <span id="pill-txt-rec">out of gamut</span>
+            </div>
+          </div>
+        </div>
+        <div class="analysis-grid">
+          <div class="metric-col">
+            <div class="metric-label">Chromaticity</div>
+            <div class="metric-value" id="val-chroma">0.3127,<br />0.3290</div>
+            <div class="metric-desc">Position in CIE 1931 (x, y) space.</div>
+          </div>
+          <div class="metric-col">
+            <div class="metric-label">Relative Luminance</div>
+            <div class="metric-value" id="val-lum">1.000<br />(fixed)</div>
+            <div class="metric-desc">Y, normalized so reference white = 1.</div>
+          </div>
+          <div class="metric-col">
+            <div class="metric-label">Dominant Wavelength</div>
+            <div class="metric-value" id="val-wave">--- nm</div>
+            <div class="metric-desc">Spectral hue this chromaticity is closest to.</div>
+          </div>
+          <div class="metric-col">
+            <div class="metric-label">Excitation Purity</div>
+            <div class="metric-value" id="val-purity">0.0%</div>
+            <div class="metric-desc">Distance from white toward the spectral locus.</div>
+          </div>
+          <div class="metric-col">
+            <div class="metric-label">Correlated CCT</div>
+            <div class="metric-value" id="val-cct">6504 K</div>
+            <div class="metric-desc">McCamy approximation — reliable near the Planckian locus only.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>CIE 1931 Diagnostics</h2>
+          <button class="close-btn" id="btn-close">&times;</button>
+        </div>
+        <div class="prose">
+          <p>The <strong>CIE 1931 color space</strong> represents the first mathematical definition of human color vision, mapped by the International Commission on Illumination.</p>
+          <p>The curved boundary (spectral locus) illustrates purely monochromatic light across the visible spectrum (380nm to 780nm). Every color perceivable by the human eye exists within this horseshoe shape.</p>
+          <p>The triangular overlays denote <strong>gamuts</strong>—the physical limits of specific display hardware. Any coordinate outside a triangle cannot be accurately reproduced by that specific standard, leading to desaturation or clipping on the target device.</p>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        const W = 580;
+        const H = 600;
+        const P = 40;
+        const X_MN = 0;
+        const X_MX = 0.8;
+        const Y_MN = 0;
+        const Y_MX = 0.9;
+        const WP = { x: 0.3127, y: 0.329 };
+
+        const ctxs = {
+          mesh: document.getElementById("layer-mesh").getContext("2d", { alpha: false }),
+          grid: document.getElementById("layer-grid").getContext("2d"),
+          labels: document.getElementById("layer-labels").getContext("2d"),
+          vectors: document.getElementById("layer-vectors").getContext("2d"),
+          interactive: document.getElementById("layer-interactive").getContext("2d")
+        };
+
+        const pxRatio = window.devicePixelRatio || 1;
+
+        let ctxKeys = Object.keys(ctxs);
+        for (let i = 0; i < ctxKeys.length; i++) {
+          let k = ctxKeys[i];
+          ctxs[k].canvas.width = W * pxRatio;
+          ctxs[k].canvas.height = H * pxRatio;
+          ctxs[k].scale(pxRatio, pxRatio);
+        }
+
+        const locusData = [
+          { w: 380, x: 0.1741, y: 0.005 },
+          { w: 390, x: 0.1738, y: 0.0049 },
+          { w: 400, x: 0.1733, y: 0.0048 },
+          { w: 410, x: 0.1726, y: 0.0048 },
+          { w: 420, x: 0.1714, y: 0.0051 },
+          { w: 430, x: 0.1689, y: 0.0069 },
+          { w: 440, x: 0.1644, y: 0.0109 },
+          { w: 450, x: 0.1566, y: 0.0177 },
+          { w: 460, x: 0.1355, y: 0.0399 },
+          { w: 470, x: 0.1241, y: 0.0578 },
+          { w: 480, x: 0.0913, y: 0.1327 },
+          { w: 490, x: 0.0454, y: 0.295 },
+          { w: 500, x: 0.0082, y: 0.5384 },
+          { w: 510, x: 0.0139, y: 0.7502 },
+          { w: 520, x: 0.0743, y: 0.8338 },
+          { w: 530, x: 0.1547, y: 0.8059 },
+          { w: 540, x: 0.2296, y: 0.7543 },
+          { w: 550, x: 0.3016, y: 0.6923 },
+          { w: 560, x: 0.3731, y: 0.6245 },
+          { w: 570, x: 0.4441, y: 0.5547 },
+          { w: 580, x: 0.5125, y: 0.4866 },
+          { w: 590, x: 0.5751, y: 0.4242 },
+          { w: 600, x: 0.627, y: 0.3725 },
+          { w: 610, x: 0.6658, y: 0.334 },
+          { w: 620, x: 0.6915, y: 0.3083 },
+          { w: 630, x: 0.7079, y: 0.292 },
+          { w: 640, x: 0.719, y: 0.2809 },
+          { w: 650, x: 0.726, y: 0.274 },
+          { w: 660, x: 0.73, y: 0.27 },
+          { w: 670, x: 0.732, y: 0.268 },
+          { w: 680, x: 0.7334, y: 0.2666 },
+          { w: 690, x: 0.7344, y: 0.2656 },
+          { w: 700, x: 0.7347, y: 0.2653 },
+          { w: 780, x: 0.7347, y: 0.2653 }
+        ];
+
+        const waveLabels = [
+          { nm: 460, x: 0.1355, y: 0.0399, ox: -12, oy: 15 },
+          { nm: 470, x: 0.1241, y: 0.0578, ox: -25, oy: 10 },
+          { nm: 480, x: 0.0913, y: 0.1327, ox: -30, oy: 5 },
+          { nm: 490, x: 0.0454, y: 0.295, ox: -30, oy: 0 },
+          { nm: 500, x: 0.0082, y: 0.5384, ox: -30, oy: 0 },
+          { nm: 510, x: 0.0139, y: 0.7502, ox: -30, oy: -5 },
+          { nm: 520, x: 0.0743, y: 0.8338, ox: -15, oy: -20 },
+          { nm: 540, x: 0.2296, y: 0.7543, ox: 10, oy: -20 },
+          { nm: 560, x: 0.3731, y: 0.6245, ox: 20, oy: -15 },
+          { nm: 580, x: 0.5125, y: 0.4866, ox: 25, oy: -10 },
+          { nm: 600, x: 0.627, y: 0.3725, ox: 25, oy: -5 },
+          { nm: 620, x: 0.6915, y: 0.3083, ox: 25, oy: 0 },
+          { nm: 700, x: 0.7347, y: 0.2653, ox: 25, oy: 10 }
+        ];
+
+        const gamutData = {
+          sRGB: { r: { x: 0.64, y: 0.33 }, g: { x: 0.3, y: 0.6 }, b: { x: 0.15, y: 0.06 }, col: "#a1a1aa", id: "pill-srgb", txt: "pill-txt-srgb" },
+          P3: { r: { x: 0.68, y: 0.32 }, g: { x: 0.265, y: 0.69 }, b: { x: 0.15, y: 0.06 }, col: "#f4f4f5", id: "pill-p3", txt: "pill-txt-p3" },
+          Rec2020: { r: { x: 0.708, y: 0.292 }, g: { x: 0.17, y: 0.797 }, b: { x: 0.131, y: 0.046 }, col: "#71717a", id: "pill-rec", txt: "pill-txt-rec" }
+        };
+
+        let pObj = { x: 0.3127, y: 0.329 };
+        let pAnim = { x: 0.3127, y: 0.329 };
+        let toggles = { sRGB: true, P3: true, Rec2020: false };
+        let activeDrag = false;
+
+        function scaleX(v) {
+          return P + ((v - X_MN) / (X_MX - X_MN)) * (W - 2 * P);
+        }
+        function scaleY(v) {
+          return H - P - ((v - Y_MN) / (Y_MX - Y_MN)) * (H - 2 * P);
+        }
+        function invX(p) {
+          return X_MN + ((p - P) / (W - 2 * P)) * (X_MX - X_MN);
+        }
+        function invY(p) {
+          return Y_MN + ((H - P - p) / (H - 2 * P)) * (Y_MX - Y_MN);
+        }
+
+        function applyGamma(c) {
+          return c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+        }
+
+        function traceLocus(ctx) {
+          ctx.beginPath();
+          for (let i = 0; i < locusData.length; i++) {
+            let px = scaleX(locusData[i].x);
+            let py = scaleY(locusData[i].y);
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+          }
+          ctx.closePath();
+        }
+
+        function drawBaseGrid() {
+          const ctx = ctxs.grid;
+          ctx.clearRect(0, 0, W, H);
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.03)";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+
+          for (let i = 0.1; i <= 0.8; i += 0.1) {
+            let px = scaleX(i);
+            ctx.moveTo(px, P);
+            ctx.lineTo(px, H - P);
+          }
+
+          for (let i = 0.1; i <= 0.9; i += 0.1) {
+            let py = scaleY(i);
+            ctx.moveTo(P, py);
+            ctx.lineTo(W - P, py);
+          }
+          ctx.stroke();
+
+          ctx.fillStyle = "#3f3f46";
+          ctx.font = "10px JetBrains Mono";
+          ctx.textAlign = "center";
+
+          for (let i = 0.1; i <= 0.8; i += 0.1) {
+            ctx.fillText(i.toFixed(1), scaleX(i), H - P + 24);
+          }
+
+          ctx.textAlign = "right";
+          ctx.textBaseline = "middle";
+          for (let i = 0.1; i <= 0.9; i += 0.1) {
+            ctx.fillText(i.toFixed(1), P - 16, scaleY(i));
+          }
+
+          traceLocus(ctx);
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+
+        function drawWaveLabels() {
+          const ctx = ctxs.labels;
+          ctx.clearRect(0, 0, W, H);
+          ctx.font = "10px JetBrains Mono";
+          ctx.fillStyle = "#71717a";
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+          ctx.lineWidth = 1;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+
+          for (let i = 0; i < waveLabels.length; i++) {
+            let item = waveLabels[i];
+            let bx = scaleX(item.x);
+            let by = scaleY(item.y);
+            let tx = bx + item.ox;
+            let ty = by + item.oy;
+
+            ctx.beginPath();
+            ctx.arc(bx, by, 2, 0, Math.PI * 2);
+            ctx.fillStyle = "#f4f4f5";
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(bx, by);
+            ctx.lineTo(tx, ty);
+            ctx.stroke();
+
+            ctx.fillStyle = "#a1a1aa";
+            let align = item.ox < 0 ? "right" : "left";
+            if (item.oy !== 0 && Math.abs(item.ox) < 15) align = "center";
+            ctx.textAlign = align;
+
+            let padX = item.ox < 0 ? -4 : 4;
+            if (align === "center") padX = 0;
+            let padY = item.oy < 0 ? -4 : 4;
+            if (item.oy === 0) padY = 0;
+
+            ctx.fillText(item.nm, tx + padX, ty + padY);
+          }
+        }
+
+        function generateGradientMesh() {
+          const ctx = ctxs.mesh;
+          ctx.fillStyle = "#121214";
+          ctx.fillRect(0, 0, W, H);
+
+          const off = document.createElement("canvas");
+          off.width = W * pxRatio;
+          off.height = H * pxRatio;
+          const offCtx = off.getContext("2d");
+          const img = offCtx.createImageData(W * pxRatio, H * pxRatio);
+          const d = img.data;
+
+          for (let py = 0; py < H * pxRatio; py++) {
+            for (let px = 0; px < W * pxRatio; px++) {
+              let cx = invX(px / pxRatio);
+              let cy = invY(py / pxRatio);
+
+              if (cy > 0 && cx > 0 && cx + cy <= 1.2) {
+                let X = cx / cy;
+                let Y = 1.0;
+                let Z = (1 - cx - cy) / cy;
+
+                let r = X * 3.2404542 - Y * 1.5371385 - Z * 0.4985314;
+                let g = -X * 0.969266 + Y * 1.8760108 + Z * 0.041556;
+                let b = X * 0.0556434 - Y * 0.2040259 + Z * 1.0572252;
+
+                let maxV = Math.max(r, g, b);
+                if (maxV > 0) {
+                  r /= maxV;
+                  g /= maxV;
+                  b /= maxV;
+                }
+                let minV = Math.min(r, g, b);
+                if (minV < 0) {
+                  r -= minV;
+                  g -= minV;
+                  b -= minV;
+                }
+                maxV = Math.max(r, g, b);
+                if (maxV > 0) {
+                  r /= maxV;
+                  g /= maxV;
+                  b /= maxV;
+                }
+
+                let idx = (py * Math.floor(W * pxRatio) + px) * 4;
+                d[idx] = Math.round(applyGamma(r) * 255);
+                d[idx + 1] = Math.round(applyGamma(g) * 255);
+                d[idx + 2] = Math.round(applyGamma(b) * 255);
+                d[idx + 3] = 255;
+              }
+            }
+          }
+          offCtx.putImageData(img, 0, 0);
+
+          ctx.save();
+          traceLocus(ctx);
+          ctx.clip();
+          ctx.drawImage(off, 0, 0, W, H);
+          ctx.restore();
+
+          document.getElementById("compute-loader").classList.add("hidden");
+        }
+
+        function drawGamutLines() {
+          const ctx = ctxs.vectors;
+          ctx.clearRect(0, 0, W, H);
+
+          let keys = Object.keys(toggles);
+          for (let i = 0; i < keys.length; i++) {
+            let key = keys[i];
+            if (toggles[key]) {
+              const g = gamutData[key];
+
+              ctx.beginPath();
+              ctx.moveTo(scaleX(g.r.x), scaleY(g.r.y));
+              ctx.lineTo(scaleX(g.g.x), scaleY(g.g.y));
+              ctx.lineTo(scaleX(g.b.x), scaleY(g.b.y));
+              ctx.closePath();
+
+              ctx.strokeStyle = g.col;
+              ctx.lineWidth = 1.5;
+              ctx.setLineDash([4, 4]);
+              ctx.stroke();
+              ctx.setLineDash([]);
+
+              ctx.fillStyle = g.col;
+              let pts = [g.r, g.g, g.b];
+              for (let p = 0; p < 3; p++) {
+                ctx.beginPath();
+                ctx.arc(scaleX(pts[p].x), scaleY(pts[p].y), 3.5, 0, Math.PI * 2);
+                ctx.fill();
+              }
+            }
+          }
+        }
+
+        function smoothInterp(s, e, a) {
+          return (1 - a) * s + a * e;
+        }
+
+        function animatePointer() {
+          const ctx = ctxs.interactive;
+          ctx.clearRect(0, 0, W, H);
+
+          pAnim.x = smoothInterp(pAnim.x, pObj.x, 0.15);
+          pAnim.y = smoothInterp(pAnim.y, pObj.y, 0.15);
+
+          let fx = scaleX(pAnim.x);
+          let fy = scaleY(pAnim.y);
+
+          ctx.shadowColor = "rgba(0,0,0,0.8)";
+          ctx.shadowBlur = 12;
+          ctx.shadowOffsetY = 4;
+
+          ctx.beginPath();
+          ctx.arc(fx, fy, 8, 0, Math.PI * 2);
+          ctx.fillStyle = "#ffffff";
+          ctx.fill();
+          ctx.lineWidth = 2.5;
+          ctx.strokeStyle = "#000000";
+          ctx.stroke();
+
+          ctx.shadowColor = "transparent";
+          requestAnimationFrame(animatePointer);
+        }
+
+        function crossProd(p1, p2, p3) {
+          return (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y);
+        }
+
+        function checkBounds(pt, v1, v2, v3) {
+          let d1 = crossProd(pt, v1, v2);
+          let d2 = crossProd(pt, v2, v3);
+          let d3 = crossProd(pt, v3, v1);
+          let n = d1 < 0 || d2 < 0 || d3 < 0;
+          let p = d1 > 0 || d2 > 0 || d3 > 0;
+          return !(n && p);
+        }
+
+        function convertXyToRgb(x, y) {
+          if (y === 0) return { r: 0, g: 0, b: 0 };
+          let X = x / y;
+          let Y = 1.0;
+          let Z = (1 - x - y) / y;
+
+          let r = X * 3.2404542 - Y * 1.5371385 - Z * 0.4985314;
+          let g = -X * 0.969266 + Y * 1.8760108 + Z * 0.041556;
+          let b = X * 0.0556434 - Y * 0.2040259 + Z * 1.0572252;
+
+          let minV = Math.min(r, g, b);
+          if (minV < 0) {
+            r -= minV;
+            g -= minV;
+            b -= minV;
+          }
+
+          let maxV = Math.max(r, g, b);
+          if (maxV > 0) {
+            r /= maxV;
+            g /= maxV;
+            b /= maxV;
+          }
+
+          r = Math.round(applyGamma(r) * 255);
+          g = Math.round(applyGamma(g) * 255);
+          b = Math.round(applyGamma(b) * 255);
+
+          return { r, g, b };
+        }
+
+        function convertRgbToXy(r, g, b) {
+          let nr = r / 255;
+          let ng = g / 255;
+          let nb = b / 255;
+
+          nr = nr > 0.04045 ? Math.pow((nr + 0.055) / 1.055, 2.4) : nr / 12.92;
+          ng = ng > 0.04045 ? Math.pow((ng + 0.055) / 1.055, 2.4) : ng / 12.92;
+          nb = nb > 0.04045 ? Math.pow((nb + 0.055) / 1.055, 2.4) : nb / 12.92;
+
+          let X = nr * 0.4124564 + ng * 0.3575761 + nb * 0.1804375;
+          let Y = nr * 0.2126729 + ng * 0.7151522 + nb * 0.072175;
+          let Z = nr * 0.0193339 + ng * 0.119192 + nb * 0.9503041;
+
+          let s = X + Y + Z;
+          if (s === 0) return { x: WP.x, y: WP.y };
+          return { x: X / s, y: Y / s };
+        }
+
+        function convertRgbToHex(r, g, b) {
+          return "#" + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1).toUpperCase();
+        }
+
+        function convertRgbToHsl(r, g, b) {
+          r /= 255;
+          g /= 255;
+          b /= 255;
+          let max = Math.max(r, g, b),
+            min = Math.min(r, g, b);
+          let h = 0,
+            s = 0,
+            l = (max + min) / 2;
+          if (max !== min) {
+            let d = max - min;
+            s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+            if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
+            else if (max === g) h = (b - r) / d + 2;
+            else if (max === b) h = (r - g) / d + 4;
+            h /= 6;
+          }
+          return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
+        }
+
+        function convertHexToRgb(h) {
+          let m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(h);
+          return m ? { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) } : null;
+        }
+
+        function calcDistance(p1, p2) {
+          return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+        }
+
+        function intersectLineSegment(rayOrigin, rayPoint, segA, segB) {
+          let dx1 = rayPoint.x - rayOrigin.x;
+          let dy1 = rayPoint.y - rayOrigin.y;
+          let dx2 = segB.x - segA.x;
+          let dy2 = segB.y - segA.y;
+          let det = dx1 * dy2 - dy1 * dx2;
+
+          if (Math.abs(det) < 1e-10) return null;
+
+          let u = ((rayOrigin.x - segA.x) * dy1 - (rayOrigin.y - segA.y) * dx1) / det;
+          let t = ((rayOrigin.x - segA.x) * dy2 - (rayOrigin.y - segA.y) * dx2) / det;
+
+          if (t >= 0 && u >= 0 && u <= 1) {
+            return {
+              x: segA.x + u * dx2,
+              y: segA.y + u * dy2,
+              t: t,
+              u: u
+            };
+          }
+          return null;
+        }
+
+        function runAnalysis(x, y) {
+          let pt = { x: x, y: y };
+          let keys = Object.keys(gamutData);
+          for (let i = 0; i < keys.length; i++) {
+            let key = keys[i];
+            let data = gamutData[key];
+            let el = document.getElementById(data.id);
+            let txt = document.getElementById(data.txt);
+            if (checkBounds(pt, data.r, data.g, data.b)) {
+              el.className = "status-pill pill-in";
+              txt.textContent = "in gamut";
+            } else {
+              el.className = "status-pill pill-out";
+              txt.textContent = "out of gamut";
+            }
+          }
+
+          document.getElementById("val-chroma").innerHTML = x.toFixed(4) + ",<br>" + y.toFixed(4);
+
+          let n = (x - 0.332) / (0.1858 - y);
+          let cct = 449 * Math.pow(n, 3) + 3525 * Math.pow(n, 2) + 6823.3 * n + 5520.33;
+
+          let cctStr = Math.round(cct) + " K";
+          if (cct < 2000 || cct > 15000 || isNaN(cct) || cct < 0) {
+            cctStr += "<br>(low confidence)";
+          }
+          document.getElementById("val-cct").innerHTML = cctStr;
+
+          let bestIntersect = null;
+          let bestIdx = -1;
+          let minT = Infinity;
+
+          for (let i = 0; i < locusData.length - 1; i++) {
+            let pA = locusData[i];
+            let pB = locusData[i + 1];
+            let int = intersectLineSegment(WP, pt, pA, pB);
+            if (int && int.t < minT && int.t > 0) {
+              minT = int.t;
+              bestIntersect = int;
+              bestIdx = i;
+            }
+          }
+
+          let isPurple = false;
+          if (!bestIntersect) {
+            let pFirst = locusData[0];
+            let pLast = locusData[locusData.length - 1];
+            let int = intersectLineSegment(WP, pt, pLast, pFirst);
+            if (int && int.t > 0) {
+              bestIntersect = int;
+              isPurple = true;
+            }
+          }
+
+          if (bestIntersect) {
+            let distToSample = calcDistance(WP, pt);
+            let distToEdge = calcDistance(WP, bestIntersect);
+            let purity = (distToSample / distToEdge) * 100;
+            document.getElementById("val-purity").textContent = Math.min(100, Math.max(0, purity)).toFixed(1) + "%";
+
+            if (isPurple) {
+              let rInt = intersectLineSegment(WP, { x: WP.x - (pt.x - WP.x), y: WP.y - (pt.y - WP.y) }, locusData[0], locusData[locusData.length - 1]);
+              let compMinT = Infinity;
+              let compBest = null;
+              for (let i = 0; i < locusData.length - 1; i++) {
+                let cInt = intersectLineSegment(WP, { x: WP.x - (pt.x - WP.x), y: WP.y - (pt.y - WP.y) }, locusData[i], locusData[i + 1]);
+                if (cInt && cInt.t < compMinT && cInt.t > 0) {
+                  compMinT = cInt.t;
+                  compBest = cInt;
+                  bestIdx = i;
+                }
+              }
+              if (compBest) {
+                let w1 = locusData[bestIdx].w;
+                let w2 = locusData[bestIdx + 1].w;
+                let wl = w1 + compBest.u * (w2 - w1);
+                document.getElementById("val-wave").textContent = wl.toFixed(0) + "c nm";
+              } else {
+                document.getElementById("val-wave").textContent = "--- nm";
+              }
+            } else {
+              let w1 = locusData[bestIdx].w;
+              let w2 = locusData[bestIdx + 1].w;
+              let wl = w1 + bestIntersect.u * (w2 - w1);
+              document.getElementById("val-wave").textContent = wl.toFixed(0) + " nm";
+            }
+          } else {
+            document.getElementById("val-purity").textContent = "0.0%";
+            document.getElementById("val-wave").textContent = "--- nm";
+          }
+        }
+
+        function synchronizeUI(r, g, b, src, forceX, forceY) {
+          let hex = convertRgbToHex(r, g, b);
+          let hsl = convertRgbToHsl(r, g, b);
+          let xy = convertRgbToXy(r, g, b);
+
+          if (forceX !== undefined && forceY !== undefined) {
+            xy.x = forceX;
+            xy.y = forceY;
+          }
+
+          document.getElementById("color-preview").style.backgroundColor = hex;
+          document.getElementById("txt-x").textContent = xy.x.toFixed(4);
+          document.getElementById("txt-y").textContent = xy.y.toFixed(4);
+
+          if (src !== "hex") document.getElementById("inp-hex").value = hex;
+          document.getElementById("inp-hsl").value = `${hsl.h}, ${hsl.s}%, ${hsl.l}%`;
+
+          if (src !== "slider") {
+            document.getElementById("inp-r").value = r;
+            document.getElementById("inp-g").value = g;
+            document.getElementById("inp-b").value = b;
+            document.getElementById("txt-r").textContent = r;
+            document.getElementById("txt-g").textContent = g;
+            document.getElementById("txt-b").textContent = b;
+          }
+
+          if (src !== "canvas") {
+            pObj.x = xy.x;
+            pObj.y = xy.y;
+          }
+
+          runAnalysis(xy.x, xy.y);
+        }
+
+        function processSliders() {
+          let r = parseInt(document.getElementById("inp-r").value);
+          let g = parseInt(document.getElementById("inp-g").value);
+          let b = parseInt(document.getElementById("inp-b").value);
+
+          document.getElementById("txt-r").textContent = r;
+          document.getElementById("txt-g").textContent = g;
+          document.getElementById("txt-b").textContent = b;
+
+          synchronizeUI(r, g, b, "slider");
+        }
+
+        function processPointer(e) {
+          let box = ctxs.interactive.canvas.getBoundingClientRect();
+          let sx = ctxs.interactive.canvas.width / box.width / pxRatio;
+          let sy = ctxs.interactive.canvas.height / box.height / pxRatio;
+
+          let cx = invX((e.clientX - box.left) * sx);
+          let cy = invY((e.clientY - box.top) * sy);
+
+          pObj.x = Math.max(0, Math.min(1, cx));
+          pObj.y = Math.max(0, Math.min(1, cy));
+
+          let rgb = convertXyToRgb(pObj.x, pObj.y);
+          synchronizeUI(rgb.r, rgb.g, rgb.b, "canvas", pObj.x, pObj.y);
+        }
+
+        document.getElementById("inp-r").addEventListener("input", processSliders);
+        document.getElementById("inp-g").addEventListener("input", processSliders);
+        document.getElementById("inp-b").addEventListener("input", processSliders);
+
+        document.getElementById("inp-hex").addEventListener("input", (e) => {
+          let rgb = convertHexToRgb(e.target.value);
+          if (rgb) synchronizeUI(rgb.r, rgb.g, rgb.b, "hex");
+        });
+
+        const targetArea = document.getElementById("interaction-layer");
+        targetArea.addEventListener("mousedown", (e) => {
+          activeDrag = true;
+          processPointer(e);
+        });
+        window.addEventListener("mousemove", (e) => {
+          if (activeDrag) processPointer(e);
+        });
+        window.addEventListener("mouseup", () => {
+          activeDrag = false;
+        });
+
+        document.getElementById("chk-srgb").addEventListener("change", (e) => {
+          toggles.sRGB = e.target.checked;
+          drawGamutLines();
+        });
+        document.getElementById("chk-p3").addEventListener("change", (e) => {
+          toggles.P3 = e.target.checked;
+          drawGamutLines();
+        });
+        document.getElementById("chk-rec").addEventListener("change", (e) => {
+          toggles.Rec2020 = e.target.checked;
+          drawGamutLines();
+        });
+
+        const modal = document.getElementById("modal");
+        document.getElementById("btn-info").addEventListener("click", () => modal.classList.add("active"));
+        document.getElementById("btn-close").addEventListener("click", () => modal.classList.remove("active"));
+        modal.addEventListener("click", (e) => {
+          if (e.target === modal) modal.classList.remove("active");
+        });
+
+        setTimeout(() => {
+          drawBaseGrid();
+          drawWaveLabels();
+          generateGradientMesh();
+          drawGamutLines();
+          animatePointer();
+          let initRgb = convertHexToRgb("#FF5880");
+          if (!initRgb) initRgb = { r: 255, g: 88, b: 128 };
+          synchronizeUI(initRgb.r, initRgb.g, initRgb.b, "init");
+        }, 50);
+      })();
+    </script>
+  </body>
+</html>
