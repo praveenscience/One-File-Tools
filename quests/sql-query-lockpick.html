@@ -1,0 +1,1635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SQL Query Lockpick | General Dev Quests</title>
+  <meta name="description" content="A lockpicking quest where each lock is a dataset and the key is a SQL query. Write SELECT, WHERE, JOIN, GROUP BY, HAVING, and ORDER BY clauses to transform data into the expected output table." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;700&family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- sql.js via CDN (WASM-based SQLite in the browser) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.js"></script>
+
+  <style>
+    /* ══ Tokens ═══════════════════════════════════════════════ */
+    :root {
+      --bg:      #050a08;
+      --surface: rgba(6,14,10,0.92);
+      --card:    rgba(8,18,12,0.97);
+      --panel:   rgba(4,10,6,0.99);
+
+      --green:   #00ff88;  --green-d:  rgba(0,255,136,0.10);
+      --lime:    #b8ff4a;  --lime-d:   rgba(184,255,74,0.10);
+      --cyan:    #00e5c8;  --cyan-d:   rgba(0,229,200,0.10);
+      --gold:    #ffd166;  --gold-d:   rgba(255,209,102,0.10);
+      --red:     #ff4560;  --red-d:    rgba(255,69,96,0.10);
+      --orange:  #ff9f43;  --orange-d: rgba(255,159,67,0.10);
+      --purple:  #a55eea;  --purple-d: rgba(165,94,234,0.10);
+      --blue:    #4ecdc4;
+
+      --border:    rgba(0,255,136,0.10);
+      --border-hi: rgba(0,255,136,0.35);
+      --text:      #c8f0da;
+      --muted:     #4a7058;
+
+      --font-ui:   'Orbitron', sans-serif;
+      --font-body: 'Rajdhani', sans-serif;
+      --font-code: 'Fira Code', monospace;
+      --ease:      cubic-bezier(0.4,0,0.2,1);
+      --r: 8px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: var(--font-body);
+      width: 100vw; height: 100vh; overflow: hidden;
+      display: flex; justify-content: center; align-items: center;
+    }
+
+    /* ── BG ──────────────────────────────────────────────── */
+    .bg-wrap {
+      position: fixed; inset: 0; z-index: 0;
+      background:
+        radial-gradient(ellipse 70% 50% at 5% 95%,  rgba(0,255,136,0.06) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 40% at 95% 5%,  rgba(0,229,200,0.05) 0%, transparent 55%),
+        radial-gradient(ellipse 40% 30% at 50% 50%, rgba(184,255,74,0.02) 0%, transparent 50%);
+    }
+    .circuit {
+      position: fixed; inset: 0; z-index: 0; opacity: 0.04;
+      background-image:
+        linear-gradient(rgba(0,255,136,0.8) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,255,136,0.8) 1px, transparent 1px),
+        linear-gradient(rgba(0,255,136,0.3) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,255,136,0.3) 1px, transparent 1px);
+      background-size: 60px 60px, 60px 60px, 12px 12px, 12px 12px;
+    }
+
+    /* ── Shell ───────────────────────────────────────────── */
+    .shell {
+      position: relative; z-index: 10;
+      width: 98vw; height: 96vh;
+      max-width: 1400px; max-height: 860px;
+      background: var(--surface);
+      backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: 0 0 0 1px rgba(0,255,136,0.04), 0 24px 80px rgba(0,0,0,0.9),
+                  inset 0 0 80px rgba(0,255,136,0.03);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+
+    /* ── Header ──────────────────────────────────────────── */
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.72rem 1.4rem;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0; gap: 1rem;
+    }
+    .header-left { display: flex; align-items: center; gap: 1rem; }
+    .hub-btn {
+      display: flex; align-items: center; gap: 0.4rem;
+      color: var(--muted); text-decoration: none;
+      font-family: var(--font-ui); font-size: 0.7rem;
+      padding: 0.38rem 0.7rem;
+      border: 1px solid rgba(74,112,88,0.3); border-radius: var(--r);
+      background: rgba(74,112,88,0.06); transition: all 0.2s;
+    }
+    .hub-btn:hover { color: var(--green); border-color: var(--green); background: var(--green-d); }
+    .hub-btn svg { width: 13px; height: 13px; fill: currentColor; }
+
+    .title-block h1 {
+      font-family: var(--font-ui); font-size: 1.05rem; font-weight: 900;
+      color: #fff; letter-spacing: 0.5px;
+      text-shadow: 0 0 20px rgba(0,255,136,0.5);
+    }
+    .title-block p {
+      font-size: 0.64rem; color: var(--green); text-transform: uppercase;
+      letter-spacing: 2.5px; font-weight: 700; margin-top: 1px;
+    }
+
+    .level-nav {
+      display: flex; align-items: center; gap: 0.5rem;
+      background: rgba(0,0,0,0.35); border: 1px solid var(--border);
+      border-radius: 10px; padding: 0.28rem 0.7rem;
+    }
+    .nav-btn {
+      background: none; border: none; color: var(--green);
+      cursor: pointer; display: flex; padding: 0.15rem;
+      border-radius: 4px; transition: all 0.15s;
+    }
+    .nav-btn:hover:not(:disabled) { background: var(--green-d); }
+    .nav-btn:disabled { color: #0d2018; cursor: not-allowed; }
+    .nav-btn svg { width: 15px; height: 15px; fill: currentColor; }
+    .level-lbl {
+      font-family: var(--font-ui); font-size: 0.66rem; color: #fff;
+      min-width: 74px; text-align: center;
+    }
+    .dots { display: flex; gap: 5px; }
+    .dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
+      cursor: pointer; transition: all 0.3s;
+    }
+    .dot.done   { background: var(--green); border-color: var(--green); box-shadow: 0 0 6px var(--green); }
+    .dot.active { background: var(--lime);  border-color: var(--lime);  box-shadow: 0 0 8px var(--lime); }
+
+    .header-right { display: flex; align-items: center; gap: 0.8rem; }
+    .chip {
+      display: flex; align-items: center; gap: 0.35rem;
+      background: rgba(0,0,0,0.3); border: 1px solid var(--border);
+      border-radius: 8px; padding: 0.25rem 0.6rem;
+      font-family: var(--font-code); font-size: 0.75rem; color: var(--muted);
+    }
+    .chip .v { font-weight: 700; color: var(--gold); }
+    .chip.s .v { color: var(--green); }
+    .diff-badge {
+      font-family: var(--font-code); font-size: 0.6rem; padding: 0.18rem 0.5rem;
+      border-radius: 4px; border: 1px solid; text-transform: uppercase; letter-spacing: 1px;
+    }
+    .d-easy   { color: var(--green);  border-color: var(--green);  background: var(--green-d); }
+    .d-medium { color: var(--gold);   border-color: var(--gold);   background: var(--gold-d); }
+    .d-hard   { color: var(--red);    border-color: var(--red);    background: var(--red-d); }
+
+    /* ── Body layout ─────────────────────────────────────── */
+    .body { display: grid; grid-template-columns: 290px 1fr 300px; flex: 1; overflow: hidden; }
+
+    /* ── LEFT – Schema / Input tables ───────────────────── */
+    .schema-panel {
+      background: var(--card);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .sp-header {
+      padding: 0.65rem 1rem;
+      border-bottom: 1px solid var(--border);
+      font-family: var(--font-ui); font-size: 0.6rem; color: var(--green);
+      text-transform: uppercase; letter-spacing: 2px;
+      display: flex; align-items: center; gap: 0.4rem;
+    }
+    .sp-header::before { content:''; width:3px; height:10px; background:var(--green); border-radius:2px; }
+
+    .schema-scroll {
+      flex: 1; overflow-y: auto; padding: 0.7rem 0.8rem;
+      display: flex; flex-direction: column; gap: 0.65rem;
+    }
+    .schema-scroll::-webkit-scrollbar { width: 4px; }
+    .schema-scroll::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 2px; }
+
+    /* Table card in schema */
+    .tbl-card {
+      border: 1px solid var(--border); border-radius: var(--r); overflow: hidden;
+    }
+    .tbl-card-header {
+      display: flex; align-items: center; gap: 0.4rem;
+      padding: 0.38rem 0.6rem;
+      background: rgba(0,255,136,0.06); border-bottom: 1px solid var(--border);
+      font-family: var(--font-code); font-size: 0.68rem; color: var(--green);
+      cursor: pointer; user-select: none; transition: background 0.15s;
+    }
+    .tbl-card-header:hover { background: rgba(0,255,136,0.1); }
+    .tbl-card-header .tbl-icon { font-size: 0.8rem; }
+    .tbl-card-header .tbl-name { font-weight: 700; flex: 1; }
+    .tbl-card-header .tbl-rows { font-size: 0.58rem; color: var(--muted); }
+    .tbl-card-header .tbl-toggle { color: var(--muted); font-size: 0.7rem; transition: transform 0.2s; }
+    .tbl-card.open .tbl-toggle { transform: rotate(90deg); }
+
+    .tbl-schema { display: none; padding: 0.35rem 0; }
+    .tbl-card.open .tbl-schema { display: block; }
+    .schema-col {
+      display: flex; align-items: center; gap: 0.4rem;
+      padding: 0.2rem 0.6rem; font-family: var(--font-code); font-size: 0.64rem;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      transition: background 0.15s; cursor: default;
+    }
+    .schema-col:last-child { border-bottom: none; }
+    .schema-col:hover { background: rgba(255,255,255,0.02); }
+    .sc-name { color: var(--text); flex: 1; }
+    .sc-type { color: var(--muted); font-size: 0.58rem; }
+    .sc-pk   { font-size: 0.52rem; color: var(--gold); background: var(--gold-d); padding: 0 3px; border-radius: 2px; border: 1px solid rgba(255,209,102,0.2); }
+
+    .tbl-preview { overflow-x: auto; max-height: 130px; }
+    .tbl-preview table {
+      width: 100%; border-collapse: collapse;
+      font-family: var(--font-code); font-size: 0.6rem;
+    }
+    .tbl-preview th {
+      padding: 0.25rem 0.5rem; background: rgba(0,255,136,0.05);
+      color: var(--green); border-bottom: 1px solid var(--border);
+      text-align: left; white-space: nowrap; font-weight: 500;
+    }
+    .tbl-preview td {
+      padding: 0.22rem 0.5rem; color: var(--text);
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      white-space: nowrap;
+    }
+    .tbl-preview tr:last-child td { border-bottom: none; }
+    .tbl-preview tr:hover td { background: rgba(255,255,255,0.02); }
+
+    /* Level objective */
+    .objective-wrap {
+      padding: 0.7rem 0.95rem;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .obj-label {
+      font-family: var(--font-ui); font-size: 0.58rem; color: var(--lime);
+      text-transform: uppercase; letter-spacing: 2px; margin-bottom: 0.4rem;
+    }
+    .obj-text {
+      font-size: 0.75rem; line-height: 1.6; color: var(--muted);
+    }
+    .obj-text strong { color: var(--text); }
+    .obj-text code {
+      font-family: var(--font-code); font-size: 0.66rem;
+      background: rgba(0,0,0,0.4); padding: 0 3px; border-radius: 3px; color: var(--gold);
+    }
+
+    /* ── CENTER – SQL Editor + Results ──────────────────── */
+    .editor-panel {
+      display: flex; flex-direction: column; overflow: hidden; position: relative;
+    }
+
+    .editor-toolbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.48rem 1rem;
+      border-bottom: 1px solid var(--border);
+      background: rgba(4,10,6,0.7); flex-shrink: 0; gap: 0.5rem;
+    }
+    .et-label { font-family: var(--font-ui); font-size: 0.7rem; color: #fff; }
+    .et-label span { color: var(--lime); }
+    .et-btns { display: flex; gap: 0.4rem; }
+    .btn {
+      padding: 0.38rem 0.8rem; border-radius: var(--r);
+      border: 1px solid var(--border); background: rgba(0,0,0,0.3);
+      color: var(--muted); font-family: var(--font-ui); font-size: 0.58rem;
+      letter-spacing: 1px; cursor: pointer; transition: all 0.2s var(--ease);
+    }
+    .btn:hover { border-color: rgba(255,255,255,0.2); color: #fff; }
+    .btn-run {
+      background: var(--green-d); border-color: var(--green); color: var(--green);
+    }
+    .btn-run:hover { background: rgba(0,255,136,0.22); box-shadow: 0 0 14px rgba(0,255,136,0.3); }
+    .btn-run:disabled { opacity:0.4; cursor:not-allowed; }
+
+    /* SQL Editor textarea */
+    .sql-editor-wrap {
+      padding: 0.6rem 0.8rem;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      position: relative;
+    }
+    .sql-line-prefix {
+      position: absolute; top: 0.6rem; left: 0.8rem; bottom: 0.6rem;
+      width: 28px; display: flex; flex-direction: column;
+      font-family: var(--font-code); font-size: 0.7rem; color: #1a3028;
+      line-height: 1.6; padding-top: 0.4rem;
+      pointer-events: none; user-select: none;
+    }
+    .sql-editor {
+      width: 100%; min-height: 110px; max-height: 160px;
+      background: transparent;
+      border: 1px solid var(--border); border-radius: var(--r);
+      color: var(--text);
+      font-family: var(--font-code); font-size: 0.73rem; line-height: 1.6;
+      padding: 0.4rem 0.5rem 0.4rem 32px;
+      outline: none; resize: vertical; tab-size: 2;
+      transition: border-color 0.2s;
+      caret-color: var(--green);
+    }
+    .sql-editor:focus { border-color: var(--green-d); box-shadow: 0 0 0 2px rgba(0,255,136,0.08); }
+    .sql-editor::selection { background: rgba(0,255,136,0.15); }
+
+    /* Keyword highlights via JS painted overlay — simple approach */
+    .sql-editor.has-error { border-color: var(--red); box-shadow: 0 0 0 2px rgba(255,69,96,0.1); }
+
+    /* Error bar */
+    .error-bar {
+      padding: 0.3rem 1rem;
+      background: rgba(255,69,96,0.08); border-bottom: 1px solid rgba(255,69,96,0.2);
+      font-family: var(--font-code); font-size: 0.68rem; color: var(--red);
+      display: none; align-items: center; gap: 0.5rem; flex-shrink: 0;
+    }
+    .error-bar.show { display: flex; }
+
+    /* Results area */
+    .results-area { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+    .results-tabs {
+      display: flex; align-items: center; gap: 0;
+      border-bottom: 1px solid var(--border);
+      background: rgba(4,10,6,0.6); flex-shrink: 0;
+    }
+    .r-tab {
+      padding: 0.42rem 1rem; font-family: var(--font-ui); font-size: 0.58rem;
+      color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent;
+      text-transform: uppercase; letter-spacing: 1.5px; transition: all 0.2s;
+    }
+    .r-tab:hover { color: var(--text); }
+    .r-tab.active { color: var(--green); border-color: var(--green); }
+
+    .results-body {
+      flex: 1; overflow: hidden; display: flex;
+    }
+    .result-pane {
+      flex: 1; overflow: auto; display: none;
+    }
+    .result-pane::-webkit-scrollbar { width: 5px; height: 5px; }
+    .result-pane::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 3px; }
+    .result-pane.active { display: block; }
+
+    /* Result table */
+    .result-table-wrap {
+      padding: 0.6rem 0.8rem; min-height: 100%;
+    }
+    .result-table {
+      width: 100%; border-collapse: collapse;
+      font-family: var(--font-code); font-size: 0.68rem;
+    }
+    .result-table th {
+      padding: 0.3rem 0.7rem; text-align: left;
+      background: rgba(0,255,136,0.06); color: var(--green);
+      border-bottom: 2px solid var(--border); white-space: nowrap; font-weight: 500;
+    }
+    .result-table td {
+      padding: 0.28rem 0.7rem; color: var(--text);
+      border-bottom: 1px solid rgba(255,255,255,0.03); white-space: nowrap;
+    }
+    .result-table tr:hover td { background: rgba(255,255,255,0.02); }
+    .result-table tr.row-match   td { background: rgba(0,255,136,0.04); }
+    .result-table tr.row-mismatch td { background: rgba(255,69,96,0.05); }
+    .result-table tr.row-extra   td { background: rgba(255,159,67,0.05); color: var(--orange); }
+    .result-table tr.row-missing td { background: rgba(165,94,234,0.05); color: var(--purple); opacity: 0.7; }
+    .result-table .null-val { color: var(--muted); font-style: italic; }
+    .result-table .cell-match { } /* normal */
+    .result-table .cell-diff  { color: var(--red); font-weight: 700; }
+
+    /* Comparison summary badge */
+    .comparison-banner {
+      display: flex; align-items: center; gap: 0.6rem;
+      padding: 0.4rem 0.8rem;
+      border-bottom: 1px solid var(--border);
+      font-family: var(--font-code); font-size: 0.68rem; flex-shrink: 0;
+    }
+    .cb-stat { display: flex; align-items: center; gap: 0.25rem; }
+    .cb-dot  { width: 8px; height: 8px; border-radius: 50%; }
+    .cb-match   .cb-dot { background: var(--green); }
+    .cb-miss    .cb-dot { background: var(--red); }
+    .cb-extra   .cb-dot { background: var(--orange); }
+    .cb-missing .cb-dot { background: var(--purple); }
+    .cb-accuracy { margin-left: auto; font-weight: 700; }
+    .cb-accuracy.perfect { color: var(--green); }
+    .cb-accuracy.partial { color: var(--gold); }
+    .cb-accuracy.zero    { color: var(--red); }
+
+    /* Empty state */
+    .empty-state {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 160px; gap: 0.5rem;
+      font-family: var(--font-code); font-size: 0.76rem; color: #0d2018;
+    }
+    .empty-state .es-icon { font-size: 1.8rem; }
+
+    /* ── RIGHT – Feedback + Hints + Progress ──────────────── */
+    .right-panel {
+      background: var(--card);
+      border-left: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+
+    .vis-section {
+      padding: 0.72rem 0.95rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .vis-title {
+      font-family: var(--font-ui); font-size: 0.57rem;
+      text-transform: uppercase; letter-spacing: 2px; margin-bottom: 0.5rem;
+      display: flex; align-items: center; gap: 0.4rem;
+    }
+    .vis-title::before { content:''; width:3px; height:10px; border-radius:2px; display:inline-block; }
+    .vt-green::before  { background: var(--green); }
+    .vt-gold::before   { background: var(--gold); }
+    .vt-lime::before   { background: var(--lime); }
+    .vt-cyan::before   { background: var(--cyan); }
+    .vt-red::before    { background: var(--red); }
+
+    /* Accuracy ring */
+    .accuracy-wrap {
+      display: flex; align-items: center; gap: 0.8rem;
+    }
+    .acc-ring-wrap {
+      position: relative; width: 64px; height: 64px; flex-shrink: 0;
+    }
+    .acc-ring-wrap svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+    .acc-ring-bg  { fill: none; stroke: rgba(255,255,255,0.05); stroke-width: 5; }
+    .acc-ring-fg  { fill: none; stroke-width: 5; stroke-linecap: round; transition: stroke-dashoffset 0.6s var(--ease); }
+    .acc-label {
+      position: absolute; inset: 0; display: flex;
+      align-items: center; justify-content: center;
+      font-family: var(--font-code); font-size: 0.75rem; font-weight: 700;
+    }
+    .acc-stats { font-family: var(--font-code); font-size: 0.65rem; line-height: 1.7; }
+    .acc-stats .as-line { display: flex; align-items: center; gap: 0.3rem; }
+    .as-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+    /* Feedback list */
+    .fb-list { display: flex; flex-direction: column; gap: 0.38rem; max-height: 160px; overflow-y: auto; }
+    .fb-list::-webkit-scrollbar { width: 3px; }
+    .fb-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .fb-item {
+      display: flex; align-items: flex-start; gap: 0.4rem;
+      font-family: var(--font-code); font-size: 0.66rem; line-height: 1.5;
+      padding: 0.3rem 0.45rem; border-radius: 5px;
+      border: 1px solid rgba(255,255,255,0.04);
+    }
+    .fb-item.ok   { color: var(--green); background: rgba(0,255,136,0.04); border-color: rgba(0,255,136,0.12); }
+    .fb-item.warn { color: var(--gold);  background: rgba(255,209,102,0.04); border-color: rgba(255,209,102,0.12); }
+    .fb-item.err  { color: var(--red);   background: rgba(255,69,96,0.04); border-color: rgba(255,69,96,0.12); }
+    .fb-item.info { color: var(--cyan);  background: rgba(0,229,200,0.04); border-color: rgba(0,229,200,0.12); }
+    .fb-item .fb-icon { flex-shrink: 0; }
+
+    /* Hint system */
+    .hint-accordion { display: flex; flex-direction: column; gap: 0.35rem; }
+    .hint-item { border: 1px solid rgba(255,255,255,0.05); border-radius: 6px; overflow: hidden; }
+    .hint-trigger {
+      display: flex; align-items: center; gap: 0.4rem;
+      padding: 0.38rem 0.55rem; cursor: pointer;
+      font-family: var(--font-code); font-size: 0.66rem; color: var(--muted);
+      background: rgba(255,255,255,0.02); user-select: none; transition: all 0.15s;
+    }
+    .hint-trigger:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+    .hint-trigger .ht-icon { font-size: 0.75rem; transition: transform 0.2s; }
+    .hint-item.open .ht-icon { transform: rotate(90deg); }
+    .hint-body {
+      display: none; padding: 0.45rem 0.55rem;
+      font-family: var(--font-code); font-size: 0.65rem; line-height: 1.6;
+      color: var(--muted); background: rgba(0,0,0,0.2);
+    }
+    .hint-body code { color: var(--gold); background: rgba(0,0,0,0.4); padding: 0 3px; border-radius: 3px; }
+    .hint-item.open .hint-body { display: block; }
+
+    /* Progress list */
+    .prog-list { display: flex; flex-direction: column; gap: 0.28rem; overflow-y: auto; flex: 1; }
+    .prog-list::-webkit-scrollbar { width: 3px; }
+    .prog-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .prog-item {
+      display: flex; align-items: center; gap: 0.4rem;
+      font-family: var(--font-code); font-size: 0.66rem; color: #0d2018;
+      padding: 0.25rem 0.4rem; border-radius: 4px;
+      border: 1px solid rgba(255,255,255,0.03); cursor: pointer; transition: all 0.2s;
+    }
+    .prog-item:hover  { color: var(--muted); border-color: rgba(255,255,255,0.08); }
+    .prog-item.done   { color: var(--green); border-color: rgba(0,255,136,0.18); background: rgba(0,255,136,0.04); }
+    .prog-item.active { color: var(--lime);  border-color: rgba(184,255,74,0.25); background: rgba(184,255,74,0.05); }
+    .prog-item .pi-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+    .prog-item .pi-badge {
+      margin-left: auto; font-size: 0.55rem; padding: 1px 4px;
+      border-radius: 3px; border: 1px solid; color: inherit; opacity: 0.7;
+    }
+
+    /* ── Overlays ─────────────────────────────────────────── */
+    .success-overlay {
+      position: absolute; inset: 0; z-index: 100;
+      background: rgba(3,8,5,0.9); backdrop-filter: blur(14px);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 0.8rem; opacity: 0; pointer-events: none; transition: opacity 0.4s var(--ease);
+    }
+    .success-overlay.show { opacity: 1; pointer-events: auto; }
+    .s-icon { font-size: 3rem; animation: bounce-in 0.5s var(--ease); }
+    @keyframes bounce-in {
+      0%{transform:scale(0);opacity:0} 60%{transform:scale(1.2);opacity:1} 100%{transform:scale(1)}
+    }
+    .s-title {
+      font-family: var(--font-ui); font-size: 1.35rem; font-weight: 900;
+      color: var(--green); letter-spacing: 2px;
+      text-shadow: 0 0 30px rgba(0,255,136,0.6);
+    }
+    .s-sub { font-size: 0.85rem; color: var(--muted); max-width: 360px; text-align: center; line-height: 1.5; }
+    .s-code {
+      font-family: var(--font-code); font-size: 0.72rem;
+      background: rgba(0,0,0,0.5); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 0.5rem 1rem; color: var(--lime); max-width: 380px;
+    }
+    .s-btns { display: flex; gap: 0.65rem; margin-top: 0.3rem; }
+    .s-btn {
+      padding: 0.55rem 1.3rem; border-radius: var(--r);
+      font-family: var(--font-ui); font-size: 0.68rem; letter-spacing: 1px;
+      cursor: pointer; border: 1px solid; transition: all 0.2s;
+    }
+    .s-next  { background: var(--green-d); border-color: var(--green); color: var(--green); }
+    .s-next:hover  { background: rgba(0,255,136,0.25); box-shadow: 0 0 18px rgba(0,255,136,0.35); }
+    .s-retry { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.15); color: #6a8070; }
+    .s-retry:hover { border-color: rgba(255,255,255,0.35); color: #fff; }
+
+    .alldone-overlay {
+      position: absolute; inset: 0; z-index: 200;
+      background: rgba(2,6,3,0.95); backdrop-filter: blur(20px);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 0.8rem; opacity: 0; pointer-events: none; transition: opacity 0.5s;
+    }
+    .alldone-overlay.show { opacity: 1; pointer-events: auto; }
+    .ad-trophy { font-size: 4rem; animation: bounce-in 0.6s var(--ease); }
+    .ad-title {
+      font-family: var(--font-ui); font-size: 1.7rem; font-weight: 900;
+      color: var(--lime); letter-spacing: 3px;
+      text-shadow: 0 0 40px rgba(184,255,74,0.6);
+    }
+    .ad-sub { font-size: 0.85rem; color: var(--muted); max-width: 420px; text-align: center; line-height: 1.6; }
+    .ad-stats { display: flex; gap: 2rem; margin-top: 0.3rem; }
+    .ad-stat { display: flex; flex-direction: column; align-items: center; font-family: var(--font-code); }
+    .ad-stat .n { font-size: 1.8rem; font-weight: 700; color: var(--cyan); }
+    .ad-stat .l { font-size: 0.62rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+    .ad-restart {
+      margin-top: 0.3rem; padding: 0.6rem 1.8rem;
+      background: var(--lime-d); border: 1px solid var(--lime); border-radius: var(--r);
+      color: var(--lime); font-family: var(--font-ui); font-size: 0.72rem; letter-spacing: 1px;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .ad-restart:hover { background: rgba(184,255,74,0.25); box-shadow: 0 0 18px rgba(184,255,74,0.35); }
+
+    /* Loading overlay */
+    .loading-overlay {
+      position: absolute; inset: 0; z-index: 300;
+      background: var(--bg); display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 0.6rem;
+      transition: opacity 0.4s;
+    }
+    .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+    .loading-spinner {
+      width: 40px; height: 40px; border-radius: 50%;
+      border: 3px solid rgba(0,255,136,0.1);
+      border-top-color: var(--green);
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { font-family: var(--font-ui); font-size: 0.7rem; color: var(--green); letter-spacing: 2px; }
+  </style>
+</head>
+<body>
+<div class="bg-wrap"></div>
+<div class="circuit"></div>
+
+<div class="shell" id="shell">
+
+  <!-- Loading overlay while sql.js initialises -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">LOADING SQL ENGINE…</div>
+  </div>
+
+  <!-- ═══ HEADER ══════════════════════════════════════════ -->
+  <header>
+    <div class="header-left">
+      <a href="../index.html" class="hub-btn">
+        <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+        Hub
+      </a>
+      <div class="title-block">
+        <h1>SQL Query Lockpick</h1>
+        <p>General Dev · Database Mastery</p>
+      </div>
+    </div>
+
+    <div class="level-nav">
+      <button class="nav-btn" id="prevBtn" disabled>
+        <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+      </button>
+      <div class="level-lbl" id="levelLbl">LEVEL 1 / 8</div>
+      <div class="dots" id="dots"></div>
+      <button class="nav-btn" id="nextBtn">
+        <svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+      </button>
+    </div>
+
+    <div class="header-right">
+      <div class="diff-badge d-easy" id="diffBadge">Easy</div>
+      <div class="chip">🔓 Score: <span class="v" id="scoreVal">0</span></div>
+      <div class="chip s">🔥 Streak: <span class="v" id="streakVal">0</span></div>
+    </div>
+  </header>
+
+  <!-- ═══ BODY ═════════════════════════════════════════════ -->
+  <div class="body">
+
+    <!-- LEFT: Schema -->
+    <aside class="schema-panel">
+      <div class="sp-header">Database Schema</div>
+      <div class="schema-scroll" id="schemaScroll"></div>
+      <div class="objective-wrap">
+        <div class="obj-label">🔒 Lock Objective</div>
+        <div class="obj-text" id="objText">Loading…</div>
+      </div>
+    </aside>
+
+    <!-- CENTER: Editor + Results -->
+    <main class="editor-panel" aria-label="SQL editor">
+      <div class="editor-toolbar">
+        <div class="et-label">Lock: <span id="lockName">—</span></div>
+        <div class="et-btns">
+          <button class="btn" id="resetBtn">↺ Reset</button>
+          <button class="btn" id="hintBtn">💡 Hint</button>
+          <button class="btn btn-run" id="runBtn" disabled>▶ Execute SQL</button>
+        </div>
+      </div>
+
+      <div class="sql-editor-wrap">
+        <textarea class="sql-editor" id="sqlEditor" spellcheck="false"
+          placeholder="-- Write your SQL query here&#10;SELECT ..."
+          aria-label="SQL query editor"></textarea>
+      </div>
+
+      <div class="error-bar" id="errorBar">
+        <span>⚠</span><span id="errorMsg">Syntax error</span>
+      </div>
+
+      <div class="results-area">
+        <div class="results-tabs">
+          <div class="r-tab active" data-pane="your">Your Output</div>
+          <div class="r-tab" data-pane="expected">Expected Output</div>
+          <div class="r-tab" data-pane="diff">Diff View</div>
+        </div>
+        <div class="comparison-banner" id="compBanner" style="display:none">
+          <span class="cb-stat cb-match"><span class="cb-dot"></span><span id="cbMatch">0</span> match</span>
+          <span class="cb-stat cb-extra"><span class="cb-dot"></span><span id="cbExtra">0</span> extra</span>
+          <span class="cb-stat cb-missing"><span class="cb-dot"></span><span id="cbMiss">0</span> missing</span>
+          <span class="cb-accuracy" id="cbAccuracy">0%</span>
+        </div>
+        <div class="results-body">
+          <div class="result-pane active" id="pane-your">
+            <div class="result-table-wrap">
+              <div class="empty-state"><div class="es-icon">🔒</div>Run your query to unlock the output</div>
+            </div>
+          </div>
+          <div class="result-pane" id="pane-expected">
+            <div class="result-table-wrap" id="expectedWrap"></div>
+          </div>
+          <div class="result-pane" id="pane-diff">
+            <div class="result-table-wrap" id="diffWrap">
+              <div class="empty-state"><div class="es-icon">🔑</div>Run your query first to see the diff</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Overlays -->
+      <div class="success-overlay" id="successOverlay" role="dialog" aria-modal="true">
+        <div class="s-icon">🔓</div>
+        <div class="s-title">LOCK PICKED!</div>
+        <div class="s-sub" id="sSub">Query matches expected output perfectly.</div>
+        <div class="s-code" id="sCode"></div>
+        <div class="s-btns">
+          <button class="s-btn s-retry" id="retryBtn">Try Again</button>
+          <button class="s-btn s-next" id="nextLvlBtn">Next Lock →</button>
+        </div>
+      </div>
+      <div class="alldone-overlay" id="alldoneOverlay" role="dialog" aria-modal="true">
+        <div class="ad-trophy">🏆</div>
+        <div class="ad-title">MASTER LOCKPICK</div>
+        <div class="ad-sub">Every SQL lock has been cracked. The database holds no secrets from you.</div>
+        <div class="ad-stats">
+          <div class="ad-stat"><div class="n" id="adScore">0</div><div class="l">Score</div></div>
+          <div class="ad-stat"><div class="n" id="adStreak">0</div><div class="l">Best Streak</div></div>
+          <div class="ad-stat"><div class="n" id="adLevels">8</div><div class="l">Locks</div></div>
+        </div>
+        <button class="ad-restart" id="restartBtn">🔄 New Set</button>
+      </div>
+    </main>
+
+    <!-- RIGHT: Feedback + Hints + Progress -->
+    <aside class="right-panel">
+
+      <div class="vis-section">
+        <div class="vis-title vt-green">🎯 Accuracy</div>
+        <div class="accuracy-wrap">
+          <div class="acc-ring-wrap">
+            <svg viewBox="0 0 64 64">
+              <circle class="acc-ring-bg" cx="32" cy="32" r="27"/>
+              <circle class="acc-ring-fg" id="accRingFg" cx="32" cy="32" r="27"
+                stroke="var(--green)"
+                stroke-dasharray="169.6" stroke-dashoffset="169.6"/>
+            </svg>
+            <div class="acc-label" id="accLabel" style="color:var(--muted)">—</div>
+          </div>
+          <div class="acc-stats" id="accStats">
+            <div class="as-line"><span class="as-dot" style="background:var(--green)"></span>Run query to see results</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="vis-section">
+        <div class="vis-title vt-lime">📋 Feedback</div>
+        <div class="fb-list" id="fbList">
+          <div class="fb-item info"><span class="fb-icon">ℹ️</span>Write a query and hit Execute</div>
+        </div>
+      </div>
+
+      <div class="vis-section">
+        <div class="vis-title vt-gold">💡 Hints</div>
+        <div class="hint-accordion" id="hintAccordion"></div>
+      </div>
+
+      <div class="vis-section" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+        <div class="vis-title vt-cyan">🔐 Locks</div>
+        <div class="prog-list" id="progList"></div>
+      </div>
+
+    </aside>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════════════════════ -->
+<script>
+/* ══════════════════════════════════════════════════════
+   LEVEL DEFINITIONS
+   Each level seeds tables into a fresh SQLite DB,
+   specifies the correct solution query, and the
+   expected output rows (derived by running solution).
+══════════════════════════════════════════════════════ */
+const LEVELS = [
+  /* 1 ── Basic SELECT + WHERE ── */
+  {
+    name: "The First Tumbler",
+    difficulty: "Easy",
+    objective: "Return the <strong>name</strong> and <strong>salary</strong> of all employees whose salary is greater than <strong>50000</strong>, ordered by salary descending.",
+    concept: "WHERE · ORDER BY",
+    setup: `
+      CREATE TABLE employees (
+        id INTEGER PRIMARY KEY,
+        name TEXT,
+        department TEXT,
+        salary INTEGER
+      );
+      INSERT INTO employees VALUES
+        (1,'Alice','Engineering',95000),
+        (2,'Bob','Marketing',45000),
+        (3,'Carol','Engineering',82000),
+        (4,'Dave','HR',38000),
+        (5,'Eve','Marketing',61000),
+        (6,'Frank','Engineering',115000);
+    `,
+    solution: `SELECT name, salary
+FROM employees
+WHERE salary > 50000
+ORDER BY salary DESC;`,
+    hints: [
+      { label: "Clause order",       body: "The order must be: <code>SELECT</code> → <code>FROM</code> → <code>WHERE</code> → <code>ORDER BY</code>." },
+      { label: "Filtering rows",     body: "Use <code>WHERE salary > 50000</code> to keep only rows where salary exceeds 50 000." },
+      { label: "Descending sort",    body: "Append <code>DESC</code> after the column name in <code>ORDER BY salary DESC</code>." },
+    ],
+  },
+
+  /* 2 ── SELECT DISTINCT + LIKE ── */
+  {
+    name: "Pattern Lock",
+    difficulty: "Easy",
+    objective: "Return distinct <strong>department</strong> names that contain the letter <strong>'e'</strong> (case-insensitive), sorted alphabetically.",
+    concept: "DISTINCT · LIKE · ORDER BY",
+    setup: `
+      CREATE TABLE employees (
+        id INTEGER PRIMARY KEY,
+        name TEXT,
+        department TEXT,
+        salary INTEGER
+      );
+      INSERT INTO employees VALUES
+        (1,'Alice','Engineering',95000),
+        (2,'Bob','Marketing',45000),
+        (3,'Carol','Engineering',82000),
+        (4,'Dave','HR',38000),
+        (5,'Eve','Marketing',61000),
+        (6,'Frank','Engineering',115000),
+        (7,'Grace','Finance',72000);
+    `,
+    solution: `SELECT DISTINCT department
+FROM employees
+WHERE LOWER(department) LIKE '%e%'
+ORDER BY department;`,
+    hints: [
+      { label: "DISTINCT",           body: "<code>SELECT DISTINCT column</code> removes duplicate values from the result." },
+      { label: "Case-insensitive LIKE", body: "Wrap the column in <code>LOWER()</code> and use <code>'%e%'</code> to match any string containing 'e'." },
+      { label: "Alphabetical sort",  body: "<code>ORDER BY department</code> defaults to ascending (A→Z)." },
+    ],
+  },
+
+  /* 3 ── Aggregate + GROUP BY ── */
+  {
+    name: "Combination Lock",
+    difficulty: "Easy",
+    objective: "Return each <strong>department</strong> with its <strong>headcount</strong> (as column <code>employees</code>) and <strong>avg_salary</strong> (rounded to 0 decimal places), ordered by headcount descending.",
+    concept: "COUNT · AVG · GROUP BY",
+    setup: `
+      CREATE TABLE employees (
+        id INTEGER PRIMARY KEY,
+        name TEXT,
+        department TEXT,
+        salary INTEGER
+      );
+      INSERT INTO employees VALUES
+        (1,'Alice','Engineering',95000),
+        (2,'Bob','Marketing',45000),
+        (3,'Carol','Engineering',82000),
+        (4,'Dave','HR',38000),
+        (5,'Eve','Marketing',61000),
+        (6,'Frank','Engineering',115000),
+        (7,'Grace','Finance',72000);
+    `,
+    solution: `SELECT department,
+       COUNT(*) AS employees,
+       ROUND(AVG(salary), 0) AS avg_salary
+FROM employees
+GROUP BY department
+ORDER BY employees DESC;`,
+    hints: [
+      { label: "COUNT(*)",           body: "<code>COUNT(*)</code> counts all rows per group. Alias it with <code>AS employees</code>." },
+      { label: "AVG + ROUND",        body: "Use <code>ROUND(AVG(salary), 0)</code> to get an integer average." },
+      { label: "GROUP BY",           body: "Every non-aggregate column in SELECT must appear in <code>GROUP BY</code>." },
+    ],
+  },
+
+  /* 4 ── HAVING ── */
+  {
+    name: "Guarded Vault",
+    difficulty: "Medium",
+    objective: "Return departments with <strong>more than 1 employee</strong> and an <strong>avg_salary above 60000</strong>. Show department, headcount, avg_salary (rounded). Order by avg_salary desc.",
+    concept: "GROUP BY · HAVING",
+    setup: `
+      CREATE TABLE employees (
+        id INTEGER PRIMARY KEY,
+        name TEXT,
+        department TEXT,
+        salary INTEGER
+      );
+      INSERT INTO employees VALUES
+        (1,'Alice','Engineering',95000),
+        (2,'Bob','Marketing',45000),
+        (3,'Carol','Engineering',82000),
+        (4,'Dave','HR',38000),
+        (5,'Eve','Marketing',61000),
+        (6,'Frank','Engineering',115000),
+        (7,'Grace','Finance',72000);
+    `,
+    solution: `SELECT department,
+       COUNT(*) AS headcount,
+       ROUND(AVG(salary),0) AS avg_salary
+FROM employees
+GROUP BY department
+HAVING COUNT(*) > 1 AND AVG(salary) > 60000
+ORDER BY avg_salary DESC;`,
+    hints: [
+      { label: "HAVING vs WHERE",    body: "<code>WHERE</code> filters rows before grouping. <code>HAVING</code> filters groups after aggregation." },
+      { label: "Multiple conditions",body: "Use <code>AND</code> to combine multiple HAVING conditions: <code>HAVING COUNT(*) > 1 AND AVG(salary) > 60000</code>." },
+      { label: "Column aliases",     body: "You can reference alias names in <code>ORDER BY</code>, but not in <code>HAVING</code> in SQLite — reuse the aggregate expression." },
+    ],
+  },
+
+  /* 5 ── INNER JOIN ── */
+  {
+    name: "Two-Key Cipher",
+    difficulty: "Medium",
+    objective: "Join <strong>employees</strong> with <strong>projects</strong> on <code>employee_id</code>. Return <strong>employee name</strong>, <strong>project name</strong>, and <strong>budget</strong> for projects with budget over 100000. Order by budget desc.",
+    concept: "INNER JOIN · ON",
+    setup: `
+      CREATE TABLE employees (
+        id INTEGER PRIMARY KEY,
+        name TEXT,
+        department TEXT,
+        salary INTEGER
+      );
+      CREATE TABLE projects (
+        id INTEGER PRIMARY KEY,
+        project_name TEXT,
+        employee_id INTEGER,
+        budget INTEGER
+      );
+      INSERT INTO employees VALUES
+        (1,'Alice','Engineering',95000),
+        (2,'Bob','Marketing',45000),
+        (3,'Carol','Engineering',82000),
+        (4,'Dave','HR',38000),
+        (5,'Eve','Marketing',61000);
+      INSERT INTO projects VALUES
+        (1,'Alpha Platform',1,250000),
+        (2,'Beta Campaign',2,80000),
+        (3,'Gamma Infra',3,180000),
+        (4,'Delta Analytics',1,95000),
+        (5,'Epsilon Launch',5,130000);
+    `,
+    solution: `SELECT e.name AS employee_name,
+       p.project_name,
+       p.budget
+FROM employees e
+INNER JOIN projects p ON e.id = p.employee_id
+WHERE p.budget > 100000
+ORDER BY p.budget DESC;`,
+    hints: [
+      { label: "JOIN syntax",        body: "<code>FROM tableA a INNER JOIN tableB b ON a.id = b.foreign_id</code> — use table aliases to shorten references." },
+      { label: "Column aliasing",    body: "Use <code>e.name AS employee_name</code> to rename columns in output." },
+      { label: "WHERE after JOIN",   body: "Apply <code>WHERE p.budget > 100000</code> after the join clause to filter joined rows." },
+    ],
+  },
+
+  /* 6 ── LEFT JOIN + NULL check ── */
+  {
+    name: "Skeleton Key",
+    difficulty: "Medium",
+    objective: "Find employees <strong>without any assigned project</strong>. Return their <strong>name</strong> and <strong>department</strong>. Order by name.",
+    concept: "LEFT JOIN · IS NULL",
+    setup: `
+      CREATE TABLE employees (
+        id INTEGER PRIMARY KEY,
+        name TEXT,
+        department TEXT,
+        salary INTEGER
+      );
+      CREATE TABLE projects (
+        id INTEGER PRIMARY KEY,
+        project_name TEXT,
+        employee_id INTEGER,
+        budget INTEGER
+      );
+      INSERT INTO employees VALUES
+        (1,'Alice','Engineering',95000),
+        (2,'Bob','Marketing',45000),
+        (3,'Carol','Engineering',82000),
+        (4,'Dave','HR',38000),
+        (5,'Eve','Marketing',61000),
+        (6,'Frank','Engineering',115000);
+      INSERT INTO projects VALUES
+        (1,'Alpha Platform',1,250000),
+        (2,'Beta Campaign',2,80000),
+        (3,'Gamma Infra',3,180000),
+        (4,'Delta Analytics',1,95000);
+    `,
+    solution: `SELECT e.name, e.department
+FROM employees e
+LEFT JOIN projects p ON e.id = p.employee_id
+WHERE p.id IS NULL
+ORDER BY e.name;`,
+    hints: [
+      { label: "LEFT JOIN",          body: "<code>LEFT JOIN</code> keeps all rows from the left table even when there's no match. Unmatched right-table columns are <code>NULL</code>." },
+      { label: "IS NULL pattern",    body: "After a LEFT JOIN, <code>WHERE right_table.id IS NULL</code> finds rows with no match — the anti-join pattern." },
+      { label: "Why not NOT IN?",    body: "<code>NOT IN</code> with NULLs is dangerous. The LEFT JOIN + IS NULL pattern is safer and faster." },
+    ],
+  },
+
+  /* 7 ── Subquery ── */
+  {
+    name: "Master Tumbler",
+    difficulty: "Hard",
+    objective: "Return employees who earn <strong>more than the average salary of their own department</strong>. Show name, department, salary. Order by department, salary desc.",
+    concept: "Correlated Subquery",
+    setup: `
+      CREATE TABLE employees (
+        id INTEGER PRIMARY KEY,
+        name TEXT,
+        department TEXT,
+        salary INTEGER
+      );
+      INSERT INTO employees VALUES
+        (1,'Alice','Engineering',95000),
+        (2,'Bob','Marketing',45000),
+        (3,'Carol','Engineering',82000),
+        (4,'Dave','HR',38000),
+        (5,'Eve','Marketing',61000),
+        (6,'Frank','Engineering',115000),
+        (7,'Grace','Finance',72000),
+        (8,'Hank','Marketing',78000),
+        (9,'Ivy','HR',55000);
+    `,
+    solution: `SELECT e.name, e.department, e.salary
+FROM employees e
+WHERE e.salary > (
+  SELECT AVG(salary)
+  FROM employees
+  WHERE department = e.department
+)
+ORDER BY e.department, e.salary DESC;`,
+    hints: [
+      { label: "Correlated subquery", body: "A correlated subquery references a column from the outer query (<code>e.department</code>) — it runs once per outer row." },
+      { label: "Subquery in WHERE",   body: "Place the subquery in the WHERE clause: <code>WHERE e.salary > (SELECT AVG(salary) FROM employees WHERE department = e.department)</code>." },
+      { label: "Multi-column ORDER",  body: "Use comma-separated columns: <code>ORDER BY e.department, e.salary DESC</code>." },
+    ],
+  },
+
+  /* 8 ── CTE + Window ── */
+  {
+    name: "Vault Master",
+    difficulty: "Hard",
+    objective: "Using a CTE or subquery, rank employees within each department by salary. Return <strong>name</strong>, <strong>department</strong>, <strong>salary</strong>, and <strong>rank</strong> (1 = highest). Show only rank 1 employees (top earner per department). Order by department.",
+    concept: "CTE · ROW_NUMBER / MAX",
+    setup: `
+      CREATE TABLE employees (
+        id INTEGER PRIMARY KEY,
+        name TEXT,
+        department TEXT,
+        salary INTEGER
+      );
+      INSERT INTO employees VALUES
+        (1,'Alice','Engineering',95000),
+        (2,'Bob','Marketing',45000),
+        (3,'Carol','Engineering',82000),
+        (4,'Dave','HR',38000),
+        (5,'Eve','Marketing',61000),
+        (6,'Frank','Engineering',115000),
+        (7,'Grace','Finance',72000),
+        (8,'Hank','Marketing',78000),
+        (9,'Ivy','HR',55000);
+    `,
+    solution: `WITH ranked AS (
+  SELECT name, department, salary,
+         RANK() OVER (PARTITION BY department ORDER BY salary DESC) AS rank
+  FROM employees
+)
+SELECT name, department, salary, rank
+FROM ranked
+WHERE rank = 1
+ORDER BY department;`,
+    hints: [
+      { label: "CTE syntax",         body: "Start with <code>WITH cte_name AS (SELECT …)</code>, then query it: <code>SELECT … FROM cte_name</code>." },
+      { label: "Window RANK()",       body: "<code>RANK() OVER (PARTITION BY department ORDER BY salary DESC)</code> assigns 1 to the highest salary per department." },
+      { label: "Filter on rank",      body: "Wrap in a CTE so you can <code>WHERE rank = 1</code> in the outer query — you can't filter on window functions in the same SELECT." },
+    ],
+  },
+];
+
+const TOTAL = LEVELS.length;
+
+/* ══════════════════════════════════════════════════════
+   STATE
+══════════════════════════════════════════════════════ */
+let SQL = null;   // sql.js constructor
+let db  = null;   // current SQLite DB instance
+
+let state = {
+  level: 0, score: 0, streak: 0, bestStreak: 0,
+  solved: new Array(TOTAL).fill(false),
+  bestAttempts: new Array(TOTAL).fill(null), // stores best query text per level
+  lastResult: null,
+  lastExpected: null,
+};
+
+function save() {
+  try {
+    localStorage.setItem('sqlpick_v1', JSON.stringify({
+      score: state.score, bestStreak: state.bestStreak,
+      solved: state.solved, level: state.level,
+      bestAttempts: state.bestAttempts,
+    }));
+  } catch(e){}
+}
+function loadSave() {
+  try {
+    const p = JSON.parse(localStorage.getItem('sqlpick_v1'));
+    if (!p) return;
+    state.score = p.score||0; state.bestStreak = p.bestStreak||0;
+    state.solved = p.solved||new Array(TOTAL).fill(false);
+    state.level  = p.level||0;
+    state.bestAttempts = p.bestAttempts||new Array(TOTAL).fill(null);
+  } catch(e){}
+}
+
+/* ══════════════════════════════════════════════════════
+   DOM refs
+══════════════════════════════════════════════════════ */
+const $ = id => document.getElementById(id);
+
+/* ══════════════════════════════════════════════════════
+   INIT sql.js
+══════════════════════════════════════════════════════ */
+async function initSQL() {
+  try {
+    SQL = await initSqlJs({
+      locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/${file}`,
+    });
+    $('loadingOverlay').classList.add('hidden');
+    $('runBtn').disabled = false;
+    loadSave();
+    updateScoreUI();
+    loadLevel(state.level);
+  } catch(e) {
+    $('loadingOverlay').innerHTML = `<div style="color:var(--red);font-family:var(--font-ui);font-size:0.8rem;text-align:center;padding:1rem">Failed to load SQL engine.<br><small style="color:var(--muted)">${e.message}</small></div>`;
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   LOAD LEVEL
+══════════════════════════════════════════════════════ */
+function loadLevel(idx) {
+  state.level = idx;
+  state.lastResult   = null;
+  state.lastExpected = null;
+  $('successOverlay').classList.remove('show');
+
+  // Close old DB
+  if (db) { try { db.close(); } catch(e){} db = null; }
+
+  const lv = LEVELS[idx];
+  $('levelLbl').textContent     = `LEVEL ${idx+1} / ${TOTAL}`;
+  $('lockName').textContent     = lv.name;
+  $('objText').innerHTML        = lv.objective;
+  const db2 = $('diffBadge');
+  db2.textContent = lv.difficulty;
+  db2.className   = 'diff-badge d-'+lv.difficulty.toLowerCase();
+  $('prevBtn').disabled = idx === 0;
+  $('nextBtn').disabled = idx === TOTAL - 1;
+
+  // Set editor to best attempt or blank
+  const saved = state.bestAttempts[idx];
+  $('sqlEditor').value = saved || '';
+  $('sqlEditor').classList.remove('has-error');
+  hideError();
+
+  // Seed DB
+  db = new SQL.Database();
+  db.run(lv.setup);
+
+  // Compute expected output
+  try {
+    const res = db.exec(lv.solution);
+    state.lastExpected = res.length ? { columns: res[0].columns, rows: res[0].values } : { columns: [], rows: [] };
+  } catch(e) {
+    state.lastExpected = { columns: [], rows: [] };
+  }
+
+  // Render schema
+  renderSchema(lv);
+
+  // Render expected pane
+  renderTable($('expectedWrap'), state.lastExpected.columns, state.lastExpected.rows, [], 'expected');
+
+  // Clear other panes
+  $('pane-your').querySelector('.result-table-wrap').innerHTML =
+    `<div class="empty-state"><div class="es-icon">🔒</div>Run your query to unlock the output</div>`;
+  $('diffWrap').innerHTML =
+    `<div class="empty-state"><div class="es-icon">🔑</div>Run your query first to see the diff</div>`;
+  $('compBanner').style.display = 'none';
+
+  // Reset feedback
+  resetAccuracy();
+  $('fbList').innerHTML = `<div class="fb-item info"><span class="fb-icon">ℹ️</span>Write a query and hit Execute</div>`;
+
+  // Render hints
+  renderHints(lv);
+
+  // Switch to "Your Output" tab
+  switchTab('your');
+  updateDots();
+  updateProgList();
+}
+
+/* ══════════════════════════════════════════════════════
+   SCHEMA RENDERING
+══════════════════════════════════════════════════════ */
+function renderSchema(lv) {
+  const scroll = $('schemaScroll');
+  scroll.innerHTML = '';
+
+  // Get all tables from the DB
+  let tables = [];
+  try {
+    const res = db.exec("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;");
+    tables = res.length ? res[0].values.map(r=>r[0]) : [];
+  } catch(e){}
+
+  tables.forEach(tName => {
+    let cols = [], rows = [];
+    try {
+      const ci = db.exec(`PRAGMA table_info(${tName});`);
+      if (ci.length) {
+        cols = ci[0].values.map(r => ({ name: r[1], type: r[2], pk: r[5] }));
+      }
+      const ri = db.exec(`SELECT * FROM ${tName} LIMIT 5;`);
+      if (ri.length) { rows = ri[0].values; }
+    } catch(e){}
+
+    const card = document.createElement('div');
+    card.className = 'tbl-card open';
+    card.innerHTML = `
+      <div class="tbl-card-header">
+        <span class="tbl-icon">🗄️</span>
+        <span class="tbl-name">${escHtml(tName)}</span>
+        <span class="tbl-rows">${rows.length}+ rows</span>
+        <span class="tbl-toggle">▶</span>
+      </div>
+      <div class="tbl-schema">
+        ${cols.map(c=>`
+          <div class="schema-col">
+            ${c.pk ? '<span class="sc-pk">PK</span>' : ''}
+            <span class="sc-name">${escHtml(c.name)}</span>
+            <span class="sc-type">${escHtml(c.type)}</span>
+          </div>
+        `).join('')}
+        <div class="tbl-preview">
+          ${rows.length ? renderPreviewTable(cols.map(c=>c.name), rows) : '<div style="padding:0.3rem 0.6rem;color:var(--muted);font-size:0.62rem">Empty</div>'}
+        </div>
+      </div>
+    `;
+    card.querySelector('.tbl-card-header').addEventListener('click', () => {
+      card.classList.toggle('open');
+    });
+    scroll.appendChild(card);
+  });
+}
+
+function renderPreviewTable(cols, rows) {
+  return `<table>
+    <thead><tr>${cols.map(c=>`<th>${escHtml(c)}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(r=>`<tr>${r.map(v=>`<td>${v===null?'<span class="null-val">NULL</span>':escHtml(String(v))}</td>`).join('')}</tr>`).join('')}</tbody>
+  </table>`;
+}
+
+/* ══════════════════════════════════════════════════════
+   SQL EXECUTION
+══════════════════════════════════════════════════════ */
+function executeQuery() {
+  const sql = $('sqlEditor').value.trim();
+  if (!sql || !db) return;
+
+  hideError();
+  $('sqlEditor').classList.remove('has-error');
+
+  let result;
+  try {
+    const res = db.exec(sql);
+    result = res.length ? { columns: res[0].columns, rows: res[0].values } : { columns: [], rows: [] };
+  } catch(e) {
+    showError(e.message);
+    $('sqlEditor').classList.add('has-error');
+    return;
+  }
+
+  state.lastResult = result;
+  state.bestAttempts[state.level] = sql;
+  save();
+
+  // Compare
+  const cmp = compareResults(state.lastExpected, result);
+  renderComparison(result, state.lastExpected, cmp);
+  updateAccuracy(cmp);
+  updateFeedback(cmp, sql);
+
+  if (cmp.perfect) levelSuccess(sql);
+  else playTone(320, 0.05, 'sawtooth');
+}
+
+/* ══════════════════════════════════════════════════════
+   COMPARISON ENGINE
+══════════════════════════════════════════════════════ */
+function compareResults(expected, actual) {
+  const expRows = expected.rows.map(r=>r.map(String).join('|'));
+  const actRows = actual.rows.map(r=>r.map(String).join('|'));
+
+  const expSet  = new Set(expRows);
+  const actSet  = new Set(actRows);
+
+  const matched = actRows.filter(r=>expSet.has(r)).length;
+  const extra   = actRows.filter(r=>!expSet.has(r)).length;
+  const missing = expRows.filter(r=>!actSet.has(r)).length;
+
+  // Column name match
+  const colsMatch = expected.columns.length === actual.columns.length &&
+    expected.columns.every((c,i)=> c.toLowerCase() === (actual.columns[i]||'').toLowerCase());
+
+  // Row count + order check
+  let orderedMatch = false;
+  if (actual.rows.length === expected.rows.length) {
+    orderedMatch = actual.rows.every((r,i)=>
+      r.map(String).join('|') === expected.rows[i].map(String).join('|')
+    );
+  }
+
+  const perfect = orderedMatch && colsMatch;
+  const accuracy = expected.rows.length > 0
+    ? Math.round(matched / expected.rows.length * 100)
+    : actual.rows.length === 0 ? 100 : 0;
+
+  return { matched, extra, missing, colsMatch, orderedMatch, perfect, accuracy, expRows, actRows };
+}
+
+/* ══════════════════════════════════════════════════════
+   TABLE RENDERING
+══════════════════════════════════════════════════════ */
+function renderComparison(actual, expected, cmp) {
+  // Your output pane
+  const yourWrap = $('pane-your').querySelector('.result-table-wrap');
+  renderTable(yourWrap, actual.columns, actual.rows, cmp.expRows, 'actual');
+
+  // Diff pane
+  renderDiff($('diffWrap'), expected, actual, cmp);
+
+  // Comparison banner
+  const banner = $('compBanner');
+  banner.style.display = 'flex';
+  $('cbMatch').textContent = cmp.matched;
+  $('cbExtra').textContent = cmp.extra;
+  $('cbMiss').textContent  = cmp.missing;
+  const acc = $('cbAccuracy');
+  acc.textContent = cmp.accuracy + '%';
+  acc.className   = 'cb-accuracy' + (cmp.perfect?' perfect':cmp.accuracy>0?' partial':' zero');
+
+  // Switch to your output
+  switchTab('your');
+}
+
+function renderTable(container, cols, rows, expectedRowKeys, mode) {
+  if (!cols.length && !rows.length) {
+    container.innerHTML = `<div class="empty-state"><div class="es-icon">📭</div>Query returned no rows</div>`;
+    return;
+  }
+  const expSet = new Set(expectedRowKeys||[]);
+  let html = `<table class="result-table"><thead><tr>${cols.map(c=>`<th>${escHtml(c)}</th>`).join('')}</tr></thead><tbody>`;
+  rows.forEach(row => {
+    const key = row.map(String).join('|');
+    const rowClass = mode==='actual' ? (expSet.has(key)?'row-match':'row-extra') :
+                     mode==='expected' ? 'row-match' : '';
+    html += `<tr class="${rowClass}">${row.map(v=>`<td>${v===null?'<span class="null-val">NULL</span>':escHtml(String(v))}</td>`).join('')}</tr>`;
+  });
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+function renderDiff(container, expected, actual, cmp) {
+  const actSet = new Set(cmp.actRows);
+  const expSet = new Set(cmp.expRows);
+  const cols = [...new Set([...expected.columns, ...actual.columns])];
+
+  let html = `<table class="result-table"><thead><tr><th>Status</th>${cols.map(c=>`<th>${escHtml(c)}</th>`).join('')}</tr></thead><tbody>`;
+
+  // Matched + extra rows from actual
+  actual.rows.forEach((row, i) => {
+    const key   = row.map(String).join('|');
+    const match = expSet.has(key);
+    const cls   = match ? 'row-match' : 'row-extra';
+    const icon  = match ? '✓' : '+';
+    const expRow = match ? expected.rows.find(r=>r.map(String).join('|')===key) : null;
+    html += `<tr class="${cls}"><td style="color:${match?'var(--green)':'var(--orange)'}">${icon}</td>${
+      actual.columns.map((c, ci) => {
+        const v = row[ci];
+        const expIdx = expRow ? expected.columns.indexOf(c) : -1;
+        const ev = expRow && expIdx>=0 ? expRow[expIdx] : null;
+        const diff = expRow && String(v) !== String(ev);
+        return `<td class="${diff?'cell-diff':''}">${v===null?'<span class="null-val">NULL</span>':escHtml(String(v))}</td>`;
+      }).join('')
+    }</tr>`;
+  });
+
+  // Missing rows
+  expected.rows.forEach(row => {
+    const key = row.map(String).join('|');
+    if (!actSet.has(key)) {
+      html += `<tr class="row-missing"><td style="color:var(--purple)">−</td>${
+        expected.columns.map((_,ci)=>{
+          const v = row[ci];
+          return `<td>${v===null?'<span class="null-val">NULL</span>':escHtml(String(v))}</td>`;
+        }).join('')
+      }</tr>`;
+    }
+  });
+
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+/* ══════════════════════════════════════════════════════
+   ACCURACY RING
+══════════════════════════════════════════════════════ */
+const CIRCUMFERENCE = 2 * Math.PI * 27; // r=27
+
+function updateAccuracy(cmp) {
+  const pct = cmp.accuracy;
+  const offset = CIRCUMFERENCE * (1 - pct/100);
+  $('accRingFg').style.strokeDashoffset = offset;
+  $('accRingFg').style.stroke = pct >= 100 ? 'var(--green)' : pct >= 50 ? 'var(--gold)' : 'var(--red)';
+  $('accLabel').textContent  = pct + '%';
+  $('accLabel').style.color  = pct >= 100 ? 'var(--green)' : pct >= 50 ? 'var(--gold)' : 'var(--red)';
+
+  $('accStats').innerHTML = `
+    <div class="as-line"><span class="as-dot" style="background:var(--green)"></span>Matched: ${cmp.matched} / ${cmp.matched+cmp.missing} rows</div>
+    <div class="as-line"><span class="as-dot" style="background:var(--orange)"></span>Extra rows: ${cmp.extra}</div>
+    <div class="as-line"><span class="as-dot" style="background:var(--purple)"></span>Missing rows: ${cmp.missing}</div>
+    <div class="as-line"><span class="as-dot" style="background:${cmp.colsMatch?'var(--green)':'var(--red)'}"></span>Columns: ${cmp.colsMatch?'✓ match':'✗ mismatch'}</div>
+    <div class="as-line"><span class="as-dot" style="background:${cmp.orderedMatch?'var(--green)':'var(--gold)'}"></span>Order: ${cmp.orderedMatch?'✓ correct':'⚠ check ORDER BY'}</div>
+  `;
+}
+
+function resetAccuracy() {
+  $('accRingFg').style.strokeDashoffset = CIRCUMFERENCE;
+  $('accLabel').textContent = '—';
+  $('accLabel').style.color = 'var(--muted)';
+  $('accStats').innerHTML = `<div class="as-line"><span class="as-dot" style="background:var(--green)"></span>Run query to see results</div>`;
+}
+
+/* ══════════════════════════════════════════════════════
+   FEEDBACK
+══════════════════════════════════════════════════════ */
+function updateFeedback(cmp, sql) {
+  const items = [];
+  const upper = sql.toUpperCase();
+
+  if (cmp.perfect) {
+    items.push({ cls:'ok',   icon:'✅', text:'Perfect match — all rows and columns correct.' });
+  } else {
+    if (cmp.missing > 0) items.push({ cls:'err',  icon:'❌', text:`${cmp.missing} expected row(s) are missing from your output.` });
+    if (cmp.extra   > 0) items.push({ cls:'warn', icon:'⚠️', text:`${cmp.extra} extra row(s) in your output that shouldn't be there.` });
+    if (!cmp.colsMatch) items.push({ cls:'err',  icon:'❌', text:'Column names or count don\'t match — check your SELECT list.' });
+    if (!cmp.orderedMatch && cmp.accuracy > 0) items.push({ cls:'warn', icon:'⚠️', text:'Row order differs — verify your ORDER BY clause.' });
+  }
+
+  // SQL keyword suggestions
+  const lv = LEVELS[state.level];
+  const concept = lv.concept.toUpperCase();
+  if (concept.includes('JOIN') && !upper.includes('JOIN'))
+    items.push({ cls:'info', icon:'💡', text:'This level requires a JOIN — try INNER JOIN or LEFT JOIN.' });
+  if (concept.includes('HAVING') && !upper.includes('HAVING'))
+    items.push({ cls:'info', icon:'💡', text:'Use HAVING to filter after GROUP BY.' });
+  if (concept.includes('GROUP BY') && !upper.includes('GROUP'))
+    items.push({ cls:'info', icon:'💡', text:'Group your results with GROUP BY.' });
+  if (concept.includes('CTE') && !upper.includes('WITH'))
+    items.push({ cls:'info', icon:'💡', text:'Consider using a CTE with WITH … AS (…).' });
+
+  if (!items.length) items.push({ cls:'info', icon:'ℹ️', text:'Query ran successfully. Check the diff view for details.' });
+
+  $('fbList').innerHTML = items.map(i =>
+    `<div class="fb-item ${i.cls}"><span class="fb-icon">${i.icon}</span><span>${i.text}</span></div>`
+  ).join('');
+}
+
+/* ══════════════════════════════════════════════════════
+   HINTS
+══════════════════════════════════════════════════════ */
+function renderHints(lv) {
+  const acc = $('hintAccordion');
+  acc.innerHTML = '';
+  lv.hints.forEach((h, i) => {
+    const item = document.createElement('div');
+    item.className = 'hint-item';
+    item.innerHTML = `
+      <div class="hint-trigger"><span class="ht-icon">▶</span>${escHtml(h.label)}</div>
+      <div class="hint-body">${h.body}</div>
+    `;
+    item.querySelector('.hint-trigger').addEventListener('click', () => item.classList.toggle('open'));
+    acc.appendChild(item);
+  });
+}
+
+/* ══════════════════════════════════════════════════════
+   TABS
+══════════════════════════════════════════════════════ */
+function switchTab(name) {
+  document.querySelectorAll('.r-tab').forEach(t => t.classList.toggle('active', t.dataset.pane === name));
+  document.querySelectorAll('.result-pane').forEach(p => p.classList.toggle('active', p.id === 'pane-'+name));
+}
+document.querySelectorAll('.r-tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.pane)));
+
+/* ══════════════════════════════════════════════════════
+   ERROR UI
+══════════════════════════════════════════════════════ */
+function showError(msg) {
+  $('errorBar').classList.add('show');
+  $('errorMsg').textContent = msg;
+}
+function hideError() {
+  $('errorBar').classList.remove('show');
+  $('errorMsg').textContent = '';
+}
+
+/* ══════════════════════════════════════════════════════
+   SUCCESS
+══════════════════════════════════════════════════════ */
+function levelSuccess(sql) {
+  if (!state.solved[state.level]) {
+    state.solved[state.level] = true;
+    const pts = { Easy:100, Medium:200, Hard:300 }[LEVELS[state.level].difficulty] || 150;
+    state.score  += pts;
+    state.streak++;
+    if (state.streak > state.bestStreak) state.bestStreak = state.streak;
+    updateScoreUI(); save();
+    playSuccess();
+  }
+  $('sSub').textContent = `${LEVELS[state.level].name} — all ${state.lastExpected.rows.length} rows matched perfectly.`;
+  $('sCode').textContent = sql.length > 120 ? sql.slice(0,117)+'…' : sql;
+  $('successOverlay').classList.add('show');
+  updateDots(); updateProgList();
+}
+function updateScoreUI() {
+  $('scoreVal').textContent  = state.score;
+  $('streakVal').textContent = state.bestStreak;
+}
+
+/* ══════════════════════════════════════════════════════
+   DOTS & PROGRESS
+══════════════════════════════════════════════════════ */
+function updateDots() {
+  const c = $('dots'); c.innerHTML = '';
+  for (let i=0; i<TOTAL; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot'+(state.solved[i]?' done':i===state.level?' active':'');
+    d.addEventListener('click', ()=>loadLevel(i));
+    c.appendChild(d);
+  }
+}
+function updateProgList() {
+  const ul = $('progList'); ul.innerHTML = '';
+  LEVELS.forEach((lv,i) => {
+    const li = document.createElement('div');
+    li.className = 'prog-item'+(state.solved[i]?' done':i===state.level?' active':'');
+    li.innerHTML = `<div class="pi-dot"></div>${lv.name}<span class="pi-badge">${lv.concept}</span>`;
+    li.addEventListener('click',()=>loadLevel(i));
+    ul.appendChild(li);
+  });
+}
+
+/* ══════════════════════════════════════════════════════
+   BUTTON HANDLERS
+══════════════════════════════════════════════════════ */
+$('runBtn').addEventListener('click', executeQuery);
+$('resetBtn').addEventListener('click', () => {
+  $('sqlEditor').value = '';
+  hideError();
+  $('sqlEditor').classList.remove('has-error');
+});
+$('hintBtn').addEventListener('click', () => {
+  const acc = $('hintAccordion');
+  const first = acc.querySelector('.hint-item');
+  if (first) first.classList.toggle('open');
+});
+$('prevBtn').addEventListener('click', () => { if(state.level>0) loadLevel(state.level-1); });
+$('nextBtn').addEventListener('click', () => { if(state.level<TOTAL-1) loadLevel(state.level+1); });
+$('retryBtn').addEventListener('click', () => { $('successOverlay').classList.remove('show'); });
+$('nextLvlBtn').addEventListener('click', () => {
+  $('successOverlay').classList.remove('show');
+  if (state.level < TOTAL-1) loadLevel(state.level+1); else showAllDone();
+});
+$('restartBtn').addEventListener('click', () => {
+  $('alldoneOverlay').classList.remove('show');
+  state.score=0; state.streak=0; state.bestStreak=0;
+  state.solved=new Array(TOTAL).fill(false);
+  state.bestAttempts=new Array(TOTAL).fill(null);
+  updateScoreUI(); save(); loadLevel(0);
+});
+function showAllDone() {
+  $('adScore').textContent  = state.score;
+  $('adStreak').textContent = state.bestStreak;
+  $('adLevels').textContent = TOTAL;
+  $('alldoneOverlay').classList.add('show');
+}
+
+/* ══════════════════════════════════════════════════════
+   KEYBOARD
+══════════════════════════════════════════════════════ */
+document.addEventListener('keydown', e => {
+  // Ctrl+Enter or Cmd+Enter runs query from anywhere
+  if ((e.ctrlKey||e.metaKey) && e.key==='Enter') { e.preventDefault(); executeQuery(); return; }
+  if (e.target.tagName==='TEXTAREA') return;
+  if (e.key==='ArrowRight' && state.level<TOTAL-1) loadLevel(state.level+1);
+  if (e.key==='ArrowLeft'  && state.level>0)       loadLevel(state.level-1);
+  if (e.key.toLowerCase()==='r') { $('resetBtn').click(); }
+});
+
+// Tab key inserts spaces in editor
+$('sqlEditor').addEventListener('keydown', e => {
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const s = e.target.selectionStart;
+    e.target.value = e.target.value.slice(0,s) + '  ' + e.target.value.slice(e.target.selectionEnd);
+    e.target.selectionStart = e.target.selectionEnd = s+2;
+  }
+});
+
+/* ══════════════════════════════════════════════════════
+   WEB AUDIO
+══════════════════════════════════════════════════════ */
+let audioCtx=null;
+function getCtx(){if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();return audioCtx;}
+function playTone(freq,vol,type,dur=0.15){
+  try{
+    const ctx=getCtx();const o=ctx.createOscillator();const g=ctx.createGain();
+    o.connect(g);g.connect(ctx.destination);
+    o.type=type;o.frequency.value=freq;
+    g.gain.setValueAtTime(vol,ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+dur);
+    o.start();o.stop(ctx.currentTime+dur);
+  }catch(e){}
+}
+function playSuccess(){[440,554,659,880].forEach((f,i)=>setTimeout(()=>playTone(f,0.08,'sine',0.2),i*70));}
+
+/* ══════════════════════════════════════════════════════
+   UTIL
+══════════════════════════════════════════════════════ */
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ══════════════════════════════════════════════════════
+   BOOT
+══════════════════════════════════════════════════════ */
+initSQL();
+</script>
+</body>
+</html>

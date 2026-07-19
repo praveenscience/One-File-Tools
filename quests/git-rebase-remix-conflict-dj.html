@@ -1,0 +1,1539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Git Rebase Remix: Conflict DJ | Git & Version Control Quest</title>
+  <meta name="description" content="A music-mixing quest for Git rebase. Replay commits through a DJ deck, resolve conflicts with realistic markers, and learn how rebase rewrites history — one track at a time." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;700&family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ══ Tokens ═══════════════════════════════════════════════ */
+    :root {
+      --bg:      #060409;
+      --surface: rgba(12,8,22,0.92);
+      --card:    rgba(18,10,32,0.96);
+      --panel:   rgba(8,4,16,0.98);
+
+      --pink:    #ff2d9b;  --pink-d:   rgba(255,45,155,0.12);
+      --purple:  #b04dff;  --purple-d: rgba(176,77,255,0.12);
+      --cyan:    #00e5ff;  --cyan-d:   rgba(0,229,255,0.12);
+      --green:   #00ff88;  --green-d:  rgba(0,255,136,0.12);
+      --gold:    #ffd60a;  --gold-d:   rgba(255,214,10,0.12);
+      --red:     #ff3d5a;  --red-d:    rgba(255,61,90,0.12);
+      --orange:  #ff8c00;  --orange-d: rgba(255,140,0,0.12);
+
+      --border:    rgba(176,77,255,0.14);
+      --border-hi: rgba(176,77,255,0.45);
+      --text:      #ddd0f8;
+      --muted:     #6a5880;
+
+      --font-ui:   'Orbitron', sans-serif;
+      --font-body: 'Rajdhani', sans-serif;
+      --font-code: 'Fira Code', monospace;
+      --ease:      cubic-bezier(0.4, 0, 0.2, 1);
+      --r: 8px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: var(--font-body);
+      width: 100vw; height: 100vh; overflow: hidden;
+      display: flex; justify-content: center; align-items: center;
+    }
+
+    /* ── Animated BG ──────────────────────────────────────── */
+    .bg-wrap {
+      position: fixed; inset: 0; z-index: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 0% 100%, rgba(255,45,155,0.07) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 50% at 100% 0%,  rgba(176,77,255,0.10) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 30% at 50% 50%,  rgba(0,229,255,0.04)  0%, transparent 50%);
+    }
+    .vinyl-bg {
+      position: fixed; inset: 0; z-index: 0; opacity: 0.03;
+      background:
+        repeating-conic-gradient(from 0deg at 50% 120%, rgba(255,45,155,0.5) 0deg 1deg, transparent 1deg 6deg);
+    }
+    .scanlines {
+      position: fixed; inset: 0; z-index: 1; pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg, transparent, transparent 3px, rgba(0,0,0,0.07) 3px, rgba(0,0,0,0.07) 4px
+      );
+    }
+
+    /* ── Shell ───────────────────────────────────────────── */
+    .shell {
+      position: relative; z-index: 10;
+      width: 98vw; height: 96vh;
+      max-width: 1400px; max-height: 840px;
+      background: var(--surface);
+      backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow:
+        0 0 0 1px rgba(255,45,155,0.05),
+        0 24px 80px rgba(0,0,0,0.9),
+        inset 0 0 60px rgba(176,77,255,0.04);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+
+    /* ── Header ──────────────────────────────────────────── */
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.72rem 1.4rem;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0; gap: 1rem;
+    }
+    .header-left { display: flex; align-items: center; gap: 1rem; }
+    .hub-btn {
+      display: flex; align-items: center; gap: 0.4rem;
+      color: var(--muted); text-decoration: none;
+      font-family: var(--font-ui); font-size: 0.7rem;
+      padding: 0.38rem 0.7rem;
+      border: 1px solid rgba(106,88,128,0.25); border-radius: var(--r);
+      background: rgba(106,88,128,0.05); transition: all 0.2s;
+    }
+    .hub-btn:hover { color: var(--purple); border-color: var(--purple); background: var(--purple-d); }
+    .hub-btn svg { width: 13px; height: 13px; fill: currentColor; }
+
+    .title-block h1 {
+      font-family: var(--font-ui); font-size: 1.05rem; font-weight: 900;
+      color: #fff; letter-spacing: 0.5px;
+      text-shadow: 0 0 20px rgba(255,45,155,0.6), 0 0 40px rgba(176,77,255,0.3);
+    }
+    .title-block p {
+      font-size: 0.65rem; color: var(--pink); text-transform: uppercase;
+      letter-spacing: 2.5px; font-weight: 700; margin-top: 1px;
+    }
+
+    .level-nav {
+      display: flex; align-items: center; gap: 0.5rem;
+      background: rgba(0,0,0,0.35); border: 1px solid var(--border);
+      border-radius: 10px; padding: 0.28rem 0.7rem;
+    }
+    .nav-btn {
+      background: none; border: none; color: var(--purple);
+      cursor: pointer; display: flex; padding: 0.15rem;
+      border-radius: 4px; transition: all 0.15s;
+    }
+    .nav-btn:hover:not(:disabled) { background: var(--purple-d); }
+    .nav-btn:disabled { color: #2a1840; cursor: not-allowed; }
+    .nav-btn svg { width: 15px; height: 15px; fill: currentColor; }
+    .level-lbl {
+      font-family: var(--font-ui); font-size: 0.66rem; color: #fff;
+      min-width: 74px; text-align: center; letter-spacing: 1px;
+    }
+    .dots { display: flex; gap: 5px; }
+    .dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
+      cursor: pointer; transition: all 0.3s;
+    }
+    .dot.done   { background: var(--green);  border-color: var(--green);  box-shadow: 0 0 6px var(--green); }
+    .dot.active { background: var(--pink);   border-color: var(--pink);   box-shadow: 0 0 8px var(--pink); }
+
+    .header-right { display: flex; align-items: center; gap: 0.8rem; }
+    .chip {
+      display: flex; align-items: center; gap: 0.35rem;
+      background: rgba(0,0,0,0.3); border: 1px solid var(--border);
+      border-radius: 8px; padding: 0.25rem 0.6rem;
+      font-family: var(--font-code); font-size: 0.75rem; color: var(--muted);
+    }
+    .chip .v { font-weight: 700; color: var(--gold); }
+    .chip.s .v { color: var(--green); }
+    .diff-badge {
+      font-family: var(--font-code); font-size: 0.6rem; padding: 0.18rem 0.5rem;
+      border-radius: 4px; border: 1px solid; text-transform: uppercase; letter-spacing: 1px;
+    }
+    .d-easy   { color: var(--green);  border-color: var(--green);  background: var(--green-d); }
+    .d-medium { color: var(--gold);   border-color: var(--gold);   background: var(--gold-d); }
+    .d-hard   { color: var(--red);    border-color: var(--red);    background: var(--red-d); }
+
+    /* ── Body ───────────────────────────────────────────── */
+    .body { display: grid; grid-template-columns: 320px 1fr 290px; flex: 1; overflow: hidden; }
+
+    /* ── LEFT – DJ Deck / Commit Queue ──────────────────── */
+    .left-panel {
+      background: var(--card);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+
+    /* DJ Deck graphic */
+    .dj-deck {
+      padding: 0.9rem 1rem;
+      border-bottom: 1px solid var(--border);
+      display: flex; flex-direction: column; align-items: center; gap: 0.6rem;
+    }
+    .deck-label {
+      font-family: var(--font-ui); font-size: 0.6rem; color: var(--pink);
+      text-transform: uppercase; letter-spacing: 2px; align-self: flex-start;
+      display: flex; align-items: center; gap: 0.4rem;
+    }
+    .deck-label::before { content:''; width:3px; height:10px; background:var(--pink); border-radius:2px; }
+
+    /* Turntable */
+    .turntable {
+      width: 110px; height: 110px; border-radius: 50%;
+      background: conic-gradient(
+        from 0deg,
+        #1a0a2e 0deg 30deg, #0d0520 30deg 60deg,
+        #1a0a2e 60deg 90deg, #0d0520 90deg 120deg,
+        #1a0a2e 120deg 150deg, #0d0520 150deg 180deg,
+        #1a0a2e 180deg 210deg, #0d0520 210deg 240deg,
+        #1a0a2e 240deg 270deg, #0d0520 270deg 300deg,
+        #1a0a2e 300deg 330deg, #0d0520 330deg 360deg
+      );
+      border: 2px solid rgba(176,77,255,0.3);
+      box-shadow: 0 0 20px rgba(176,77,255,0.2), inset 0 0 20px rgba(0,0,0,0.5);
+      position: relative; display: flex; align-items: center; justify-content: center;
+      animation: spin 4s linear infinite;
+    }
+    .turntable.playing { animation-play-state: running; }
+    .turntable.paused  { animation-play-state: paused; }
+    @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+    .turntable-label {
+      font-family: var(--font-ui); font-size: 0.5rem; color: var(--pink);
+      text-align: center; letter-spacing: 1px; z-index: 1;
+      background: rgba(6,4,9,0.8); border-radius: 50%;
+      width: 42px; height: 42px; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; padding: 2px;
+      border: 1px solid rgba(255,45,155,0.3);
+    }
+    .turntable-label .spin-txt { font-size: 0.85rem; }
+
+    /* Sanity / risk meter */
+    .meter-wrap {
+      width: 100%; display: flex; flex-direction: column; gap: 0.25rem;
+    }
+    .meter-label {
+      font-family: var(--font-code); font-size: 0.62rem; color: var(--muted);
+      display: flex; justify-content: space-between;
+    }
+    .meter-label .mv { font-weight: 700; }
+    .meter-label .mv.ok     { color: var(--green); }
+    .meter-label .mv.warn   { color: var(--gold); }
+    .meter-label .mv.danger { color: var(--red); }
+    .meter-bar-bg {
+      height: 6px; background: rgba(255,255,255,0.07); border-radius: 3px; overflow: hidden;
+    }
+    .meter-bar {
+      height: 100%; border-radius: 3px; transition: width 0.5s var(--ease), background-position 0.5s;
+      background: linear-gradient(90deg, var(--green), var(--gold), var(--red));
+      background-size: 300% 100%;
+    }
+
+    /* Commit queue */
+    .queue-header {
+      padding: 0.55rem 1rem;
+      border-bottom: 1px solid var(--border);
+      font-family: var(--font-ui); font-size: 0.6rem; color: var(--cyan);
+      text-transform: uppercase; letter-spacing: 2px;
+      display: flex; align-items: center; gap: 0.4rem;
+    }
+    .queue-header::before { content:''; width:3px; height:10px; background:var(--cyan); border-radius:2px; }
+
+    .commit-queue {
+      flex: 1; overflow-y: auto; padding: 0.6rem 0.8rem;
+      display: flex; flex-direction: column; gap: 0.4rem;
+    }
+    .commit-queue::-webkit-scrollbar { width: 4px; }
+    .commit-queue::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 2px; }
+
+    .commit-card {
+      padding: 0.5rem 0.65rem;
+      border-radius: var(--r); border: 1px solid rgba(255,255,255,0.06);
+      background: rgba(255,255,255,0.03);
+      font-family: var(--font-code); font-size: 0.68rem;
+      cursor: pointer; transition: all 0.2s; position: relative;
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .commit-card:hover { border-color: var(--purple); background: var(--purple-d); }
+    .commit-card.selected { border-color: var(--pink); background: var(--pink-d); box-shadow: 0 0 10px rgba(255,45,155,0.15); }
+    .commit-card.applied  { border-color: rgba(0,255,136,0.3); background: rgba(0,255,136,0.04); opacity: 0.6; }
+    .commit-card.conflict { border-color: var(--red); background: var(--red-d); animation: card-pulse 1s ease infinite alternate; }
+    @keyframes card-pulse { from{box-shadow:none} to{box-shadow:0 0 12px rgba(255,61,90,0.4)} }
+
+    .commit-card .cc-hash { color: var(--gold); font-size: 0.6rem; letter-spacing: 0.5px; }
+    .commit-card .cc-msg  { color: var(--text); font-size: 0.68rem; }
+    .commit-card .cc-meta { color: var(--muted); font-size: 0.6rem; }
+    .commit-card .cc-badge {
+      position: absolute; top: 4px; right: 6px;
+      font-size: 0.55rem; padding: 1px 5px; border-radius: 3px; border: 1px solid;
+    }
+    .cc-badge.applied  { color: var(--green); border-color: var(--green); background: var(--green-d); }
+    .cc-badge.conflict { color: var(--red);   border-color: var(--red);   background: var(--red-d); }
+    .cc-badge.pending  { color: var(--muted); border-color: rgba(255,255,255,0.1); }
+
+    /* Branch diagram */
+    .branch-mini {
+      padding: 0.6rem 1rem;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .branch-mini .bm-label {
+      font-family: var(--font-ui); font-size: 0.58rem; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 0.4rem;
+    }
+    .branch-lines { font-family: var(--font-code); font-size: 0.65rem; line-height: 1.7; }
+    .branch-lines .bl { display: flex; align-items: center; gap: 0.4rem; }
+    .branch-lines .bl-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .branch-lines .bl-name { color: var(--text); }
+    .branch-lines .bl-sha  { color: var(--muted); }
+
+    /* ── CENTER – Conflict Resolver ─────────────────────── */
+    .center-panel {
+      display: flex; flex-direction: column; overflow: hidden; position: relative;
+    }
+
+    .center-toolbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.5rem 1rem;
+      border-bottom: 1px solid var(--border);
+      background: rgba(6,4,9,0.7); flex-shrink: 0; gap: 0.6rem;
+    }
+    .ct-info { font-family: var(--font-ui); font-size: 0.73rem; color: #fff; }
+    .ct-info span { color: var(--pink); }
+    .ct-btns { display: flex; gap: 0.5rem; }
+    .btn {
+      padding: 0.4rem 0.85rem; border-radius: var(--r);
+      border: 1px solid var(--border); background: rgba(0,0,0,0.3);
+      color: var(--muted); font-family: var(--font-ui); font-size: 0.6rem;
+      letter-spacing: 1px; cursor: pointer; transition: all 0.2s var(--ease);
+    }
+    .btn:hover { border-color: rgba(255,255,255,0.25); color: #fff; }
+    .btn-replay {
+      background: var(--purple-d); border-color: var(--purple); color: var(--purple);
+    }
+    .btn-replay:hover { background: rgba(176,77,255,0.25); box-shadow: 0 0 14px rgba(176,77,255,0.3); }
+    .btn-replay:disabled { opacity:0.4; cursor:not-allowed; }
+    .btn-continue {
+      background: var(--green-d); border-color: var(--green); color: var(--green);
+    }
+    .btn-continue:hover { background: rgba(0,255,136,0.25); box-shadow: 0 0 14px rgba(0,255,136,0.3); }
+    .btn-continue:disabled { opacity:0.4; cursor:not-allowed; }
+
+    /* Main canvas */
+    .center-canvas { flex: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 0.9rem; }
+    .center-canvas::-webkit-scrollbar { width: 5px; }
+    .center-canvas::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 3px; }
+
+    /* Idle state */
+    .idle-prompt {
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 0.6rem;
+      font-family: var(--font-code); font-size: 0.8rem; color: #1e0e36;
+      border: 2px dashed #1e0e36; border-radius: var(--r); padding: 2rem;
+    }
+    .idle-prompt .ip-icon { font-size: 2rem; }
+
+    /* File conflict block */
+    .conflict-block {
+      border: 1px solid var(--border); border-radius: var(--r);
+      overflow: hidden; animation: slide-in 0.25s var(--ease);
+    }
+    @keyframes slide-in { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
+
+    .conflict-header {
+      display: flex; align-items: center; gap: 0.6rem;
+      padding: 0.45rem 0.75rem;
+      background: rgba(255,61,90,0.08); border-bottom: 1px solid rgba(255,61,90,0.2);
+      font-family: var(--font-code); font-size: 0.7rem;
+    }
+    .conflict-header .cf-file { color: var(--red); font-weight: 700; }
+    .conflict-header .cf-badge {
+      font-size: 0.55rem; padding: 1px 6px; border-radius: 3px;
+      background: rgba(255,61,90,0.15); border: 1px solid rgba(255,61,90,0.4); color: var(--red);
+    }
+    .conflict-header.resolved {
+      background: rgba(0,255,136,0.06); border-color: rgba(0,255,136,0.2);
+    }
+    .conflict-header.resolved .cf-file { color: var(--green); }
+    .conflict-header.resolved .cf-badge {
+      background: rgba(0,255,136,0.1); border-color: rgba(0,255,136,0.3); color: var(--green);
+    }
+
+    /* Conflict marker editor */
+    .conflict-editor {
+      background: var(--panel); padding: 0;
+    }
+    .conflict-zone {
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .conflict-zone:last-child { border-bottom: none; }
+
+    .cz-section {
+      display: flex; gap: 0;
+    }
+    .cz-gutter {
+      width: 32px; flex-shrink: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      font-family: var(--font-code); font-size: 0.6rem; color: var(--muted);
+      border-right: 1px solid rgba(255,255,255,0.04); padding: 0.3rem 0;
+    }
+    .cz-body { flex: 1; padding: 0.4rem 0.7rem; }
+
+    .cz-marker {
+      font-family: var(--font-code); font-size: 0.65rem; padding: 0.22rem 0.7rem;
+      user-select: none; letter-spacing: 0.5px;
+    }
+    .cz-marker.head    { background: rgba(0,229,255,0.08);   color: var(--cyan);   border-left: 3px solid var(--cyan); }
+    .cz-marker.sep     { background: rgba(255,255,255,0.03); color: var(--muted);  border-left: 3px solid var(--muted); }
+    .cz-marker.incoming{ background: rgba(176,77,255,0.08);  color: var(--purple); border-left: 3px solid var(--purple); }
+
+    .cz-code-head     { font-family: var(--font-code); font-size: 0.7rem; padding: 0.35rem 0.7rem; background: rgba(0,229,255,0.04);   border-left: 3px solid var(--cyan); color: #a0e8f8; }
+    .cz-code-incoming { font-family: var(--font-code); font-size: 0.7rem; padding: 0.35rem 0.7rem; background: rgba(176,77,255,0.04);  border-left: 3px solid var(--purple); color: #d0a8f8; }
+    .cz-code-context  { font-family: var(--font-code); font-size: 0.7rem; padding: 0.35rem 0.7rem; color: #6a7898; background: transparent; }
+
+    /* Resolution buttons */
+    .resolution-row {
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem;
+      padding: 0.65rem 0.75rem;
+      background: rgba(0,0,0,0.2); border-top: 1px solid rgba(255,255,255,0.04);
+    }
+    .res-btn {
+      padding: 0.45rem 0.3rem; border-radius: 5px; border: 1px solid;
+      font-family: var(--font-ui); font-size: 0.55rem; letter-spacing: 0.5px;
+      text-align: center; cursor: pointer; transition: all 0.2s; line-height: 1.4;
+    }
+    .res-btn.keep-head     { color: var(--cyan);  border-color: rgba(0,229,255,0.35);  background: rgba(0,229,255,0.07); }
+    .res-btn.keep-incoming { color: var(--purple);border-color: rgba(176,77,255,0.35); background: rgba(176,77,255,0.07); }
+    .res-btn.merge-both    { color: var(--green); border-color: rgba(0,255,136,0.35);  background: rgba(0,255,136,0.07); }
+    .res-btn:hover { transform: translateY(-1px); filter: brightness(1.2); }
+    .res-btn:disabled { opacity:0.35; cursor:not-allowed; transform:none; filter:none; }
+
+    .res-resolved-banner {
+      display: none; align-items: center; gap: 0.5rem;
+      padding: 0.4rem 0.75rem;
+      background: rgba(0,255,136,0.05); border-top: 1px solid rgba(0,255,136,0.15);
+      font-family: var(--font-code); font-size: 0.68rem; color: var(--green);
+    }
+    .res-resolved-banner.show { display: flex; }
+    .resolved-code {
+      font-family: var(--font-code); font-size: 0.7rem;
+      padding: 0.35rem 0.7rem; color: var(--green);
+      background: rgba(0,255,136,0.05); border-left: 3px solid var(--green);
+    }
+
+    /* Clean apply block */
+    .clean-block {
+      border: 1px solid rgba(0,255,136,0.2); border-radius: var(--r); overflow: hidden;
+    }
+    .clean-header {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.4rem 0.75rem; background: rgba(0,255,136,0.06);
+      font-family: var(--font-code); font-size: 0.68rem; color: var(--green);
+    }
+    .clean-body { font-family: var(--font-code); font-size: 0.68rem; padding: 0.5rem 0.75rem; color: #6a7898; }
+
+    /* Debrief */
+    .debrief {
+      border: 1px solid rgba(255,214,10,0.2); border-radius: var(--r); overflow: hidden;
+    }
+    .debrief-header {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.4rem 0.75rem; background: rgba(255,214,10,0.07);
+      font-family: var(--font-ui); font-size: 0.62rem; color: var(--gold);
+      text-transform: uppercase; letter-spacing: 1.5px;
+    }
+    .debrief-body {
+      padding: 0.65rem 0.75rem; font-size: 0.75rem; line-height: 1.65; color: var(--muted);
+    }
+    .debrief-body strong { color: var(--text); }
+    .debrief-body code {
+      font-family: var(--font-code); font-size: 0.66rem;
+      background: rgba(0,0,0,0.4); padding: 0 3px; border-radius: 3px; color: var(--gold);
+    }
+
+    /* ── RIGHT – Visualiser + Manual ───────────────────── */
+    .right-panel {
+      background: var(--card);
+      border-left: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+
+    .vis-section {
+      padding: 0.72rem 0.95rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .vis-title {
+      font-family: var(--font-ui); font-size: 0.58rem;
+      text-transform: uppercase; letter-spacing: 2px; margin-bottom: 0.5rem;
+      display: flex; align-items: center; gap: 0.4rem;
+    }
+    .vis-title::before { content:''; width:3px; height:10px; border-radius:2px; display:inline-block; }
+    .vt-pink::before   { background: var(--pink); }
+    .vt-cyan::before   { background: var(--cyan); }
+    .vt-gold::before   { background: var(--gold); }
+    .vt-green::before  { background: var(--green); }
+    .vt-purple::before { background: var(--purple); }
+
+    /* History graph */
+    .history-graph {
+      font-family: var(--font-code); font-size: 0.63rem; line-height: 1.8;
+      background: rgba(0,0,0,0.25); border: 1px solid var(--border);
+      border-radius: 5px; padding: 0.45rem 0.6rem;
+    }
+    .hg-row { display: flex; align-items: center; gap: 0.4rem; }
+    .hg-sha  { color: var(--gold); min-width: 44px; }
+    .hg-msg  { color: var(--text); flex:1; }
+    .hg-tag  {
+      font-size: 0.52rem; padding: 0 4px; border-radius: 3px; border: 1px solid;
+      white-space: nowrap;
+    }
+    .hg-tag.base     { color: var(--cyan);  border-color: var(--cyan);  background: var(--cyan-d); }
+    .hg-tag.feature  { color: var(--pink);  border-color: var(--pink);  background: var(--pink-d); }
+    .hg-tag.rebased  { color: var(--green); border-color: var(--green); background: var(--green-d); }
+    .hg-connector { color: var(--muted); padding: 0 0.3rem; font-size: 0.8rem; }
+
+    /* Progress */
+    .prog-list { display: flex; flex-direction: column; gap: 0.28rem; }
+    .prog-item {
+      display: flex; align-items: center; gap: 0.4rem;
+      font-family: var(--font-code); font-size: 0.66rem; color: #2a1840;
+      padding: 0.25rem 0.4rem; border-radius: 4px;
+      border: 1px solid rgba(255,255,255,0.03); cursor: pointer; transition: all 0.2s;
+    }
+    .prog-item:hover  { color: var(--muted); border-color: rgba(255,255,255,0.08); }
+    .prog-item.done   { color: var(--green);  border-color: rgba(0,255,136,0.18); background: rgba(0,255,136,0.04); }
+    .prog-item.active { color: var(--pink);   border-color: rgba(255,45,155,0.25); background: rgba(255,45,155,0.05); }
+    .prog-item .pi-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+
+    /* Field manual */
+    .manual-scroll {
+      flex: 1; overflow-y: auto; padding: 0.6rem 0.95rem;
+      display: flex; flex-direction: column; gap: 0.5rem;
+    }
+    .manual-scroll::-webkit-scrollbar { width: 3px; }
+    .manual-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .cmd-card {
+      border: 1px solid rgba(255,255,255,0.05); border-radius: 6px;
+      background: rgba(255,255,255,0.02); padding: 0.45rem 0.55rem;
+    }
+    .cmd-card .cmd-line {
+      font-family: var(--font-code); font-size: 0.65rem;
+      color: var(--gold); margin-bottom: 3px;
+    }
+    .cmd-card .cmd-desc {
+      font-size: 0.68rem; color: var(--muted); line-height: 1.5;
+    }
+    .cmd-card .cmd-desc strong { color: var(--text); }
+
+    /* ── Overlays ────────────────────────────────────────── */
+    .success-overlay {
+      position: absolute; inset: 0; z-index: 100;
+      background: rgba(4,2,10,0.9); backdrop-filter: blur(12px);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 0.8rem; opacity: 0; pointer-events: none; transition: opacity 0.4s var(--ease);
+    }
+    .success-overlay.show { opacity: 1; pointer-events: auto; }
+    .success-icon { font-size: 3rem; animation: bounce-in 0.5s var(--ease); }
+    @keyframes bounce-in {
+      0%{transform:scale(0);opacity:0} 60%{transform:scale(1.2);opacity:1} 100%{transform:scale(1)}
+    }
+    .success-title {
+      font-family: var(--font-ui); font-size: 1.35rem; font-weight: 900;
+      color: var(--pink); letter-spacing: 2px;
+      text-shadow: 0 0 30px rgba(255,45,155,0.6), 0 0 60px rgba(176,77,255,0.3);
+    }
+    .success-sub { font-size: 0.85rem; color: var(--muted); text-align: center; max-width: 360px; line-height: 1.5; }
+    .s-btns { display: flex; gap: 0.65rem; margin-top: 0.35rem; }
+    .s-btn {
+      padding: 0.55rem 1.3rem; border-radius: var(--r);
+      font-family: var(--font-ui); font-size: 0.68rem; letter-spacing: 1px;
+      cursor: pointer; border: 1px solid; transition: all 0.2s;
+    }
+    .s-next  { background: var(--pink-d);  border-color: var(--pink);  color: var(--pink); }
+    .s-next:hover  { background: rgba(255,45,155,0.28); box-shadow: 0 0 18px rgba(255,45,155,0.35); }
+    .s-retry { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.15); color: #7a72b0; }
+    .s-retry:hover { border-color: rgba(255,255,255,0.35); color: #fff; }
+
+    .alldone-overlay {
+      position: absolute; inset: 0; z-index: 200;
+      background: rgba(3,1,8,0.95); backdrop-filter: blur(18px);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 0.8rem; opacity: 0; pointer-events: none; transition: opacity 0.5s;
+    }
+    .alldone-overlay.show { opacity: 1; pointer-events: auto; }
+    .alldone-trophy { font-size: 4rem; animation: bounce-in 0.6s var(--ease); }
+    .alldone-title {
+      font-family: var(--font-ui); font-size: 1.7rem; font-weight: 900;
+      color: var(--pink); letter-spacing: 3px;
+      text-shadow: 0 0 40px rgba(255,45,155,0.7), 0 0 80px rgba(176,77,255,0.4);
+    }
+    .alldone-sub { font-size: 0.85rem; color: var(--muted); max-width: 400px; text-align: center; line-height: 1.6; }
+    .alldone-stats { display: flex; gap: 2rem; margin-top: 0.3rem; }
+    .alldone-stat { display: flex; flex-direction: column; align-items: center; font-family: var(--font-code); }
+    .alldone-stat .n { font-size: 1.8rem; font-weight: 700; color: var(--cyan); }
+    .alldone-stat .l { font-size: 0.62rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+    .alldone-restart {
+      margin-top: 0.3rem; padding: 0.6rem 1.8rem;
+      background: var(--pink-d); border: 1px solid var(--pink); border-radius: var(--r);
+      color: var(--pink); font-family: var(--font-ui); font-size: 0.72rem; letter-spacing: 1px;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .alldone-restart:hover { background: rgba(255,45,155,0.28); box-shadow: 0 0 18px rgba(255,45,155,0.35); }
+  </style>
+</head>
+<body>
+<div class="bg-wrap"></div>
+<div class="vinyl-bg"></div>
+<div class="scanlines"></div>
+
+<div class="shell" id="shell">
+
+  <!-- ═══ HEADER ══════════════════════════════════════════ -->
+  <header>
+    <div class="header-left">
+      <a href="../index.html" class="hub-btn">
+        <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+        Hub
+      </a>
+      <div class="title-block">
+        <h1>Git Rebase Remix</h1>
+        <p>Conflict DJ · Git &amp; Version Control</p>
+      </div>
+    </div>
+
+    <div class="level-nav" role="navigation" aria-label="Level navigation">
+      <button class="nav-btn" id="prevBtn" disabled>
+        <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+      </button>
+      <div class="level-lbl" id="levelLbl">LEVEL 1 / 6</div>
+      <div class="dots" id="dots"></div>
+      <button class="nav-btn" id="nextBtn">
+        <svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+      </button>
+    </div>
+
+    <div class="header-right">
+      <div class="diff-badge d-easy" id="diffBadge">Easy</div>
+      <div class="chip">🎧 Score: <span class="v" id="scoreVal">0</span></div>
+      <div class="chip s">🔥 Streak: <span class="v" id="streakVal">0</span></div>
+    </div>
+  </header>
+
+  <!-- ═══ BODY ═════════════════════════════════════════════ -->
+  <div class="body">
+
+    <!-- LEFT: DJ Deck + Commit Queue -->
+    <aside class="left-panel">
+      <div class="dj-deck">
+        <div class="deck-label">DJ Deck</div>
+        <div class="turntable paused" id="turntable">
+          <div class="turntable-label">
+            <span class="spin-txt" id="deckEmoji">⏸</span>
+            <span id="deckLabel" style="font-size:0.45rem;text-align:center;line-height:1.2">STOPPED</span>
+          </div>
+        </div>
+        <div class="meter-wrap">
+          <div class="meter-label">
+            <span>Sanity Meter</span>
+            <span class="mv ok" id="sanityVal">100%</span>
+          </div>
+          <div class="meter-bar-bg">
+            <div class="meter-bar" id="sanityBar" style="width:100%;background-position:0% 0"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="queue-header">Commit Queue</div>
+      <div class="commit-queue" id="commitQueue"></div>
+
+      <div class="branch-mini">
+        <div class="bm-label">Branch Map</div>
+        <div class="branch-lines" id="branchLines"></div>
+      </div>
+    </aside>
+
+    <!-- CENTER: Conflict Resolver -->
+    <main class="center-panel" aria-label="Conflict resolver">
+      <div class="center-toolbar">
+        <div class="ct-info">Replaying: <span id="replayingCommit">—</span></div>
+        <div class="ct-btns">
+          <button class="btn" id="resetBtn">↺ Reset</button>
+          <button class="btn btn-replay" id="replayBtn" disabled>▶ Replay Next</button>
+          <button class="btn btn-continue" id="continueBtn" disabled>✓ Continue</button>
+        </div>
+      </div>
+
+      <div class="center-canvas" id="centerCanvas">
+        <div class="idle-prompt" id="idlePrompt">
+          <span class="ip-icon">🎚️</span>
+          <span>Select a commit and hit <strong style="color:var(--purple)">▶ Replay Next</strong> to start the rebase</span>
+        </div>
+      </div>
+
+      <div class="success-overlay" id="successOverlay" role="dialog" aria-modal="true">
+        <div class="success-icon">🎶</div>
+        <div class="success-title">PLAYS CLEAN!</div>
+        <div class="success-sub" id="successSub">All conflicts resolved. The rebase mixed perfectly.</div>
+        <div class="s-btns">
+          <button class="s-btn s-retry" id="retryBtn">Retry Level</button>
+          <button class="s-btn s-next" id="nextLvlBtn">Next Track →</button>
+        </div>
+      </div>
+
+      <div class="alldone-overlay" id="alldoneOverlay" role="dialog" aria-modal="true">
+        <div class="alldone-trophy">🏆</div>
+        <div class="alldone-title">MASTER DJ</div>
+        <div class="alldone-sub">
+          Every rebase conflict has been mixed clean. History is linear. The crowd goes wild.
+        </div>
+        <div class="alldone-stats">
+          <div class="alldone-stat"><div class="n" id="finalScore">0</div><div class="l">Score</div></div>
+          <div class="alldone-stat"><div class="n" id="finalStreak">0</div><div class="l">Best Streak</div></div>
+          <div class="alldone-stat"><div class="n" id="finalLvls">6</div><div class="l">Tracks</div></div>
+        </div>
+        <button class="alldone-restart" id="restartBtn">🔄 New Set</button>
+      </div>
+    </main>
+
+    <!-- RIGHT: Visualiser + Manual -->
+    <aside class="right-panel">
+
+      <div class="vis-section">
+        <div class="vis-title vt-pink">📈 Rebase History</div>
+        <div class="history-graph" id="historyGraph">
+          <div class="hg-row" style="color:var(--muted);font-size:0.62rem">Load a level to see commit graph…</div>
+        </div>
+      </div>
+
+      <div class="vis-section">
+        <div class="vis-title vt-cyan">📋 Level Progress</div>
+        <div class="prog-list" id="progList"></div>
+      </div>
+
+      <div class="vis-section" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+        <div class="vis-title vt-gold">📖 Field Manual</div>
+        <div class="manual-scroll">
+          <div class="cmd-card">
+            <div class="cmd-line">git rebase &lt;base-branch&gt;</div>
+            <div class="cmd-desc">Moves your branch commits <strong>on top of</strong> base-branch, rewriting commit hashes.</div>
+          </div>
+          <div class="cmd-card">
+            <div class="cmd-line">git rebase --continue</div>
+            <div class="cmd-desc">After staging resolved files, tells Git to <strong>apply the next commit</strong> in the replay sequence.</div>
+          </div>
+          <div class="cmd-card">
+            <div class="cmd-line">git rebase --abort</div>
+            <div class="cmd-desc">Cancels the rebase and returns to the <strong>original branch state</strong> — safe escape hatch.</div>
+          </div>
+          <div class="cmd-card">
+            <div class="cmd-line">git rebase --skip</div>
+            <div class="cmd-desc">Skips the conflicting commit entirely. Use when the change is <strong>already in base</strong>.</div>
+          </div>
+          <div class="cmd-card">
+            <div class="cmd-line">&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD</div>
+            <div class="cmd-desc"><strong>Your version</strong> (the base branch state before replaying the feature commit).</div>
+          </div>
+          <div class="cmd-card">
+            <div class="cmd-line">======= / &gt;&gt;&gt;&gt;&gt;&gt;&gt;</div>
+            <div class="cmd-desc">Separator then <strong>incoming</strong> — the feature commit's version of the change.</div>
+          </div>
+          <div class="cmd-card">
+            <div class="cmd-line">Golden Rule</div>
+            <div class="cmd-desc">Rebase rewrites history. <strong>Never rebase public/shared branches</strong> — only local or personal feature branches.</div>
+          </div>
+        </div>
+      </div>
+
+    </aside>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════════════════════ -->
+<script>
+/* ══════════════════════════════════════════════════════
+   LEVEL DATA
+   Each level has a base branch + feature branch.
+   Commits are replayed one by one.
+   Each commit is either:
+     - type: 'clean'    — applies without conflict
+     - type: 'conflict' — has HEAD vs incoming blocks that player must resolve
+   Correct resolution is specified per conflict.
+══════════════════════════════════════════════════════ */
+const LEVELS = [
+  /* 1 ── Simple single-file conflict ── */
+  {
+    name: "First Drop",
+    difficulty: "Easy",
+    brief: "Replay a single feature commit onto main. One file conflicts — keep the incoming change from the feature branch.",
+    debrief: "When you <code>git rebase main</code> on a feature branch, Git replays each feature commit on top of the latest main. If both branches touched the same line, you get conflict markers. Here you kept the <strong>incoming</strong> (feature) version.",
+    baseBranch: "main",
+    featureBranch: "feat/volume-control",
+    commits: [
+      {
+        hash: "a1b2c3d",
+        message: "Add volume control to player",
+        type: "conflict",
+        file: "src/player.js",
+        context_before: ["function init() {", "  setupUI();"],
+        head:     ["  const vol = 50; // default"],
+        incoming: ["  const vol = 80; // louder default"],
+        context_after: ["}"],
+        resolution: "keep-incoming",
+        resolved_line: "  const vol = 80; // louder default",
+        hint: "The feature branch raised the default volume. Keep the <strong>incoming</strong> change to apply the feature commit's intent.",
+      },
+    ],
+    history: [
+      { sha:"f0e1d2", msg:"Initial setup",     tag:"base" },
+      { sha:"c3b4a5", msg:"Refactor UI",        tag:"base" },
+      { sha:"a1b2c3", msg:"Add volume control", tag:"feature" },
+    ],
+  },
+
+  /* 2 ── Two clean + one conflict ── */
+  {
+    name: "Beatmatch",
+    difficulty: "Easy",
+    brief: "Three commits to replay. Two apply cleanly; one has a conflict in the config file. Choose the correct resolution.",
+    debrief: "Most rebases apply commits cleanly — only lines that <strong>both branches edited</strong> produce conflicts. Watching which commits are clean vs conflicted helps you understand how Git merges line-by-line.",
+    baseBranch: "main",
+    featureBranch: "feat/equaliser",
+    commits: [
+      {
+        hash: "b2c3d4e",
+        message: "Add equaliser module",
+        type: "clean",
+        file: "src/equaliser.js",
+        clean_lines: ["export function eq(freq) { return freq * 1.2; }"],
+      },
+      {
+        hash: "c3d4e5f",
+        message: "Update audio config",
+        type: "conflict",
+        file: "config/audio.json",
+        context_before: ["{", '  "sampleRate": 44100,'],
+        head:     ['  "bitDepth": 16'],
+        incoming: ['  "bitDepth": 24'],
+        context_after: ["}"],
+        resolution: "keep-incoming",
+        resolved_line: '  "bitDepth": 24',
+        hint: "The feature branch upgraded bit depth to 24. Keep <strong>incoming</strong> to preserve the audio quality improvement.",
+      },
+      {
+        hash: "d4e5f6a",
+        message: "Add EQ presets",
+        type: "clean",
+        file: "src/presets.js",
+        clean_lines: ["export const PRESETS = ['flat','bass','treble'];"],
+      },
+    ],
+    history: [
+      { sha:"a0b1c2", msg:"Setup project",     tag:"base" },
+      { sha:"b2c3d4", msg:"Add eq module",     tag:"feature" },
+      { sha:"c3d4e5", msg:"Update audio cfg",  tag:"feature" },
+      { sha:"d4e5f6", msg:"Add EQ presets",    tag:"feature" },
+    ],
+  },
+
+  /* 3 ── Keep HEAD strategy ── */
+  {
+    name: "Hold the Beat",
+    difficulty: "Medium",
+    brief: "The base branch has a hotfix for a critical bug. The feature branch changes the same line differently. Keep HEAD (base branch) to preserve the hotfix.",
+    debrief: "Sometimes the <strong>HEAD version is what you want to keep</strong> — a hotfix on main that the feature branch doesn't know about yet. Keeping incoming would undo the fix. This is why rebase requires careful reading of both sides.",
+    baseBranch: "main",
+    featureBranch: "feat/tempo-sync",
+    commits: [
+      {
+        hash: "e5f6a7b",
+        message: "Sync tempo to BPM",
+        type: "conflict",
+        file: "src/tempo.js",
+        context_before: ["function syncTempo() {"],
+        head:     ["  if (!bpm || bpm < 1) throw new Error('Invalid BPM'); // hotfix"],
+        incoming: ["  // TODO: validate BPM later"],
+        context_after: ["}"],
+        resolution: "keep-head",
+        resolved_line: "  if (!bpm || bpm < 1) throw new Error('Invalid BPM'); // hotfix",
+        hint: "HEAD has a critical input validation hotfix. The feature branch's TODO comment would <strong>remove the safety check</strong>. Keep <strong>HEAD</strong>.",
+      },
+      {
+        hash: "f6a7b8c",
+        message: "Add BPM display",
+        type: "clean",
+        file: "src/ui/bpm.js",
+        clean_lines: ["export const BPMDisplay = ({ bpm }) => `<span>${bpm} BPM</span>`;"],
+      },
+    ],
+    history: [
+      { sha:"c0d1e2", msg:"Initial audio engine", tag:"base"    },
+      { sha:"d2e3f4", msg:"Hotfix BPM validation", tag:"base"   },
+      { sha:"e5f6a7", msg:"Sync tempo to BPM",     tag:"feature"},
+      { sha:"f6a7b8", msg:"Add BPM display",        tag:"feature"},
+    ],
+  },
+
+  /* 4 ── Merge both strategy ── */
+  {
+    name: "Layer Cake",
+    difficulty: "Medium",
+    brief: "Both HEAD and incoming made additive changes to the same block — keep both lines combined to integrate all changes.",
+    debrief: "<strong>Merging both</strong> is the right call when both sides added independent, non-conflicting lines within the same block. The final result combines HEAD's and incoming's lines — no change is discarded.",
+    baseBranch: "main",
+    featureBranch: "feat/effects-chain",
+    commits: [
+      {
+        hash: "a7b8c9d",
+        message: "Add reverb effect",
+        type: "conflict",
+        file: "src/effects.js",
+        context_before: ["const EFFECTS = ["],
+        head:     ["  'chorus',"],
+        incoming: ["  'reverb',"],
+        context_after: ["];"],
+        resolution: "merge-both",
+        resolved_line: "  'chorus',\n  'reverb',",
+        hint: "HEAD added 'chorus', incoming added 'reverb'. Both are valid new effects — <strong>merge both</strong> lines to keep all additions.",
+      },
+      {
+        hash: "b8c9d0e",
+        message: "Add delay effect",
+        type: "conflict",
+        file: "src/effects.js",
+        context_before: ["const EFFECTS = ["],
+        head:     ["  'chorus', 'reverb',"],
+        incoming: ["  'delay',"],
+        context_after: ["];"],
+        resolution: "merge-both",
+        resolved_line: "  'chorus', 'reverb',\n  'delay',",
+        hint: "Keep accumulating effects — <strong>merge both</strong> again to build the complete effects chain.",
+      },
+    ],
+    history: [
+      { sha:"b0c1d2", msg:"Base audio engine",  tag:"base"    },
+      { sha:"a7b8c9", msg:"Add reverb effect",  tag:"feature" },
+      { sha:"b8c9d0", msg:"Add delay effect",   tag:"feature" },
+    ],
+  },
+
+  /* 5 ── Skip strategy (already in base) ── */
+  {
+    name: "Dead Wax",
+    difficulty: "Hard",
+    brief: "The feature commit tries to add a line that's already in the base branch. Use <strong>skip</strong> — applying it would duplicate the change.",
+    debrief: "When a commit's change has <strong>already been cherry-picked or merged into base</strong>, replaying it produces a conflict that looks like: HEAD already has the line, and incoming is identical. The correct strategy is <code>git rebase --skip</code>.",
+    baseBranch: "main",
+    featureBranch: "feat/crossfade",
+    commits: [
+      {
+        hash: "c9d0e1f",
+        message: "Add crossfade function",
+        type: "conflict",
+        file: "src/crossfade.js",
+        context_before: [],
+        head:     ["export function crossfade(a, b, t) { return a*(1-t) + b*t; }"],
+        incoming: ["export function crossfade(a, b, t) { return a*(1-t) + b*t; }"],
+        context_after: [],
+        resolution: "keep-head",
+        resolved_line: "export function crossfade(a, b, t) { return a*(1-t) + b*t; }",
+        hint: "Both versions are <strong>identical</strong> — main already has this change (cherry-pick). Keep HEAD or skip — the result is the same content.",
+      },
+      {
+        hash: "d0e1f2a",
+        message: "Improve crossfade curve",
+        type: "conflict",
+        file: "src/crossfade.js",
+        context_before: [],
+        head:     ["export function crossfade(a, b, t) { return a*(1-t) + b*t; }"],
+        incoming: ["export function crossfade(a, b, t) { const e = t*t*(3-2*t); return a*(1-e)+b*e; }"],
+        context_after: [],
+        resolution: "keep-incoming",
+        resolved_line: "export function crossfade(a, b, t) { const e = t*t*(3-2*t); return a*(1-e)+b*e; }",
+        hint: "Now the feature branch upgrades to a <strong>smoothstep curve</strong> — genuinely new improvement. Keep incoming.",
+      },
+    ],
+    history: [
+      { sha:"d0e1f2", msg:"Cherry-pick crossfade",  tag:"base"    },
+      { sha:"c9d0e1", msg:"Add crossfade fn",        tag:"feature" },
+      { sha:"d0e1f2", msg:"Improve crossfade curve", tag:"feature" },
+    ],
+  },
+
+  /* 6 ── Multi-file multi-hunk ── */
+  {
+    name: "The Final Mix",
+    difficulty: "Hard",
+    brief: "Three commits, two files, multiple conflict hunks. Resolve each hunk carefully — the full mix must play clean.",
+    debrief: "A complex rebase replays many commits, each possibly touching multiple files. The golden rule: read <strong>both sides carefully</strong>, understand the intent, then decide per-hunk. <code>git rebase</code> pauses at every conflicting commit — always a chance to get it right.",
+    baseBranch: "main",
+    featureBranch: "feat/master-output",
+    commits: [
+      {
+        hash: "e1f2a3b",
+        message: "Refactor output pipeline",
+        type: "conflict",
+        file: "src/pipeline.js",
+        context_before: ["function buildPipeline(opts) {"],
+        head:     ["  const stages = opts.stages || ['input','process'];"],
+        incoming: ["  const stages = opts.stages || ['input','process','output'];"],
+        context_after: ["}"],
+        resolution: "keep-incoming",
+        resolved_line: "  const stages = opts.stages || ['input','process','output'];",
+        hint: "The feature branch added an 'output' stage to the default pipeline. Keep <strong>incoming</strong>.",
+      },
+      {
+        hash: "f2a3b4c",
+        message: "Add master limiter",
+        type: "conflict",
+        file: "src/limiter.js",
+        context_before: ["const LIMITS = {"],
+        head:     ["  peak: -3,   // dBFS"],
+        incoming: ["  peak: -1,   // updated threshold"],
+        context_after: ["};"],
+        resolution: "keep-incoming",
+        resolved_line: "  peak: -1,   // updated threshold",
+        hint: "The feature branch updated the peak limiter threshold. Keep <strong>incoming</strong>.",
+      },
+      {
+        hash: "a3b4c5d",
+        message: "Add gain and metadata",
+        type: "conflict",
+        file: "src/metadata.js",
+        context_before: ["module.exports = {"],
+        head:     ["  version: '1.0',"],
+        incoming: ["  version: '2.0', gain: 1.0,"],
+        context_after: ["};"],
+        resolution: "merge-both",
+        resolved_line: "  version: '2.0', gain: 1.0,",
+        hint: "The feature branch bumped the version and added gain. Keep <strong>incoming</strong> (which subsumes HEAD's version string with a newer one).",
+      },
+    ],
+    history: [
+      { sha:"e0f1a2", msg:"Core engine v2",       tag:"base"    },
+      { sha:"e1f2a3", msg:"Refactor pipeline",    tag:"feature" },
+      { sha:"f2a3b4", msg:"Add master limiter",   tag:"feature" },
+      { sha:"a3b4c5", msg:"Add gain + metadata",  tag:"feature" },
+    ],
+  },
+];
+
+const TOTAL = LEVELS.length;
+
+/* ══════════════════════════════════════════════════════
+   STATE
+══════════════════════════════════════════════════════ */
+let state = {
+  level: 0, score: 0, streak: 0, bestStreak: 0,
+  solved: new Array(TOTAL).fill(false),
+  commitIdx: 0,          // which commit we are about to replay
+  sanity: 100,           // starts full, loses 15 per wrong choice
+  conflictsResolved: 0,  // conflicts resolved in current commit
+  conflictsTotal: 0,     // total conflicts in current commit
+  phase: 'idle',         // 'idle' | 'replaying' | 'done'
+  commitPhase: 'idle',   // 'idle' | 'clean' | 'conflict' | 'resolved'
+};
+
+function save() {
+  try { localStorage.setItem('dj_v1', JSON.stringify({ score:state.score, bestStreak:state.bestStreak, solved:state.solved, level:state.level })); } catch(e){}
+}
+function loadSave() {
+  try {
+    const p = JSON.parse(localStorage.getItem('dj_v1'));
+    if (!p) return;
+    state.score = p.score||0; state.bestStreak = p.bestStreak||0;
+    state.solved = p.solved||new Array(TOTAL).fill(false);
+    state.level  = p.level||0;
+  } catch(e){}
+}
+
+/* ══════════════════════════════════════════════════════
+   DOM helpers
+══════════════════════════════════════════════════════ */
+const $ = id => document.getElementById(id);
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ══════════════════════════════════════════════════════
+   LOAD LEVEL
+══════════════════════════════════════════════════════ */
+function loadLevel(idx) {
+  state.level   = idx;
+  state.commitIdx = 0;
+  state.sanity  = 100;
+  state.phase   = 'idle';
+  state.commitPhase = 'idle';
+  $('successOverlay').classList.remove('show');
+
+  const lv = LEVELS[idx];
+  $('levelLbl').textContent  = `LEVEL ${idx+1} / ${TOTAL}`;
+  const db = $('diffBadge');
+  db.textContent = lv.difficulty;
+  db.className   = 'diff-badge d-'+lv.difficulty.toLowerCase();
+  $('prevBtn').disabled = idx === 0;
+  $('nextBtn').disabled = idx === TOTAL - 1;
+
+  updateSanity(100);
+  setTurntable(false, lv.name);
+  renderCommitQueue(lv);
+  renderBranchMap(lv);
+  renderHistory(lv, []);
+  renderCanvas('idle');
+  $('replayBtn').disabled   = false;
+  $('continueBtn').disabled = true;
+  $('replayingCommit').textContent = '—';
+  updateDots();
+  updateProgList();
+}
+
+/* ══════════════════════════════════════════════════════
+   COMMIT QUEUE
+══════════════════════════════════════════════════════ */
+function renderCommitQueue(lv) {
+  const container = $('commitQueue');
+  container.innerHTML = '';
+  lv.commits.forEach((c, i) => {
+    const card = document.createElement('div');
+    card.className = 'commit-card';
+    card.id = 'cc_' + i;
+    const status = i < state.commitIdx ? 'applied' : i === state.commitIdx ? 'selected' : 'pending';
+    if (status !== 'pending') card.classList.add(status);
+
+    const badgeText = { applied:'✓ Applied', conflict:'⚡ Conflict', pending:'…' }[status] || '…';
+    card.innerHTML = `
+      <span class="cc-hash">${c.hash}</span>
+      <span class="cc-msg">${escHtml(c.message)}</span>
+      <span class="cc-meta">${c.file}</span>
+      <span class="cc-badge ${status}">${badgeText}</span>
+    `;
+    container.appendChild(card);
+  });
+}
+
+function updateCommitCard(idx, status) {
+  const card = $('cc_' + idx);
+  if (!card) return;
+  card.className = 'commit-card ' + status;
+  const badge = card.querySelector('.cc-badge');
+  if (badge) {
+    const txt = { applied:'✓ Applied', conflict:'⚡ Conflict', pending:'…', selected:'▶ Active' };
+    badge.textContent = txt[status] || '…';
+    badge.className = 'cc-badge ' + status;
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   BRANCH MAP
+══════════════════════════════════════════════════════ */
+function renderBranchMap(lv) {
+  const colors = { base: 'var(--cyan)', feature: 'var(--pink)' };
+  $('branchLines').innerHTML = `
+    <div class="bl"><div class="bl-dot" style="background:var(--cyan)"></div><span class="bl-name">${lv.baseBranch}</span> <span class="bl-sha">(HEAD)</span></div>
+    <div class="bl"><div class="bl-dot" style="background:var(--pink)"></div><span class="bl-name">${lv.featureBranch}</span> <span class="bl-sha">(replaying)</span></div>
+  `;
+}
+
+/* ══════════════════════════════════════════════════════
+   HISTORY GRAPH
+══════════════════════════════════════════════════════ */
+function renderHistory(lv, rebased) {
+  const hg = $('historyGraph');
+  hg.innerHTML = '';
+  lv.history.forEach((h, i) => {
+    const isRebased = rebased.includes(h.sha);
+    const tag = isRebased ? 'rebased' : h.tag;
+    const row = document.createElement('div');
+    row.className = 'hg-row';
+    row.innerHTML = `
+      <span class="hg-sha">${h.sha.slice(0,7)}</span>
+      ${i > 0 ? '<span class="hg-connector">│</span>' : ''}
+      <span class="hg-msg">${escHtml(h.msg)}</span>
+      <span class="hg-tag ${tag}">${tag}</span>
+    `;
+    hg.appendChild(row);
+  });
+}
+
+/* ══════════════════════════════════════════════════════
+   CANVAS RENDERING
+══════════════════════════════════════════════════════ */
+function renderCanvas(phase, commit) {
+  const canvas = $('centerCanvas');
+  canvas.innerHTML = '';
+
+  if (phase === 'idle') {
+    const idle = document.createElement('div');
+    idle.className = 'idle-prompt';
+    idle.innerHTML = `<span class="ip-icon">🎚️</span><span>Hit <strong style="color:var(--purple)">▶ Replay Next</strong> to start replaying commits</span>`;
+    canvas.appendChild(idle);
+    return;
+  }
+
+  if (phase === 'clean' && commit) {
+    const cb = document.createElement('div');
+    cb.className = 'clean-block';
+    cb.innerHTML = `
+      <div class="clean-header">✓ Applying cleanly — <strong>${escHtml(commit.hash)}</strong> · ${escHtml(commit.message)}</div>
+      <div class="clean-body">${escHtml(commit.file)}<br>${(commit.clean_lines||[]).map(l=>`<div style="color:var(--green);margin-top:3px">+ ${escHtml(l)}</div>`).join('')}</div>
+    `;
+    canvas.appendChild(cb);
+    return;
+  }
+
+  if (phase === 'conflict' && commit) {
+    renderConflict(canvas, commit);
+  }
+
+  if (phase === 'done') {
+    const lv = LEVELS[state.level];
+    const db = document.createElement('div');
+    db.className = 'debrief';
+    db.innerHTML = `
+      <div class="debrief-header">🎙️ Debrief — ${escHtml(lv.name)}</div>
+      <div class="debrief-body">${lv.debrief}</div>
+    `;
+    canvas.appendChild(db);
+  }
+}
+
+function renderConflict(canvas, commit) {
+  const block = document.createElement('div');
+  block.className = 'conflict-block';
+  block.id = 'cfBlock';
+
+  // Header
+  const hdr = document.createElement('div');
+  hdr.className = 'conflict-header'; hdr.id = 'cfHeader';
+  hdr.innerHTML = `
+    <span>⚡</span>
+    <span class="cf-file">${escHtml(commit.file)}</span>
+    <span class="cf-badge">CONFLICT</span>
+    <span style="margin-left:auto;font-size:0.62rem;color:var(--muted)">${escHtml(commit.hash)} · ${escHtml(commit.message)}</span>
+  `;
+  block.appendChild(hdr);
+
+  // Conflict editor
+  const editor = document.createElement('div');
+  editor.className = 'conflict-editor';
+
+  // Context before
+  (commit.context_before || []).forEach(line => {
+    const d = document.createElement('div');
+    d.className = 'cz-code-context'; d.textContent = line;
+    editor.appendChild(d);
+  });
+
+  // HEAD marker
+  const mHead = document.createElement('div');
+  mHead.className = 'cz-marker head'; mHead.textContent = '<<<<<<< HEAD';
+  editor.appendChild(mHead);
+
+  const headCode = document.createElement('div');
+  headCode.className = 'cz-code-head'; headCode.id = 'cfHead';
+  headCode.textContent = commit.head.join('\n');
+  editor.appendChild(headCode);
+
+  const mSep = document.createElement('div');
+  mSep.className = 'cz-marker sep'; mSep.textContent = '=======';
+  editor.appendChild(mSep);
+
+  const incomingCode = document.createElement('div');
+  incomingCode.className = 'cz-code-incoming'; incomingCode.id = 'cfIncoming';
+  incomingCode.textContent = commit.incoming.join('\n');
+  editor.appendChild(incomingCode);
+
+  const mIncoming = document.createElement('div');
+  mIncoming.className = 'cz-marker incoming'; mIncoming.textContent = `>>>>>>> ${commit.hash}`;
+  editor.appendChild(mIncoming);
+
+  // Context after
+  (commit.context_after || []).forEach(line => {
+    const d = document.createElement('div');
+    d.className = 'cz-code-context'; d.textContent = line;
+    editor.appendChild(d);
+  });
+
+  block.appendChild(editor);
+
+  // Hint
+  const hintDiv = document.createElement('div');
+  hintDiv.style.cssText = 'padding:0.5rem 0.75rem;background:rgba(176,77,255,0.05);border-top:1px solid rgba(176,77,255,0.1);font-size:0.7rem;color:var(--muted);line-height:1.5;';
+  hintDiv.innerHTML = `💡 ${commit.hint}`;
+  block.appendChild(hintDiv);
+
+  // Resolution buttons
+  const resRow = document.createElement('div');
+  resRow.className = 'resolution-row';
+  resRow.innerHTML = `
+    <button class="res-btn keep-head"     id="btnKeepHead"     aria-label="Keep HEAD version">↑ Keep HEAD<br><small style="opacity:0.7">base branch</small></button>
+    <button class="res-btn keep-incoming" id="btnKeepIncoming" aria-label="Keep incoming version">↓ Keep Incoming<br><small style="opacity:0.7">feature commit</small></button>
+    <button class="res-btn merge-both"    id="btnMergeBoth"    aria-label="Merge both versions">⇅ Merge Both<br><small style="opacity:0.7">keep all</small></button>
+  `;
+  block.appendChild(resRow);
+
+  // Resolved banner (hidden initially)
+  const banner = document.createElement('div');
+  banner.className = 'res-resolved-banner'; banner.id = 'resBanner';
+  banner.innerHTML = `<span>✓ Resolved</span><span id="resolvedCode" style="font-family:var(--font-code);font-size:0.68rem;color:var(--green)"></span>`;
+  block.appendChild(banner);
+
+  canvas.appendChild(block);
+
+  // Wire up resolution buttons
+  $('btnKeepHead').addEventListener('click',     () => resolveConflict('keep-head',     commit));
+  $('btnKeepIncoming').addEventListener('click', () => resolveConflict('keep-incoming', commit));
+  $('btnMergeBoth').addEventListener('click',    () => resolveConflict('merge-both',    commit));
+}
+
+/* ══════════════════════════════════════════════════════
+   CONFLICT RESOLUTION
+══════════════════════════════════════════════════════ */
+function resolveConflict(choice, commit) {
+  const correct = choice === commit.resolution;
+
+  // Update sanity
+  if (!correct) {
+    state.sanity = Math.max(0, state.sanity - 20);
+    updateSanity(state.sanity);
+    playTone(220, 0.07, 'sawtooth');
+  } else {
+    playTone(660, 0.06, 'sine', 0.1);
+  }
+
+  // Show resolved state
+  const block = $('cfBlock');
+  if (block) {
+    const hdr = $('cfHeader');
+    if (hdr) { hdr.className = 'conflict-header resolved'; hdr.innerHTML = `<span>✓</span><span class="cf-file">${escHtml(commit.file)}</span><span class="cf-badge">RESOLVED</span><span style="margin-left:auto;font-size:0.62rem;color:var(--green)">${choice.replace(/-/g,' ')}</span>`; }
+    // Replace editor section with resolved code
+    const editor = block.querySelector('.conflict-editor');
+    if (editor) {
+      editor.innerHTML = '';
+      const resolved = document.createElement('div');
+      resolved.className = 'resolved-code';
+      resolved.textContent = commit.resolved_line;
+      editor.appendChild(resolved);
+    }
+    // Disable buttons
+    ['btnKeepHead','btnKeepIncoming','btnMergeBoth'].forEach(id => {
+      const b = $(id); if (b) b.disabled = true;
+    });
+    const banner = $('resBanner');
+    if (banner) { banner.classList.add('show'); }
+  }
+
+  // Enable continue button
+  $('continueBtn').disabled = false;
+  $('replayBtn').disabled   = true;
+  state.commitPhase = 'resolved';
+}
+
+/* ══════════════════════════════════════════════════════
+   REPLAY ENGINE
+══════════════════════════════════════════════════════ */
+function replayNext() {
+  const lv = LEVELS[state.level];
+  if (state.commitIdx >= lv.commits.length) {
+    // All done
+    finishLevel();
+    return;
+  }
+
+  const commit = lv.commits[state.commitIdx];
+  $('replayingCommit').textContent = `${commit.hash.slice(0,7)} — ${commit.message}`;
+  updateCommitCard(state.commitIdx, 'selected');
+  setTurntable(true, lv.name);
+
+  $('replayBtn').disabled   = true;
+  $('continueBtn').disabled = true;
+
+  if (commit.type === 'clean') {
+    renderCanvas('clean', commit);
+    setTimeout(() => {
+      updateCommitCard(state.commitIdx, 'applied');
+      state.commitIdx++;
+      renderCommitQueue(lv);
+      $('replayBtn').disabled   = false;
+      $('continueBtn').disabled = true;
+      state.commitPhase = 'idle';
+      playTone(440, 0.05, 'sine', 0.12);
+    }, 900);
+  } else {
+    // Conflict
+    updateCommitCard(state.commitIdx, 'conflict');
+    renderCanvas('conflict', commit);
+    state.commitPhase = 'conflict';
+  }
+
+  state.phase = 'replaying';
+}
+
+function continueAfterResolve() {
+  const lv = LEVELS[state.level];
+  updateCommitCard(state.commitIdx, 'applied');
+  state.commitIdx++;
+  renderCommitQueue(lv);
+
+  if (state.commitIdx >= lv.commits.length) {
+    finishLevel();
+  } else {
+    $('replayBtn').disabled   = false;
+    $('continueBtn').disabled = true;
+    renderCanvas('idle');
+    $('replayingCommit').textContent = '— ready for next commit';
+    state.commitPhase = 'idle';
+  }
+}
+
+function finishLevel() {
+  setTurntable(false, LEVELS[state.level].name);
+  renderCanvas('done');
+  $('replayBtn').disabled   = true;
+  $('continueBtn').disabled = true;
+  state.phase = 'done';
+  renderHistory(LEVELS[state.level], []);
+
+  setTimeout(() => {
+    if (!state.solved[state.level]) {
+      state.solved[state.level] = true;
+      const pts = { Easy:100, Medium:200, Hard:300 }[LEVELS[state.level].difficulty] || 150;
+      state.score  += pts;
+      state.streak++;
+      if (state.streak > state.bestStreak) state.bestStreak = state.streak;
+      updateScoreUI(); save();
+      playSuccess();
+    }
+    $('successSub').textContent = `${LEVELS[state.level].name} mixed clean. Sanity remaining: ${state.sanity}%.`;
+    $('successOverlay').classList.add('show');
+    updateDots(); updateProgList();
+  }, 600);
+}
+
+/* ══════════════════════════════════════════════════════
+   TURNTABLE & SANITY
+══════════════════════════════════════════════════════ */
+function setTurntable(playing, label) {
+  const tt = $('turntable');
+  tt.classList.toggle('playing', playing);
+  tt.classList.toggle('paused', !playing);
+  $('deckEmoji').textContent  = playing ? '▶' : '⏸';
+  $('deckLabel').textContent  = playing ? (label || 'PLAYING').toUpperCase().slice(0,10) : 'STOPPED';
+}
+
+function updateSanity(v) {
+  state.sanity = v;
+  $('sanityBar').style.width = v + '%';
+  $('sanityBar').style.backgroundPosition = (100 - v) + '% 0';
+  const el = $('sanityVal');
+  el.textContent = v + '%';
+  el.className = 'mv' + (v > 60 ? ' ok' : v > 30 ? ' warn' : ' danger');
+}
+
+function updateScoreUI() {
+  $('scoreVal').textContent  = state.score;
+  $('streakVal').textContent = state.bestStreak;
+}
+
+/* ══════════════════════════════════════════════════════
+   DOTS & PROGRESS
+══════════════════════════════════════════════════════ */
+function updateDots() {
+  const c = $('dots'); c.innerHTML = '';
+  for (let i=0; i<TOTAL; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot'+(state.solved[i]?' done':i===state.level?' active':'');
+    d.addEventListener('click', () => loadLevel(i));
+    c.appendChild(d);
+  }
+}
+function updateProgList() {
+  const ul = $('progList'); ul.innerHTML = '';
+  LEVELS.forEach((lv,i) => {
+    const li = document.createElement('div');
+    li.className = 'prog-item'+(state.solved[i]?' done':i===state.level?' active':'');
+    li.innerHTML = `<div class="pi-dot"></div>${lv.name}`;
+    li.addEventListener('click', () => loadLevel(i));
+    ul.appendChild(li);
+  });
+}
+
+/* ══════════════════════════════════════════════════════
+   BUTTONS
+══════════════════════════════════════════════════════ */
+$('replayBtn').addEventListener('click', () => {
+  if (state.commitPhase === 'idle' || state.commitPhase === 'resolved') replayNext();
+});
+$('continueBtn').addEventListener('click', () => {
+  if (state.commitPhase === 'resolved') continueAfterResolve();
+});
+$('resetBtn').addEventListener('click', () => loadLevel(state.level));
+$('prevBtn').addEventListener('click', () => { if(state.level>0) loadLevel(state.level-1); });
+$('nextBtn').addEventListener('click', () => { if(state.level<TOTAL-1) loadLevel(state.level+1); });
+$('retryBtn').addEventListener('click', () => { $('successOverlay').classList.remove('show'); loadLevel(state.level); });
+$('nextLvlBtn').addEventListener('click', () => {
+  $('successOverlay').classList.remove('show');
+  if (state.level < TOTAL-1) loadLevel(state.level+1); else showAllDone();
+});
+$('restartBtn').addEventListener('click', () => {
+  $('alldoneOverlay').classList.remove('show');
+  state.score=0; state.streak=0; state.bestStreak=0;
+  state.solved=new Array(TOTAL).fill(false);
+  updateScoreUI(); save(); loadLevel(0);
+});
+function showAllDone() {
+  $('finalScore').textContent  = state.score;
+  $('finalStreak').textContent = state.bestStreak;
+  $('finalLvls').textContent   = TOTAL;
+  $('alldoneOverlay').classList.add('show');
+}
+
+/* ══════════════════════════════════════════════════════
+   KEYBOARD
+══════════════════════════════════════════════════════ */
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    if (!$('replayBtn').disabled) replayNext();
+    else if (!$('continueBtn').disabled) continueAfterResolve();
+  }
+  if (e.key === 'ArrowRight' && state.level<TOTAL-1) loadLevel(state.level+1);
+  if (e.key === 'ArrowLeft'  && state.level>0)       loadLevel(state.level-1);
+  if (e.key.toLowerCase()==='r') loadLevel(state.level);
+  // resolution shortcuts
+  if (e.key==='1' && !$('btnKeepHead')?.disabled)     $('btnKeepHead')?.click();
+  if (e.key==='2' && !$('btnKeepIncoming')?.disabled) $('btnKeepIncoming')?.click();
+  if (e.key==='3' && !$('btnMergeBoth')?.disabled)    $('btnMergeBoth')?.click();
+});
+
+/* ══════════════════════════════════════════════════════
+   WEB AUDIO
+══════════════════════════════════════════════════════ */
+let audioCtx=null;
+function getCtx(){if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();return audioCtx;}
+function playTone(freq,vol,type,dur=0.15){
+  try{
+    const ctx=getCtx();const o=ctx.createOscillator();const g=ctx.createGain();
+    o.connect(g);g.connect(ctx.destination);
+    o.type=type;o.frequency.value=freq;
+    g.gain.setValueAtTime(vol,ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+dur);
+    o.start();o.stop(ctx.currentTime+dur);
+  }catch(e){}
+}
+function playSuccess(){
+  [330,440,550,660,880].forEach((f,i)=>setTimeout(()=>playTone(f,0.08,'sine',0.2),i*60));
+}
+
+/* ══════════════════════════════════════════════════════
+   INIT
+══════════════════════════════════════════════════════ */
+loadSave();
+updateScoreUI();
+loadLevel(state.level);
+</script>
+</body>
+</html>

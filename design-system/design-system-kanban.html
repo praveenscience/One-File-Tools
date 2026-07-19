@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Docket — A Kanban Job Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Onest:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<style>
+:root{
+  --paper:#f7f4ea; --paper2:#efe9d8; --paper3:#e6ddc4;
+  --ink:#1c2420; --ink-dim:#5c665d; --ink-faint:#8b9389;
+  --line:#ddd3b3; --line-soft:#e8e0c8;
+  --teal:#24504a; --teal-bright:#356e64; --teal-glow:rgba(36,80,74,.08);
+  --coral:#c1503a; --coral-glow:rgba(193,80,58,.12);
+  --ochre:#c1923a; --ochre-glow:rgba(193,146,58,.12);
+  --sage:#5f8a5c; --sage-glow:rgba(95,138,92,.12);
+  --shadow-card:0 1px 2px rgba(28,36,32,.06), 0 4px 10px rgba(28,36,32,.06);
+  --shadow-modal:0 24px 60px rgba(28,36,32,.28);
+  --font-display:'Fraunces',serif;
+  --font-ui:'Onest',sans-serif;
+  --font-mono:'Spline Sans Mono',monospace;
+}
+html.dark{
+  --paper:#151a17; --paper2:#1c221e; --paper3:#232a24;
+  --ink:#ecece4; --ink-dim:#9aa39a; --ink-faint:#69746c;
+  --line:#31392f; --line-soft:#293026;
+  --teal:#7fb0a6; --teal-bright:#9bc7bd; --teal-glow:rgba(127,176,166,.1);
+  --coral:#e0806a; --coral-glow:rgba(224,128,106,.14);
+  --ochre:#dcb56a; --ochre-glow:rgba(220,181,106,.14);
+  --sage:#8fbb8a; --sage-glow:rgba(143,187,138,.14);
+  --shadow-card:0 1px 2px rgba(0,0,0,.3), 0 6px 16px rgba(0,0,0,.32);
+  --shadow-modal:0 24px 70px rgba(0,0,0,.55);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{background:var(--paper);}
+body{
+  background:
+    radial-gradient(circle at 1px 1px, rgba(28,36,32,.05) 1px, transparent 0) 0 0/22px 22px,
+    var(--paper);
+  color:var(--ink); font-family:var(--font-ui); min-height:100vh; line-height:1.55;
+  transition:background-color .25s, color .25s;
+}
+html.dark body{
+  background:
+    radial-gradient(circle at 1px 1px, rgba(255,255,255,.035) 1px, transparent 0) 0 0/22px 22px,
+    var(--paper);
+}
+button,input,select,textarea{font-family:inherit; color:inherit;}
+button{cursor:pointer; background:none; border:none;}
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible{ outline:2px solid var(--teal); outline-offset:2px; }
+::selection{ background:var(--teal-glow); }
+.shell{ max-width:1240px; margin:0 auto; padding:34px 28px 70px; }
+
+/* ============ MASTHEAD ============ */
+.masthead{ display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap; margin-bottom:30px; }
+.brand-row{ display:flex; align-items:center; gap:14px; }
+.brand-mark{ width:42px; height:42px; flex-shrink:0; color:var(--teal); }
+.brand-text h1{ font-family:var(--font-display); font-weight:700; font-size:26px; letter-spacing:.005em; }
+.brand-text p{ font-family:var(--font-mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-faint); margin-top:4px; }
+.masthead-actions{ display:flex; align-items:center; gap:10px; }
+.theme-toggle{
+  width:38px; height:38px; border-radius:50%; border:1.5px solid var(--line); display:grid; place-items:center;
+  color:var(--ink-dim); transition:border-color .15s, color .15s;
+}
+.theme-toggle:hover{ border-color:var(--teal); color:var(--teal); }
+.theme-toggle svg{ width:17px; height:17px; }
+.new-task-btn{
+  display:inline-flex; align-items:center; gap:9px; font-weight:600; font-size:13.5px;
+  padding:11px 20px; background:var(--teal); color:var(--paper); border-radius:6px; transition:background .15s, transform .15s;
+}
+.new-task-btn:hover{ background:var(--teal-bright); transform:translateY(-1px); }
+.new-task-btn svg{ width:15px; height:15px; }
+
+/* ============ BOARD ============ */
+.board{ display:grid; grid-template-columns:repeat(3,1fr); gap:22px; align-items:start; }
+@media (max-width:900px){ .board{ grid-template-columns:1fr; } }
+
+.lane{ display:flex; flex-direction:column; }
+.lane-head{ display:flex; align-items:center; gap:12px; margin-bottom:16px; padding-bottom:14px; border-bottom:2px solid var(--line); }
+.lane-stamp{
+  width:36px; height:36px; border-radius:50%; border:2px solid currentColor; display:grid; place-items:center;
+  font-family:var(--font-mono); font-weight:600; font-size:13px; flex-shrink:0; transform:rotate(-6deg);
+  transition:transform .2s ease;
+}
+.lane[data-status="todo"] .lane-stamp{ color:var(--ink-dim); }
+.lane[data-status="progress"] .lane-stamp{ color:var(--ochre); }
+.lane[data-status="done"] .lane-stamp{ color:var(--sage); }
+.lane-stamp.bump{ animation:stampBump .28s ease; }
+@keyframes stampBump{ 0%{transform:rotate(-6deg) scale(1);} 45%{transform:rotate(-6deg) scale(1.18);} 100%{transform:rotate(-6deg) scale(1);} }
+.lane-title{ font-family:var(--font-display); font-weight:600; font-size:18px; }
+.lane-sub{ font-family:var(--font-mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-faint); margin-top:2px; }
+
+.lane-body{
+  background:var(--paper2); border:1px solid var(--line-soft); border-radius:10px; padding:14px; min-height:160px;
+  display:flex; flex-direction:column; gap:12px;
+}
+.lane-empty{
+  border:1.5px dashed var(--line); border-radius:8px; padding:26px 14px; text-align:center;
+  font-size:12.5px; color:var(--ink-faint); font-style:italic;
+}
+
+/* ============ TICKET CARDS (signature element) ============ */
+.ticket{
+  position:relative; background:var(--paper); border:1px solid var(--line); border-radius:7px;
+  padding:16px 16px 12px 18px; box-shadow:var(--shadow-card); cursor:grab;
+  transition:box-shadow .18s, transform .18s;
+}
+.ticket:hover{ box-shadow:0 2px 4px rgba(28,36,32,.08), 0 10px 20px rgba(28,36,32,.1); }
+html.dark .ticket:hover{ box-shadow:0 2px 6px rgba(0,0,0,.35), 0 12px 26px rgba(0,0,0,.4); }
+.ticket.sortable-ghost{ opacity:.35; }
+.ticket.sortable-chosen{ cursor:grabbing; }
+.ticket.sortable-drag{ box-shadow:0 20px 40px rgba(0,0,0,.25); }
+
+/* perforated left edge */
+.ticket::before{
+  content:""; position:absolute; left:0; top:8px; bottom:8px; width:1px;
+  background-image:repeating-linear-gradient(180deg, var(--line) 0 3px, transparent 3px 8px);
+}
+/* folded corner priority flag */
+.ticket-flag{
+  position:absolute; top:0; right:0; width:0; height:0;
+  border-style:solid; border-width:0 26px 26px 0; border-color:transparent var(--flag-color, var(--ink-faint)) transparent transparent;
+  border-radius:0 7px 0 0;
+}
+.ticket-flag-label{
+  position:absolute; top:3px; right:2px; font-family:var(--font-mono); font-size:7.5px; font-weight:600; color:var(--paper);
+  transform:rotate(45deg); letter-spacing:.03em;
+}
+.ticket.priority-urgent .ticket-flag{ --flag-color: var(--coral); }
+.ticket.priority-normal .ticket-flag{ --flag-color: var(--ochre); }
+.ticket.priority-low .ticket-flag{ --flag-color: var(--sage); }
+
+.ticket-title{ font-family:var(--font-ui); font-weight:600; font-size:14.5px; color:var(--ink); margin:0 22px 12px 4px; line-height:1.4; }
+.ticket-meta{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding-left:4px; }
+.avatar{
+  width:26px; height:26px; border-radius:50%; display:grid; place-items:center; flex-shrink:0;
+  font-family:var(--font-mono); font-weight:600; font-size:10px; color:#fff;
+}
+.avatar-name{ font-size:11px; color:var(--ink-dim); }
+.assignee-group{ display:flex; align-items:center; gap:8px; }
+
+.due-stub{
+  display:inline-flex; align-items:center; gap:5px; font-family:var(--font-mono); font-size:10.5px; color:var(--ink-faint);
+  border-top:1px dashed var(--line); margin:12px -16px -12px 4px; padding:9px 16px 0 0;
+}
+.due-stub svg{ width:11px; height:11px; }
+.due-stub.overdue{ color:var(--coral); }
+.ticket-delete{
+  position:absolute; bottom:9px; right:10px; width:20px; height:20px; border-radius:5px; display:grid; place-items:center;
+  color:var(--ink-faint); opacity:0; transition:opacity .15s, color .15s, background .15s;
+}
+.ticket:hover .ticket-delete{ opacity:1; }
+.ticket-delete:hover{ color:var(--coral); background:var(--coral-glow); }
+.ticket-delete svg{ width:12px; height:12px; }
+
+/* ============ MODAL ============ */
+.modal-backdrop{
+  position:fixed; inset:0; background:rgba(20,24,20,.5); backdrop-filter:blur(2px); z-index:90;
+  display:flex; align-items:center; justify-content:center; padding:20px; opacity:0; pointer-events:none; transition:opacity .18s;
+}
+.modal-backdrop.open{ opacity:1; pointer-events:auto; }
+.modal-card{
+  width:100%; max-width:440px; background:var(--paper); border:1px solid var(--line); border-radius:12px;
+  padding:28px 28px 24px; box-shadow:var(--shadow-modal); transform:translateY(10px) scale(.98); transition:transform .18s;
+}
+.modal-backdrop.open .modal-card{ transform:translateY(0) scale(1); }
+.modal-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:22px; }
+.modal-title{ font-family:var(--font-display); font-weight:700; font-size:21px; }
+.modal-close{ width:30px; height:30px; border-radius:50%; display:grid; place-items:center; color:var(--ink-faint); transition:background .15s, color .15s; }
+.modal-close:hover{ background:var(--line-soft); color:var(--ink); }
+.modal-close svg{ width:14px; height:14px; }
+
+.field-group{ margin-bottom:16px; }
+.field-group label{ display:block; font-size:11.5px; font-weight:600; color:var(--ink-dim); margin-bottom:7px; text-transform:uppercase; letter-spacing:.05em; }
+.field-group input, .field-group select{
+  width:100%; background:var(--paper2); border:1px solid var(--line); border-radius:7px; padding:10px 12px; font-size:13.5px; color:var(--ink);
+}
+.field-row{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.priority-choice{ display:flex; gap:8px; }
+.priority-opt{
+  flex:1; padding:9px; border:1.5px solid var(--line); border-radius:7px; font-size:12px; font-weight:600; text-align:center;
+  color:var(--ink-dim); transition:border-color .15s, color .15s, background .15s;
+}
+.priority-opt.selected.urgent{ border-color:var(--coral); color:var(--coral); background:var(--coral-glow); }
+.priority-opt.selected.normal{ border-color:var(--ochre); color:var(--ochre); background:var(--ochre-glow); }
+.priority-opt.selected.low{ border-color:var(--sage); color:var(--sage); background:var(--sage-glow); }
+
+.modal-actions{ display:flex; gap:12px; margin-top:22px; }
+.btn-secondary{ flex:1; padding:11px; border:1.5px solid var(--line); border-radius:7px; font-weight:600; font-size:13px; color:var(--ink-dim); transition:border-color .15s, color .15s; }
+.btn-secondary:hover{ border-color:var(--ink-dim); color:var(--ink); }
+.btn-primary{ flex:1; padding:11px; border-radius:7px; background:var(--teal); color:var(--paper); font-weight:700; font-size:13px; transition:background .15s; }
+.btn-primary:hover{ background:var(--teal-bright); }
+.field-error{ font-size:11.5px; color:var(--coral); margin-top:6px; display:none; }
+.field-error.show{ display:block; }
+
+@media (max-width:480px){ .field-row{ grid-template-columns:1fr; } }
+@media (prefers-reduced-motion:reduce){ *,*::before,*::after{ transition:none !important; animation:none !important; } }
+</style>
+</head>
+<body>
+<div class="shell" id="app"></div>
+
+<script>
+/* ============================================================
+   DOCKET — A KANBAN JOB BOARD
+   ============================================================ */
+
+const ICONS = {
+  brand:`<svg viewBox="0 0 42 42" fill="none"><rect x="3" y="3" width="36" height="36" rx="6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 15h18M12 21h18M12 27h11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
+  sun:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8l1.8-1.8M18 6l1.8-1.8"/></svg>`,
+  moon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>`,
+  plus:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`,
+  close:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`,
+  trash:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14"/></svg>`,
+  calendar:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>`
+};
+
+const LANES = [
+  { key:"todo", label:"To Do", sub:"Awaiting pickup" },
+  { key:"progress", label:"In Progress", sub:"Currently underway" },
+  { key:"done", label:"Done", sub:"Cleared for archive" }
+];
+const PRIORITY_LABEL = { urgent:"URG", normal:"NRM", low:"LOW" };
+const AVATAR_PALETTE = ["#24504a","#c1503a","#c1923a","#5f8a5c","#5b6ea3","#8a5b8f"];
+
+const STORAGE_KEY = "docket_kanban_v1";
+const THEME_KEY = "docket_theme";
+
+function freshTasks(){
+  return [
+    { id:uid(), status:"todo", title:"Draft onboarding email sequence", assignee:"Nadia R.", priority:"urgent", due:offsetDate(-1) },
+    { id:uid(), status:"todo", title:"Audit color contrast on settings page", assignee:"Theo M.", priority:"normal", due:offsetDate(4) },
+    { id:uid(), status:"todo", title:"Collect icon set for empty states", assignee:"Priya K.", priority:"low", due:offsetDate(9) },
+    { id:uid(), status:"progress", title:"Redesign the billing summary card", assignee:"Theo M.", priority:"normal", due:offsetDate(2) },
+    { id:uid(), status:"progress", title:"Write release notes for v2.4", assignee:"Nadia R.", priority:"low", due:offsetDate(6) },
+    { id:uid(), status:"done", title:"Ship dark mode across dashboard", assignee:"Priya K.", priority:"normal", due:offsetDate(-3) },
+    { id:uid(), status:"done", title:"Fix avatar upload crop bug", assignee:"Sam O.", priority:"urgent", due:offsetDate(-6) }
+  ];
+}
+function uid(){ return "t" + Math.random().toString(36).slice(2,9); }
+function offsetDate(days){
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0,10);
+}
+function formatDue(dateStr){
+  const d = new Date(dateStr + "T00:00:00");
+  const today = new Date(); today.setHours(0,0,0,0);
+  const diffDays = Math.round((d - today) / 86400000);
+  const label = d.toLocaleDateString(undefined, { month:"short", day:"numeric" });
+  if(diffDays < 0) return { text:`${label} · overdue`, overdue:true };
+  if(diffDays === 0) return { text:`${label} · today`, overdue:false };
+  return { text:label, overdue:false };
+}
+function initialsOf(name){
+  return name.trim().split(/\s+/).map(p=>p[0]).slice(0,2).join("").toUpperCase();
+}
+function colorFor(name){
+  let hash = 0;
+  for(const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) % AVATAR_PALETTE.length;
+  return AVATAR_PALETTE[hash];
+}
+function esc(s){ const d=document.createElement("div"); d.textContent=s; return d.innerHTML; }
+
+function loadTasks(){
+  try{ const raw = localStorage.getItem(STORAGE_KEY); if(raw) return JSON.parse(raw); }catch(e){}
+  return freshTasks();
+}
+function saveTasks(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); }catch(e){} }
+
+let tasks = loadTasks();
+let modalOpen = false;
+let modalPriority = "normal";
+
+/* ============ RENDER ============ */
+function render(){
+  document.getElementById("app").innerHTML = `
+    <div class="masthead">
+      <div class="brand-row">
+        <div class="brand-mark">${ICONS.brand}</div>
+        <div class="brand-text"><h1>Docket</h1><p>The Job Board — Kanban Workflow</p></div>
+      </div>
+      <div class="masthead-actions">
+        <button class="theme-toggle" onclick="toggleTheme()" id="theme-toggle" aria-label="Toggle color theme"></button>
+        <button class="new-task-btn" onclick="openModal()">${ICONS.plus} New Task</button>
+      </div>
+    </div>
+
+    <div class="board">
+      ${LANES.map(lane => renderLane(lane)).join("")}
+    </div>
+
+    ${modalOpen ? renderModal() : ""}
+  `;
+  updateThemeIcon();
+  initSortable();
+  if(modalOpen){
+    const first = document.getElementById("field-title");
+    if(first) first.focus();
+  }
+}
+
+function renderLane(lane){
+  const laneTasks = tasks.filter(t => t.status === lane.key);
+  return `<div class="lane" data-status="${lane.key}">
+    <div class="lane-head">
+      <div class="lane-stamp" id="stamp-${lane.key}">${laneTasks.length}</div>
+      <div>
+        <div class="lane-title">${lane.label}</div>
+        <div class="lane-sub">${lane.sub}</div>
+      </div>
+    </div>
+    <div class="lane-body" id="lane-${lane.key}" data-status="${lane.key}">
+      ${laneTasks.length ? laneTasks.map(t => renderTicket(t)).join("") : `<div class="lane-empty">No tasks here yet.</div>`}
+    </div>
+  </div>`;
+}
+
+function renderTicket(t){
+  const due = formatDue(t.due);
+  const color = colorFor(t.assignee);
+  return `<div class="ticket priority-${t.priority}" data-id="${t.id}">
+    <div class="ticket-flag"><span class="ticket-flag-label">${PRIORITY_LABEL[t.priority]}</span></div>
+    <div class="ticket-title">${esc(t.title)}</div>
+    <div class="ticket-meta">
+      <div class="assignee-group">
+        <div class="avatar" style="background:${color}">${esc(initialsOf(t.assignee))}</div>
+        <span class="avatar-name">${esc(t.assignee)}</span>
+      </div>
+    </div>
+    <div class="due-stub ${due.overdue?'overdue':''}">${ICONS.calendar} ${due.text}</div>
+    <button class="ticket-delete" onclick="deleteTask('${t.id}')" aria-label="Delete task">${ICONS.trash}</button>
+  </div>`;
+}
+
+/* ============ THEME ============ */
+function updateThemeIcon(){
+  const btn = document.getElementById("theme-toggle");
+  if(!btn) return;
+  const isDark = document.documentElement.classList.contains("dark");
+  btn.innerHTML = isDark ? ICONS.sun : ICONS.moon;
+}
+function toggleTheme(){
+  const html = document.documentElement;
+  html.classList.toggle("dark");
+  try{ localStorage.setItem(THEME_KEY, html.classList.contains("dark") ? "dark" : "light"); }catch(e){}
+  updateThemeIcon();
+}
+function applyStoredTheme(){
+  let theme;
+  try{ theme = localStorage.getItem(THEME_KEY); }catch(e){}
+  if(!theme) theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  document.documentElement.classList.toggle("dark", theme === "dark");
+}
+
+/* ============ DRAG & DROP ============ */
+function initSortable(){
+  LANES.forEach(lane => {
+    const el = document.getElementById("lane-"+lane.key);
+    if(!el) return;
+    Sortable.create(el, {
+      group:"kanban",
+      animation:180,
+      ghostClass:"sortable-ghost",
+      chosenClass:"sortable-chosen",
+      dragClass:"sortable-drag",
+      onEnd(evt){
+        const id = evt.item.dataset.id;
+        const newStatus = evt.to.dataset.status;
+        const task = tasks.find(t => t.id === id);
+        if(task) task.status = newStatus;
+        saveTasks();
+        refreshCountsOnly();
+      }
+    });
+  });
+}
+
+/* patch only the count stamps + empty-state placeholders after a drag,
+   so Sortable's own DOM (which the library is actively managing) is never
+   torn down by a full render() mid-interaction */
+function refreshCountsOnly(){
+  LANES.forEach(lane => {
+    const laneEl = document.getElementById("lane-"+lane.key);
+    const stamp = document.getElementById("stamp-"+lane.key);
+    if(!laneEl || !stamp) return;
+    const count = laneEl.querySelectorAll(".ticket").length;
+    stamp.textContent = count;
+    stamp.classList.remove("bump");
+    void stamp.offsetWidth;
+    stamp.classList.add("bump");
+    const emptyState = laneEl.querySelector(".lane-empty");
+    if(count > 0 && emptyState) emptyState.remove();
+    if(count === 0 && !laneEl.querySelector(".lane-empty")){
+      laneEl.innerHTML = `<div class="lane-empty">No tasks here yet.</div>`;
+    }
+  });
+}
+
+/* ============ MODAL ============ */
+function openModal(){ modalOpen = true; modalPriority = "normal"; render(); }
+function closeModal(){ modalOpen = false; render(); }
+function setModalPriority(p){
+  modalPriority = p;
+  document.querySelectorAll(".priority-opt").forEach(el => {
+    el.classList.toggle("selected", el.dataset.priority === p);
+  });
+}
+
+function renderModal(){
+  return `<div class="modal-backdrop open" onclick="if(event.target===this) closeModal()">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-head">
+        <div class="modal-title" id="modal-title">New Task</div>
+        <button class="modal-close" onclick="closeModal()" aria-label="Close">${ICONS.close}</button>
+      </div>
+      <form id="task-form" onsubmit="handleSubmit(event)">
+        <div class="field-group">
+          <label for="field-title">Task Title</label>
+          <input id="field-title" type="text" placeholder="e.g. Design the empty-state illustration" required>
+        </div>
+        <div class="field-row">
+          <div class="field-group">
+            <label for="field-assignee">Assignee</label>
+            <input id="field-assignee" type="text" placeholder="e.g. Jordan P." required>
+          </div>
+          <div class="field-group">
+            <label for="field-due">Due Date</label>
+            <input id="field-due" type="date" value="${offsetDate(3)}" required>
+          </div>
+        </div>
+        <div class="field-group">
+          <label>Priority</label>
+          <div class="priority-choice">
+            <button type="button" class="priority-opt urgent ${modalPriority==='urgent'?'selected':''}" data-priority="urgent" onclick="setModalPriority('urgent')">Urgent</button>
+            <button type="button" class="priority-opt normal ${modalPriority==='normal'?'selected':''}" data-priority="normal" onclick="setModalPriority('normal')">Normal</button>
+            <button type="button" class="priority-opt low ${modalPriority==='low'?'selected':''}" data-priority="low" onclick="setModalPriority('low')">Low</button>
+          </div>
+        </div>
+        <div class="field-group">
+          <label for="field-status">Column</label>
+          <select id="field-status">
+            ${LANES.map(l => `<option value="${l.key}">${l.label}</option>`).join("")}
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn-primary">Add Task</button>
+        </div>
+      </form>
+    </div>
+  </div>`;
+}
+
+function handleSubmit(e){
+  e.preventDefault();
+  const title = document.getElementById("field-title").value.trim();
+  const assignee = document.getElementById("field-assignee").value.trim();
+  const due = document.getElementById("field-due").value;
+  const status = document.getElementById("field-status").value;
+  if(!title || !assignee || !due) return;
+  tasks.push({ id:uid(), status, title, assignee, priority:modalPriority, due });
+  saveTasks();
+  modalOpen = false;
+  render();
+}
+
+function deleteTask(id){
+  tasks = tasks.filter(t => t.id !== id);
+  saveTasks();
+  render();
+}
+
+document.addEventListener("keydown", (e) => {
+  if(e.key === "Escape" && modalOpen) closeModal();
+});
+
+
+applyStoredTheme();
+render();
+</script>
+</body>
+</html>

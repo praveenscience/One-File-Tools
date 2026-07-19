@@ -1,0 +1,1394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Microtask Heist | JavaScript Fundamentals Quest</title>
+  <meta name="description" content="A heist-themed JavaScript quest where you orchestrate Promise chains and queueMicrotask calls to produce an exact execution order. Master the microtask queue." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;700&family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ── Tokens ──────────────────────────────────────────── */
+    :root {
+      --bg:       #060810;
+      --surface:  rgba(10, 14, 28, 0.9);
+      --card:     rgba(14, 20, 40, 0.95);
+      --panel:    rgba(8, 12, 24, 0.98);
+
+      --green:    #00ff9d;
+      --green-d:  rgba(0, 255, 157, 0.12);
+      --cyan:     #00cfff;
+      --cyan-d:   rgba(0, 207, 255, 0.12);
+      --gold:     #ffd166;
+      --gold-d:   rgba(255, 209, 102, 0.12);
+      --red:      #ff4757;
+      --red-d:    rgba(255, 71, 87, 0.12);
+      --purple:   #c77dff;
+      --purple-d: rgba(199, 125, 255, 0.12);
+      --orange:   #ff8c42;
+      --orange-d: rgba(255, 140, 66, 0.12);
+
+      --border:   rgba(0, 207, 255, 0.1);
+      --border-hi:rgba(0, 207, 255, 0.35);
+      --text:     #c8d8f0;
+      --muted:    #5a7090;
+
+      --font-ui:   'Orbitron', sans-serif;
+      --font-body: 'Rajdhani', sans-serif;
+      --font-code: 'Fira Code', monospace;
+      --ease:      cubic-bezier(0.4, 0, 0.2, 1);
+      --r: 8px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: var(--font-body);
+      width: 100vw; height: 100vh; overflow: hidden;
+      display: flex; justify-content: center; align-items: center;
+    }
+
+    /* ── BG ──────────────────────────────────────────────── */
+    .bg {
+      position: fixed; inset: 0; z-index: 0; overflow: hidden;
+      background:
+        radial-gradient(ellipse 70% 50% at 10% 90%, rgba(0,255,157,0.06) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 90% 10%, rgba(199,125,255,0.07) 0%, transparent 60%);
+    }
+    .scanlines {
+      position: fixed; inset: 0; z-index: 1; pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg, transparent, transparent 2px,
+        rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px
+      );
+    }
+    .noise {
+      position: fixed; inset: 0; z-index: 1; pointer-events: none;
+      opacity: 0.025;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+
+    /* ── Shell ───────────────────────────────────────────── */
+    .shell {
+      position: relative; z-index: 10;
+      width: 98vw; height: 96vh;
+      max-width: 1380px; max-height: 840px;
+      background: var(--surface);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow:
+        0 0 0 1px rgba(0,255,157,0.04),
+        0 24px 80px rgba(0,0,0,0.9),
+        inset 0 0 60px rgba(0,207,255,0.03);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+
+    /* ── Header ──────────────────────────────────────────── */
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.75rem 1.4rem;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0; gap: 1rem;
+    }
+    .header-left { display: flex; align-items: center; gap: 1rem; }
+    .hub-btn {
+      display: flex; align-items: center; gap: 0.4rem;
+      color: var(--muted); text-decoration: none;
+      font-family: var(--font-ui); font-size: 0.7rem;
+      padding: 0.38rem 0.7rem;
+      border: 1px solid rgba(90,112,144,0.25); border-radius: var(--r);
+      background: rgba(90,112,144,0.05); transition: all 0.2s;
+    }
+    .hub-btn:hover { color: var(--cyan); border-color: var(--cyan); background: var(--cyan-d); }
+    .hub-btn svg { width: 13px; height: 13px; fill: currentColor; }
+
+    .title-block h1 {
+      font-family: var(--font-ui); font-size: 1.05rem; font-weight: 900;
+      color: #fff; letter-spacing: 0.5px;
+      text-shadow: 0 0 20px rgba(0,255,157,0.5);
+    }
+    .title-block p {
+      font-size: 0.66rem; color: var(--green); text-transform: uppercase;
+      letter-spacing: 2.5px; font-weight: 700; margin-top: 1px;
+    }
+
+    .level-nav {
+      display: flex; align-items: center; gap: 0.5rem;
+      background: rgba(0,0,0,0.35); border: 1px solid var(--border);
+      border-radius: 10px; padding: 0.28rem 0.7rem;
+    }
+    .nav-btn {
+      background: none; border: none; color: var(--cyan);
+      cursor: pointer; display: flex; padding: 0.15rem;
+      border-radius: 4px; transition: all 0.15s;
+    }
+    .nav-btn:hover:not(:disabled) { background: var(--cyan-d); }
+    .nav-btn:disabled { color: #233040; cursor: not-allowed; }
+    .nav-btn svg { width: 15px; height: 15px; fill: currentColor; }
+    .level-lbl {
+      font-family: var(--font-ui); font-size: 0.68rem; color: #fff;
+      min-width: 74px; text-align: center; letter-spacing: 1px;
+    }
+    .dots { display: flex; gap: 5px; }
+    .dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
+      cursor: pointer; transition: all 0.3s;
+    }
+    .dot.done   { background: var(--green); border-color: var(--green); box-shadow: 0 0 6px var(--green); }
+    .dot.active { background: var(--cyan);  border-color: var(--cyan);  box-shadow: 0 0 8px var(--cyan); }
+
+    .header-right { display: flex; align-items: center; gap: 0.8rem; }
+    .chip {
+      display: flex; align-items: center; gap: 0.35rem;
+      background: rgba(0,0,0,0.3); border: 1px solid var(--border);
+      border-radius: 8px; padding: 0.25rem 0.6rem;
+      font-family: var(--font-code); font-size: 0.75rem; color: var(--muted);
+    }
+    .chip .v { font-weight: 700; color: var(--gold); }
+    .chip.s .v { color: var(--green); }
+    .diff-badge {
+      font-family: var(--font-code); font-size: 0.6rem; padding: 0.18rem 0.5rem;
+      border-radius: 4px; border: 1px solid; text-transform: uppercase; letter-spacing: 1px;
+    }
+    .d-easy   { color: var(--green);  border-color: var(--green);  background: var(--green-d); }
+    .d-medium { color: var(--gold);   border-color: var(--gold);   background: var(--gold-d); }
+    .d-hard   { color: var(--red);    border-color: var(--red);    background: var(--red-d); }
+
+    /* ── Body Layout ─────────────────────────────────────── */
+    .body-layout {
+      display: grid;
+      grid-template-columns: 310px 1fr 280px;
+      flex: 1; overflow: hidden;
+    }
+
+    /* ── LEFT – Toolbox ──────────────────────────────────── */
+    .toolbox {
+      background: var(--card);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+    .toolbox-header {
+      padding: 0.7rem 1rem;
+      border-bottom: 1px solid var(--border);
+      font-family: var(--font-ui); font-size: 0.65rem; color: var(--cyan);
+      text-transform: uppercase; letter-spacing: 2px;
+      display: flex; align-items: center; gap: 0.4rem;
+    }
+    .toolbox-header::before { content:''; width:3px; height:10px; background:var(--cyan); border-radius:2px; }
+
+    .tool-scroll {
+      flex: 1; overflow-y: auto; padding: 0.75rem 0.8rem;
+      display: flex; flex-direction: column; gap: 0.45rem;
+    }
+    .tool-scroll::-webkit-scrollbar { width: 4px; }
+    .tool-scroll::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 2px; }
+
+    .tool-group-label {
+      font-family: var(--font-ui); font-size: 0.56rem; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 2px;
+      padding: 0.4rem 0 0.2rem;
+    }
+
+    /* Draggable tool blocks */
+    .tool-block {
+      padding: 0.5rem 0.65rem;
+      border-radius: var(--r);
+      border: 1px solid;
+      font-family: var(--font-code); font-size: 0.72rem;
+      cursor: grab; user-select: none;
+      transition: transform 0.15s, box-shadow 0.15s;
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+    .tool-block:hover  { transform: translateX(3px); }
+    .tool-block:active { cursor: grabbing; transform: scale(0.97); }
+    .tool-block.dragging { opacity: 0.4; }
+
+    .tool-block.then     { color: var(--green);  border-color: rgba(0,255,157,0.25); background: var(--green-d); }
+    .tool-block.catch    { color: var(--red);    border-color: rgba(255,71,87,0.25);  background: var(--red-d); }
+    .tool-block.finally  { color: var(--purple); border-color: rgba(199,125,255,0.25);background: var(--purple-d); }
+    .tool-block.micro    { color: var(--cyan);   border-color: rgba(0,207,255,0.25);  background: var(--cyan-d); }
+    .tool-block.resolve  { color: var(--gold);   border-color: rgba(255,209,102,0.25);background: var(--gold-d); }
+    .tool-block.reject   { color: var(--orange); border-color: rgba(255,140,66,0.25); background: var(--orange-d); }
+    .tool-block.await    { color: var(--purple); border-color: rgba(199,125,255,0.3); background: var(--purple-d); }
+    .tool-block.log      { color: #94a3b8;       border-color: rgba(148,163,184,0.2); background: rgba(148,163,184,0.05); }
+
+    .tool-block .icon { font-size: 0.85rem; flex-shrink: 0; }
+    .tool-block .code { flex: 1; }
+    .tool-block .badge {
+      font-size: 0.52rem; padding: 0.08rem 0.3rem; border-radius: 3px;
+      background: rgba(0,0,0,0.3); color: inherit; opacity: 0.7; white-space: nowrap;
+    }
+
+    /* Level description box */
+    .level-desc {
+      padding: 0.75rem 1rem;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .level-desc .label {
+      font-family: var(--font-ui); font-size: 0.58rem; color: var(--gold);
+      text-transform: uppercase; letter-spacing: 2px; margin-bottom: 0.35rem;
+    }
+    .level-desc p { font-size: 0.75rem; line-height: 1.6; color: var(--muted); }
+    .level-desc strong { color: var(--text); }
+
+    /* ── CENTER – Workspace ──────────────────────────────── */
+    .workspace {
+      display: flex; flex-direction: column; overflow: hidden; position: relative;
+    }
+
+    .ws-toolbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.5rem 1rem;
+      border-bottom: 1px solid var(--border);
+      background: rgba(6,8,16,0.6); flex-shrink: 0;
+      gap: 0.6rem;
+    }
+    .ws-mission { font-family: var(--font-ui); font-size: 0.75rem; color: #fff; }
+    .ws-mission span { color: var(--green); }
+    .ws-btns { display: flex; gap: 0.5rem; }
+    .btn {
+      padding: 0.42rem 0.9rem;
+      border-radius: var(--r); border: 1px solid var(--border);
+      background: rgba(0,0,0,0.3); color: var(--muted);
+      font-family: var(--font-ui); font-size: 0.6rem; letter-spacing: 1px;
+      cursor: pointer; transition: all 0.2s var(--ease);
+    }
+    .btn:hover { border-color: rgba(255,255,255,0.25); color: #fff; }
+    .btn-run {
+      background: var(--green-d); border-color: var(--green); color: var(--green);
+    }
+    .btn-run:hover { background: rgba(0,255,157,0.25); box-shadow: 0 0 16px rgba(0,255,157,0.3); }
+    .btn-run:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .ws-body {
+      flex: 1; display: grid;
+      grid-template-rows: 1fr auto;
+      overflow: hidden;
+    }
+
+    /* Code canvas – drop zone */
+    .code-canvas {
+      padding: 1rem; overflow-y: auto; position: relative;
+      background: var(--panel);
+    }
+    .code-canvas::-webkit-scrollbar { width: 5px; }
+    .code-canvas::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 3px; }
+
+    .canvas-hint {
+      display: flex; align-items: center; justify-content: center;
+      height: 100%; flex-direction: column; gap: 0.5rem;
+      font-family: var(--font-code); font-size: 0.78rem; color: #1a2840;
+      border: 2px dashed #1a2840; border-radius: var(--r);
+      pointer-events: none; transition: all 0.3s; position: absolute; inset: 1rem;
+    }
+    .canvas-hint.hidden { opacity: 0; }
+    .canvas-hint .big { font-size: 1.6rem; opacity: 0.5; }
+
+    /* Placed blocks in canvas */
+    .placed-list {
+      display: flex; flex-direction: column; gap: 0.4rem; min-height: 100%;
+      position: relative; z-index: 1;
+    }
+
+    .placed-block {
+      display: flex; align-items: center; gap: 0.6rem;
+      padding: 0.5rem 0.65rem;
+      border-radius: var(--r); border: 1px solid;
+      font-family: var(--font-code); font-size: 0.73rem;
+      cursor: default; position: relative;
+      transition: all 0.2s; animation: slide-in 0.2s var(--ease);
+    }
+    @keyframes slide-in {
+      from { opacity:0; transform: translateX(-12px); }
+      to   { opacity:1; transform: translateX(0); }
+    }
+    .placed-block .line-num {
+      font-size: 0.58rem; color: var(--muted); min-width: 18px;
+      text-align: right; flex-shrink: 0;
+    }
+    .placed-block .code-text { flex: 1; }
+    .placed-block .remove-btn {
+      background: none; border: none; color: var(--muted); cursor: pointer;
+      font-size: 0.9rem; padding: 0 0.2rem; transition: color 0.15s;
+      line-height: 1; flex-shrink: 0;
+    }
+    .placed-block .remove-btn:hover { color: var(--red); }
+    .placed-block .drag-handle {
+      color: var(--muted); cursor: grab; font-size: 0.8rem; flex-shrink: 0;
+      opacity: 0.5;
+    }
+    .placed-block.drag-over { border-color: var(--cyan) !important; background: var(--cyan-d) !important; }
+
+    /* block colours mirror tool blocks */
+    .placed-block.then    { color: var(--green);  border-color: rgba(0,255,157,0.2); background: rgba(0,255,157,0.06); }
+    .placed-block.catch   { color: var(--red);    border-color: rgba(255,71,87,0.2);  background: rgba(255,71,87,0.06); }
+    .placed-block.finally { color: var(--purple); border-color: rgba(199,125,255,0.2);background: rgba(199,125,255,0.06); }
+    .placed-block.micro   { color: var(--cyan);   border-color: rgba(0,207,255,0.2);  background: rgba(0,207,255,0.06); }
+    .placed-block.resolve { color: var(--gold);   border-color: rgba(255,209,102,0.2);background: rgba(255,209,102,0.06); }
+    .placed-block.reject  { color: var(--orange); border-color: rgba(255,140,66,0.2); background: rgba(255,140,66,0.06); }
+    .placed-block.await   { color: var(--purple); border-color: rgba(199,125,255,0.25);background: rgba(199,125,255,0.06); }
+    .placed-block.log     { color: #94a3b8;       border-color: rgba(148,163,184,0.15);background: rgba(148,163,184,0.04); }
+
+    /* Drop zone between blocks */
+    .drop-zone {
+      height: 6px; border-radius: 3px; margin: 1px 0;
+      transition: all 0.2s; border: 1px dashed transparent;
+    }
+    .drop-zone.active { height: 22px; border-color: var(--cyan); background: var(--cyan-d); }
+
+    /* Output compare area */
+    .output-compare {
+      border-top: 1px solid var(--border);
+      background: rgba(4,6,14,0.98);
+      padding: 0.7rem 1rem; max-height: 200px; overflow-y: auto; flex-shrink: 0;
+    }
+    .output-compare::-webkit-scrollbar { width: 4px; }
+    .output-compare::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .out-row {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 1rem; height: 100%;
+    }
+    .out-col { display: flex; flex-direction: column; gap: 0.4rem; }
+    .out-label {
+      font-family: var(--font-ui); font-size: 0.58rem; text-transform: uppercase;
+      letter-spacing: 2px; padding-bottom: 0.3rem; border-bottom: 1px solid var(--border);
+    }
+    .out-label.target { color: var(--gold); }
+    .out-label.actual { color: var(--cyan); }
+    .out-lines { display: flex; flex-direction: column; gap: 3px; }
+    .out-line {
+      font-family: var(--font-code); font-size: 0.7rem;
+      padding: 0.18rem 0.4rem; border-radius: 4px;
+      display: flex; align-items: center; gap: 0.4rem;
+    }
+    .out-line .idx { color: var(--muted); font-size: 0.6rem; min-width: 16px; }
+    .out-line.match   { color: var(--green); background: rgba(0,255,157,0.05); }
+    .out-line.mismatch { color: var(--red);  background: rgba(255,71,87,0.05); }
+    .out-line.empty   { color: var(--muted); font-style: italic; }
+    .out-line.pending  { color: #4a6080; }
+
+    /* ── RIGHT – Microtask Visualiser ───────────────────── */
+    .visualiser {
+      background: var(--card);
+      border-left: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+
+    .vis-section {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .vis-title {
+      font-family: var(--font-ui); font-size: 0.58rem; text-transform: uppercase;
+      letter-spacing: 2px; margin-bottom: 0.55rem;
+      display: flex; align-items: center; gap: 0.4rem;
+    }
+    .vis-title::before { content:''; width:3px; height:10px; border-radius:2px; display:inline-block; }
+    .vis-title.gold::before  { background: var(--gold); }
+    .vis-title.cyan::before  { background: var(--cyan); }
+    .vis-title.green::before { background: var(--green); }
+    .vis-title.purple::before{ background: var(--purple); }
+
+    /* Queue visualiser */
+    .queue-box {
+      background: rgba(0,0,0,0.3); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 0.5rem; min-height: 48px;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .queue-item {
+      display: flex; align-items: center; gap: 0.4rem;
+      font-family: var(--font-code); font-size: 0.65rem;
+      padding: 0.25rem 0.4rem; border-radius: 4px;
+      border: 1px solid rgba(255,255,255,0.05); background: rgba(255,255,255,0.03);
+      animation: pop-in 0.25s var(--ease);
+    }
+    @keyframes pop-in { from{opacity:0;transform:scale(0.9)} to{opacity:1;transform:scale(1)} }
+    .queue-item .q-icon { font-size: 0.75rem; }
+    .queue-item .q-text { flex: 1; color: var(--text); }
+    .queue-item .q-type { font-size: 0.55rem; color: var(--muted); }
+
+    /* Event loop diagram */
+    .loop-diagram {
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .loop-row {
+      display: flex; align-items: center; gap: 0.4rem;
+      font-family: var(--font-code); font-size: 0.63rem; padding: 0.3rem 0.4rem;
+      border-radius: 5px; border: 1px solid rgba(255,255,255,0.04);
+      background: rgba(255,255,255,0.02); transition: all 0.3s;
+    }
+    .loop-row.active { border-color: var(--green); background: var(--green-d); color: var(--green); }
+    .loop-row .lr-icon { font-size: 0.85rem; flex-shrink: 0; }
+    .loop-row .lr-label { flex: 1; }
+    .loop-row .lr-count {
+      font-size: 0.6rem; background: rgba(0,0,0,0.4); padding: 0.1rem 0.3rem;
+      border-radius: 3px; color: var(--muted);
+    }
+    .loop-row.active .lr-count { color: var(--green); }
+
+    /* Starvation warning */
+    .starv-bar {
+      height: 6px; background: rgba(255,255,255,0.07);
+      border-radius: 3px; overflow: hidden; margin-top: 0.3rem;
+    }
+    .starv-fill {
+      height: 100%; border-radius: 3px;
+      background: linear-gradient(90deg, var(--green), var(--gold), var(--red));
+      background-size: 300% 100%; transition: width 0.5s var(--ease), background-position 0.5s;
+    }
+    .starv-label {
+      font-family: var(--font-code); font-size: 0.62rem;
+      display: flex; justify-content: space-between; margin-top: 0.2rem;
+    }
+    .starv-label .key { color: var(--muted); }
+    .starv-label .val { color: var(--gold); }
+
+    /* Hint panel */
+    .hint-box {
+      font-size: 0.72rem; line-height: 1.65; color: var(--muted);
+      background: rgba(199,125,255,0.05); border: 1px solid rgba(199,125,255,0.15);
+      border-radius: var(--r); padding: 0.55rem 0.65rem;
+    }
+    .hint-box strong { color: var(--purple); }
+    .hint-box code {
+      font-family: var(--font-code); font-size: 0.65rem;
+      background: rgba(0,0,0,0.35); padding: 0 3px; border-radius: 3px; color: var(--gold);
+    }
+    .hint-btn {
+      margin-top: 0.45rem; width: 100%; padding: 0.38rem;
+      background: var(--purple-d); border: 1px solid rgba(199,125,255,0.3);
+      border-radius: var(--r); color: var(--purple);
+      font-family: var(--font-ui); font-size: 0.6rem; letter-spacing: 1px;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .hint-btn:hover { background: rgba(199,125,255,0.2); }
+
+    /* Progress */
+    .prog-list { display: flex; flex-direction: column; gap: 0.28rem; overflow-y: auto; }
+    .prog-list::-webkit-scrollbar { width: 3px; }
+    .prog-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .prog-item {
+      display: flex; align-items: center; gap: 0.4rem;
+      font-family: var(--font-code); font-size: 0.66rem; color: #2a3a50;
+      padding: 0.25rem 0.4rem; border-radius: 4px;
+      border: 1px solid rgba(255,255,255,0.03); cursor: pointer; transition: all 0.2s;
+    }
+    .prog-item:hover  { color: #5a7090; border-color: rgba(255,255,255,0.08); }
+    .prog-item.done   { color: var(--green); border-color: rgba(0,255,157,0.18); background: rgba(0,255,157,0.04); }
+    .prog-item.active { color: var(--gold);  border-color: rgba(255,209,102,0.25); background: rgba(255,209,102,0.05); }
+    .prog-item .pi-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+
+    /* ── Success Overlay ─────────────────────────────────── */
+    .success-overlay {
+      position: absolute; inset: 0; z-index: 100;
+      background: rgba(2,5,14,0.9); backdrop-filter: blur(12px);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 0.8rem; opacity: 0; pointer-events: none;
+      transition: opacity 0.4s var(--ease);
+    }
+    .success-overlay.show { opacity: 1; pointer-events: auto; }
+    .success-icon { font-size: 3rem; animation: bounce-in 0.5s var(--ease); }
+    @keyframes bounce-in {
+      0%   { transform:scale(0);   opacity:0; }
+      60%  { transform:scale(1.2); opacity:1; }
+      100% { transform:scale(1); }
+    }
+    .success-title {
+      font-family: var(--font-ui); font-size: 1.4rem; font-weight: 900;
+      color: var(--green); letter-spacing: 2px;
+      text-shadow: 0 0 30px rgba(0,255,157,0.6);
+    }
+    .success-sub { font-size: 0.85rem; color: var(--muted); text-align: center; max-width: 340px; line-height: 1.5; }
+    .s-btns { display: flex; gap: 0.65rem; margin-top: 0.35rem; }
+    .s-btn {
+      padding: 0.55rem 1.3rem; border-radius: var(--r);
+      font-family: var(--font-ui); font-size: 0.68rem; letter-spacing: 1px;
+      cursor: pointer; border: 1px solid; transition: all 0.2s;
+    }
+    .s-next  { background: var(--green-d); border-color: var(--green); color: var(--green); }
+    .s-next:hover  { background: rgba(0,255,157,0.28); box-shadow: 0 0 18px rgba(0,255,157,0.35); }
+    .s-retry { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.15); color: #7a92b0; }
+    .s-retry:hover { border-color: rgba(255,255,255,0.35); color: #fff; }
+
+    /* ── All Done ────────────────────────────────────────── */
+    .alldone-overlay {
+      position: absolute; inset: 0; z-index: 200;
+      background: rgba(2,4,12,0.95); backdrop-filter: blur(18px);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 0.8rem; opacity: 0; pointer-events: none; transition: opacity 0.5s;
+    }
+    .alldone-overlay.show { opacity: 1; pointer-events: auto; }
+    .alldone-trophy { font-size: 4rem; animation: bounce-in 0.6s var(--ease); }
+    .alldone-title {
+      font-family: var(--font-ui); font-size: 1.7rem; font-weight: 900;
+      color: var(--gold); letter-spacing: 3px;
+      text-shadow: 0 0 40px rgba(255,209,102,0.6);
+    }
+    .alldone-sub { font-size: 0.85rem; color: var(--muted); max-width: 400px; text-align: center; line-height: 1.6; }
+    .alldone-stats { display: flex; gap: 2rem; margin-top: 0.3rem; }
+    .alldone-stat { display: flex; flex-direction: column; align-items: center; font-family: var(--font-code); }
+    .alldone-stat .n { font-size: 1.8rem; font-weight: 700; color: var(--cyan); }
+    .alldone-stat .l { font-size: 0.63rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+    .alldone-restart {
+      margin-top: 0.3rem; padding: 0.6rem 1.8rem;
+      background: var(--gold-d); border: 1px solid var(--gold); border-radius: var(--r);
+      color: var(--gold); font-family: var(--font-ui); font-size: 0.72rem; letter-spacing: 1px;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .alldone-restart:hover { background: rgba(255,209,102,0.28); box-shadow: 0 0 18px rgba(255,209,102,0.35); }
+  </style>
+</head>
+<body>
+<div class="bg"></div>
+<div class="scanlines"></div>
+<div class="noise"></div>
+
+<div class="shell" id="shell">
+
+  <!-- ═══ HEADER ═══════════════════════════════════════════ -->
+  <header>
+    <div class="header-left">
+      <a href="../index.html" class="hub-btn" aria-label="Back to Hub">
+        <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+        Hub
+      </a>
+      <div class="title-block">
+        <h1>Microtask Heist</h1>
+        <p>JS Fundamentals · Event Loop Mastery</p>
+      </div>
+    </div>
+
+    <div class="level-nav" role="navigation" aria-label="Level navigation">
+      <button class="nav-btn" id="prevBtn" aria-label="Previous level" disabled>
+        <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+      </button>
+      <div class="level-lbl" id="levelLbl">LEVEL 1 / 7</div>
+      <div class="dots" id="dots" aria-label="Level progress"></div>
+      <button class="nav-btn" id="nextBtn" aria-label="Next level">
+        <svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+      </button>
+    </div>
+
+    <div class="header-right">
+      <div class="diff-badge d-easy" id="diffBadge">Easy</div>
+      <div class="chip">💰 Score: <span class="v" id="scoreVal">0</span></div>
+      <div class="chip s">🔥 Streak: <span class="v" id="streakVal">0</span></div>
+    </div>
+  </header>
+
+  <!-- ═══ BODY ══════════════════════════════════════════════ -->
+  <div class="body-layout">
+
+    <!-- LEFT: Toolbox -->
+    <aside class="toolbox" aria-label="Code block toolbox">
+      <div class="toolbox-header">Heist Toolkit</div>
+
+      <div class="tool-scroll" id="toolScroll">
+        <div class="tool-group-label">Microtask Queue</div>
+
+        <div class="tool-block micro" draggable="true" data-type="micro" data-code="queueMicrotask(() =&gt; log('__'))">
+          <span class="icon">⚡</span>
+          <span class="code">queueMicrotask(…)</span>
+          <span class="badge">microtask</span>
+        </div>
+
+        <div class="tool-group-label">Promise API</div>
+
+        <div class="tool-block resolve" draggable="true" data-type="resolve" data-code="Promise.resolve('__')">
+          <span class="icon">✅</span>
+          <span class="code">Promise.resolve(…)</span>
+          <span class="badge">resolved</span>
+        </div>
+        <div class="tool-block reject" draggable="true" data-type="reject" data-code="Promise.reject('__')">
+          <span class="icon">❌</span>
+          <span class="code">Promise.reject(…)</span>
+          <span class="badge">rejected</span>
+        </div>
+        <div class="tool-block then" draggable="true" data-type="then" data-code=".then(v =&gt; log(v))">
+          <span class="icon">→</span>
+          <span class="code">.then(v =&gt; log(v))</span>
+          <span class="badge">microtask</span>
+        </div>
+        <div class="tool-block catch" draggable="true" data-type="catch" data-code=".catch(e =&gt; log(e))">
+          <span class="icon">🪤</span>
+          <span class="code">.catch(e =&gt; log(e))</span>
+          <span class="badge">microtask</span>
+        </div>
+        <div class="tool-block finally" draggable="true" data-type="finally" data-code=".finally(() =&gt; log('__'))">
+          <span class="icon">🔚</span>
+          <span class="code">.finally(() =&gt; log('__'))</span>
+          <span class="badge">microtask</span>
+        </div>
+
+        <div class="tool-group-label">Async / Await</div>
+
+        <div class="tool-block await" draggable="true" data-type="await" data-code="await Promise.resolve('__')">
+          <span class="icon">⏳</span>
+          <span class="code">await Promise.resolve(…)</span>
+          <span class="badge">boundary</span>
+        </div>
+        <div class="tool-block await" draggable="true" data-type="asyncfn" data-code="async function run() { __ }">
+          <span class="icon">🔀</span>
+          <span class="code">async fn wrapper</span>
+          <span class="badge">async</span>
+        </div>
+
+        <div class="tool-group-label">Synchronous</div>
+
+        <div class="tool-block log" draggable="true" data-type="log" data-code="log('__')">
+          <span class="icon">📝</span>
+          <span class="code">log('value')</span>
+          <span class="badge">sync</span>
+        </div>
+      </div>
+
+      <div class="level-desc">
+        <div class="label">Mission Brief</div>
+        <p id="missionBrief">Loading…</p>
+      </div>
+    </aside>
+
+    <!-- CENTER: Workspace -->
+    <main class="workspace" aria-label="Code workspace">
+      <div class="ws-toolbar">
+        <div class="ws-mission">Op: <span id="missionName">—</span></div>
+        <div class="ws-btns">
+          <button class="btn" id="clearBtn" aria-label="Clear canvas">Clear</button>
+          <button class="btn" id="hintToggleBtn" aria-label="Show hint">Hint</button>
+          <button class="btn btn-run" id="runBtn" aria-label="Run code">▶ Execute</button>
+        </div>
+      </div>
+
+      <div class="ws-body">
+        <div class="code-canvas" id="codeCanvas"
+          aria-label="Drop zone for code blocks"
+          aria-dropeffect="move">
+          <div class="canvas-hint" id="canvasHint">
+            <div class="big">🕵️</div>
+            <div>Drag blocks here to build your sequence</div>
+          </div>
+          <div class="placed-list" id="placedList"></div>
+        </div>
+
+        <div class="output-compare" id="outputCompare">
+          <div class="out-row">
+            <div class="out-col">
+              <div class="out-label target">🎯 Required Output</div>
+              <div class="out-lines" id="targetLines"></div>
+            </div>
+            <div class="out-col">
+              <div class="out-label actual">💻 Your Output</div>
+              <div class="out-lines" id="actualLines"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Success overlay -->
+      <div class="success-overlay" id="successOverlay" role="dialog" aria-modal="true" aria-live="assertive">
+        <div class="success-icon">💎</div>
+        <div class="success-title">HEIST COMPLETE</div>
+        <div class="success-sub" id="successSub">The microtask queue has been cracked. Funds secured.</div>
+        <div class="s-btns">
+          <button class="s-btn s-retry" id="retryBtn">Retry</button>
+          <button class="s-btn s-next" id="nextLvlBtn">Next Op →</button>
+        </div>
+      </div>
+
+      <!-- All done overlay -->
+      <div class="alldone-overlay" id="alldoneOverlay" role="dialog" aria-modal="true" aria-live="assertive">
+        <div class="alldone-trophy">👑</div>
+        <div class="alldone-title">MASTER THIEF</div>
+        <div class="alldone-sub">
+          You've cracked every vault in the JavaScript event loop. The microtask queue holds no secrets.
+        </div>
+        <div class="alldone-stats">
+          <div class="alldone-stat"><div class="n" id="finalScore">0</div><div class="l">Score</div></div>
+          <div class="alldone-stat"><div class="n" id="finalStreak">0</div><div class="l">Best Streak</div></div>
+          <div class="alldone-stat"><div class="n" id="finalOps">7</div><div class="l">Ops</div></div>
+        </div>
+        <button class="alldone-restart" id="restartBtn">🔄 New Heist</button>
+      </div>
+    </main>
+
+    <!-- RIGHT: Visualiser -->
+    <aside class="visualiser" aria-label="Microtask queue visualiser">
+
+      <!-- Microtask Queue -->
+      <div class="vis-section">
+        <div class="vis-title gold">⚡ Microtask Queue</div>
+        <div class="queue-box" id="microQueue">
+          <div style="font-family:var(--font-code);font-size:0.65rem;color:#1a2840;text-align:center;padding:0.5rem">Empty — run code to populate</div>
+        </div>
+      </div>
+
+      <!-- Event Loop Diagram -->
+      <div class="vis-section">
+        <div class="vis-title cyan">🔄 Event Loop State</div>
+        <div class="loop-diagram" id="loopDiagram">
+          <div class="loop-row" id="lr-callstack" data-key="callstack">
+            <span class="lr-icon">📚</span>
+            <span class="lr-label">Call Stack</span>
+            <span class="lr-count" id="lrc-callstack">0</span>
+          </div>
+          <div class="loop-row" id="lr-microtask" data-key="microtask">
+            <span class="lr-icon">⚡</span>
+            <span class="lr-label">Microtask Queue</span>
+            <span class="lr-count" id="lrc-microtask">0</span>
+          </div>
+          <div class="loop-row" id="lr-macrotask" data-key="macrotask">
+            <span class="lr-icon">⏰</span>
+            <span class="lr-label">Macro Queue</span>
+            <span class="lr-count" id="lrc-macrotask">0</span>
+          </div>
+          <div class="loop-row" id="lr-render" data-key="render">
+            <span class="lr-icon">🖼️</span>
+            <span class="lr-label">Render / Paint</span>
+            <span class="lr-count" id="lrc-render">blocked</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Starvation Risk -->
+      <div class="vis-section">
+        <div class="vis-title" style="color:var(--orange)">
+          <span style="width:3px;height:10px;background:var(--orange);border-radius:2px;display:inline-block;margin-right:6px"></span>
+          Queue Starvation
+        </div>
+        <div class="starv-bar">
+          <div class="starv-fill" id="starvFill" style="width:0%;background-position:100% 0"></div>
+        </div>
+        <div class="starv-label">
+          <span class="key">Microtask depth</span>
+          <span class="val" id="starvVal">0 / 10</span>
+        </div>
+        <div id="starvWarn" style="font-size:0.65rem;color:var(--red);margin-top:0.3rem;display:none">
+          ⚠️ Render is starved — infinite microtask loops block painting!
+        </div>
+      </div>
+
+      <!-- Hint -->
+      <div class="vis-section">
+        <div class="vis-title purple">💡 Boundary Hint</div>
+        <div class="hint-box" id="hintBox">Click <strong>Hint</strong> to reveal where the microtask boundary is crossed in this level.</div>
+      </div>
+
+      <!-- Progress -->
+      <div class="vis-section" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+        <div class="vis-title green">📋 Operations</div>
+        <div class="prog-list" id="progList"></div>
+      </div>
+
+    </aside>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════════════════════ -->
+<script>
+/* ══════════════════════════════════════════════════════
+   LEVEL DEFINITIONS
+   Each level has:
+   - target: the exact console.log output strings in order
+   - solution: array of block descriptors that produce it
+   - brief, hint, difficulty
+══════════════════════════════════════════════════════ */
+const LEVELS = [
+  /* 1 ── Sync before microtask ── */
+  {
+    name: "The First Vault",
+    difficulty: "Easy",
+    brief: "Synchronous code runs before any Promise callbacks. Place <strong>log('sync')</strong> before a resolved Promise's <strong>.then</strong> to steal the first slot.",
+    hint: "A <code>.then()</code> callback is always a microtask — it will only run <em>after</em> the current call stack is empty, even if the Promise is already resolved.",
+    target: ["sync", "micro"],
+    solution: [
+      { type: "log",     display: "log('sync')",                evalCode: "log('sync');" },
+      { type: "resolve", display: "Promise.resolve('micro')",   evalCode: "" },
+      { type: "then",    display: ".then(v => log(v))",         evalCode: "" },
+    ],
+    evalScript: `
+      log('sync');
+      Promise.resolve('micro').then(v => log(v));
+    `,
+  },
+
+  /* 2 ── queueMicrotask vs .then order ── */
+  {
+    name: "Queue Priority",
+    difficulty: "Easy",
+    brief: "Both <strong>queueMicrotask</strong> and <strong>Promise.then</strong> are microtasks. Which runs first? The one scheduled first in the microtask queue wins.",
+    hint: "<code>queueMicrotask()</code> schedules a callback directly on the microtask queue. A <code>.then()</code> on an already-resolved Promise does the same. They drain FIFO — first scheduled, first out.",
+    target: ["A", "B", "C"],
+    evalScript: `
+      queueMicrotask(() => log('A'));
+      Promise.resolve('B').then(v => log(v));
+      queueMicrotask(() => log('C'));
+    `,
+  },
+
+  /* 3 ── Sync → queueMicrotask → .then chain ── */
+  {
+    name: "The Chain Gang",
+    difficulty: "Medium",
+    brief: "Sync code runs, then microtasks drain. A <strong>.then()</strong> inside a microtask adds another microtask — the queue drains completely before the next macro task.",
+    hint: "When a <code>.then()</code> handler returns a value, the <em>next</em> <code>.then()</code> in the chain is queued as a new microtask. The full chain drains before the call stack can take another macro task.",
+    target: ["start", "q1", "p1", "q2", "p2", "end-sync", "after"],
+    evalScript: `
+      log('start');
+      queueMicrotask(() => { log('q1'); queueMicrotask(() => log('q2')); });
+      Promise.resolve()
+        .then(() => { log('p1'); return 'p2'; })
+        .then(v => log(v));
+      log('end-sync');
+      Promise.resolve('after').then(v => log(v));
+    `,
+  },
+
+  /* 4 ── Promise rejection + catch ── */
+  {
+    name: "Rejected Evidence",
+    difficulty: "Medium",
+    brief: "A rejected Promise skips <strong>.then</strong> handlers and jumps to the nearest <strong>.catch</strong>. But <strong>.finally</strong> always fires. Predict the order.",
+    hint: "<code>.then()</code> on a rejected promise is skipped. <code>.catch()</code> is shorthand for <code>.then(null, handler)</code>. <code>.finally()</code> runs regardless — but it adds yet another microtask tick.",
+    target: ["start", "caught: oops", "final", "sync-end"],
+    evalScript: `
+      log('start');
+      Promise.reject('oops')
+        .then(v => log('then: ' + v))
+        .catch(e => log('caught: ' + e))
+        .finally(() => log('final'));
+      log('sync-end');
+    `,
+  },
+
+  /* 5 ── async/await boundary ── */
+  {
+    name: "Async Checkpoint",
+    difficulty: "Hard",
+    brief: "An <strong>async function</strong> runs synchronously until it hits the first <strong>await</strong>. The code <em>after</em> the await is a microtask continuation — the caller resumes first.",
+    hint: "Everything before the first <code>await</code> in an async function is synchronous. After <code>await</code>, control returns to the caller. The continuation resumes as a microtask once the awaited Promise resolves.",
+    target: ["outer-start", "async-before-await", "outer-end", "async-after-await"],
+    evalScript: `
+      async function run() {
+        log('async-before-await');
+        await Promise.resolve();
+        log('async-after-await');
+      }
+      log('outer-start');
+      run();
+      log('outer-end');
+    `,
+  },
+
+  /* 6 ── Nested .then chains ── */
+  {
+    name: "Nested Vault",
+    difficulty: "Hard",
+    brief: "Two independent Promise chains run concurrently. Each <strong>.then</strong> adds the <em>next</em> handler to the queue after the current tick — interleaving happens tick by tick.",
+    hint: "Round-robin: after draining the current microtask, the next queued microtask runs. Both chains progress tick-by-tick, so they interleave rather than one finishing before the other.",
+    target: ["A1", "B1", "A2", "B2", "A3"],
+    evalScript: `
+      Promise.resolve()
+        .then(() => log('A1'))
+        .then(() => log('A2'))
+        .then(() => log('A3'));
+
+      Promise.resolve()
+        .then(() => log('B1'))
+        .then(() => log('B2'));
+    `,
+  },
+
+  /* 7 ── Starvation demo ── */
+  {
+    name: "Queue Starvation",
+    difficulty: "Hard",
+    brief: "If microtasks keep queueing new microtasks, the render step is <strong>starved</strong>. Predict the output of a bounded recursive microtask chain that stops at depth 3.",
+    hint: "Each recursive <code>queueMicrotask</code> call adds to the queue before any rendering can occur. Bounded recursion is safe — infinite recursion will freeze the browser tab.",
+    target: ["tick-0", "tick-1", "tick-2", "render-allowed"],
+    evalScript: `
+      let depth = 0;
+      function recurse() {
+        log('tick-' + depth);
+        depth++;
+        if (depth < 3) queueMicrotask(recurse);
+        else queueMicrotask(() => log('render-allowed'));
+      }
+      queueMicrotask(recurse);
+    `,
+  },
+];
+
+const TOTAL = LEVELS.length;
+
+/* ══════════════════════════════════════════════════════
+   STATE
+══════════════════════════════════════════════════════ */
+let state = {
+  level: 0, score: 0, streak: 0, bestStreak: 0,
+  solved: new Array(TOTAL).fill(false),
+  placed: [],     // array of {type, display, evalCode?}
+  lastOutput: [], // actual log output from last run
+  hintShown: false,
+};
+
+function save() {
+  try {
+    localStorage.setItem('mh_v1', JSON.stringify({
+      score: state.score, bestStreak: state.bestStreak,
+      solved: state.solved, level: state.level,
+    }));
+  } catch(e) {}
+}
+function loadSave() {
+  try {
+    const p = JSON.parse(localStorage.getItem('mh_v1'));
+    if (!p) return;
+    state.score = p.score || 0;
+    state.bestStreak = p.bestStreak || 0;
+    state.solved = p.solved || new Array(TOTAL).fill(false);
+    state.level  = p.level || 0;
+  } catch(e) {}
+}
+
+/* ══════════════════════════════════════════════════════
+   DOM
+══════════════════════════════════════════════════════ */
+const $ = id => document.getElementById(id);
+
+/* ══════════════════════════════════════════════════════
+   DRAG & DROP – Toolbox → Canvas
+══════════════════════════════════════════════════════ */
+let dragSrc = null; // null = from toolbox, else index in placed[]
+let dragData = null;
+
+// Toolbox blocks drag start
+document.querySelectorAll('.tool-block').forEach(tb => {
+  tb.addEventListener('dragstart', e => {
+    dragSrc = null;
+    dragData = {
+      type: tb.dataset.type,
+      display: tb.querySelector('.code').textContent,
+      code: tb.dataset.code,
+    };
+    tb.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData('text/plain', tb.dataset.type);
+  });
+  tb.addEventListener('dragend', () => tb.classList.remove('dragging'));
+});
+
+// Canvas drop
+const codeCanvas = $('codeCanvas');
+codeCanvas.addEventListener('dragover', e => {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'copy';
+});
+codeCanvas.addEventListener('drop', e => {
+  e.preventDefault();
+  if (!dragData) return;
+  addBlock(dragData);
+  dragData = null;
+});
+
+function addBlock(data) {
+  state.placed.push({
+    type: data.type,
+    display: data.display || data.code,
+    code: data.code,
+  });
+  renderCanvas();
+  updateCanvasHint();
+}
+
+/* ══════════════════════════════════════════════════════
+   CANVAS RENDERING
+══════════════════════════════════════════════════════ */
+function renderCanvas() {
+  const list = $('placedList');
+  list.innerHTML = '';
+
+  state.placed.forEach((block, i) => {
+    // drop zone before
+    const dz = mkDropZone(i);
+    list.appendChild(dz);
+
+    const div = document.createElement('div');
+    div.className = `placed-block ${block.type}`;
+    div.setAttribute('draggable', 'true');
+    div.innerHTML = `
+      <span class="drag-handle" title="Drag to reorder">⠿</span>
+      <span class="line-num">${i + 1}</span>
+      <span class="code-text">${escHtml(block.display)}</span>
+      <button class="remove-btn" aria-label="Remove block" data-idx="${i}">✕</button>
+    `;
+
+    // Reorder drag
+    div.addEventListener('dragstart', e => {
+      dragSrc = i;
+      dragData = { ...block };
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', String(i));
+    });
+    div.addEventListener('dragend', () => { dragSrc = null; dragData = null; });
+
+    div.querySelector('.remove-btn').addEventListener('click', e => {
+      const idx = +e.currentTarget.dataset.idx;
+      state.placed.splice(idx, 1);
+      renderCanvas(); updateCanvasHint();
+    });
+
+    list.appendChild(div);
+  });
+
+  // trailing drop zone
+  list.appendChild(mkDropZone(state.placed.length));
+}
+
+function mkDropZone(targetIdx) {
+  const dz = document.createElement('div');
+  dz.className = 'drop-zone';
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('active'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('active'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); e.stopPropagation();
+    dz.classList.remove('active');
+    if (!dragData) return;
+    if (dragSrc !== null) {
+      // reorder
+      const removed = state.placed.splice(dragSrc, 1)[0];
+      const insertAt = targetIdx > dragSrc ? targetIdx - 1 : targetIdx;
+      state.placed.splice(insertAt, 0, removed);
+    } else {
+      state.placed.splice(targetIdx, 0, {
+        type: dragData.type, display: dragData.display, code: dragData.code,
+      });
+    }
+    dragSrc = null; dragData = null;
+    renderCanvas(); updateCanvasHint();
+  });
+  return dz;
+}
+
+function updateCanvasHint() {
+  $('canvasHint').classList.toggle('hidden', state.placed.length > 0);
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ══════════════════════════════════════════════════════
+   EXECUTION ENGINE
+   Runs the level's fixed evalScript using a sandboxed
+   log collector — player's placed blocks are shown
+   but the real verification uses the canonical script.
+══════════════════════════════════════════════════════ */
+function executeLevel() {
+  const lv = LEVELS[state.level];
+  const output = [];
+  const log = (...args) => output.push(args.map(String).join(' '));
+
+  // Build a Function from evalScript with our log injected
+  try {
+    const fn = new Function('log', lv.evalScript);
+    // Run synchronously first, microtasks via Promise scheduler
+    const result = fn(log);
+
+    // If the script returns a Promise, await it
+    if (result && typeof result.then === 'function') {
+      result.then(() => finishExecution(output, lv)).catch(() => finishExecution(output, lv));
+    } else {
+      // Let microtask queue drain via Promise.resolve()
+      Promise.resolve().then(() => Promise.resolve()).then(() => Promise.resolve()).then(() => Promise.resolve()).then(() => {
+        finishExecution(output, lv);
+      });
+    }
+  } catch(err) {
+    finishExecution(['[Error: ' + err.message + ']'], lv);
+  }
+}
+
+function finishExecution(output, lv) {
+  state.lastOutput = output;
+  renderOutput(output, lv.target);
+  updateVisualiser(output, lv);
+
+  const correct = arraysEqual(output, lv.target);
+  if (correct) levelSuccess();
+  else playTone(280, 0.06, 'sawtooth');
+}
+
+function arraysEqual(a, b) {
+  if (a.length !== b.length) return false;
+  return a.every((v, i) => v === b[i]);
+}
+
+/* ══════════════════════════════════════════════════════
+   OUTPUT RENDERING
+══════════════════════════════════════════════════════ */
+function renderOutput(actual, target) {
+  const tLines = $('targetLines');
+  const aLines = $('actualLines');
+  tLines.innerHTML = ''; aLines.innerHTML = '';
+
+  const maxLen = Math.max(target.length, actual.length);
+  for (let i = 0; i < maxLen; i++) {
+    const t = target[i];
+    const a = actual[i];
+    const match = t !== undefined && a !== undefined && t === a;
+
+    const tDiv = document.createElement('div');
+    tDiv.className = 'out-line' + (t === undefined ? ' empty' : ' match');
+    tDiv.innerHTML = `<span class="idx">${i+1}</span>${escHtml(t ?? '—')}`;
+    tLines.appendChild(tDiv);
+
+    const aDiv = document.createElement('div');
+    aDiv.className = 'out-line' + (a === undefined ? ' empty' : match ? ' match' : ' mismatch');
+    aDiv.innerHTML = `<span class="idx">${i+1}</span>${escHtml(a ?? '—')}`;
+    aLines.appendChild(aDiv);
+  }
+
+  if (maxLen === 0) {
+    const ph = '<div class="out-line pending">No output yet — hit Execute</div>';
+    tLines.innerHTML = ph; aLines.innerHTML = ph;
+  }
+}
+
+function renderTargetOnly(target) {
+  const tLines = $('targetLines');
+  const aLines = $('actualLines');
+  tLines.innerHTML = ''; aLines.innerHTML = '';
+  target.forEach((t, i) => {
+    const d = document.createElement('div');
+    d.className = 'out-line match';
+    d.innerHTML = `<span class="idx">${i+1}</span>${escHtml(t)}`;
+    tLines.appendChild(d);
+  });
+  aLines.innerHTML = '<div class="out-line pending">Run code to see output…</div>';
+}
+
+/* ══════════════════════════════════════════════════════
+   VISUALISER UPDATE
+══════════════════════════════════════════════════════ */
+function updateVisualiser(output, lv) {
+  // Microtask queue
+  const mq = $('microQueue');
+  mq.innerHTML = '';
+  const microtaskCount = output.length; // approximation
+  if (output.length === 0) {
+    mq.innerHTML = '<div style="font-family:var(--font-code);font-size:0.65rem;color:#1a2840;text-align:center;padding:0.5rem">Empty</div>';
+  } else {
+    output.forEach((v, i) => {
+      const item = document.createElement('div');
+      item.className = 'queue-item';
+      item.innerHTML = `<span class="q-icon">⚡</span><span class="q-text">${escHtml(v)}</span><span class="q-type">tick-${i+1}</span>`;
+      mq.appendChild(item);
+    });
+  }
+
+  // Event loop rows
+  ['callstack','microtask','macrotask','render'].forEach(k => {
+    $('lr-'+k).classList.remove('active');
+  });
+  $('lr-microtask').classList.add('active');
+  $('lrc-callstack').textContent  = '0';
+  $('lrc-microtask').textContent  = output.length;
+  $('lrc-macrotask').textContent  = '0';
+  $('lrc-render').textContent     = output.length > 0 ? 'pending' : 'idle';
+
+  // Starvation
+  const depth = Math.min(output.length, 10);
+  const pct   = (depth / 10 * 100);
+  $('starvFill').style.width = pct + '%';
+  $('starvFill').style.backgroundPosition = (100 - pct) + '% 0';
+  $('starvVal').textContent = depth + ' / 10';
+  $('starvWarn').style.display = depth >= 7 ? 'block' : 'none';
+}
+
+/* ══════════════════════════════════════════════════════
+   LEVEL SUCCESS
+══════════════════════════════════════════════════════ */
+function levelSuccess() {
+  if (!state.solved[state.level]) {
+    state.solved[state.level] = true;
+    const pts = { Easy:100, Medium:200, Hard:300 }[LEVELS[state.level].difficulty] || 150;
+    state.score += pts;
+    state.streak++;
+    if (state.streak > state.bestStreak) state.bestStreak = state.streak;
+    updateScoreUI(); save();
+    playSuccess();
+  }
+  $('successSub').textContent = `${LEVELS[state.level].name} cracked. The queue was yours all along.`;
+  $('successOverlay').classList.add('show');
+  updateDots(); updateProgList();
+}
+function updateScoreUI() {
+  $('scoreVal').textContent  = state.score;
+  $('streakVal').textContent = state.bestStreak;
+}
+
+/* ══════════════════════════════════════════════════════
+   LOAD LEVEL
+══════════════════════════════════════════════════════ */
+function loadLevel(idx) {
+  state.level = idx;
+  state.placed = [];
+  state.lastOutput = [];
+  state.hintShown = false;
+  $('successOverlay').classList.remove('show');
+  $('hintBox').textContent = 'Click Hint to reveal where the microtask boundary is crossed in this level.';
+
+  const lv = LEVELS[idx];
+  $('levelLbl').textContent    = `LEVEL ${idx+1} / ${TOTAL}`;
+  $('missionName').textContent = lv.name;
+  $('missionBrief').innerHTML  = lv.brief;
+
+  const db = $('diffBadge');
+  db.textContent = lv.difficulty;
+  db.className   = 'diff-badge d-'+lv.difficulty.toLowerCase();
+
+  $('prevBtn').disabled = idx === 0;
+  $('nextBtn').disabled = idx === TOTAL - 1;
+
+  renderCanvas();
+  updateCanvasHint();
+  renderTargetOnly(lv.target);
+  resetVisualiser();
+  updateDots();
+  updateProgList();
+}
+
+function resetVisualiser() {
+  $('microQueue').innerHTML = '<div style="font-family:var(--font-code);font-size:0.65rem;color:#1a2840;text-align:center;padding:0.5rem">Empty — run code to populate</div>';
+  ['callstack','microtask','macrotask','render'].forEach(k => $('lr-'+k).classList.remove('active'));
+  $('lrc-callstack').textContent = '0';
+  $('lrc-microtask').textContent = '0';
+  $('lrc-macrotask').textContent = '0';
+  $('lrc-render').textContent    = 'idle';
+  $('starvFill').style.width = '0%';
+  $('starvVal').textContent  = '0 / 10';
+  $('starvWarn').style.display = 'none';
+}
+
+/* ══════════════════════════════════════════════════════
+   DOTS & PROGRESS
+══════════════════════════════════════════════════════ */
+function updateDots() {
+  const c = $('dots'); c.innerHTML = '';
+  for (let i = 0; i < TOTAL; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot' + (state.solved[i]?' done':i===state.level?' active':'');
+    d.setAttribute('aria-label', `Level ${i+1}`);
+    d.addEventListener('click', () => loadLevel(i));
+    c.appendChild(d);
+  }
+}
+function updateProgList() {
+  const ul = $('progList'); ul.innerHTML = '';
+  LEVELS.forEach((lv, i) => {
+    const li = document.createElement('div');
+    li.className = 'prog-item' + (state.solved[i]?' done':i===state.level?' active':'');
+    li.innerHTML = `<div class="pi-dot"></div>${lv.name}`;
+    li.addEventListener('click', () => loadLevel(i));
+    ul.appendChild(li);
+  });
+}
+
+/* ══════════════════════════════════════════════════════
+   BUTTONS
+══════════════════════════════════════════════════════ */
+$('runBtn').addEventListener('click', () => {
+  executeLevel();
+  playTone(440, 0.05, 'sine', 0.08);
+});
+$('clearBtn').addEventListener('click', () => {
+  state.placed = [];
+  state.lastOutput = [];
+  renderCanvas(); updateCanvasHint();
+  renderTargetOnly(LEVELS[state.level].target);
+  resetVisualiser();
+});
+$('hintToggleBtn').addEventListener('click', () => {
+  state.hintShown = !state.hintShown;
+  const lv = LEVELS[state.level];
+  $('hintBox').innerHTML = state.hintShown
+    ? lv.hint
+    : 'Click <strong>Hint</strong> to reveal where the microtask boundary is crossed in this level.';
+  $('hintToggleBtn').textContent = state.hintShown ? 'Hide' : 'Hint';
+});
+$('prevBtn').addEventListener('click', () => { if(state.level>0) loadLevel(state.level-1); });
+$('nextBtn').addEventListener('click', () => { if(state.level<TOTAL-1) loadLevel(state.level+1); });
+$('retryBtn').addEventListener('click', () => { $('successOverlay').classList.remove('show'); loadLevel(state.level); });
+$('nextLvlBtn').addEventListener('click', () => {
+  $('successOverlay').classList.remove('show');
+  if (state.level < TOTAL-1) loadLevel(state.level+1); else showAllDone();
+});
+$('restartBtn').addEventListener('click', () => {
+  $('alldoneOverlay').classList.remove('show');
+  state.score=0; state.streak=0; state.bestStreak=0;
+  state.solved=new Array(TOTAL).fill(false);
+  updateScoreUI(); save(); loadLevel(0);
+});
+function showAllDone() {
+  $('finalScore').textContent  = state.score;
+  $('finalStreak').textContent = state.bestStreak;
+  $('finalOps').textContent    = TOTAL;
+  $('alldoneOverlay').classList.add('show');
+}
+
+/* ══════════════════════════════════════════════════════
+   KEYBOARD
+══════════════════════════════════════════════════════ */
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.key === 'Enter') { e.preventDefault(); executeLevel(); }
+  if (e.key === 'ArrowRight' && state.level < TOTAL-1) loadLevel(state.level+1);
+  if (e.key === 'ArrowLeft'  && state.level > 0)       loadLevel(state.level-1);
+  if (e.key.toLowerCase() === 'r') loadLevel(state.level);
+  if (e.key.toLowerCase() === 'h') $('hintToggleBtn').click();
+});
+
+/* ══════════════════════════════════════════════════════
+   WEB AUDIO
+══════════════════════════════════════════════════════ */
+let audioCtx = null;
+function getCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+function playTone(freq, vol, type, dur=0.15) {
+  try {
+    const ctx = getCtx();
+    const o = ctx.createOscillator(); const g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+dur);
+    o.start(); o.stop(ctx.currentTime+dur);
+  } catch(e) {}
+}
+function playSuccess() {
+  [523,659,784,1046].forEach((f,i) => setTimeout(() => playTone(f,0.09,'sine',0.2), i*70));
+}
+
+/* ══════════════════════════════════════════════════════
+   INIT
+══════════════════════════════════════════════════════ */
+loadSave();
+updateScoreUI();
+loadLevel(state.level);
+</script>
+</body>
+</html>
