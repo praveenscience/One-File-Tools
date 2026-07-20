@@ -1,0 +1,806 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plan Chest — A File Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=Albert+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#f5f2e9; --paper2:#eae5d4; --paper3:#e0d9c2;
+  --ink:#211f1c; --ink-dim:#6b6558; --ink-faint:#a39c8b;
+  --line:#d9d1b8; --line-soft:#e6e0cb;
+  --accent:#c1573a; --accent-bright:#d97452; --accent-glow:rgba(193,87,58,.1);
+  --clay:#b98a52; --teal:#3f8a82; --slateblue:#4f6b8a; --amber-k:#b98a2e; --sage:#5f8a5c;
+  --shadow-card:0 1px 2px rgba(33,31,28,.05), 0 6px 14px rgba(33,31,28,.05);
+  --shadow-menu:0 12px 34px rgba(33,31,28,.22);
+  --font-display:'Source Serif 4',serif;
+  --font-ui:'Albert Sans',sans-serif;
+  --font-mono:'DM Mono',monospace;
+}
+html.dark{
+  --paper:#181b1c; --paper2:#202426; --paper3:#272c2e;
+  --ink:#ece9e2; --ink-dim:#9aa19f; --ink-faint:#656d6b;
+  --line:#31383a; --line-soft:#282f31;
+  --accent:#e0806a; --accent-bright:#ef9b86; --accent-glow:rgba(224,128,106,.14);
+  --clay:#d1a06b; --teal:#6bb0a8; --slateblue:#7f9dbd; --amber-k:#d1ab5c; --sage:#8fbb8a;
+  --shadow-card:0 1px 2px rgba(0,0,0,.3), 0 8px 20px rgba(0,0,0,.32);
+  --shadow-menu:0 16px 40px rgba(0,0,0,.5);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{background:var(--paper);}
+body{background:var(--paper); color:var(--ink); font-family:var(--font-ui); min-height:100vh; overflow:hidden; transition:background-color .2s,color .2s;}
+button,input,select{font-family:inherit; color:inherit;}
+button{cursor:pointer; background:none; border:none;}
+button:focus-visible, input:focus-visible, select:focus-visible{outline:2px solid var(--accent); outline-offset:1px;}
+::selection{background:var(--accent-glow);}
+.app{ display:flex; height:100vh; }
+
+.sidebar{
+  width:250px; flex-shrink:0; background:var(--paper2); border-right:1px solid var(--line);
+  display:flex; flex-direction:column; padding:20px 14px; overflow-y:auto; transition:transform .2s;
+}
+.sidebar-brand{ display:flex; align-items:center; gap:10px; padding:2px 8px 20px; }
+.sidebar-brand svg{ width:24px; height:24px; color:var(--accent); flex-shrink:0; }
+.sidebar-brand-text{ font-family:var(--font-display); font-weight:600; font-size:16.5px; }
+.sidebar-section-label{
+  font-family:var(--font-ui); font-weight:700; font-size:10px; letter-spacing:.11em; text-transform:uppercase;
+  color:var(--ink-faint); padding:0 8px; margin:16px 0 8px;
+}
+.sidebar-section-label:first-of-type{ margin-top:0; }
+.fav-row{
+  display:flex; align-items:center; gap:9px; padding:7px 8px; border-radius:7px; font-size:13px; color:var(--ink-dim);
+  transition:background .12s, color .12s; width:100%; text-align:left;
+}
+.fav-row:hover{ background:var(--paper3); color:var(--ink); }
+.fav-row.active{ background:var(--accent-glow); color:var(--accent); font-weight:600; }
+.fav-row svg{ width:15px; height:15px; flex-shrink:0; }
+
+.tree-node{ user-select:none; }
+.tree-row{ display:flex; align-items:center; gap:5px; padding:6px 8px 6px 0; border-radius:7px; cursor:pointer; transition:background .12s, color .12s; }
+.tree-row:hover{ background:var(--paper3); }
+.tree-row.active{ background:var(--accent-glow); color:var(--accent); font-weight:600; }
+.tree-elbow{ width:14px; height:24px; flex-shrink:0; color:var(--line); margin-left:-2px; }
+.tree-elbow svg{ width:100%; height:100%; display:block; }
+.tree-toggle{ width:16px; height:16px; display:grid; place-items:center; flex-shrink:0; color:var(--ink-faint); transition:transform .15s; }
+.tree-toggle.open{ transform:rotate(90deg); }
+.tree-toggle svg{ width:9px; height:9px; }
+.tree-toggle.leaf{ visibility:hidden; }
+.tree-icon{ width:15px; height:15px; flex-shrink:0; color:var(--clay); }
+.tree-name{ font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.tree-children{ position:relative; margin-left:19px; padding-left:7px; }
+.tree-children::before{ content:""; position:absolute; left:0; top:0; bottom:14px; width:1.4px;
+  background:linear-gradient(180deg, var(--line) 0%, var(--line) 88%, transparent 100%); }
+.main{ flex:1; display:flex; flex-direction:column; min-width:0; }
+.toolbar{ display:flex; align-items:center; gap:10px; padding:16px 22px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+.mobile-menu-btn{ display:none; width:34px; height:34px; border-radius:7px; align-items:center; justify-content:center; color:var(--ink-dim); }
+.mobile-menu-btn svg{ width:18px; height:18px; }
+
+.breadcrumb{ display:flex; align-items:center; gap:6px; font-size:13.5px; flex:1; min-width:110px; overflow-x:auto; }
+.crumb{ color:var(--ink-dim); font-weight:500; padding:4px 6px; border-radius:5px; transition:background .12s, color .12s; white-space:nowrap; }
+.crumb:hover{ background:var(--paper3); color:var(--ink); }
+.crumb.current{ color:var(--ink); font-weight:700; }
+.crumb-sep{ color:var(--ink-faint); font-size:11px; }
+
+.search-wrap{ position:relative; }
+.search-wrap svg{ position:absolute; left:11px; top:50%; transform:translateY(-50%); width:14px; height:14px; color:var(--ink-faint); }
+.search-input{ width:180px; background:var(--paper2); border:1px solid var(--line); border-radius:8px; padding:8px 12px 8px 32px; font-size:13px; }
+
+.view-toggle{ display:flex; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+.view-btn{ width:34px; height:34px; display:grid; place-items:center; color:var(--ink-faint); transition:background .12s, color .12s; }
+.view-btn.active{ background:var(--paper3); color:var(--accent); }
+.view-btn svg{ width:15px; height:15px; }
+
+.sort-select{ background:var(--paper2); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:12.5px; }
+.new-btn{
+  display:inline-flex; align-items:center; gap:7px; font-weight:600; font-size:12.5px; padding:9px 14px 9px 16px;
+  background:var(--accent); color:var(--paper); border-radius:8px; transition:background .15s;
+}
+.new-btn:hover{ background:var(--accent-bright); }
+.new-btn svg{ width:13px; height:13px; }
+.new-btn .caret{ opacity:.75; margin-left:2px; }
+
+.items-scroll{ flex:1; overflow-y:auto; padding:20px 22px 40px; }
+.items-empty{ text-align:center; padding:60px 20px; color:var(--ink-faint); font-size:13.5px; font-style:italic; }
+.drop-zone{ position:absolute; inset:0; z-index:40; background:var(--accent-glow); border:2px dashed var(--accent); border-radius:12px; display:none; align-items:center; justify-content:center; font-weight:700; color:var(--accent); font-size:15px; }
+.drop-zone.show{ display:flex; }
+
+/* grid view */
+.grid-view{ display:grid; grid-template-columns:repeat(auto-fill,minmax(118px,1fr)); gap:6px; }
+.item-tile{ position:relative; display:flex; flex-direction:column; align-items:center; text-align:center; padding:14px 8px 10px; border-radius:9px; cursor:default; }
+.item-tile:hover{ background:var(--paper2); }
+.item-tile.selected{ background:var(--accent-glow); }
+.item-tile.selected::after{
+  content:""; position:absolute; top:0; right:0; width:0; height:0;
+  border-style:solid; border-width:0 14px 14px 0; border-color:transparent var(--accent) transparent transparent; border-radius:0 9px 0 0;
+}
+.item-icon{ width:38px; height:38px; margin-bottom:8px; }
+.item-icon svg{ width:100%; height:100%; }
+.item-name{ font-size:12px; font-weight:500; line-height:1.35; word-break:break-word; max-width:100%; }
+.item-name-input{ width:100%; font-size:12px; text-align:center; background:var(--paper); border:1px solid var(--accent); border-radius:4px; padding:2px 4px; }
+
+/* list view */
+.list-view{ display:flex; flex-direction:column; }
+.list-head, .list-row{ display:grid; grid-template-columns:1fr 130px 130px; align-items:center; gap:12px; padding:9px 12px; }
+.list-head{ font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-faint); border-bottom:1px solid var(--line); }
+.list-row{ border-radius:7px; font-size:13px; cursor:default; position:relative; border-left:3px solid transparent; }
+.list-row:hover{ background:var(--paper2); }
+.list-row.selected{ background:var(--accent-glow); border-left-color:var(--accent); }
+.list-name-cell{ display:flex; align-items:center; gap:10px; min-width:0; }
+.list-icon{ width:20px; height:20px; flex-shrink:0; }
+.list-icon svg{ width:100%; height:100%; }
+.list-name{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.list-meta{ font-family:var(--font-mono); font-size:11.5px; color:var(--ink-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+
+.ctx-menu{ position:fixed; z-index:80; min-width:190px; background:var(--paper); border:1px solid var(--line); border-radius:9px; box-shadow:var(--shadow-menu); padding:6px; }
+.ctx-item{ display:flex; align-items:center; gap:10px; width:100%; text-align:left; padding:8px 10px; border-radius:6px; font-size:13px; transition:background .1s; }
+.ctx-item:hover{ background:var(--paper2); }
+.ctx-item.danger{ color:var(--accent); }
+.ctx-item svg{ width:14px; height:14px; flex-shrink:0; color:var(--ink-dim); }
+.ctx-item.danger svg{ color:var(--accent); }
+.ctx-sep{ height:1px; background:var(--line); margin:5px 4px; }
+.ctx-item:disabled{ opacity:.4; cursor:not-allowed; }
+.ctx-item:disabled:hover{ background:none; }
+
+
+.modal-backdrop{ position:fixed; inset:0; background:rgba(20,18,15,.5); backdrop-filter:blur(2px); z-index:95; display:flex; align-items:center; justify-content:center; padding:20px; }
+.modal-card{ width:100%; max-width:520px; max-height:82vh; overflow-y:auto; background:var(--paper); border:1px solid var(--line); border-radius:12px; padding:22px 24px; box-shadow:var(--shadow-menu); }
+.modal-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:14px; }
+.modal-close{ width:30px; height:30px; border-radius:50%; display:grid; place-items:center; color:var(--ink-faint); flex-shrink:0; transition:background .12s,color .12s; }
+.modal-close:hover{ background:var(--paper2); color:var(--ink); }
+.modal-close svg{ width:14px; height:14px; }
+.preview-icon svg{ width:34px; height:34px; }
+.preview-title{ font-family:var(--font-display); font-weight:600; font-size:16.5px; word-break:break-word; }
+.preview-meta{ font-family:var(--font-mono); font-size:11px; color:var(--ink-dim); margin-top:4px; }
+.preview-body{ margin-top:18px; }
+.preview-body img{ max-width:100%; border-radius:8px; border:1px solid var(--line); display:block; }
+.preview-text{ font-family:var(--font-mono); font-size:12px; white-space:pre-wrap; word-break:break-word; background:var(--paper2); border:1px solid var(--line); border-radius:8px; padding:14px; max-height:320px; overflow-y:auto; }
+.preview-empty{ font-size:13px; color:var(--ink-faint); font-style:italic; padding:34px 10px; text-align:center; border:1px dashed var(--line); border-radius:8px; }
+.modal-actions{ display:flex; justify-content:flex-end; margin-top:16px; }
+.btn-primary{ padding:9px 18px; border-radius:7px; background:var(--accent); color:var(--paper); font-weight:700; font-size:12.5px; text-decoration:none; display:inline-flex; align-items:center; gap:7px; }
+.btn-primary:hover{ background:var(--accent-bright); }
+.btn-primary svg{ width:13px; height:13px; }
+
+
+.theme-toggle{ width:34px; height:34px; border-radius:8px; border:1px solid var(--line); display:grid; place-items:center; color:var(--ink-dim); transition:border-color .15s,color .15s; }
+.theme-toggle:hover{ border-color:var(--accent); color:var(--accent); }
+.theme-toggle svg{ width:16px; height:16px; }
+
+@media (max-width:760px){
+  .sidebar{ position:fixed; z-index:60; top:0; bottom:0; left:0; transform:translateX(-100%); box-shadow:var(--shadow-menu); }
+  .sidebar.open{ transform:translateX(0); }
+  .mobile-menu-btn{ display:flex; }
+  .search-input{ width:110px; }
+  .list-head, .list-row{ grid-template-columns:1fr 90px; }
+  .list-head span:nth-child(3), .list-row .list-modified{ display:none; }
+}
+@media (prefers-reduced-motion:reduce){ *,*::before,*::after{ transition:none !important; } }
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+
+<script>
+
+const ICON = {
+  brand:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 7l4-3h10l4 3v13H3z"/><path d="M3 7h18M8 11h8M8 15h5"/></svg>`,
+  chevron:`<svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 1l4 4-4 4"/></svg>`,
+  elbow:`<svg viewBox="0 0 14 24" fill="none"><path d="M2 0 C2 11 2 12 12 12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`,
+  folder:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/></svg>`,
+  folderFill:`<svg viewBox="0 0 44 44" fill="none"><path d="M5 12a2 2 0 0 1 2-2h9l4 4h17a2 2 0 0 1 2 2v18a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z" fill="var(--clay)" opacity=".18" stroke="var(--clay)" stroke-width="1.6"/></svg>`,
+  imageFill:`<svg viewBox="0 0 44 44" fill="none"><rect x="6" y="8" width="32" height="28" rx="3" fill="var(--teal)" opacity=".14" stroke="var(--teal)" stroke-width="1.6"/><circle cx="16" cy="17" r="3" stroke="var(--teal)" stroke-width="1.6"/><path d="M9 32l9-10 6 6 5-5 8 9" stroke="var(--teal)" stroke-width="1.6" stroke-linejoin="round"/></svg>`,
+  docFill:`<svg viewBox="0 0 44 44" fill="none"><path d="M11 6h15l7 7v25H11z" fill="var(--slateblue)" opacity=".14" stroke="var(--slateblue)" stroke-width="1.6" stroke-linejoin="round"/><path d="M26 6v7h7" stroke="var(--slateblue)" stroke-width="1.6" stroke-linejoin="round"/><path d="M16 24h12M16 29h12M16 19h6" stroke="var(--slateblue)" stroke-width="1.4" stroke-linecap="round"/></svg>`,
+  codeFill:`<svg viewBox="0 0 44 44" fill="none"><path d="M11 6h15l7 7v25H11z" fill="var(--amber-k)" opacity=".14" stroke="var(--amber-k)" stroke-width="1.6" stroke-linejoin="round"/><path d="M26 6v7h7" stroke="var(--amber-k)" stroke-width="1.6" stroke-linejoin="round"/><path d="M18 21l-4 4 4 4M26 21l4 4-4 4" stroke="var(--amber-k)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  archiveFill:`<svg viewBox="0 0 44 44" fill="none"><rect x="7" y="14" width="30" height="22" rx="2.5" fill="var(--sage)" opacity=".14" stroke="var(--sage)" stroke-width="1.6"/><path d="M7 14V9a2 2 0 0 1 2-2h26a2 2 0 0 1 2 2v5" stroke="var(--sage)" stroke-width="1.6"/><path d="M19 21h6v6h-6z" stroke="var(--sage)" stroke-width="1.4"/></svg>`,
+  search:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.3-4.3"/></svg>`,
+  grid:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>`,
+  list:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>`,
+  plus:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`,
+  sun:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8l1.8-1.8M18 6l1.8-1.8"/></svg>`,
+  moon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>`,
+  pencil:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l3-1 10-10-2-2L5 17z"/><path d="M14 7l2-2 2 2-2 2z"/></svg>`,
+  duplicate:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="12" height="14" rx="2"/><path d="M9 20h9a2 2 0 0 0 2-2V8" /></svg>`,
+  clipboard:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="6" y="4" width="12" height="17" rx="2"/><rect x="9" y="2" width="6" height="4" rx="1"/></svg>`,
+  trash:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14"/></svg>`,
+  home:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>`,
+  menu:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>`,
+  open:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4L10 14M6 6H4v14h14v-2"/></svg>`,
+  close:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`,
+  docNew:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 12v6M9 15h6"/></svg>`,
+  importIcon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 19h16"/></svg>`,
+  download:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13M7 11l5 5 5-5"/><path d="M4 21h16"/></svg>`,
+  caret:`<svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1l4 4 4-4"/></svg>`
+};
+const KIND_ICON = { folder:ICON.folderFill, image:ICON.imageFill, document:ICON.docFill, code:ICON.codeFill, archive:ICON.archiveFill };
+const THEME_KEY = "plan_chest_theme";
+
+const IMAGE_EXT = ["png","jpg","jpeg","gif","svg","webp","bmp","ico","heic"];
+const CODE_EXT = ["js","ts","jsx","tsx","py","rb","go","rs","c","cpp","h","hpp","css","html","json","java","php","sh","yml","yaml","xml","sql"];
+const ARCHIVE_EXT = ["zip","rar","7z","tar","gz","bz2"];
+const TEXT_PREVIEWABLE = [...CODE_EXT, "txt","md","csv","log"];
+
+function extOf(name){ const i = name.lastIndexOf("."); return i>=0 ? name.slice(i+1).toLowerCase() : ""; }
+function getKind(name){
+  const ext = extOf(name);
+  if(IMAGE_EXT.includes(ext)) return "image";
+  if(CODE_EXT.includes(ext)) return "code";
+  if(ARCHIVE_EXT.includes(ext)) return "archive";
+  return "document";
+}
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+
+
+let idSeed = 1;
+function nid(){ return "n" + (idSeed++); }
+function fileNode(name, kind, size, modified){ return { id:nid(), type:"file", name, kind, size, modified }; }
+function folderNode(name, modified, children){ return { id:nid(), type:"folder", name, modified, children: children || [] }; }
+
+const root = folderNode("Library", "2026-06-02", [
+  folderNode("Projects", "2026-07-10", [
+    folderNode("Aurora Rebrand", "2026-07-09", [
+      fileNode("moodboard.png", "image", 4200000, "2026-07-08"),
+      fileNode("brief.docx", "document", 82000, "2026-06-30"),
+      fileNode("logo-final.svg", "image", 18000, "2026-07-09")
+    ]),
+    folderNode("Nimbus App", "2026-07-11", [
+      fileNode("app.jsx", "code", 6400, "2026-07-11"),
+      fileNode("README.md", "document", 2100, "2026-07-01"),
+      fileNode("wireframes.pdf", "document", 950000, "2026-06-22")
+    ])
+  ]),
+  folderNode("Assets", "2026-06-28", [
+    folderNode("Icons", "2026-06-20", [
+      fileNode("arrow-set.svg", "image", 9200, "2026-06-19"),
+      fileNode("nav-icons.svg", "image", 14300, "2026-06-20")
+    ]),
+    folderNode("Fonts", "2026-05-14", [
+      fileNode("Source-Serif.otf", "document", 210000, "2026-05-14"),
+      fileNode("Albert-Sans.otf", "document", 198000, "2026-05-14")
+    ])
+  ]),
+  fileNode("Notes.md", "document", 3400, "2026-07-12"),
+  fileNode("budget.xlsx", "document", 44000, "2026-06-15"),
+  fileNode("archive.zip", "archive", 12400000, "2026-04-02")
+]);
+root.children[2].textContent = "# Notes\n\nDemo content — this file was baked into the sample data, so it has no real bytes behind it.\n";
+
+
+let state = {
+  currentId: root.id,
+  view: "grid",
+  sort: "name",
+  search: "",
+  expanded: new Set([root.id]),
+  selected: new Set(),
+  renamingId: null,
+  renamingValue: "",
+  clipboard: null,
+  sidebarOpen: false,
+  previewId: null,
+  dragOver: false
+};
+
+
+function esc(s){ const d=document.createElement("div"); d.textContent=s; return d.innerHTML; }
+function findPath(id, node=root, path=[]){
+  const nextPath = [...path, node];
+  if(node.id === id) return nextPath;
+  if(node.type === "folder"){
+    for(const child of node.children){
+      const found = findPath(id, child, nextPath);
+      if(found) return found;
+    }
+  }
+  return null;
+}
+function findNode(id, node=root){
+  if(node.id === id) return node;
+  if(node.type === "folder") for(const c of node.children){ const f = findNode(id,c); if(f) return f; }
+  return null;
+}
+function findParent(id, node=root){
+  if(node.type === "folder"){
+    if(node.children.some(c=>c.id===id)) return node;
+    for(const c of node.children){ const f = findParent(id,c); if(f) return f; }
+  }
+  return null;
+}
+function bytesReadable(n){
+  if(n == null) return "—";
+  if(n < 1024) return n + " B";
+  if(n < 1024*1024) return (n/1024).toFixed(1) + " KB";
+  return (n/(1024*1024)).toFixed(1) + " MB";
+}
+function formatDate(d){
+  return new Date(d+"T00:00:00").toLocaleDateString(undefined,{ month:"short", day:"numeric", year:"numeric" });
+}
+function currentFolder(){ return findNode(state.currentId); }
+function baseSortedChildren(folder){
+  const items = [...folder.children];
+  const cmp = {
+    name: (a,b)=>a.name.localeCompare(b.name),
+    modified: (a,b)=>b.modified.localeCompare(a.modified),
+    size: (a,b)=>(b.size||0)-(a.size||0)
+  }[state.sort];
+  items.sort((a,b)=>{
+    if(a.type!==b.type) return a.type==="folder" ? -1 : 1;
+    return cmp(a,b);
+  });
+  return items;
+}
+function uniqueName(baseName, siblings){
+  const names = new Set(siblings.map(s=>s.name));
+  if(!names.has(baseName)) return baseName;
+  let i = 2;
+  const dot = baseName.lastIndexOf(".");
+  const stem = dot>0 ? baseName.slice(0,dot) : baseName;
+  const ext = dot>0 ? baseName.slice(dot) : "";
+  while(names.has(`${stem} ${i}${ext}`)) i++;
+  return `${stem} ${i}${ext}`;
+}
+function cloneNode(node){
+  if(node.type==="file"){ const c = fileNode(node.name, node.kind, node.size, node.modified); c.textContent=node.textContent; c.objectURL=node.objectURL; c.realFile=node.realFile; return c; }
+  return folderNode(node.name, node.modified, node.children.map(cloneNode));
+}
+
+
+function render(){
+  document.getElementById("app").innerHTML = `
+    ${renderSidebar()}
+    <div class="main">
+      ${renderToolbar()}
+      <div class="items-scroll" id="items-scroll" oncontextmenu="onBackgroundContextMenu(event)"
+        ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDropFiles(event)">
+        <div class="drop-zone ${state.dragOver?'show':''}">Drop to import into this folder</div>
+        ${renderItems()}
+      </div>
+    </div>
+    <input type="file" id="import-folder-input" webkitdirectory multiple style="display:none" onchange="onImportFolderChange(event)">
+    <input type="file" id="import-files-input" multiple style="display:none" onchange="onImportFilesChange(event)">
+    ${state.previewId ? renderPreviewModal() : ""}
+  `;
+  updateThemeIcon();
+  focusRenameInputIfNeeded();
+}
+
+function renderSidebar(){
+  return `<div class="sidebar ${state.sidebarOpen?'open':''}" id="sidebar">
+    <div class="sidebar-brand">${ICON.brand}<span class="sidebar-brand-text">Plan Chest</span></div>
+    <div class="sidebar-section-label">Favorites</div>
+    <button class="fav-row ${state.currentId===root.id?'active':''}" onclick="navigateTo('${root.id}')">${ICON.home} Library</button>
+    ${root.children.filter(c=>c.type==='folder').slice(0,2).map(c => `
+      <button class="fav-row ${state.currentId===c.id?'active':''}" onclick="navigateTo('${c.id}')">${ICON.folder} ${esc(c.name)}</button>
+    `).join("")}
+    <div class="sidebar-section-label">Folders</div>
+    ${renderTreeNode(root, 0)}
+  </div>`;
+}
+function renderTreeNode(node, depth){
+  if(node.type !== "folder") return "";
+  const folders = node.children.filter(c=>c.type==="folder");
+  const isOpen = state.expanded.has(node.id);
+  const isActive = state.currentId === node.id;
+  let html = `<div class="tree-node">
+    <div class="tree-row ${isActive?'active':''}" onclick="navigateTo('${node.id}')" oncontextmenu="onItemContextMenu(event,'${node.id}')">
+      ${depth>0 ? `<span class="tree-elbow">${ICON.elbow}</span>` : ""}
+      <span class="tree-toggle ${folders.length?'':'leaf'} ${isOpen?'open':''}" onclick="event.stopPropagation(); toggleExpand('${node.id}')">${ICON.chevron}</span>
+      <span class="tree-icon">${ICON.folder}</span>
+      <span class="tree-name">${esc(node.name)}</span>
+    </div>`;
+  if(folders.length && isOpen){
+    html += `<div class="tree-children">${folders.map(f=>renderTreeNode(f, depth+1)).join("")}</div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+function renderToolbar(){
+  const path = findPath(state.currentId);
+  return `<div class="toolbar">
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">${ICON.menu}</button>
+    <div class="breadcrumb">
+      ${path.map((n,i)=>`
+        ${i>0 ? `<span class="crumb-sep">/</span>` : ""}
+        <button class="crumb ${i===path.length-1?'current':''}" onclick="navigateTo('${n.id}')">${esc(n.name)}</button>
+      `).join("")}
+    </div>
+    <div class="search-wrap">${ICON.search}<input class="search-input" id="search-input" placeholder="Search everywhere" value="${esc(state.search)}" oninput="onSearchInput(this.value)"></div>
+    <div class="view-toggle">
+      <button class="view-btn ${state.view==='grid'?'active':''}" onclick="setView('grid')" aria-label="Grid view">${ICON.grid}</button>
+      <button class="view-btn ${state.view==='list'?'active':''}" onclick="setView('list')" aria-label="List view">${ICON.list}</button>
+    </div>
+    <select class="sort-select" onchange="setSort(this.value)">
+      <option value="name" ${state.sort==='name'?'selected':''}>Name</option>
+      <option value="modified" ${state.sort==='modified'?'selected':''}>Date Modified</option>
+      <option value="size" ${state.sort==='size'?'selected':''}>Size</option>
+    </select>
+    <button class="new-btn" id="new-btn" onclick="toggleNewMenu(event)">${ICON.plus} New <span class="caret">${ICON.caret}</span></button>
+    <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme"></button>
+  </div>`;
+}
+
+
+function renderItems(){
+  const query = state.search.trim().toLowerCase();
+  if(query){
+    const results = [];
+    searchRecursive(root, query, [], results);
+    if(!results.length) return `<div class="items-empty">No items match "${esc(state.search)}" anywhere in Library.</div>`;
+    return renderSearchList(results);
+  }
+  const items = baseSortedChildren(currentFolder());
+  if(!items.length) return `<div class="items-empty">This folder is empty. Drop files here, or use New → Import.</div>`;
+  return state.view === "grid" ? renderGrid(items) : renderList(items, false);
+}
+function searchRecursive(node, query, pathNames, results){
+  if(node.id !== root.id && node.name.toLowerCase().includes(query)){
+    results.push({ node, path: pathNames });
+  }
+  if(node.type==="folder"){
+    node.children.forEach(c => searchRecursive(c, query, [...pathNames, node.name], results));
+  }
+}
+function renderSearchList(results){
+  return renderList(results.map(r=>r.node), true, results);
+}
+
+function renderGrid(items){
+  return `<div class="grid-view">${items.map(item => `
+    <div class="item-tile ${state.selected.has(item.id)?'selected':''}" data-id="${item.id}"
+      onclick="onItemClick(event,'${item.id}')" ondblclick="onItemDoubleClick('${item.id}')" oncontextmenu="onItemContextMenu(event,'${item.id}')">
+      <div class="item-icon">${item.type==='folder' ? KIND_ICON.folder : KIND_ICON[item.kind]}</div>
+      ${state.renamingId===item.id
+        ? `<input class="item-name-input" id="rename-input" value="${esc(state.renamingValue)}" oninput="onRenameInput(this.value)" onkeydown="onRenameKey(event)" onblur="commitRename()" onclick="event.stopPropagation()">`
+        : `<div class="item-name">${esc(item.name)}</div>`}
+    </div>`).join("")}</div>`;
+}
+function renderList(items, isSearch, resultMeta){
+  return `<div class="list-view">
+    <div class="list-head"><span>Name</span><span>${isSearch ? "Location" : "Size"}</span><span>Modified</span></div>
+    ${items.map((item,i) => `
+      <div class="list-row ${state.selected.has(item.id)?'selected':''}" data-id="${item.id}"
+        onclick="onItemClick(event,'${item.id}')" ondblclick="onItemDoubleClick('${item.id}')" oncontextmenu="onItemContextMenu(event,'${item.id}')">
+        <div class="list-name-cell">
+          <div class="list-icon">${item.type==='folder' ? KIND_ICON.folder : KIND_ICON[item.kind]}</div>
+          ${state.renamingId===item.id && !isSearch
+            ? `<input class="item-name-input" id="rename-input" value="${esc(state.renamingValue)}" oninput="onRenameInput(this.value)" onkeydown="onRenameKey(event)" onblur="commitRename()" onclick="event.stopPropagation()">`
+            : `<span class="list-name">${esc(item.name)}</span>`}
+        </div>
+        <span class="list-meta">${isSearch ? (esc(resultMeta[i].path.join(" / ") || "Library")) : (item.type==='file' ? bytesReadable(item.size) : "—")}</span>
+        <span class="list-meta list-modified">${formatDate(item.modified)}</span>
+      </div>`).join("")}
+  </div>`;
+}
+
+
+function onSearchInput(value){
+  state.search = value;
+  const container = document.getElementById("items-scroll");
+  if(container){
+    const dropZone = container.querySelector(".drop-zone");
+    container.innerHTML = (dropZone ? dropZone.outerHTML : "") + renderItems();
+  }
+}
+
+
+function navigateTo(id){
+  state.currentId = id;
+  state.selected.clear();
+  state.search = "";
+  state.sidebarOpen = false;
+  let p = findPath(id);
+  p.forEach(n => state.expanded.add(n.id));
+  render();
+}
+function toggleExpand(id){
+  if(state.expanded.has(id)) state.expanded.delete(id); else state.expanded.add(id);
+  render();
+}
+function toggleSidebar(){ state.sidebarOpen = !state.sidebarOpen; render(); }
+function setView(v){ state.view = v; render(); }
+function setSort(v){ state.sort = v; render(); }
+
+
+function onItemClick(e, id){
+  if(e.metaKey || e.ctrlKey){
+    state.selected.has(id) ? state.selected.delete(id) : state.selected.add(id);
+  } else if(e.shiftKey && state.selected.size){
+    const items = baseSortedChildren(currentFolder()).map(i=>i.id);
+    const anchor = [...state.selected][0];
+    const a = items.indexOf(anchor), b = items.indexOf(id);
+    if(a>=0 && b>=0){ const [lo,hi] = a<b ? [a,b] : [b,a]; state.selected = new Set(items.slice(lo,hi+1)); }
+    else state.selected = new Set([id]);
+  } else {
+    state.selected = new Set([id]);
+  }
+  const container = document.getElementById("items-scroll");
+  if(container){
+    const dropZone = container.querySelector(".drop-zone");
+    container.innerHTML = (dropZone ? dropZone.outerHTML : "") + renderItems();
+  }
+}
+function onItemDoubleClick(id){
+  const node = findNode(id);
+  if(node.type === "folder") navigateTo(id);
+  else openPreview(id);
+}
+
+
+function beginRename(id){
+  state.renamingId = id;
+  state.renamingValue = findNode(id).name;
+  render();
+}
+function focusRenameInputIfNeeded(){
+  if(state.renamingId){
+    const input = document.getElementById("rename-input");
+    if(input){ input.focus(); input.select(); }
+  }
+}
+function onRenameInput(value){ state.renamingValue = value; }
+function onRenameKey(e){
+  if(e.key === "Enter") commitRename();
+  if(e.key === "Escape"){ state.renamingId = null; render(); }
+}
+function commitRename(){
+  if(!state.renamingId) return;
+  const node = findNode(state.renamingId);
+  const trimmed = state.renamingValue.trim();
+  if(node && trimmed) node.name = trimmed;
+  state.renamingId = null;
+  render();
+}
+
+
+function createFolder(){
+  const folder = currentFolder();
+  const name = uniqueName("Untitled Folder", folder.children);
+  const newNode = folderNode(name, todayStr());
+  folder.children.push(newNode);
+  state.selected = new Set([newNode.id]);
+  render();
+  beginRename(newNode.id);
+}
+function createFile(){
+  const folder = currentFolder();
+  const name = uniqueName("Untitled.txt", folder.children);
+  const newNode = fileNode(name, "document", 0, todayStr());
+  newNode.textContent = "";
+  folder.children.push(newNode);
+  state.selected = new Set([newNode.id]);
+  render();
+  beginRename(newNode.id);
+}
+function deleteSelected(targetId){
+  const idsToDelete = state.selected.has(targetId) && state.selected.size > 1 ? [...state.selected] : [targetId];
+  idsToDelete.forEach(id => {
+    const parent = findParent(id);
+    if(parent) parent.children = parent.children.filter(c => c.id !== id);
+  });
+  state.selected.clear();
+  render();
+}
+function duplicateSelected(targetId){
+  const idsToDup = state.selected.has(targetId) && state.selected.size > 1 ? [...state.selected] : [targetId];
+  idsToDup.forEach(id => {
+    const node = findNode(id);
+    const parent = findParent(id);
+    if(!node || !parent) return;
+    const copy = cloneNode(node);
+    copy.name = uniqueName(node.name.replace(/(\.[^.]+)?$/, m => ` copy${m}`), parent.children);
+    parent.children.push(copy);
+  });
+  render();
+}
+function copySelected(targetId){
+  const idsToCopy = state.selected.has(targetId) && state.selected.size > 1 ? [...state.selected] : [targetId];
+  state.clipboard = { nodes: idsToCopy.map(id => findNode(id)).filter(Boolean) };
+}
+function pasteClipboard(){
+  if(!state.clipboard || !state.clipboard.nodes.length) return;
+  const folder = currentFolder();
+  state.clipboard.nodes.forEach(node => {
+    const copy = cloneNode(node);
+    copy.name = uniqueName(copy.name, folder.children);
+    folder.children.push(copy);
+  });
+  render();
+}
+
+
+async function readTextIfSuitable(fnode, file){
+  const ext = extOf(fnode.name);
+  if(TEXT_PREVIEWABLE.includes(ext) && file.size < 200000){
+    try{ fnode.textContent = await file.text(); }catch(e){}
+  }
+}
+async function onImportFolderChange(e){
+  const files = Array.from(e.target.files);
+  e.target.value = "";
+  if(!files.length) return;
+  const parent = currentFolder();
+  const folderCache = new Map();
+  for(const file of files){
+    const relPath = file.webkitRelativePath || file.name;
+    const parts = relPath.split("/");
+    const fileName = parts.pop();
+    let dest = parent, cacheKey = "";
+    for(const part of parts){
+      cacheKey += "/" + part;
+      if(folderCache.has(cacheKey)){ dest = folderCache.get(cacheKey); continue; }
+      const name = uniqueName(part, dest.children);
+      const node = folderNode(name, todayStr());
+      dest.children.push(node);
+      folderCache.set(cacheKey, node);
+      dest = node;
+    }
+    const kind = getKind(fileName);
+    const fnode = fileNode(uniqueName(fileName, dest.children), kind, file.size, todayStr());
+    fnode.realFile = file;
+    if(kind === "image") fnode.objectURL = URL.createObjectURL(file);
+    await readTextIfSuitable(fnode, file);
+    dest.children.push(fnode);
+  }
+  render();
+}
+async function onImportFilesChange(e){
+  const files = Array.from(e.target.files);
+  e.target.value = "";
+  if(!files.length) return;
+  await importLooseFiles(files);
+}
+async function importLooseFiles(files){
+  const dest = currentFolder();
+  for(const file of files){
+    const kind = getKind(file.name);
+    const fnode = fileNode(uniqueName(file.name, dest.children), kind, file.size, todayStr());
+    fnode.realFile = file;
+    if(kind === "image") fnode.objectURL = URL.createObjectURL(file);
+    await readTextIfSuitable(fnode, file);
+    dest.children.push(fnode);
+  }
+  render();
+}
+function onDragOver(e){ e.preventDefault(); state.dragOver = true; const dz = document.querySelector(".drop-zone"); if(dz) dz.classList.add("show"); }
+function onDragLeave(e){ state.dragOver = false; const dz = document.querySelector(".drop-zone"); if(dz) dz.classList.remove("show"); }
+async function onDropFiles(e){
+  e.preventDefault();
+  state.dragOver = false;
+  const files = Array.from(e.dataTransfer.files || []);
+  if(files.length) await importLooseFiles(files);
+  else render();
+}
+
+
+function openPreview(id){ state.previewId = id; render(); }
+function closePreview(){ state.previewId = null; render(); }
+function renderPreviewModal(){
+  const node = findNode(state.previewId);
+  if(!node){ state.previewId = null; return ""; }
+  let body;
+  if(node.kind === "image" && node.objectURL){
+    body = `<img src="${node.objectURL}" alt="${esc(node.name)}">`;
+  } else if(node.textContent !== undefined){
+    body = `<div class="preview-text">${esc(node.textContent) || "<span style=\"opacity:.6\">(empty file)</span>"}</div>`;
+  } else {
+    body = `<div class="preview-empty">No preview available — this is sample data with no real file behind it.</div>`;
+  }
+  const downloadBtn = node.realFile
+    ? `<a class="btn-primary" href="${URL.createObjectURL(node.realFile)}" download="${esc(node.name)}">${ICON.download} Download</a>`
+    : "";
+  return `<div class="modal-backdrop" onclick="if(event.target===this) closePreview()">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div style="display:flex;align-items:center;gap:12px;min-width:0;">
+          <div class="preview-icon">${KIND_ICON[node.kind]}</div>
+          <div style="min-width:0;">
+            <div class="preview-title">${esc(node.name)}</div>
+            <div class="preview-meta">${bytesReadable(node.size)} · Modified ${formatDate(node.modified)}</div>
+          </div>
+        </div>
+        <button class="modal-close" onclick="closePreview()">${ICON.close}</button>
+      </div>
+      <div class="preview-body">${body}</div>
+      ${downloadBtn ? `<div class="modal-actions">${downloadBtn}</div>` : ""}
+    </div>
+  </div>`;
+}
+
+
+function updateThemeIcon(){
+  const btn = document.getElementById("theme-toggle");
+  if(!btn) return;
+  btn.innerHTML = document.documentElement.classList.contains("dark") ? ICON.sun : ICON.moon;
+}
+function toggleTheme(){
+  document.documentElement.classList.toggle("dark");
+  try{ localStorage.setItem(THEME_KEY, document.documentElement.classList.contains("dark") ? "dark" : "light"); }catch(e){}
+  updateThemeIcon();
+}
+function applyStoredTheme(){
+  let t; try{ t = localStorage.getItem(THEME_KEY); }catch(e){}
+  if(!t) t = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  document.documentElement.classList.toggle("dark", t === "dark");
+}
+
+
+function removeCtxMenu(){ const m = document.getElementById("ctx-menu"); if(m) m.remove(); }
+function positionMenu(menu, x, y){
+  const vw = window.innerWidth, vh = window.innerHeight;
+  menu.style.left = Math.min(x, vw-210) + "px";
+  menu.style.top = Math.min(y, vh-270) + "px";
+}
+function onItemContextMenu(e, id){
+  e.preventDefault(); e.stopPropagation();
+  removeCtxMenu();
+  if(!state.selected.has(id)) { state.selected = new Set([id]); const c = document.getElementById("items-scroll"); if(c){ const dz=c.querySelector(".drop-zone"); c.innerHTML = (dz?dz.outerHTML:"") + renderItems(); } }
+  const node = findNode(id);
+  const menu = document.createElement("div");
+  menu.className = "ctx-menu"; menu.id = "ctx-menu"; menu.dataset.kind = "item";
+  menu.innerHTML = `
+    <button class="ctx-item" onclick="${node.type==='folder' ? `navigateTo('${id}')` : `openPreview('${id}')`}; removeCtxMenu()">${ICON.open} Open</button>
+    <div class="ctx-sep"></div>
+    <button class="ctx-item" onclick="beginRename('${id}'); removeCtxMenu()">${ICON.pencil} Rename</button>
+    <button class="ctx-item" onclick="duplicateSelected('${id}'); removeCtxMenu()">${ICON.duplicate} Duplicate</button>
+    <button class="ctx-item" onclick="copySelected('${id}'); removeCtxMenu()">${ICON.clipboard} Copy</button>
+    <button class="ctx-item" onclick="pasteClipboard(); removeCtxMenu()" ${state.clipboard? "" : "disabled"}>${ICON.clipboard} Paste</button>
+    <div class="ctx-sep"></div>
+    <button class="ctx-item danger" onclick="deleteSelected('${id}'); removeCtxMenu()">${ICON.trash} Delete</button>
+  `;
+  document.body.appendChild(menu);
+  positionMenu(menu, e.clientX, e.clientY);
+}
+function onBackgroundContextMenu(e){
+  if(e.target.closest(".item-tile") || e.target.closest(".list-row")) return;
+  e.preventDefault();
+  removeCtxMenu();
+  const menu = document.createElement("div");
+  menu.className = "ctx-menu"; menu.id = "ctx-menu"; menu.dataset.kind = "bg";
+  menu.innerHTML = `
+    <button class="ctx-item" onclick="createFolder(); removeCtxMenu()">${ICON.folder} New Folder</button>
+    <button class="ctx-item" onclick="createFile(); removeCtxMenu()">${ICON.docNew} New File</button>
+    <div class="ctx-sep"></div>
+    <button class="ctx-item" onclick="pasteClipboard(); removeCtxMenu()" ${state.clipboard? "" : "disabled"}>${ICON.clipboard} Paste</button>
+  `;
+  document.body.appendChild(menu);
+  positionMenu(menu, e.clientX, e.clientY);
+}
+function toggleNewMenu(e){
+  e.stopPropagation();
+  const existing = document.getElementById("ctx-menu");
+  const wasNewMenu = existing && existing.dataset.kind === "new";
+  removeCtxMenu();
+  if(wasNewMenu) return;
+  const btn = document.getElementById("new-btn");
+  const rect = btn.getBoundingClientRect();
+  const menu = document.createElement("div");
+  menu.className = "ctx-menu"; menu.id = "ctx-menu"; menu.dataset.kind = "new";
+  menu.innerHTML = `
+    <button class="ctx-item" onclick="createFolder(); removeCtxMenu()">${ICON.folder} New Folder</button>
+    <button class="ctx-item" onclick="createFile(); removeCtxMenu()">${ICON.docNew} New File</button>
+    <div class="ctx-sep"></div>
+    <button class="ctx-item" onclick="document.getElementById('import-folder-input').click(); removeCtxMenu()">${ICON.importIcon} Import Folder…</button>
+    <button class="ctx-item" onclick="document.getElementById('import-files-input').click(); removeCtxMenu()">${ICON.importIcon} Import Files…</button>
+  `;
+  document.body.appendChild(menu);
+  menu.style.left = Math.min(rect.left, window.innerWidth-220) + "px";
+  menu.style.top = (rect.bottom + 6) + "px";
+}
+document.addEventListener("click", (e) => { if(!e.target.closest(".ctx-menu") && !e.target.closest("#new-btn")) removeCtxMenu(); });
+document.addEventListener("keydown", (e) => {
+  if(e.key === "Escape"){
+    removeCtxMenu();
+    if(state.renamingId){ state.renamingId=null; render(); }
+    if(state.previewId){ state.previewId=null; render(); }
+  }
+});
+
+
+applyStoredTheme();
+render();
+</script>
+</body>
+</html>
