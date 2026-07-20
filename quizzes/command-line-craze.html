@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Command Line Craze — One File Tools</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+      /* ========================================
+         Reset & Base
+         ======================================== */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      /* ========================================
+         Dark Mode & Retro Theme
+         ======================================== */
+      :root {
+        --bg-color: #1b0d1d; /* Dark Purple */
+        --primary-color: #ff77ff; /* Lighter Pink */
+        --scanline-color: rgba(255, 0, 255, 0.1);
+        --shadow-color: #ff77ff; /* Lighter Pink */
+      }
+
+      /* ========================================
+         Background Icons
+         ======================================== */
+      .bg-icon-container {
+        position: fixed;
+        inset: 0;
+        overflow: hidden;
+        z-index: 0;
+      }
+      .bg-icon {
+        font-family: 'Material Icons';
+        position: absolute;
+        color: rgba(157, 140, 255, 0.08); /* Subtle purple */
+        opacity: 0;
+        animation: fadeInOut infinite;
+        user-select: none;
+        pointer-events: none;
+        text-shadow: none; /* Remove main text shadow */
+      }
+      @keyframes fadeInOut {
+          0%, 100% { opacity: 0; transform: scale(0.95); }
+          50% { opacity: 1; transform: scale(1); }
+      }
+
+      body {
+        font-family: 'VT323', monospace;
+        line-height: 1.6;
+        background: var(--bg-color);
+        color: var(--primary-color);
+        text-shadow: 0 0 5px var(--shadow-color);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        padding: 2rem;
+      }
+
+      /* ========================================
+         Scanlines
+         ======================================== */
+      .scanline {
+          position: absolute;
+          left: 0;
+          right: 0;
+          background: linear-gradient(to bottom, var(--scanline-color), rgba(255, 0, 255, 0.159) 50%, var(--scanline-color));
+          z-index: 2;
+          pointer-events: none;
+          animation: scanline linear infinite;
+      }
+
+      .scanline:nth-child(1) { height: 10px; animation-duration: 7s; }
+      .scanline:nth-child(2) { height: 20px; animation-duration: 11s; animation-direction: reverse; animation-delay: -3s; }
+      .scanline:nth-child(3) { height: 8px; animation-duration: 8s; animation-delay: -5s; }
+      .scanline:nth-child(4) { height: 15px; animation-duration: 13s; animation-direction: reverse; animation-delay: -8s; }
+      .scanline:nth-child(5) { height: 5px; animation-duration: 6s; animation-delay: -2s; }
+      .scanline:nth-child(6) { height: 12px; animation-duration: 10s; animation-direction: reverse; animation-delay: -1s; }
+
+      @keyframes scanline {
+          0% { transform: translateY(-20px); }
+          100% { transform: translateY(100vh); }
+      }
+
+      .container {
+          width: 100%;
+          max-width: 800px;
+          border: 2px solid var(--primary-color);
+          padding: 2rem;
+          background: rgba(48, 25, 52, 0.8);
+          box-shadow: 0 0 15px var(--shadow-color), inset 0 0 15px var(--shadow-color);
+          position: relative;
+          z-index: 1;
+      }
+
+      #score-container {
+          text-align: center;
+          margin-bottom: 1rem;
+      }
+
+      #score-display {
+          font-size: 3rem;
+          text-shadow: 0 0 8px var(--shadow-color);
+      }
+
+      /* ========================================
+         Quiz Styles
+         ======================================== */
+      header h1 {
+          font-size: 2.5rem;
+          text-align: center;
+          text-shadow: 0 0 5px var(--shadow-color);
+          margin-bottom: 1rem;
+      }
+
+      .warning-text {
+          text-align: center;
+          margin-top: 1.5rem;
+          margin-bottom: 1rem;
+          font-size: 1.2rem;
+      }
+
+      #quiz-container {
+          display: flex;
+          flex-direction: column;
+      }
+
+      #question-container {
+          margin-bottom: 2rem;
+          font-size: 1.5rem;
+          border: 1px solid var(--primary-color);
+          padding: 1rem;
+      }
+
+      #options-container {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 1rem;
+      }
+
+      .option-btn {
+          font-family: 'VT323', monospace;
+          background: transparent;
+          border: 1px solid var(--primary-color);
+          color: var(--primary-color);
+          padding: 1rem;
+          font-size: 1.2rem;
+          cursor: pointer;
+          text-align: left;
+          transition: background 0.2s, color 0.2s;
+      }
+
+      .option-btn:hover {
+          background: var(--primary-color);
+          color: #000;
+      }
+      
+      .option-btn.correct {
+          background: #0f0;
+          color: #000;
+          animation: blink 0.5s 2;
+      }
+
+      .option-btn.incorrect {
+          background: #f00;
+          color: #000;
+          border-color: #f00;
+          text-shadow: none;
+          box-shadow: 0 0 10px #f00;
+      }
+
+      @keyframes blink {
+          50% { opacity: 0.5; }
+      }
+
+      #feedback-container {
+          margin-top: 1.5rem;
+          font-size: 1.5rem;
+          text-align: center;
+          height: 2rem;
+      }
+
+      #progress-container {
+          margin-top: 1rem;
+          width: 100%;
+          border: 1px solid var(--primary-color);
+          height: 20px;
+      }
+
+      #progress-bar {
+          height: 100%;
+          background: var(--primary-color);
+          width: 0%;
+          transition: width 0.5s;
+      }
+
+      #results-container {
+          display: none;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          gap: 2rem;
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -45%);
+          z-index: 10;
+          opacity: 0;
+          transition: opacity 0.5s ease-in-out 0.5s, transform 0.5s ease-in-out 0.5s;
+          width: 100%;
+          text-align: center;
+      }
+
+      #results-container.visible {
+          display: flex;
+          opacity: 1;
+          transform: translate(-50%, -50%);
+      }
+
+      #results-container #final-score-display {
+          font-size: 3rem;
+          text-shadow: 0 0 8px var(--shadow-color);
+      }
+
+      #results-container #final-feedback-text {
+          font-size: 25px;
+      }
+
+      #results-container #restart-btn {
+          font-family: 'VT323', monospace;
+          background: var(--primary-color);
+          border: 1px solid var(--primary-color);
+          color: #000;
+          padding: 1rem 2rem;
+          font-size: 3rem;
+          cursor: pointer;
+          margin-top: 1rem;
+      }
+
+      .fade-out {
+          opacity: 0 !important;
+          pointer-events: none !important;
+          transition: opacity 0.5s ease-out;
+      }
+
+      footer {
+          position: absolute;
+          bottom: 10px;
+          left: 50%;
+          transform: translateX(-50%);
+          font-size: 1rem;
+          z-index: 3;
+      }
+
+      footer a {
+          color: var(--primary-color);
+          text-decoration: none;
+      }
+      
+      footer a:hover {
+          text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="bg-icon-container" id="bg-icon-container"></div>
+    <div class="scanline"></div>
+    <div class="scanline"></div>
+    <div class="scanline"></div>
+    <div class="scanline"></div>
+    <div class="scanline"></div>
+    <div class="scanline"></div>
+
+    <div id="score-container">
+        <p id="score-display"></p>
+    </div>
+
+    <div class="container">
+        <header>
+            <h1>⏳ Command Line Craze</h1>
+        </header>
+
+        <main id="main-content">
+            <div id="quiz-container">
+                <div id="question-container"></div>
+                <div id="options-container"></div>
+                <div id="feedback-container"></div>
+                <p class="warning-text">Think carefully. You cannot go back and change your answer!</p>
+                <div id="progress-container">
+                    <div id="progress-bar"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+    <div id="results-container">
+        <p id="final-score-display"></p>
+        <p id="final-feedback-text"></p>
+        <button id="restart-btn">Restart Quiz</button>
+    </div>
+    <footer>
+        <p>Part of <a href="https://github.com/praveenscience/One-File-Tools">One File Tools</a></p>
+    </footer>
+
+    <script>
+        const quizData = Object.freeze([
+            {
+                question: "Which command lists files and directories in the current directory?",
+                options: ["dir", "list", "ls", "show"],
+                answer: "ls"
+            },
+            {
+                question: "How do you change to the parent directory?",
+                options: ["cd ..", "cd /", "cd ~", "cd up"],
+                answer: "cd .."
+            },
+            {
+                question: "Which command prints the full path of the current working directory?",
+                options: ["path", "whereami", "pwd", "location"],
+                answer: "pwd"
+            },
+            {
+                question: "How do you create a new directory named 'projects'?",
+                options: ["new dir projects", "mkdir projects", "create projects", "make projects"],
+                answer: "mkdir projects"
+            },
+            {
+                question: "Which command is used to remove a file named 'temp.txt'?",
+                options: ["del temp.txt", "erase temp.txt", "rm temp.txt", "remove temp.txt"],
+                answer: "rm temp.txt"
+            },
+            {
+                question: "How do you copy a file named 'source.txt' to 'dest.txt'?",
+                options: ["copy source.txt dest.txt", "cp source.txt dest.txt", "duplicate source.txt dest.txt", "clone source.txt dest.txt"],
+                answer: "cp source.txt dest.txt"
+            },
+            {
+                question: "Which command renames 'old.txt' to 'new.txt'?",
+                options: ["ren old.txt new.txt", "rename old.txt new.txt", "mv old.txt new.txt", "move old.txt new.txt"],
+                answer: "mv old.txt new.txt"
+            },
+            {
+                question: "How do you search for the word 'error' inside 'log.txt'?",
+                options: ["search 'error' in log.txt", "find 'error' log.txt", "grep 'error' log.txt", "lookup 'error' log.txt"],
+                answer: "grep 'error' log.txt"
+            },
+            {
+                question: "Which command finds all files ending with '.js' in the current directory and subdirectories?",
+                options: ["find . -name '*.js'", "search . -ext .js", "locate *.js", "ls -R *.js"],
+                answer: "find . -name '*.js'"
+            },
+            {
+                question: "What command makes a script named 'run.sh' executable for the owner?",
+                options: ["chmod +x run.sh", "exec run.sh", "chown +x run.sh", "perm +x run.sh"],
+                answer: "chmod +x run.sh"
+            }
+        ]);
+
+        const STORAGE_KEY = 'commandLineCrazeProgress';
+
+        const questionContainer = document.getElementById('question-container'),
+              optionsContainer = document.getElementById('options-container'),
+              feedbackContainer = document.getElementById('feedback-container'),
+              progressBar = document.getElementById('progress-bar'),
+              quizContainer = document.getElementById('quiz-container'),
+              mainContent = document.getElementById('main-content'),
+              scoreContainer = document.getElementById('score-container'),
+              scoreDisplay = document.getElementById('score-display'),
+              resultsContainer = document.getElementById('results-container'),
+              finalScoreDisplay = document.getElementById('final-score-display'),
+              finalFeedbackText = document.getElementById('final-feedback-text'),
+              restartBtn = document.getElementById('restart-btn');
+
+        let currentQuestionIndex = 0;
+        let score = 0;
+
+        function loadProgress() {
+            const savedProgress = localStorage.getItem(STORAGE_KEY);
+            if (savedProgress) {
+                const progress = JSON.parse(savedProgress);
+                currentQuestionIndex = progress.currentQuestionIndex || 0;
+                score = progress.score || 0;
+                updateScoreDisplay();
+            }
+        }
+
+        function saveProgress() {
+            const progress = { currentQuestionIndex, score };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+        }
+
+        function updateScoreDisplay() {
+            scoreDisplay.textContent = `YOUR SCORE: ${score} / ${quizData.length}`;
+        }
+
+        function loadQuestion() {
+            feedbackContainer.textContent = '';
+            const currentQuestion = quizData[currentQuestionIndex];
+            questionContainer.textContent = `Q${currentQuestionIndex + 1}: ${currentQuestion.question}`;
+            optionsContainer.innerHTML = '';
+
+            currentQuestion.options.forEach(option => {
+                const button = document.createElement('button');
+                button.textContent = option;
+                button.classList.add('option-btn');
+                button.addEventListener('click', () => selectAnswer(button, option, currentQuestion.answer));
+                optionsContainer.appendChild(button);
+            });
+
+            updateProgressBar();
+            saveProgress();
+        }
+
+        function selectAnswer(button, selectedOption, correctAnswer) {
+            const buttons = optionsContainer.querySelectorAll('.option-btn');
+            buttons.forEach(btn => btn.disabled = true);
+
+            if (selectedOption === correctAnswer) {
+                button.classList.add('correct');
+                feedbackContainer.textContent = 'Correct!';
+                feedbackContainer.style.color = '#0f0';
+                score++;
+            } else {
+                button.classList.add('incorrect');
+                feedbackContainer.textContent = `Incorrect. The correct answer is ${correctAnswer}.`;
+                feedbackContainer.style.color = '#f00';
+                // Also highlight the correct answer
+                buttons.forEach(btn => {
+                    if (btn.textContent === correctAnswer) {
+                        btn.classList.add('correct');
+                    }
+                });
+            }
+
+            updateScoreDisplay();
+            currentQuestionIndex++;
+            saveProgress();
+
+            setTimeout(() => {
+                if (currentQuestionIndex >= quizData.length) {
+                    showResults();
+                } else {
+                    loadQuestion();
+                }
+            }, 2000);
+        }
+        
+        function updateProgressBar() {
+            const progressPercentage = (currentQuestionIndex / quizData.length) * 100;
+            progressBar.style.width = `${progressPercentage}%`;
+        }
+
+        function showResults() {
+            localStorage.removeItem(STORAGE_KEY);
+
+            // Fade out quiz elements
+            document.querySelector('.container').classList.add('fade-out');
+            document.getElementById('score-container').classList.add('fade-out');
+            document.querySelector('footer').classList.add('fade-out');
+
+            // Prepare results content
+            finalScoreDisplay.textContent = `FINAL SCORE: ${score} / ${quizData.length}`;
+
+            let feedback = '';
+            const confetti = '🎉 ';
+            if (score === 10) {
+                feedback = confetti + 'Wow! You are a Command Line Master!';
+            } else if (score > 5) {
+                feedback = confetti + 'Great job! You can still do better next time.';
+            } else if (score === 5) {
+                feedback = confetti + 'Right in the middle! You can do much better next time.';
+            } else {
+                feedback = confetti + 'Aww! You did good, but can do so much better next time.';
+            }
+            finalFeedbackText.innerHTML = feedback;
+
+            // Show results container
+            resultsContainer.classList.add('visible');
+        }
+
+        function restartQuiz() {
+            currentQuestionIndex = 0;
+            score = 0;
+
+            // Hide results and show quiz
+            resultsContainer.classList.remove('visible');
+            document.querySelector('.container').classList.remove('fade-out');
+            document.getElementById('score-container').classList.remove('fade-out');
+            document.querySelector('footer').classList.remove('fade-out');
+
+            updateScoreDisplay();
+            loadQuestion();
+        }
+
+        restartBtn.addEventListener('click', restartQuiz);
+        // Initial load
+        loadProgress();
+        updateScoreDisplay();
+        loadQuestion();
+
+        function createBackgroundIcons() {
+            const container = document.getElementById('bg-icon-container');
+            if (!container) return;
+            const iconCount = 15;
+
+            for (let i = 0; i < iconCount; i++) {
+                const icon = document.createElement('span');
+                icon.className = 'bg-icon';
+                icon.textContent = 'settings';
+
+                const size = Math.random() * 250 + 80; // 80px to 330px
+                icon.style.fontSize = `${size}px`;
+
+                icon.style.top = `${Math.random() * 100 - 10}vh`;
+                icon.style.left = `${Math.random() * 100 - 10}vw`;
+
+                const duration = Math.random() * 20 + 15; // 15s to 35s
+                const delay = Math.random() * -20;
+                icon.style.animationDuration = `${duration}s`;
+                icon.style.animationDelay = `${delay}s`;
+
+                container.appendChild(icon);
+            }
+        }
+        createBackgroundIcons();
+    </script>
+  </body>
+</html>
