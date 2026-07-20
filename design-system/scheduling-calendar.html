@@ -1,0 +1,899 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Scheduling Calendar — One File Design System</title>
+
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+
+    <style>
+      :root {
+        --ds-bg: #f7f7fb;
+        --ds-surface: #ffffff;
+        --ds-border: rgba(20, 20, 40, 0.12);
+        --ds-text: #111827;
+        --ds-muted: rgba(17, 24, 39, 0.65);
+        --ds-shadow: 0 10px 30px rgba(17, 24, 39, 0.08);
+      }
+
+      html.dark {
+        --ds-bg: #0b1220;
+        --ds-surface: rgba(16, 24, 40, 0.85);
+        --ds-border: rgba(255, 255, 255, 0.10);
+        --ds-text: #e5e7eb;
+        --ds-muted: rgba(229, 231, 235, 0.65);
+        --ds-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+      }
+
+      body {
+        background: var(--ds-bg);
+        color: var(--ds-text);
+      }
+
+      .ds-surface {
+        background: var(--ds-surface);
+        border: 1px solid var(--ds-border);
+        border-radius: 16px;
+        box-shadow: var(--ds-shadow);
+      }
+
+      .calendar-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .ds-btn {
+        border: 1px solid var(--ds-border);
+        background: rgba(255, 255, 255, 0.6);
+      }
+      html.dark .ds-btn {
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      .nav-pill {
+        padding: 8px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--ds-border);
+        background: rgba(255, 255, 255, 0.6);
+      }
+      html.dark .nav-pill {
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      .dow-row,
+      .calendar-grid {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 6px;
+      }
+
+      .dow-row div {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--ds-muted);
+        padding: 6px 4px;
+      }
+
+      .day-cell {
+        border: 1px solid var(--ds-border);
+        border-radius: 12px;
+        padding: 10px 10px 8px;
+        min-height: 92px;
+        cursor: pointer;
+        background: rgba(255, 255, 255, 0.35);
+        position: relative;
+        transition: transform 120ms ease, background 120ms ease;
+      }
+      html.dark .day-cell {
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .day-cell:hover {
+        transform: translateY(-1px);
+        background: rgba(255, 255, 255, 0.55);
+      }
+      html.dark .day-cell:hover {
+        background: rgba(255, 255, 255, 0.07);
+      }
+
+      .day-num {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        font-weight: 700;
+        font-size: 13px;
+        line-height: 1;
+        margin-bottom: 8px;
+      }
+
+      .outside-month {
+        opacity: 0.45;
+      }
+
+      .today-badge {
+        font-size: 10px;
+        font-weight: 700;
+        padding: 4px 8px;
+        border-radius: 999px;
+        border: 1px solid rgba(99, 102, 241, 0.35);
+        color: #4f46e5;
+        background: rgba(99, 102, 241, 0.10);
+      }
+      html.dark .today-badge {
+        color: #a5b4fc;
+        border-color: rgba(165, 180, 252, 0.35);
+        background: rgba(99, 102, 241, 0.18);
+      }
+
+      .event-indicators {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .event-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--c);
+        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.03);
+      }
+
+      .event-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 8px;
+        border-radius: 999px;
+        border: 1px solid rgba(0, 0, 0, 0.05);
+        background: rgba(255, 255, 255, 0.5);
+        max-width: 100%;
+      }
+      html.dark .event-pill {
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .event-pill .label {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--c);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .sidebar {
+        position: sticky;
+        top: 18px;
+        max-height: calc(100vh - 36px);
+        overflow: auto;
+      }
+
+      @media (max-width: 767.98px) {
+        .sidebar {
+          position: fixed;
+          inset: auto 0 0 0;
+          max-height: 72vh;
+          border-radius: 18px 18px 0 0;
+          transform: translateY(100%);
+          transition: transform 200ms ease;
+          z-index: 1050;
+        }
+        .sidebar.open {
+          transform: translateY(0);
+        }
+
+        .sidebar-backdrop {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.4);
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 200ms ease;
+          z-index: 1040;
+        }
+        .sidebar-backdrop.open {
+          opacity: 1;
+          pointer-events: auto;
+        }
+      }
+    </style>
+  </head>
+
+  <body class="py-4">
+    <div class="container-fluid px-3 px-md-4">
+      <!-- Top bar -->
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
+        <div class="d-flex align-items-center gap-3">
+          <div
+            class="d-flex align-items-center justify-content-center" 
+            style="width:40px;height:40px;border-radius:14px;border:1px solid var(--ds-border);background:rgba(99,102,241,0.12);color:#4f46e5;font-weight:800;"
+            aria-hidden="true"
+          >
+            DS
+          </div>
+          <div>
+            <h1 class="h4 mb-1 fw-bold">Scheduling Calendar</h1>
+            <div class="text-muted" style="font-size: 13px;">Design System • Dashboards</div>
+          </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+          <button id="todayBtn" type="button" class="btn ds-btn">Today</button>
+          <div class="nav-pill d-flex gap-2">
+            <button id="prevMonthBtn" type="button" class="btn btn-link text-decoration-none fw-semibold">&larr;</button>
+            <div id="monthLabel" class="fw-bold" style="min-width: 150px; text-align:center;"></div>
+            <button id="nextMonthBtn" type="button" class="btn btn-link text-decoration-none fw-semibold">&rarr;</button>
+          </div>
+          <button
+            id="themeToggleBtn"
+            type="button"
+            class="btn ds-btn"
+            aria-label="Toggle dark/light mode"
+          >
+            <span id="themeIcon" aria-hidden="true">🌙</span>
+            <span class="ms-2" style="font-weight:700;">Theme</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="row g-3">
+        <!-- Calendar -->
+        <div class="col-12 col-lg-8">
+          <div class="ds-surface p-3 p-md-4">
+            <div class="calendar-header mb-3">
+              <div>
+                <div class="fw-bold">Month view</div>
+                <div class="text-muted" style="font-size: 13px;">Click a day to see events • Add new events from the sidebar</div>
+              </div>
+              <div class="d-flex align-items-center gap-3">
+                <div class="d-flex align-items-center gap-2">
+                  <span class="event-dot" style="--c:#4f46e5" aria-hidden="true"></span>
+                  <span class="text-muted" style="font-size: 12px;">work</span>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                  <span class="event-dot" style="--c:#0ea5e9" aria-hidden="true"></span>
+                  <span class="text-muted" style="font-size: 12px;">personal</span>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                  <span class="event-dot" style="--c:#10b981" aria-hidden="true"></span>
+                  <span class="text-muted" style="font-size: 12px;">meeting</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="dow-row mb-2" aria-hidden="true">
+              <div>Sun</div>
+              <div>Mon</div>
+              <div>Tue</div>
+              <div>Wed</div>
+              <div>Thu</div>
+              <div>Fri</div>
+              <div>Sat</div>
+            </div>
+
+            <div id="calendarGrid" class="calendar-grid" role="grid" aria-label="Calendar month grid"></div>
+
+            <div class="mt-3 text-muted" style="font-size: 12px;">
+              Tip: on mobile, the event panel opens from the bottom when you click a day.
+            </div>
+          </div>
+        </div>
+
+        <!-- Sidebar / Modal Panel -->
+        <div class="col-12 col-lg-4">
+          <div
+            id="sidebarBackdrop"
+            class="sidebar-backdrop"
+            aria-hidden="true"
+          ></div>
+
+          <div id="sidebar" class="ds-surface p-3 p-md-4 sidebar" aria-label="Day events sidebar">
+            <div class="d-flex align-items-start justify-content-between gap-3">
+              <div>
+                <div class="fw-bold">Events</div>
+                <div id="selectedDayLabel" class="text-muted" style="font-size: 13px;">Select a day</div>
+              </div>
+              <button id="closeSidebarBtn" type="button" class="btn ds-btn d-lg-none" aria-label="Close">✕</button>
+            </div>
+
+            <hr class="my-3" />
+
+            <!-- Mini month picker -->
+            <div class="mb-3">
+              <div class="fw-semibold mb-2">Mini month picker</div>
+              <div class="d-flex align-items-center gap-2">
+                <button id="miniPrevMonth" type="button" class="btn btn-sm ds-btn">&larr;</button>
+<label for="miniMonthSelect" class="visually-hidden">Mini month</label>
+<select id="miniMonthSelect" class="form-select form-select-sm ds-btn" style="width:auto; flex: 1;" aria-label="Mini month"></select>
+                  <!-- populated by JS -->
+                <select id="miniYearSelect"
+                  <!-- populated by JS -->
+                </select>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <div class="fw-semibold mb-2">Add event</div>
+
+              <form id="eventForm" class="row g-2">
+                <input type="hidden" id="eventDate" />
+
+                <div class="col-12">
+                  <label class="form-label" for="eventTitle">Title</label>
+                  <input
+                    id="eventTitle"
+                    type="text"
+                    class="form-control ds-btn"
+                    placeholder="e.g., Design review"
+                    required
+                  />
+                </div>
+
+                <div class="col-6">
+                  <label class="form-label" for="eventTime">Time</label>
+                  <input
+                    id="eventTime"
+                    type="time"
+                    class="form-control ds-btn"
+                    required
+                  />
+                </div>
+
+                <div class="col-6">
+                  <label class="form-label" for="eventCategory">Category</label>
+                  <select id="eventCategory" class="form-select ds-btn" required>
+                    <option value="work">work</option>
+                    <option value="personal">personal</option>
+                    <option value="meeting">meeting</option>
+                  </select>
+                </div>
+
+                <div class="col-12 d-flex gap-2 mt-2">
+                  <button id="addEventBtn" type="submit" class="btn" style="background:#4f46e5;color:#fff;border:1px solid rgba(0,0,0,0.05);">
+                    Add
+                  </button>
+                  <button id="clearDayBtn" type="button" class="btn ds-btn">
+                    Clear day
+                  </button>
+                </div>
+              </form>
+
+              <div id="formHint" class="text-muted mt-2" style="font-size: 12px;">
+                Select a day first.
+              </div>
+            </div>
+
+            <hr class="my-3" />
+
+            <!-- Events list -->
+            <div>
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <div class="fw-semibold">Day events</div>
+                <div id="eventCount" class="text-muted" style="font-size: 12px;">0</div>
+              </div>
+
+              <div id="eventList" class="d-flex flex-column gap-2">
+                <!-- event cards injected -->
+              </div>
+
+              <div id="emptyState" class="text-muted" style="font-size: 13px; display:none;">
+                No events for this day.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer note -->
+      <div class="text-muted mt-4" style="font-size: 12px;">
+        This is a standalone Vanilla JS + Bootstrap 5 demo. Events are stored in-memory for the session.
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+      (function () {
+        "use strict";
+
+        // ====== Config ======
+        const CATEGORY_META = {
+          work: { color: "#4f46e5", label: "work" },
+          personal: { color: "#0ea5e9", label: "personal" },
+          meeting: { color: "#10b981", label: "meeting" }
+        };
+
+        const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+        // ====== Helpers ======
+        const pad2 = (n) => String(n).padStart(2, "0");
+        const dateKey = (d) => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+        const parseDateKey = (key) => {
+          const [y, m, day] = key.split("-").map(Number);
+          return new Date(y, m - 1, day);
+        };
+        const sameDay = (a, b) => dateKey(a) === dateKey(b);
+
+        const startOfMonth = (d) => new Date(d.getFullYear(), d.getMonth(), 1);
+        const addMonths = (d, delta) => new Date(d.getFullYear(), d.getMonth() + delta, 1);
+
+        const formatSelectedLabel = (d) => {
+          const dow = DAYS[d.getDay()];
+          return `${dow}, ${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+        };
+
+        const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+
+        // ====== DOM ======
+        const monthLabel = document.getElementById("monthLabel");
+        const calendarGrid = document.getElementById("calendarGrid");
+
+        const prevMonthBtn = document.getElementById("prevMonthBtn");
+        const nextMonthBtn = document.getElementById("nextMonthBtn");
+        const todayBtn = document.getElementById("todayBtn");
+
+        const miniPrevMonth = document.getElementById("miniPrevMonth");
+        const miniMonthSelect = document.getElementById("miniMonthSelect");
+        const miniYearSelect = document.getElementById("miniYearSelect");
+
+        const themeToggleBtn = document.getElementById("themeToggleBtn");
+        const themeIcon = document.getElementById("themeIcon");
+
+        const sidebar = document.getElementById("sidebar");
+        const sidebarBackdrop = document.getElementById("sidebarBackdrop");
+        const closeSidebarBtn = document.getElementById("closeSidebarBtn");
+
+        const selectedDayLabel = document.getElementById("selectedDayLabel");
+        const eventList = document.getElementById("eventList");
+        const eventCount = document.getElementById("eventCount");
+        const emptyState = document.getElementById("emptyState");
+
+        const eventForm = document.getElementById("eventForm");
+        const eventDateEl = document.getElementById("eventDate");
+        const eventTitleEl = document.getElementById("eventTitle");
+        const eventTimeEl = document.getElementById("eventTime");
+        const eventCategoryEl = document.getElementById("eventCategory");
+        const formHint = document.getElementById("formHint");
+
+        const clearDayBtn = document.getElementById("clearDayBtn");
+
+        // ====== State ======
+        let viewMonth = new Date(); // first day of the visible month
+        let selectedDay = null;
+
+        // in-memory event store:
+        // { [dateKey]: Array<{ id, title, time, category }> }
+        let eventsByDay = {};
+
+        const ensureSeedEvents = () => {
+          const now = new Date();
+          const seed = [
+            { offset: 0, title: "Team standup", time: "09:30", category: "meeting" },
+            { offset: 2, title: "Design tokens review", time: "11:00", category: "work" },
+            { offset: 3, title: "Dentist appointment", time: "15:45", category: "personal" },
+            { offset: 7, title: "Client sync", time: "10:15", category: "meeting" },
+            { offset: 10, title: "Write proposal draft", time: "13:00", category: "work" },
+          ];
+
+          seed.forEach((s, idx) => {
+            const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + s.offset);
+            const key = dateKey(d);
+            if (!eventsByDay[key]) eventsByDay[key] = [];
+            eventsByDay[key].push({
+              id: `seed-${idx}`,
+              title: s.title,
+              time: s.time,
+              category: s.category
+            });
+          });
+        };
+
+        // ====== Rendering ======
+        function setThemeIcon() {
+          const isDark = document.documentElement.classList.contains("dark");
+          themeIcon.textContent = isDark ? "☀️" : "🌙";
+        }
+
+        function toggleTheme() {
+          document.documentElement.classList.toggle("dark");
+          const isDark = document.documentElement.classList.contains("dark");
+          try {
+            localStorage.setItem("theme", isDark ? "dark" : "light");
+          } catch (e) {}
+          setThemeIcon();
+          // no further UI changes needed (CSS variables)
+        }
+
+        function applyInitialTheme() {
+          try {
+            const stored = localStorage.getItem("theme");
+            const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+            const shouldDark = stored === "dark" || (!stored && prefersDark);
+            if (shouldDark) document.documentElement.classList.add("dark");
+          } catch (e) {
+            // ignore
+          }
+          setThemeIcon();
+        }
+
+        function showSidebar() {
+          // On desktop it is always visible; on mobile we slide it up.
+          sidebar.classList.add("open");
+          sidebarBackdrop.classList.add("open");
+        }
+
+        function hideSidebar() {
+          sidebar.classList.remove("open");
+          sidebarBackdrop.classList.remove("open");
+        }
+
+        function renderMonthHeader() {
+          monthLabel.textContent = `${MONTHS[viewMonth.getMonth()]} ${viewMonth.getFullYear()}`;
+        }
+
+        function renderCalendarGrid() {
+          renderMonthHeader();
+          calendarGrid.innerHTML = "";
+
+          const first = startOfMonth(viewMonth);
+          const startDay = first.getDay(); // 0..6
+
+          // Determine number of cells (42 = 6 weeks)
+          const cells = 42;
+
+          for (let i = 0; i < cells; i++) {
+            const dayOffset = i - startDay;
+            const cellDate = new Date(first.getFullYear(), first.getMonth(), 1 + dayOffset);
+            const key = dateKey(cellDate);
+            const inMonth = cellDate.getMonth() === viewMonth.getMonth();
+
+            const cell = document.createElement("button");
+            cell.type = "button";
+            cell.className = "day-cell" + (inMonth ? "" : " outside-month");
+            cell.setAttribute("data-date", key);
+            cell.setAttribute("role", "gridcell");
+            cell.setAttribute("aria-label", `${cellDate.toDateString()}${eventsByDay[key]?.length ? `, ${eventsByDay[key].length} events` : ""}`);
+
+            const isToday = sameDay(cellDate, new Date());
+
+            const numWrap = document.createElement("div");
+            numWrap.className = "day-num";
+
+            const num = document.createElement("div");
+            num.textContent = String(cellDate.getDate());
+
+            if (isToday) {
+              const todayBadge = document.createElement("div");
+              todayBadge.className = "today-badge";
+              todayBadge.textContent = "Today";
+              numWrap.appendChild(num);
+              numWrap.appendChild(todayBadge);
+            } else {
+              // keep layout stable
+              const spacer = document.createElement("div");
+              spacer.style.width = "1px";
+              spacer.style.height = "1px";
+              spacer.setAttribute("aria-hidden", "true");
+              numWrap.appendChild(num);
+              numWrap.appendChild(spacer);
+            }
+
+            const events = (eventsByDay[key] || []).slice().sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+
+            const indicators = document.createElement("div");
+            indicators.className = "event-indicators";
+
+            // Show max 3 pills (then +N)
+            const max = 3;
+            const show = events.slice(0, max);
+            const hiddenCount = Math.max(0, events.length - show.length);
+
+            show.forEach((ev) => {
+              const meta = CATEGORY_META[ev.category] || CATEGORY_META.work;
+
+              const pill = document.createElement("div");
+              pill.className = "event-pill";
+              pill.style.setProperty("--c", meta.color);
+              pill.title = `${ev.title} • ${ev.time} • ${ev.category}`;
+
+              const dot = document.createElement("span");
+              dot.className = "event-dot";
+              dot.style.setProperty("--c", meta.color);
+
+              const label = document.createElement("span");
+              label.className = "label";
+              label.textContent = ev.time ? `${ev.time}` : meta.label;
+
+              pill.appendChild(dot);
+              pill.appendChild(label);
+              indicators.appendChild(pill);
+            });
+
+            if (hiddenCount > 0) {
+              const more = document.createElement("div");
+              more.className = "event-pill";
+              more.style.setProperty("--c", "rgba(99,102,241,0.95)");
+              more.title = `${hiddenCount} more events`;
+              const label = document.createElement("span");
+              label.className = "label";
+              label.textContent = `+${hiddenCount} more`;
+              more.appendChild(label);
+              indicators.appendChild(more);
+            }
+
+            // Assistive: if no events, keep empty space
+            cell.appendChild(numWrap);
+            cell.appendChild(indicators);
+
+            cell.addEventListener("click", () => {
+              const d = parseDateKey(key);
+              selectedDay = d;
+              syncSelectedDay(d);
+              onDaySelectedMobileMaybe();
+            });
+
+            calendarGrid.appendChild(cell);
+          }
+        }
+
+        function onDaySelectedMobileMaybe() {
+          // If small screen, open sidebar.
+          const isMobile = window.matchMedia("(max-width: 767.98px)").matches;
+          if (isMobile) showSidebar();
+        }
+
+        function syncSelectedDay(d) {
+          selectedDay = d;
+          const key = dateKey(d);
+
+          selectedDayLabel.textContent = formatSelectedLabel(d);
+          eventDateEl.value = key;
+
+          // Form hint
+          formHint.textContent = "";
+
+          // Default time if empty
+          if (!eventTimeEl.value) {
+            const now = new Date();
+            eventTimeEl.value = `${pad2(now.getHours())}:${pad2(Math.max(0, Math.min(59, Math.round(now.getMinutes()/5)*5)))} `
+              .replace(" ", "");
+          }
+
+          renderEventList(key);
+        }
+
+        function renderEventList(key) {
+          eventList.innerHTML = "";
+
+          const list = (eventsByDay[key] || []).slice().sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+          eventCount.textContent = `${list.length}`;
+
+          if (!list.length) {
+            emptyState.style.display = "block";
+            return;
+          }
+          emptyState.style.display = "none";
+
+          list.forEach((ev) => {
+            const meta = CATEGORY_META[ev.category] || CATEGORY_META.work;
+
+            const card = document.createElement("div");
+            card.className = "d-flex gap-3 align-items-start";
+
+            const left = document.createElement("div");
+            left.style.width = "10px";
+            left.style.height = "44px";
+            left.style.borderRadius = "999px";
+            left.style.background = meta.color;
+            left.style.marginTop = "2px";
+
+            const right = document.createElement("div");
+            right.className = "flex-grow-1";
+
+            const top = document.createElement("div");
+            top.className = "d-flex align-items-center justify-content-between gap-2";
+
+            const title = document.createElement("div");
+            title.className = "fw-bold";
+            title.textContent = ev.title;
+
+            const chip = document.createElement("div");
+            chip.className = "badge";
+            chip.style.background = `${meta.color}22`;
+            chip.style.color = meta.color;
+            chip.style.border = `1px solid ${meta.color}33`;
+            chip.textContent = ev.category;
+
+            top.appendChild(title);
+            top.appendChild(chip);
+
+            const sub = document.createElement("div");
+            sub.className = "text-muted";
+            sub.style.fontSize = "13px";
+            sub.textContent = ev.time ? ev.time : "";
+
+            const actions = document.createElement("div");
+            actions.className = "d-flex gap-2 mt-2";
+
+            const delBtn = document.createElement("button");
+            delBtn.type = "button";
+            delBtn.className = "btn btn-sm";
+            delBtn.style.border = "1px solid var(--ds-border)";
+            delBtn.style.background = "transparent";
+            delBtn.textContent = "Delete";
+
+            delBtn.addEventListener("click", () => {
+              eventsByDay[key] = (eventsByDay[key] || []).filter((e) => e.id !== ev.id);
+              renderEventList(key);
+              renderCalendarGrid();
+            });
+
+            actions.appendChild(delBtn);
+
+            right.appendChild(top);
+            right.appendChild(sub);
+            right.appendChild(actions);
+
+            card.appendChild(left);
+            card.appendChild(right);
+            eventList.appendChild(card);
+          });
+        }
+
+        function updateViewMonthTo(d) {
+          viewMonth = startOfMonth(d);
+          renderCalendarGrid();
+        }
+
+        function setSelectedIfVisible() {
+          if (!selectedDay) return;
+          const inMonth = selectedDay.getMonth() === viewMonth.getMonth() && selectedDay.getFullYear() === viewMonth.getFullYear();
+          if (!inMonth) {
+            // If user navigates away, keep selection but still show events in sidebar.
+            // Sidebar still works regardless of month visibility.
+          }
+        }
+
+        // ====== Navigation ======
+        prevMonthBtn.addEventListener("click", () => {
+          viewMonth = addMonths(viewMonth, -1);
+          renderCalendarGrid();
+          setSelectedIfVisible();
+          syncMiniPicker();
+        });
+
+        nextMonthBtn.addEventListener("click", () => {
+          viewMonth = addMonths(viewMonth, 1);
+          renderCalendarGrid();
+          setSelectedIfVisible();
+          syncMiniPicker();
+        });
+
+        todayBtn.addEventListener("click", () => {
+          const now = new Date();
+          updateViewMonthTo(now);
+          syncSelectedDay(now);
+          syncMiniPicker();
+          // On mobile open
+          const isMobile = window.matchMedia("(max-width: 767.98px)").matches;
+          if (isMobile) showSidebar();
+        });
+
+        // ====== Mini month picker ======
+        function syncMiniPicker() {
+          miniMonthSelect.value = String(viewMonth.getMonth());
+          miniYearSelect.value = String(viewMonth.getFullYear());
+        }
+
+        function initMiniPicker() {
+          miniMonthSelect.innerHTML = MONTHS.map((m, idx) => `<option value="${idx}">${m}</option>`).join("");
+
+          const currentYear = new Date().getFullYear();
+          const years = [];
+          for (let y = currentYear - 3; y <= currentYear + 3; y++) years.push(y);
+          miniYearSelect.innerHTML = years.map((y) => `<option value="${y}">${y}</option>`).join("");
+
+          syncMiniPicker();
+        }
+
+        miniPrevMonth.addEventListener("click", () => {
+          viewMonth = addMonths(viewMonth, -1);
+          renderCalendarGrid();
+          syncMiniPicker();
+        });
+
+        miniMonthSelect.addEventListener("change", () => {
+          const m = Number(miniMonthSelect.value);
+          viewMonth = new Date(viewMonth.getFullYear(), m, 1);
+          renderCalendarGrid();
+        });
+
+        miniYearSelect.addEventListener("change", () => {
+          const y = Number(miniYearSelect.value);
+          viewMonth = new Date(y, viewMonth.getMonth(), 1);
+          renderCalendarGrid();
+        });
+
+        // ====== Sidebar interactions ======
+        closeSidebarBtn.addEventListener("click", hideSidebar);
+        sidebarBackdrop.addEventListener("click", hideSidebar);
+
+        // ====== Event form ======
+        eventForm.addEventListener("submit", (e) => {
+          e.preventDefault();
+
+          const key = eventDateEl.value;
+          if (!key) {
+            formHint.textContent = "Select a day first.";
+            return;
+          }
+
+          const title = eventTitleEl.value.trim();
+          const time = eventTimeEl.value;
+          const category = eventCategoryEl.value;
+
+          if (!title || !time || !category) return;
+
+          if (!eventsByDay[key]) eventsByDay[key] = [];
+
+          const id = `ev-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+          eventsByDay[key].push({
+            id,
+            title,
+            time,
+            category
+          });
+
+          eventTitleEl.value = "";
+          // keep time/category for faster entry
+
+          renderEventList(key);
+          renderCalendarGrid();
+        });
+
+        clearDayBtn.addEventListener("click", () => {
+          const key = eventDateEl.value;
+          if (!key) {
+            formHint.textContent = "Select a day first.";
+            return;
+          }
+          eventsByDay[key] = [];
+          renderEventList(key);
+          renderCalendarGrid();
+        });
+
+        // ====== Init ======
+        function init() {
+          applyInitialTheme();
+
+          ensureSeedEvents();
+          initMiniPicker();
+          renderCalendarGrid();
+          syncSelectedDay(new Date());
+          renderEventList(dateKey(new Date()));
+
+          // Theme toggle
+          themeToggleBtn.addEventListener("click", toggleTheme);
+
+          // If desktop, keep sidebar shown; if mobile, keep it hidden until click.
+          const isMobile = window.matchMedia("(max-width: 767.98px)").matches;
+          if (!isMobile) {
+            sidebarBackdrop.classList.remove("open");
+            sidebar.classList.remove("open");
+            // On desktop, it's already visible by CSS sticky; open/close classes don't matter.
+          }
+        }
+
+        init();
+      })();
+    </script>
+  </body>
+</html>

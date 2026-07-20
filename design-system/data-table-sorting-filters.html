@@ -1,0 +1,861 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Data Table — Sorting & Filters</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              brand: {
+                50: "#eef2ff",
+                100: "#e0e7ff",
+                500: "#6366f1",
+                600: "#4f46e5",
+                700: "#4338ca",
+              },
+            },
+          },
+        },
+      };
+    </script>
+
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      }
+
+      /* Subtle text rendering like ShadCN */
+      th,
+      td {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      /* Tailwind @apply isn't supported via CDN in this repo, so keep focus styles as plain CSS */
+      .focus-ring:focus {
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.5), 0 0 0 4px rgba(238, 242, 255, 0.2);
+      }
+      html.dark .focus-ring:focus {
+        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.6), 0 0 0 4px rgba(15, 23, 42, 0.9);
+      }
+
+
+      .header-sort-indicator {
+        transition: opacity 120ms ease;
+      }
+    </style>
+  </head>
+
+  <body class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 min-h-screen transition-colors">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
+      <header class="flex items-start justify-between gap-4 mb-6">
+        <div>
+          <p class="text-brand-600 dark:text-brand-500 font-semibold text-sm uppercase tracking-wide">
+            Data Table
+          </p>
+          <h1 class="text-2xl sm:text-3xl font-bold mt-1">Sorting, filters, pagination, and row selection</h1>
+          <p class="text-slate-500 dark:text-slate-400 text-sm mt-2 max-w-2xl">
+            ShadCN/UI-inspired aesthetics with vanilla JS logic. Responsive on mobile with horizontal scroll.
+          </p>
+        </div>
+
+        <button
+          id="themeToggle"
+          type="button"
+          aria-label="Toggle dark mode"
+          class="shrink-0 p-2 rounded-full border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 focus-ring"
+        >
+          <span id="themeIcon" class="text-lg">🌙</span>
+        </button>
+      </header>
+
+      <!-- Filters / Search + page size -->
+      <section class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm">
+        <div class="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-800">
+          <div class="flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4 justify-between">
+            <div class="flex flex-col sm:flex-row gap-3 sm:gap-4">
+              <div class="flex items-center gap-2">
+                <label class="text-sm font-medium text-slate-700 dark:text-slate-200 whitespace-nowrap" for="searchName">Search</label>
+                <input
+                  id="searchName"
+                  type="text"
+                  placeholder="Name or email…"
+                  class="w-full sm:w-72 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm focus-ring"
+                />
+              </div>
+
+              <div class="flex items-center gap-2">
+                <label class="text-sm font-medium text-slate-700 dark:text-slate-200 whitespace-nowrap" for="filterStatus">Status</label>
+                <select
+                  id="filterStatus"
+                  class="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm focus-ring"
+                >
+                  <option value="">All</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                  <option value="pending">Pending</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-3 justify-between lg:justify-end">
+              <div class="flex items-center gap-2">
+                <label class="text-sm font-medium text-slate-700 dark:text-slate-200 whitespace-nowrap" for="pageSize">Rows</label>
+                <select
+                  id="pageSize"
+                  class="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm focus-ring"
+                >
+                  <option value="10" selected>10</option>
+                  <option value="25">25</option>
+                  <option value="50">50</option>
+                </select>
+              </div>
+
+              <div class="text-sm text-slate-500 dark:text-slate-400" id="summaryText">—</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bulk action bar -->
+        <div id="bulkBar" class="hidden p-4 sm:p-6 border-b border-slate-200 dark:border-slate-800">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div class="text-sm">
+              <span class="font-semibold">Bulk actions:</span>
+              <span id="bulkCount" class="font-semibold text-brand-600 dark:text-brand-500">0</span>
+              <span class="text-slate-500 dark:text-slate-400">selected</span>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button
+                type="button"
+                id="bulkActivate"
+                class="px-3 py-2 rounded-lg bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700 focus-ring"
+              >
+                Mark Active
+              </button>
+              <button
+                type="button"
+                id="bulkDeactivate"
+                class="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 focus-ring"
+              >
+                Mark Inactive
+              </button>
+              <button
+                type="button"
+                id="bulkClear"
+                class="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 focus-ring"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div class="overflow-x-auto">
+          <table class="min-w-[920px] w-full text-sm">
+            <thead class="bg-white dark:bg-slate-900">
+              <tr class="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                <th class="px-4 py-3 w-[48px]">
+                  <label class="sr-only" for="selectAll">Select all rows</label>
+                  <input
+                    id="selectAll"
+                    type="checkbox"
+                    class="w-4 h-4 rounded border-slate-300 dark:border-slate-700 text-brand-600 focus-ring"
+                    aria-label="Select all rows"
+                  />
+                </th>
+
+                <!-- Name -->
+                <th class="px-4 py-3">
+                  <button
+                    type="button"
+                    class="w-full flex items-center gap-2 header-sort-btn focus:outline-none"
+                    data-col="name"
+                    data-kind="string"
+                    aria-label="Sort by name"
+                  >
+                    <span class="font-semibold">User</span>
+                    <span class="header-sort-indicator" id="sortIcon-name">↕</span>
+                  </button>
+                </th>
+
+                <!-- Email -->
+                <th class="px-4 py-3">
+                  <button
+                    type="button"
+                    class="w-full flex items-center gap-2 focus:outline-none header-sort-btn"
+                    data-col="email"
+                    data-kind="string"
+                    aria-label="Sort by email"
+                  >
+                    <span class="font-semibold">Email</span>
+                    <span class="header-sort-indicator" id="sortIcon-email">↕</span>
+                  </button>
+                </th>
+
+                <!-- Plan with filter (dropdown) -->
+                <th class="px-4 py-3">
+                  <div class="flex flex-col gap-2">
+                    <button
+                      type="button"
+                      class="w-full flex items-center gap-2 focus:outline-none header-sort-btn"
+                      data-col="plan"
+                      data-kind="string"
+                      aria-label="Sort by plan"
+                    >
+                      <span class="font-semibold">Plan</span>
+                      <span class="header-sort-indicator" id="sortIcon-plan">↕</span>
+                    </button>
+                    <select
+                      id="filterPlan"
+                      class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 text-xs focus-ring"
+                      aria-label="Filter by plan"
+                    >
+                      <option value="">All</option>
+                      <option value="Free">Free</option>
+                      <option value="Pro">Pro</option>
+                      <option value="Team">Team</option>
+                      <option value="Enterprise">Enterprise</option>
+                    </select>
+                  </div>
+                </th>
+
+                <!-- Status -->
+                <th class="px-4 py-3">
+                  <div class="flex flex-col gap-2">
+                    <button
+                      type="button"
+                      class="w-full flex items-center gap-2 focus:outline-none header-sort-btn"
+                      data-col="status"
+                      data-kind="status"
+                      aria-label="Sort by status"
+                    >
+                      <span class="font-semibold">Status</span>
+                      <span class="header-sort-indicator" id="sortIcon-status">↕</span>
+                    </button>
+
+                    <select
+                      id="filterStatusCol"
+                      class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 text-xs focus-ring"
+                      aria-label="Filter by status"
+                    >
+                      <option value="">All</option>
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                      <option value="pending">Pending</option>
+                    </select>
+                  </div>
+                </th>
+
+                <!-- Created -->
+                <th class="px-4 py-3">
+                  <button
+                    type="button"
+                    class="w-full flex items-center gap-2 focus:outline-none header-sort-btn"
+                    data-col="createdAt"
+                    data-kind="date"
+                    aria-label="Sort by created date"
+                  >
+                    <span class="font-semibold">Created</span>
+                    <span class="header-sort-indicator" id="sortIcon-createdAt">↕</span>
+                  </button>
+                </th>
+              </tr>
+            </thead>
+
+            <tbody id="tableBody" class="bg-white dark:bg-slate-900 divide-y divide-slate-200 dark:divide-slate-800">
+              <!-- rows injected -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+            <span id="rangeText">—</span>
+          </div>
+
+          <div class="flex items-center gap-2 justify-end">
+            <button
+              id="prevBtn"
+              type="button"
+              class="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed focus-ring"
+            >
+              Prev
+            </button>
+
+            <div id="pageNumbers" class="flex items-center gap-1"></div>
+
+            <button
+              id="nextBtn"
+              type="button"
+              class="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed focus-ring"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+
+        <div id="emptyState" class="hidden p-10 text-center">
+          <div class="mx-auto max-w-md">
+            <div class="text-base font-semibold">No results</div>
+            <div class="text-sm text-slate-500 dark:text-slate-400 mt-1">Try adjusting filters or search.</div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="text-center mt-8 text-xs text-slate-500 dark:text-slate-400">
+        Vanilla JS + Tailwind CDN. Built for the Design System pillar.
+      </footer>
+    </div>
+
+    <script>
+      const THEME_KEY = "data_table_theme_v1";
+      const html = document.documentElement;
+      const themeToggle = document.getElementById("themeToggle");
+      const themeIcon = document.getElementById("themeIcon");
+
+      function applyTheme(isDark) {
+        html.classList.toggle("dark", isDark);
+        themeIcon.textContent = isDark ? "☀️" : "🌙";
+      }
+
+      function initTheme() {
+        let saved = null;
+        try {
+          saved = localStorage.getItem(THEME_KEY);
+        } catch (e) {}
+
+        if (saved === "dark" || saved === "light") {
+          applyTheme(saved === "dark");
+          return;
+        }
+
+        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        applyTheme(prefersDark);
+      }
+
+      initTheme();
+
+      themeToggle.addEventListener("click", () => {
+        const isDark = !html.classList.contains("dark");
+        applyTheme(isDark);
+        try {
+          localStorage.setItem(THEME_KEY, isDark ? "dark" : "light");
+        } catch (e) {}
+      });
+
+      const dataset = makeDataset();
+
+      // State
+      const state = {
+        search: "",
+        filterStatusGlobal: "",
+        filterPlan: "",
+        filterStatusCol: "",
+
+        sort: { col: "createdAt", dir: "desc" }, // initial
+
+        page: 1,
+        pageSize: 10,
+
+        selected: new Set(), // ids
+      };
+
+      // Elements
+      const searchInput = document.getElementById("searchName");
+      const filterStatusGlobal = document.getElementById("filterStatus");
+      const filterPlan = document.getElementById("filterPlan");
+      const filterStatusCol = document.getElementById("filterStatusCol");
+
+      const pageSizeSel = document.getElementById("pageSize");
+      const tableBody = document.getElementById("tableBody");
+      const emptyState = document.getElementById("emptyState");
+
+      const prevBtn = document.getElementById("prevBtn");
+      const nextBtn = document.getElementById("nextBtn");
+      const pageNumbers = document.getElementById("pageNumbers");
+
+      const rangeText = document.getElementById("rangeText");
+      const summaryText = document.getElementById("summaryText");
+
+      const selectAll = document.getElementById("selectAll");
+
+      const bulkBar = document.getElementById("bulkBar");
+      const bulkCount = document.getElementById("bulkCount");
+      const bulkActivate = document.getElementById("bulkActivate");
+      const bulkDeactivate = document.getElementById("bulkDeactivate");
+      const bulkClear = document.getElementById("bulkClear");
+
+      // Sorting icons
+      function updateSortIcons() {
+        const icons = {
+          name: document.getElementById("sortIcon-name"),
+          email: document.getElementById("sortIcon-email"),
+          plan: document.getElementById("sortIcon-plan"),
+          status: document.getElementById("sortIcon-status"),
+          createdAt: document.getElementById("sortIcon-createdAt"),
+        };
+
+        for (const [key, el] of Object.entries(icons)) {
+          if (!el) continue;
+          if (state.sort.col !== key) {
+            el.textContent = "↕";
+            el.style.opacity = "0.5";
+            continue;
+          }
+
+          el.style.opacity = "1";
+          if (state.sort.dir === "asc") el.textContent = "↑";
+          else if (state.sort.dir === "desc") el.textContent = "↓";
+          else el.textContent = "↕";
+        }
+      }
+
+      // Sort cycle: none -> asc -> desc -> none
+      function cycleSort(col) {
+        if (state.sort.col !== col) {
+          state.sort.col = col;
+          state.sort.dir = "asc";
+          state.page = 1;
+          return;
+        }
+
+        if (state.sort.dir === "asc") {
+          state.sort.dir = "desc";
+        } else if (state.sort.dir === "desc") {
+          state.sort.col = null;
+          state.sort.dir = null;
+        } else {
+          state.sort.col = col;
+          state.sort.dir = "asc";
+        }
+        state.page = 1;
+      }
+
+      function statusRank(s) {
+        // smaller = earlier in asc
+        if (s === "active") return 0;
+        if (s === "pending") return 1;
+        return 2; // inactive
+      }
+
+      function parseDateMs(s) {
+        // expects YYYY-MM-DD
+        return new Date(s + "T00:00:00").getTime();
+      }
+
+      function matchesSearch(row) {
+        if (!state.search.trim()) return true;
+        const q = state.search.trim().toLowerCase();
+        return (
+          row.name.toLowerCase().includes(q) ||
+          row.email.toLowerCase().includes(q)
+        );
+      }
+
+      function matchesStatus(row) {
+        const sGlobal = state.filterStatusGlobal;
+        const sCol = state.filterStatusCol;
+        const target = sCol || sGlobal;
+        if (!target) return true;
+        return row.status === target;
+      }
+
+      function matchesPlan(row) {
+        if (!state.filterPlan) return true;
+        return row.plan === state.filterPlan;
+      }
+
+      function applyFiltersSort(items) {
+        let out = items.filter((r) => matchesSearch(r) && matchesStatus(r) && matchesPlan(r));
+
+        if (state.sort.col && state.sort.dir) {
+          const dirMul = state.sort.dir === "asc" ? 1 : -1;
+          out.sort((a, b) => {
+            let av = a[state.sort.col];
+            let bv = b[state.sort.col];
+
+            if (state.sort.col === "createdAt") {
+              av = parseDateMs(av);
+              bv = parseDateMs(bv);
+              return (av - bv) * dirMul;
+            }
+
+            if (state.sort.col === "status") {
+              return (statusRank(av) - statusRank(bv)) * dirMul;
+            }
+
+            // string compare
+            return String(av).localeCompare(String(bv), undefined, { sensitivity: "base" }) * dirMul;
+          });
+        }
+
+        return out;
+      }
+
+      function getVisibleRows(filtered) {
+        const total = filtered.length;
+        const pageCount = Math.max(1, Math.ceil(total / state.pageSize));
+        state.page = Math.min(state.page, pageCount);
+        const start = (state.page - 1) * state.pageSize;
+        const end = Math.min(start + state.pageSize, total);
+        return {
+          total,
+          pageCount,
+          start,
+          end,
+          rows: filtered.slice(start, end),
+        };
+      }
+
+      function selectionOnPage(idsOnPage) {
+        let checked = 0;
+        for (const id of idsOnPage) {
+          if (state.selected.has(id)) checked++;
+        }
+        return { checked, total: idsOnPage.length };
+      }
+
+      function setBulkUI() {
+        const count = state.selected.size;
+        bulkCount.textContent = String(count);
+        bulkBar.classList.toggle("hidden", count === 0);
+      }
+
+      function statusBadge(status) {
+        const common = "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold";
+        if (status === "active") {
+          return `<span class="${common} bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border border-emerald-500/20">Active</span>`;
+        }
+        if (status === "pending") {
+          return `<span class="${common} bg-amber-500/15 text-amber-600 dark:text-amber-300 border border-amber-500/20">Pending</span>`;
+        }
+        return `<span class="${common} bg-slate-500/15 text-slate-600 dark:text-slate-300 border border-slate-500/20">Inactive</span>`;
+      }
+
+      function render() {
+        const filtered = applyFiltersSort(dataset);
+        const { total, pageCount, start, end, rows } = getVisibleRows(filtered);
+
+        summaryText.textContent = `${total.toLocaleString()} results`;
+        rangeText.textContent = total === 0 ? "0 results" : `Showing ${start + 1}–${end} of ${total}`;
+
+        emptyState.classList.toggle("hidden", total !== 0);
+
+        // Pagination buttons
+        prevBtn.disabled = state.page <= 1;
+        nextBtn.disabled = state.page >= pageCount;
+
+        // page numbers (simple window)
+        const windowSize = 5;
+        const startPage = Math.max(1, state.page - Math.floor(windowSize / 2));
+        const endPage = Math.min(pageCount, startPage + windowSize - 1);
+        const actualStart = Math.max(1, endPage - windowSize + 1);
+
+        pageNumbers.innerHTML = "";
+        for (let p = actualStart; p <= endPage; p++) {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.textContent = String(p);
+          btn.className =
+            "px-3 py-2 rounded-lg text-sm font-semibold border focus-ring " +
+            (p === state.page
+              ? "bg-brand-600 text-white border-brand-600"
+              : "bg-transparent border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800");
+          btn.addEventListener("click", () => {
+            state.page = p;
+            render();
+          });
+          pageNumbers.appendChild(btn);
+        }
+
+        // Select-all checkbox state for current page
+        const idsOnPage = rows.map((r) => r.id);
+        const { checked, total: pageTotal } = selectionOnPage(idsOnPage);
+        selectAll.checked = pageTotal > 0 && checked === pageTotal;
+        selectAll.indeterminate = checked > 0 && checked < pageTotal;
+
+        // Sort icons
+        updateSortIcons();
+
+        // Bulk bar
+        setBulkUI();
+
+        // Table rows
+        tableBody.innerHTML = rows
+          .map((row, idx) => {
+            const zebra = idx % 2 === 0 ? "bg-white dark:bg-slate-900" : "bg-slate-50/60 dark:bg-slate-800/40";
+            const hover = "hover:bg-brand-50 dark:hover:bg-brand-500/10";
+            const checked = state.selected.has(row.id);
+
+            return `
+              <tr class="${zebra} ${hover} transition-colors">
+                <td class="px-4 py-3 w-[48px]">
+                  <input
+                    type="checkbox"
+                    class="row-check w-4 h-4 rounded border-slate-300 dark:border-slate-700 text-brand-600 focus-ring"
+                    data-id="${row.id}"
+                    ${checked ? "checked" : ""}
+                    aria-label="Select row ${row.name}"
+                    title="Select row"
+                  />
+                </td>
+
+                <td class="px-4 py-3">
+                  <div class="font-semibold text-slate-900 dark:text-slate-100">${escapeHtml(row.name)}</div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">@${escapeHtml(row.handle)}</div>
+                </td>
+
+                <td class="px-4 py-3">
+                  <div class="text-slate-700 dark:text-slate-200">${escapeHtml(row.email)}</div>
+                </td>
+
+                <td class="px-4 py-3">
+                  <div class="inline-flex items-center gap-2">
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 bg-white/60 dark:bg-slate-900/40">
+                      ${escapeHtml(row.plan)}
+                    </span>
+                  </div>
+                </td>
+
+                <td class="px-4 py-3">${statusBadge(row.status)}</td>
+
+                <td class="px-4 py-3">
+                  <div class="text-slate-700 dark:text-slate-200">${escapeHtml(row.createdAt)}</div>
+                </td>
+              </tr>
+            `;
+          })
+          .join("");
+
+        // Attach row checkbox handlers
+        tableBody.querySelectorAll(".row-check").forEach((cb) => {
+          cb.addEventListener("change", (e) => {
+            const id = Number(e.currentTarget.dataset.id);
+            if (e.currentTarget.checked) state.selected.add(id);
+            else state.selected.delete(id);
+            render();
+          });
+        });
+      }
+
+      // Global filter / search handlers
+      function syncStateFromUI() {
+        state.search = searchInput.value;
+        state.filterStatusGlobal = filterStatusGlobal.value;
+        state.filterPlan = filterPlan.value;
+        state.filterStatusCol = filterStatusCol.value;
+        state.page = 1;
+      }
+
+      searchInput.addEventListener("input", () => {
+        syncStateFromUI();
+        render();
+      });
+
+      filterStatusGlobal.addEventListener("change", () => {
+        syncStateFromUI();
+        render();
+      });
+
+      filterPlan.addEventListener("change", () => {
+        state.page = 1;
+        render();
+      });
+
+      filterStatusCol.addEventListener("change", () => {
+        state.page = 1;
+        render();
+      });
+
+      pageSizeSel.addEventListener("change", () => {
+        state.pageSize = Number(pageSizeSel.value);
+        state.page = 1;
+        render();
+      });
+
+      // Header sorting handlers
+      document.querySelectorAll(".header-sort-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const col = btn.dataset.col;
+          cycleSort(col);
+          render();
+        });
+      });
+
+      // Pagination handlers
+      prevBtn.addEventListener("click", () => {
+        state.page = Math.max(1, state.page - 1);
+        render();
+      });
+
+      nextBtn.addEventListener("click", () => {
+        state.page = state.page + 1;
+        render();
+      });
+
+      // Select all on current page
+      selectAll.addEventListener("change", (e) => {
+        const idsOnPage = Array.from(tableBody.querySelectorAll(".row-check"))
+          .map((cb) => Number(cb.dataset.id));
+
+        if (e.currentTarget.checked) {
+          idsOnPage.forEach((id) => state.selected.add(id));
+        } else {
+          idsOnPage.forEach((id) => state.selected.delete(id));
+        }
+
+        render();
+      });
+
+      // Bulk actions
+      bulkActivate.addEventListener("click", () => {
+        if (!state.selected.size) return;
+        dataset.forEach((r) => {
+          if (state.selected.has(r.id)) r.status = "active";
+        });
+        render();
+      });
+
+      bulkDeactivate.addEventListener("click", () => {
+        if (!state.selected.size) return;
+        dataset.forEach((r) => {
+          if (state.selected.has(r.id)) r.status = "inactive";
+        });
+        render();
+      });
+
+      bulkClear.addEventListener("click", () => {
+        state.selected.clear();
+        render();
+      });
+
+      // Helpers
+      function escapeHtml(s) {
+        return String(s)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "<")
+          .replaceAll(">", ">")
+          .replaceAll('"', """)
+          .replaceAll("'", "&#039;");
+      }
+
+      function seededRandom(seed) {
+        // Mulberry32
+        let t = seed;
+        return function () {
+          t += 0x6d2b79f5;
+          let x = Math.imul(t ^ (t >>> 15), 1 | t);
+          x ^= x + Math.imul(x ^ (x >>> 7), 61 | x);
+          return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      function makeDataset() {
+        const names = [
+          "Ava Chen",
+          "Noah Williams",
+          "Sophia Martinez",
+          "Liam Brown",
+          "Mia Johnson",
+          "Ethan Davis",
+          "Olivia Wilson",
+          "James Anderson",
+          "Charlotte Thomas",
+          "Benjamin Taylor",
+          "Amelia Moore",
+          "Lucas Jackson",
+          "Isabella White",
+          "Henry Harris",
+          "Harper Martin",
+          "Jack Thompson",
+          "Evelyn Garcia",
+          "Alexander Martinez",
+          "Abigail Robinson",
+          "Michael Clark",
+        ];
+
+        const handles = [
+          "ava",
+          "noah",
+          "sophia",
+          "liam",
+          "mia",
+          "ethan",
+          "olivia",
+          "james",
+          "charlotte",
+          "ben",
+          "amelia",
+          "lucas",
+          "isabella",
+          "henry",
+          "harper",
+          "jack",
+          "evelyn",
+          "alex",
+          "abigail",
+          "mike",
+        ];
+
+        const plans = ["Free", "Pro", "Team", "Enterprise"];
+        const statuses = ["active", "inactive", "pending"];
+
+        const start = new Date("2025-01-05T00:00:00");
+        const rand = seededRandom(1337);
+
+        const rows = [];
+        let id = 1;
+
+        // 64 rows
+        for (let i = 0; i < 64; i++) {
+          const baseIdx = i % names.length;
+          const name = names[baseIdx];
+          const handle = handles[baseIdx] + (i >= names.length ? `-${i - names.length + 1}` : "");
+
+          const email = `${handle.replace(/[^a-z0-9-]/gi, "").toLowerCase()}@example.com`;
+
+          const plan = plans[Math.floor(rand() * plans.length)];
+          const status = statuses[Math.floor(rand() * statuses.length)];
+
+          const daysOffset = Math.floor(rand() * 320);
+          const created = new Date(start.getTime() + daysOffset * 24 * 60 * 60 * 1000);
+          const createdAt = created.toISOString().slice(0, 10);
+
+          rows.push({
+            id: id++,
+            name,
+            handle,
+            email,
+            plan,
+            status,
+            createdAt,
+          });
+        }
+
+        return rows;
+      }
+
+      // Initial render + wire select inputs
+      state.pageSize = Number(pageSizeSel.value);
+
+      // Keep the two status filters coherent: if either is set, they can narrow down.
+      // (filterStatusGlobal and filterStatusCol are both supported.)
+
+      // Fix initial selection bar
+      setBulkUI();
+
+      render();
+    </script>
+  </body>
+</html>
+
