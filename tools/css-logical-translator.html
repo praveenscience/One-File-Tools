@@ -1,0 +1,1517 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Physical → Logical — a CSS direction translator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,340;0,9..144,440;0,9..144,560;0,9..144,650;1,9..144,440;1,9..144,560&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg: #14100b;
+        --bg-2: #191410;
+        --surface: #1d1712;
+        --surface-2: #241d15;
+        --surface-hover: #2a2219;
+        --border: rgba(233, 214, 181, 0.09);
+        --border-strong: rgba(233, 214, 181, 0.2);
+        --text: #f1e6d4;
+        --text-dim: #b7a98d;
+        --text-mute: #7c705b;
+        --accent: #d7a75f;
+        --accent-dim: #a9834b;
+        --accent-ink: #241a0b;
+        --accent-soft: rgba(215, 167, 95, 0.13);
+        --accent-soft-strong: rgba(215, 167, 95, 0.24);
+        --rose: #c2765078;
+        --rose-solid: #c47654;
+        --rose-soft: rgba(196, 118, 84, 0.16);
+        --sage: #8faa72;
+        --sage-soft: rgba(143, 170, 114, 0.15);
+        --shadow-soft: 0 20px 60px -20px rgba(0, 0, 0, 0.6);
+        --radius-lg: 18px;
+        --radius-md: 12px;
+        --radius-sm: 8px;
+
+        --font-display: "Fraunces", serif;
+        --font-ui: "Manrope", sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      ::selection {
+        background: var(--accent-soft-strong);
+        color: var(--text);
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font-ui);
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+      }
+
+      body {
+        min-height: 100vh;
+        position: relative;
+        overflow-x: hidden;
+      }
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background: radial-gradient(680px 480px at 12% -6%, rgba(215, 167, 95, 0.1), transparent 60%), radial-gradient(620px 520px at 96% 18%, rgba(196, 118, 84, 0.07), transparent 60%), radial-gradient(900px 700px at 50% 120%, rgba(215, 167, 95, 0.05), transparent 60%);
+        pointer-events: none;
+        z-index: 0;
+      }
+      body::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        opacity: 0.035;
+        pointer-events: none;
+        z-index: 0;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+        mix-blend-mode: overlay;
+      }
+
+      .wrap {
+        position: relative;
+        z-index: 1;
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 64px 28px 90px;
+      }
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-family: var(--font-mono);
+        font-size: 11.5px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 22px;
+      }
+      .eyebrow::before {
+        content: "";
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--accent);
+        box-shadow: 0 0 0 4px var(--accent-soft);
+      }
+
+      h1.title {
+        font-family: var(--font-display);
+        font-weight: 560;
+        font-size: clamp(36px, 5.6vw, 58px);
+        line-height: 1.02;
+        letter-spacing: -0.01em;
+        margin: 0 0 18px;
+        color: var(--text);
+      }
+      h1.title em {
+        font-style: italic;
+        font-weight: 440;
+        color: var(--accent);
+      }
+      h1.title .arrow {
+        display: inline-block;
+        padding: 0 6px;
+        color: var(--text-mute);
+        font-style: normal;
+      }
+
+      p.lede {
+        max-width: 620px;
+        font-size: 16.5px;
+        line-height: 1.65;
+        color: var(--text-dim);
+        margin: 0 0 44px;
+        font-weight: 400;
+      }
+      p.lede strong {
+        color: var(--text);
+        font-weight: 600;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 22px;
+      }
+      .toolbar-group {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        appearance: none;
+        border: 1px solid var(--border-strong);
+        background: var(--surface);
+        color: var(--text-dim);
+        font-family: var(--font-ui);
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        padding: 9px 15px;
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        transition: all 0.16s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .btn:hover {
+        background: var(--surface-hover);
+        color: var(--text);
+        border-color: var(--border-strong);
+      }
+      .btn:active {
+        transform: translateY(1px);
+      }
+      .btn.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--accent-ink);
+      }
+      .btn.primary:hover {
+        background: #e3b671;
+      }
+      .btn svg {
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+      }
+
+      /* segmented flow-dial control */
+      .dial {
+        display: flex;
+        align-items: center;
+        background: var(--surface);
+        border: 1px solid var(--border-strong);
+        border-radius: 999px;
+        padding: 5px;
+        gap: 5px;
+      }
+      .dial-label {
+        font-family: var(--font-mono);
+        font-size: 10.5px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--text-mute);
+        padding-left: 10px;
+        padding-right: 2px;
+        white-space: nowrap;
+      }
+      .dial button {
+        appearance: none;
+        border: none;
+        background: transparent;
+        color: var(--text-mute);
+        font-family: var(--font-mono);
+        font-size: 12px;
+        font-weight: 500;
+        line-height: 1;
+        padding: 9px 16px;
+        border-radius: 999px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        white-space: nowrap;
+        transition:
+          background 0.18s ease,
+          color 0.18s ease;
+      }
+      .dial button svg {
+        width: 12px;
+        height: 12px;
+        flex-shrink: 0;
+        transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .dial button.active {
+        background: var(--accent-soft-strong);
+        color: var(--accent);
+      }
+      .dial button:not(.active):hover {
+        color: var(--text-dim);
+      }
+      .dial button:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      .editors {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1px;
+        background: var(--border);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        box-shadow: var(--shadow-soft);
+      }
+      @media (max-width: 860px) {
+        .editors {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .panel {
+        background: var(--surface);
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+      .panel-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--border);
+      }
+      .panel-head .panel-title {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-mute);
+      }
+      .panel-title .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+      }
+      .panel-title .dot.physical {
+        background: var(--rose-solid);
+      }
+      .panel-title .dot.logical {
+        background: var(--sage);
+      }
+
+      .icon-btn {
+        appearance: none;
+        border: 1px solid transparent;
+        background: transparent;
+        color: var(--text-mute);
+        cursor: pointer;
+        padding: 5px 9px;
+        border-radius: 7px;
+        font-family: var(--font-mono);
+        font-size: 11.5px;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        transition: all 0.15s ease;
+      }
+      .icon-btn:hover {
+        color: var(--accent);
+        background: var(--accent-soft);
+      }
+      .icon-btn svg {
+        width: 12px;
+        height: 12px;
+      }
+
+      .code-area {
+        display: flex;
+        height: 360px;
+        font-family: var(--font-mono);
+        font-size: 13.5px;
+        line-height: 1.65;
+      }
+
+      .gutter {
+        flex-shrink: 0;
+        padding: 16px 0;
+        text-align: right;
+        color: var(--text-mute);
+        opacity: 0.55;
+        user-select: none;
+        overflow: hidden;
+        background: var(--surface-2);
+        border-right: 1px solid var(--border);
+      }
+      .gutter span {
+        display: block;
+        padding: 0 12px;
+        height: 22.3px;
+      }
+
+      textarea#physicalInput {
+        flex: 1;
+        resize: none;
+        border: none;
+        outline: none;
+        background: transparent;
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 13.5px;
+        line-height: 22.3px;
+        padding: 16px 18px;
+        overflow-y: auto;
+        tab-size: 2;
+      }
+      textarea#physicalInput::placeholder {
+        color: var(--text-mute);
+      }
+
+      .output-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 16px 0;
+      }
+      .out-line {
+        padding: 0 18px;
+        min-height: 22.3px;
+        line-height: 22.3px;
+        white-space: pre;
+        color: var(--text-dim);
+        border-left: 2px solid transparent;
+      }
+      .out-line.changed {
+        color: var(--text);
+        background: var(--sage-soft);
+        border-left-color: var(--sage);
+      }
+      .out-line.flagged {
+        color: var(--text);
+        background: var(--rose-soft);
+        border-left-color: var(--rose-solid);
+      }
+      .out-line .prop {
+        color: var(--accent);
+      }
+      .out-line .val {
+        color: var(--text-dim);
+      }
+
+      .stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 24px;
+        padding: 18px 22px;
+        margin-top: 1px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-top: none;
+        border-bottom-left-radius: var(--radius-lg);
+        border-bottom-right-radius: var(--radius-lg);
+        font-family: var(--font-mono);
+        font-size: 12.5px;
+      }
+      .stat {
+        display: flex;
+        align-items: baseline;
+        gap: 7px;
+        color: var(--text-mute);
+      }
+      .stat b {
+        font-size: 16px;
+        font-family: var(--font-display);
+        font-weight: 560;
+      }
+      .stat.converted b {
+        color: var(--sage);
+      }
+      .stat.safe b {
+        color: var(--text-dim);
+      }
+      .stat.flagged b {
+        color: var(--rose-solid);
+      }
+
+      .section-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin: 62px 0 8px;
+      }
+      h2.section-title {
+        font-family: var(--font-display);
+        font-weight: 500;
+        font-size: 24px;
+        letter-spacing: -0.005em;
+        margin: 0;
+      }
+      p.section-sub {
+        color: var(--text-mute);
+        font-size: 13.5px;
+        margin: 6px 0 26px;
+        max-width: 640px;
+      }
+
+      .preview-stage-wrap {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+      }
+      @media (max-width: 780px) {
+        .preview-stage-wrap {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .stage {
+        background: linear-gradient(180deg, var(--surface), var(--surface-2));
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 26px;
+        min-height: 220px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
+      }
+      .stage-tag {
+        position: absolute;
+        top: 16px;
+        left: 20px;
+        font-family: var(--font-mono);
+        font-size: 10.5px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--text-mute);
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .stage-tag .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+      }
+      .stage-tag.physical .dot {
+        background: var(--rose-solid);
+      }
+      .stage-tag.logical .dot {
+        background: var(--sage);
+      }
+
+      .demo-card {
+        background: var(--bg-2);
+        border: 1px solid var(--border-strong);
+        box-shadow: 0 14px 34px -18px rgba(0, 0, 0, 0.55);
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+        max-width: 320px;
+      }
+      .demo-card .avatar {
+        flex-shrink: 0;
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: linear-gradient(150deg, var(--accent), var(--rose-solid));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-display);
+        font-weight: 600;
+        color: var(--accent-ink);
+        font-size: 15px;
+      }
+      .demo-card .body {
+        min-width: 0;
+      }
+      .demo-card .body h3 {
+        margin: 2px 0 4px;
+        font-family: var(--font-ui);
+        font-size: 14.5px;
+        font-weight: 700;
+        color: var(--text);
+      }
+      .demo-card .body p {
+        margin: 0;
+        font-size: 12.5px;
+        line-height: 1.55;
+        color: var(--text-dim);
+      }
+
+      #previewRoot {
+        display: contents;
+      }
+
+      .flow-caption {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 18px;
+        padding: 13px 16px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        font-size: 13px;
+        color: var(--text-dim);
+        line-height: 1.55;
+      }
+      .flow-caption svg {
+        flex-shrink: 0;
+        width: 16px;
+        height: 16px;
+        color: var(--accent);
+      }
+
+      .insights {
+        margin-top: 44px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .insight-row {
+        display: flex;
+        gap: 14px;
+        align-items: flex-start;
+        padding: 15px 18px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+      }
+      .insight-row .chip {
+        flex-shrink: 0;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        padding: 4px 9px;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        white-space: nowrap;
+        margin-top: 1px;
+      }
+      .insight-row p {
+        margin: 0;
+        font-size: 13.5px;
+        line-height: 1.6;
+        color: var(--text-dim);
+      }
+      .insight-empty {
+        color: var(--text-mute);
+        font-size: 13.5px;
+        padding: 20px 4px;
+        font-style: italic;
+        font-family: var(--font-display);
+      }
+
+      details.reference {
+        margin-top: 54px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        background: var(--surface);
+        overflow: hidden;
+      }
+      details.reference summary {
+        list-style: none;
+        cursor: pointer;
+        padding: 18px 22px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-family: var(--font-display);
+        font-size: 17px;
+        color: var(--text);
+      }
+      details.reference summary::-webkit-details-marker {
+        display: none;
+      }
+      details.reference summary .chevron {
+        color: var(--text-mute);
+        transition: transform 0.2s ease;
+        width: 16px;
+        height: 16px;
+      }
+      details.reference[open] summary .chevron {
+        transform: rotate(180deg);
+      }
+      .reference-body {
+        padding: 4px 22px 26px;
+        border-top: 1px solid var(--border);
+      }
+      .ref-group {
+        margin-top: 22px;
+      }
+      .ref-group h4 {
+        font-family: var(--font-mono);
+        font-size: 11.5px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin: 0 0 10px;
+      }
+      table.ref-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: var(--font-mono);
+        font-size: 12.5px;
+      }
+      table.ref-table td {
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--border);
+        color: var(--text-dim);
+      }
+      table.ref-table td.arrow-cell {
+        color: var(--text-mute);
+        width: 26px;
+        text-align: center;
+      }
+      table.ref-table td:first-child {
+        color: var(--rose-solid);
+      }
+      table.ref-table td:last-child {
+        color: var(--sage);
+      }
+
+      footer {
+        margin-top: 70px;
+        padding-top: 22px;
+        border-top: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 10px;
+        font-size: 12px;
+        color: var(--text-mute);
+        font-family: var(--font-mono);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          transition: none !important;
+          animation: none !important;
+        }
+      }
+
+      ::-webkit-scrollbar {
+        width: 9px;
+        height: 9px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--border-strong);
+        border-radius: 8px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: var(--text-mute);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="eyebrow">CSS Direction &amp; Flow</div>
+      <h1 class="title">Physical <span class="arrow">→</span> <em>Logical</em></h1>
+      <p class="lede">
+        Paste CSS written with fixed sides — <strong>left</strong>, <strong>right</strong>, <strong>top</strong>, <strong>bottom</strong>
+        — and get the flow-relative equivalent that reads correctly in any direction or writing mode. Toggle the preview below to watch exactly where a physical layout comes apart in RTL.
+      </p>
+
+      <div class="toolbar">
+        <div class="toolbar-group">
+          <button type="button" class="btn primary" id="btnSample">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v14m0 0-5-5m5 5 5-5M4 21h16" /></svg>
+            Load sample
+          </button>
+          <button type="button" class="btn" id="btnClear">Clear</button>
+        </div>
+        <div class="toolbar-group">
+          <div class="dial" id="dirDial" role="group" aria-label="Reading direction">
+            <span class="dial-label">Direction</span>
+            <button type="button" data-dir="ltr" class="active" aria-pressed="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15m0 0-5-5m5 5-5 5" /></svg>
+              LTR
+            </button>
+            <button type="button" data-dir="rtl" aria-pressed="false">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15m0 0-5-5m5 5-5 5" /></svg>
+              RTL
+            </button>
+          </div>
+          <div class="dial" id="flowDial" role="group" aria-label="Writing mode">
+            <span class="dial-label">Flow</span>
+            <button type="button" data-flow="horizontal-tb" class="active" aria-pressed="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15m0 0-5-5m5 5-5 5" /></svg>
+              Horizontal
+            </button>
+            <button type="button" data-flow="vertical-rl" aria-pressed="false">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v15m0 0-5-5m5 5 5-5" /></svg>
+              Vertical
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="editors">
+        <div class="panel">
+          <div class="panel-head">
+            <div class="panel-title"><span class="dot physical"></span> Physical CSS</div>
+            <button type="button" class="icon-btn" id="btnCopyInput" data-label="Copy">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="12" height="12" rx="2" />
+                <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+              </svg>
+              <span class="label">Copy</span>
+            </button>
+          </div>
+          <div class="code-area">
+            <div class="gutter" id="inputGutter"><span>1</span></div>
+            <textarea
+              id="physicalInput"
+              spellcheck="false"
+              placeholder=".card {
+  margin-left: 24px;
+  text-align: left;
+}"
+            ></textarea>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">
+            <div class="panel-title"><span class="dot logical"></span> Logical CSS</div>
+            <button type="button" class="icon-btn" id="btnCopyOutput" data-label="Copy">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="12" height="12" rx="2" />
+                <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+              </svg>
+              <span class="label">Copy</span>
+            </button>
+          </div>
+          <div class="code-area">
+            <div class="gutter" id="outputGutter"><span>1</span></div>
+            <div class="output-body" id="outputBody"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stats" aria-live="polite">
+        <div class="stat converted"><b id="statConverted">0</b> converted</div>
+        <div class="stat safe"><b id="statSafe">0</b> already direction-safe</div>
+        <div class="stat flagged"><b id="statFlagged">0</b> need a manual look</div>
+      </div>
+
+      <div class="section-head">
+        <h2 class="section-title">See it break, then watch it hold</h2>
+      </div>
+      <p class="section-sub">Both cards use the same source rules. The left one keeps your physical properties as written; the right one uses the converted logical properties. Flip direction or flow above.</p>
+
+      <div class="preview-stage-wrap">
+        <div class="stage">
+          <span class="stage-tag physical"><span class="dot"></span> Physical</span>
+          <div id="previewRoot">
+            <div class="demo-card" id="previewPhysical">
+              <div class="avatar">A</div>
+              <div class="body">
+                <h3>Shipment update</h3>
+                <p>Your order left the warehouse and is on its way to you.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="stage">
+          <span class="stage-tag logical"><span class="dot"></span> Logical</span>
+          <div class="demo-card" id="previewLogical">
+            <div class="avatar">A</div>
+            <div class="body">
+              <h3>Shipment update</h3>
+              <p>Your order left the warehouse and is on its way to you.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flow-caption" id="flowCaption" aria-live="polite">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 8v4l2.5 2.5" />
+        </svg>
+        <span id="flowCaptionText">Currently rendering left-to-right, horizontal — set RTL above to see the physical card's edges stay put while the logical one flips.</span>
+      </div>
+
+      <div class="insights" id="insights" aria-live="polite"></div>
+
+      <details class="reference">
+        <summary>
+          Full conversion reference
+          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+        </summary>
+        <div class="reference-body">
+          <div class="ref-group">
+            <h4>Box model — margin, padding, border</h4>
+            <table class="ref-table">
+              <tr>
+                <td>margin-top / bottom</td>
+                <td class="arrow-cell">→</td>
+                <td>margin-block-start / end</td>
+              </tr>
+              <tr>
+                <td>margin-left / right</td>
+                <td class="arrow-cell">→</td>
+                <td>margin-inline-start / end</td>
+              </tr>
+              <tr>
+                <td>padding-top / bottom</td>
+                <td class="arrow-cell">→</td>
+                <td>padding-block-start / end</td>
+              </tr>
+              <tr>
+                <td>padding-left / right</td>
+                <td class="arrow-cell">→</td>
+                <td>padding-inline-start / end</td>
+              </tr>
+              <tr>
+                <td>border-top / bottom</td>
+                <td class="arrow-cell">→</td>
+                <td>border-block-start / end</td>
+              </tr>
+              <tr>
+                <td>border-left / right</td>
+                <td class="arrow-cell">→</td>
+                <td>border-inline-start / end</td>
+              </tr>
+              <tr>
+                <td>border-*-width / style / color</td>
+                <td class="arrow-cell">→</td>
+                <td>border-block/inline-start/end-*</td>
+              </tr>
+              <tr>
+                <td>scroll-margin / scroll-padding *</td>
+                <td class="arrow-cell">→</td>
+                <td>scroll-margin/padding-block/inline-*</td>
+              </tr>
+            </table>
+          </div>
+
+          <div class="ref-group">
+            <h4>Corners</h4>
+            <table class="ref-table">
+              <tr>
+                <td>border-top-left-radius</td>
+                <td class="arrow-cell">→</td>
+                <td>border-start-start-radius</td>
+              </tr>
+              <tr>
+                <td>border-top-right-radius</td>
+                <td class="arrow-cell">→</td>
+                <td>border-start-end-radius</td>
+              </tr>
+              <tr>
+                <td>border-bottom-right-radius</td>
+                <td class="arrow-cell">→</td>
+                <td>border-end-end-radius</td>
+              </tr>
+              <tr>
+                <td>border-bottom-left-radius</td>
+                <td class="arrow-cell">→</td>
+                <td>border-end-start-radius</td>
+              </tr>
+            </table>
+          </div>
+
+          <div class="ref-group">
+            <h4>Position &amp; sizing</h4>
+            <table class="ref-table">
+              <tr>
+                <td>top / bottom</td>
+                <td class="arrow-cell">→</td>
+                <td>inset-block-start / end</td>
+              </tr>
+              <tr>
+                <td>left / right</td>
+                <td class="arrow-cell">→</td>
+                <td>inset-inline-start / end</td>
+              </tr>
+              <tr>
+                <td>width / height</td>
+                <td class="arrow-cell">→</td>
+                <td>inline-size / block-size</td>
+              </tr>
+              <tr>
+                <td>min/max-width / height</td>
+                <td class="arrow-cell">→</td>
+                <td>min/max-inline-size / block-size</td>
+              </tr>
+            </table>
+          </div>
+
+          <div class="ref-group">
+            <h4>Alignment, overflow &amp; float (experimental)</h4>
+            <table class="ref-table">
+              <tr>
+                <td>text-align: left / right</td>
+                <td class="arrow-cell">→</td>
+                <td>text-align: start / end</td>
+              </tr>
+              <tr>
+                <td>overflow-x / overflow-y</td>
+                <td class="arrow-cell">→</td>
+                <td>overflow-inline / overflow-block</td>
+              </tr>
+              <tr>
+                <td>float / clear: left / right</td>
+                <td class="arrow-cell">→</td>
+                <td>float / clear: inline-start / end</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </details>
+
+      <footer>
+        <span>Physical → Logical · a small CSS utility</span>
+        <span>Built for reading direction, not just RTL</span>
+      </footer>
+    </div>
+
+    <script>
+      (function () {
+        var DIRECT_MAP = {
+          "margin-top": "margin-block-start",
+          "margin-bottom": "margin-block-end",
+          "margin-left": "margin-inline-start",
+          "margin-right": "margin-inline-end",
+          "padding-top": "padding-block-start",
+          "padding-bottom": "padding-block-end",
+          "padding-left": "padding-inline-start",
+          "padding-right": "padding-inline-end",
+          "border-top": "border-block-start",
+          "border-bottom": "border-block-end",
+          "border-left": "border-inline-start",
+          "border-right": "border-inline-end",
+          "border-top-width": "border-block-start-width",
+          "border-bottom-width": "border-block-end-width",
+          "border-left-width": "border-inline-start-width",
+          "border-right-width": "border-inline-end-width",
+          "border-top-style": "border-block-start-style",
+          "border-bottom-style": "border-block-end-style",
+          "border-left-style": "border-inline-start-style",
+          "border-right-style": "border-inline-end-style",
+          "border-top-color": "border-block-start-color",
+          "border-bottom-color": "border-block-end-color",
+          "border-left-color": "border-inline-start-color",
+          "border-right-color": "border-inline-end-color",
+          "border-top-left-radius": "border-start-start-radius",
+          "border-top-right-radius": "border-start-end-radius",
+          "border-bottom-right-radius": "border-end-end-radius",
+          "border-bottom-left-radius": "border-end-start-radius",
+          top: "inset-block-start",
+          bottom: "inset-block-end",
+          left: "inset-inline-start",
+          right: "inset-inline-end",
+          width: "inline-size",
+          height: "block-size",
+          "min-width": "min-inline-size",
+          "max-width": "max-inline-size",
+          "min-height": "min-block-size",
+          "max-height": "max-block-size",
+          "overflow-x": "overflow-inline",
+          "overflow-y": "overflow-block",
+          "scroll-margin-top": "scroll-margin-block-start",
+          "scroll-margin-bottom": "scroll-margin-block-end",
+          "scroll-margin-left": "scroll-margin-inline-start",
+          "scroll-margin-right": "scroll-margin-inline-end",
+          "scroll-padding-top": "scroll-padding-block-start",
+          "scroll-padding-bottom": "scroll-padding-block-end",
+          "scroll-padding-left": "scroll-padding-inline-start",
+          "scroll-padding-right": "scroll-padding-inline-end"
+        };
+
+        var PROP_CATEGORY = {};
+        ["margin-top", "margin-bottom", "margin-left", "margin-right", "padding-top", "padding-bottom", "padding-left", "padding-right", "border-top", "border-bottom", "border-left", "border-right", "border-top-width", "border-bottom-width", "border-left-width", "border-right-width", "border-top-style", "border-bottom-style", "border-left-style", "border-right-style", "border-top-color", "border-bottom-color", "border-left-color", "border-right-color", "scroll-margin-top", "scroll-margin-bottom", "scroll-margin-left", "scroll-margin-right", "scroll-padding-top", "scroll-padding-bottom", "scroll-padding-left", "scroll-padding-right"].forEach(function (k) {
+          PROP_CATEGORY[k] = "boxModel";
+        });
+        ["border-top-left-radius", "border-top-right-radius", "border-bottom-right-radius", "border-bottom-left-radius"].forEach(function (k) {
+          PROP_CATEGORY[k] = "radius";
+        });
+        ["top", "bottom", "left", "right"].forEach(function (k) {
+          PROP_CATEGORY[k] = "inset";
+        });
+        ["width", "height", "min-width", "max-width", "min-height", "max-height"].forEach(function (k) {
+          PROP_CATEGORY[k] = "sizing";
+        });
+        PROP_CATEGORY["overflow-x"] = "overflow";
+        PROP_CATEGORY["overflow-y"] = "overflow";
+
+        var NOTES = {
+          boxModel: "Margins, padding and borders now follow reading order (start/end) instead of a fixed screen edge, so spacing stays correct when direction or writing-mode changes.",
+          radius: "Corner names follow the block/inline flow, so the rounded corner tracks the same reading-order position when the layout flips.",
+          inset: "Positioning offsets follow flow direction instead of a fixed screen edge — a start offset stays on the leading edge in any direction.",
+          sizing: "Logical sizing ties to writing-mode, not just text direction — this matters even in a left-to-right document that includes vertical text.",
+          align: "'start' and 'end' align with the beginning and close of the reading direction, so text alignment flips automatically with 'dir'.",
+          overflow: "The scrollable axis now maps to inline/block flow rather than a fixed x/y screen axis.",
+          floatClear: "Experimental in the spec — solidly supported in current evergreen browsers, but worth checking caniuse before shipping it."
+        };
+
+        function splitValueTokens(value) {
+          var tokens = [],
+            current = "",
+            depth = 0;
+          value = value.trim();
+          for (var i = 0; i < value.length; i++) {
+            var ch = value[i];
+            if (ch === "(") depth++;
+            if (ch === ")") depth--;
+            if (ch === " " && depth === 0) {
+              if (current) {
+                tokens.push(current);
+                current = "";
+              }
+            } else {
+              current += ch;
+            }
+          }
+          if (current) tokens.push(current);
+          return tokens;
+        }
+
+        function expandBoxShorthand(tokens) {
+          var top, right, bottom, left;
+          if (tokens.length === 1) {
+            top = right = bottom = left = tokens[0];
+          } else if (tokens.length === 2) {
+            top = bottom = tokens[0];
+            right = left = tokens[1];
+          } else if (tokens.length === 3) {
+            top = tokens[0];
+            right = left = tokens[1];
+            bottom = tokens[2];
+          } else if (tokens.length === 4) {
+            top = tokens[0];
+            right = tokens[1];
+            bottom = tokens[2];
+            left = tokens[3];
+          } else return null;
+          if (top === right && right === bottom && bottom === left) return null;
+          var blockVal = top === bottom ? top : top + " " + bottom;
+          var inlineVal = left === right ? left : left + " " + right;
+          return { blockVal: blockVal, inlineVal: inlineVal };
+        }
+
+        function expandRadiusShorthand(tokens) {
+          var tl, tr, br, bl;
+          if (tokens.length === 1) {
+            tl = tr = br = bl = tokens[0];
+          } else if (tokens.length === 2) {
+            tl = br = tokens[0];
+            tr = bl = tokens[1];
+          } else if (tokens.length === 3) {
+            tl = tokens[0];
+            tr = bl = tokens[1];
+            br = tokens[2];
+          } else if (tokens.length === 4) {
+            tl = tokens[0];
+            tr = tokens[1];
+            br = tokens[2];
+            bl = tokens[3];
+          } else return null;
+          if (tl === tr && tr === br && br === bl) return null;
+          return { startStart: tl, startEnd: tr, endEnd: br, endStart: bl };
+        }
+
+        function normalizeCSS(source) {
+          var out = "";
+          var depth = 0;
+          var quote = null;
+          for (var i = 0; i < source.length; i++) {
+            var ch = source[i];
+            var prev = i > 0 ? source[i - 1] : "";
+            if (quote) {
+              out += ch;
+              if (ch === quote && prev !== "\\") quote = null;
+              continue;
+            }
+            if (ch === '"' || ch === "'") {
+              quote = ch;
+              out += ch;
+              continue;
+            }
+            if (ch === "(") {
+              depth++;
+              out += ch;
+              continue;
+            }
+            if (ch === ")") {
+              depth = Math.max(0, depth - 1);
+              out += ch;
+              continue;
+            }
+            if (ch === "{" && depth === 0) {
+              out = out.replace(/[ \t]+$/, "") + " {\n";
+              continue;
+            }
+            if (ch === "}" && depth === 0) {
+              out += "\n}\n";
+              continue;
+            }
+            if (ch === ";" && depth === 0) {
+              out += ";\n";
+              continue;
+            }
+            out += ch;
+          }
+          return out
+            .split("\n")
+            .map(function (l) {
+              return l.trim();
+            })
+            .filter(function (l) {
+              return l.length > 0;
+            });
+        }
+
+        function reindent(lines) {
+          var depth = 0;
+          return lines.map(function (line) {
+            if (line === "}") depth = Math.max(0, depth - 1);
+            var indented = new Array(depth + 1).join("  ") + line;
+            if (/\{\s*$/.test(line)) depth++;
+            return indented;
+          });
+        }
+
+        var DECL_RE = /^(\s*)([\w-]+)\s*:\s*(.+?);?\s*$/;
+        function matchDecl(line) {
+          if (/\{\s*$/.test(line)) return null;
+          return line.match(DECL_RE);
+        }
+
+        function stripImportant(value) {
+          var m = value.match(/^(.*?)\s*!\s*important\s*$/i);
+          if (m) return { value: m[1].trim(), important: " !important" };
+          return { value: value, important: "" };
+        }
+
+        function convertLine(rawLine) {
+          var m = matchDecl(rawLine);
+          if (!m) {
+            return [{ text: rawLine, changed: false, isDecl: false }];
+          }
+          var indent = m[1],
+            propRaw = m[2],
+            valueRaw = m[3];
+          var prop = propRaw.toLowerCase();
+          var stripped = stripImportant(valueRaw.trim());
+          var value = stripped.value;
+          var important = stripped.important;
+
+          if (prop.indexOf("--") === 0) {
+            return [{ text: rawLine, changed: false, isDecl: false }];
+          }
+
+          if (prop === "margin" || prop === "padding") {
+            var tokens = splitValueTokens(value);
+            if (tokens.length >= 1 && tokens.length <= 4) {
+              var res = expandBoxShorthand(tokens);
+              if (!res) return [{ text: rawLine, changed: false, isDecl: true }];
+              return [
+                { text: indent + prop + "-block: " + res.blockVal + important + ";", changed: true, isDecl: true, category: "boxModel", prop: prop + "-block" },
+                { text: indent + prop + "-inline: " + res.inlineVal + important + ";", changed: true, isDecl: true, category: "boxModel", prop: prop + "-inline" }
+              ];
+            }
+          }
+
+          if (prop === "border-radius") {
+            if (value.indexOf("/") !== -1) {
+              return [{ text: rawLine, changed: false, flagged: true, isDecl: true, category: "radius" }];
+            }
+            var rtokens = splitValueTokens(value);
+            var rres = expandRadiusShorthand(rtokens);
+            if (!rres) return [{ text: rawLine, changed: false, isDecl: true }];
+            return [
+              { text: indent + "border-start-start-radius: " + rres.startStart + important + ";", changed: true, isDecl: true, category: "radius", prop: "border-start-start-radius" },
+              { text: indent + "border-start-end-radius: " + rres.startEnd + important + ";", changed: true, isDecl: true, category: "radius", prop: "border-start-end-radius" },
+              { text: indent + "border-end-end-radius: " + rres.endEnd + important + ";", changed: true, isDecl: true, category: "radius", prop: "border-end-end-radius" },
+              { text: indent + "border-end-start-radius: " + rres.endStart + important + ";", changed: true, isDecl: true, category: "radius", prop: "border-end-start-radius" }
+            ];
+          }
+
+          if (prop === "text-align") {
+            var lv = value.toLowerCase();
+            if (lv === "left" || lv === "right") {
+              var nv = lv === "left" ? "start" : "end";
+              return [{ text: indent + "text-align: " + nv + important + ";", changed: true, isDecl: true, category: "align", prop: "text-align" }];
+            }
+            return [{ text: rawLine, changed: false, isDecl: true }];
+          }
+
+          if (prop === "float" || prop === "clear") {
+            var lv2 = value.toLowerCase();
+            if (lv2 === "left" || lv2 === "right") {
+              var nv2 = lv2 === "left" ? "inline-start" : "inline-end";
+              return [{ text: indent + prop + ": " + nv2 + important + ";", changed: true, flagged: true, isDecl: true, category: "floatClear", prop: prop }];
+            }
+            return [{ text: rawLine, changed: false, isDecl: true }];
+          }
+
+          if (DIRECT_MAP[prop]) {
+            var newProp = DIRECT_MAP[prop];
+            return [{ text: indent + newProp + ": " + value + important + ";", changed: true, isDecl: true, category: PROP_CATEGORY[prop], prop: newProp }];
+          }
+
+          return [{ text: rawLine, changed: false, isDecl: true }];
+        }
+
+        function convertSource(source) {
+          var lines = reindent(normalizeCSS(source));
+          var outRows = [];
+          var flatPhysical = [];
+          var flatLogical = [];
+          var stats = { converted: 0, safe: 0, flagged: 0 };
+          var categoriesUsed = {};
+
+          lines.forEach(function (line) {
+            var m = matchDecl(line);
+            if (m && m[2].toLowerCase().indexOf("--") !== 0) {
+              flatPhysical.push(m[2].toLowerCase() + ": " + m[3].trim() + ";");
+            }
+            var rows = convertLine(line);
+            rows.forEach(function (row) {
+              outRows.push(row);
+              if (row.isDecl) {
+                if (row.changed) {
+                  stats.converted++;
+                  if (row.category) categoriesUsed[row.category] = true;
+                } else if (row.flagged) {
+                  stats.flagged++;
+                  if (row.category) categoriesUsed[row.category] = true;
+                } else {
+                  stats.safe++;
+                }
+              }
+              var lm = matchDecl(row.text);
+              if (lm && lm[2].toLowerCase().indexOf("--") !== 0) {
+                flatLogical.push(lm[2].toLowerCase() + ": " + lm[3].trim() + ";");
+              }
+            });
+          });
+
+          return {
+            rows: outRows,
+            stats: stats,
+            categoriesUsed: categoriesUsed,
+            flatPhysical: flatPhysical.join(" "),
+            flatLogical: flatLogical.join(" ")
+          };
+        }
+
+        var input = document.getElementById("physicalInput");
+        var inputGutter = document.getElementById("inputGutter");
+        var outputBody = document.getElementById("outputBody");
+        var outputGutter = document.getElementById("outputGutter");
+        var statConverted = document.getElementById("statConverted");
+        var statSafe = document.getElementById("statSafe");
+        var statFlagged = document.getElementById("statFlagged");
+        var insightsEl = document.getElementById("insights");
+        var previewPhysical = document.getElementById("previewPhysical");
+        var previewLogical = document.getElementById("previewLogical");
+        var previewRoot = document.getElementById("previewRoot");
+        var flowCaptionText = document.getElementById("flowCaptionText");
+
+        var SAMPLE = ".card {\n  margin-left: 24px;\n  padding: 18px 28px;\n  border-left: 3px solid #d7a75f;\n  border-top-left-radius: 14px;\n  border-bottom-left-radius: 14px;\n  text-align: left;\n  width: 300px;\n}";
+
+        function escapeHTML(s) {
+          return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+
+        function highlightLine(text) {
+          var m = matchDecl(text);
+          if (!m) return escapeHTML(text);
+          var indent = m[1],
+            prop = m[2],
+            value = m[3];
+          return escapeHTML(indent) + '<span class="prop">' + escapeHTML(prop) + '</span>: <span class="val">' + escapeHTML(value) + "</span>;";
+        }
+
+        function buildGutter(el, count) {
+          var html = "";
+          for (var i = 1; i <= count; i++) {
+            html += "<span>" + i + "</span>";
+          }
+          el.innerHTML = html || "<span>1</span>";
+        }
+
+        var dirState = "ltr";
+        var flowState = "horizontal-tb";
+        var lastResult = null;
+        var debounceTimer = null;
+
+        function render() {
+          var source = input.value;
+          var result = convertSource(source);
+          lastResult = result;
+
+          var inputLineCount = source.split("\n").length;
+          buildGutter(inputGutter, inputLineCount);
+
+          var outHTML = "";
+          result.rows.forEach(function (row) {
+            var cls = "out-line";
+            if (row.changed) cls += " changed";
+            if (row.flagged) cls += " flagged";
+            outHTML += '<div class="' + cls + '">' + highlightLine(row.text) + "</div>";
+          });
+          outputBody.innerHTML = outHTML || '<div class="out-line" style="color:var(--text-mute);font-style:italic;">Converted CSS will appear here.</div>';
+          buildGutter(outputGutter, result.rows.length || 1);
+
+          statConverted.textContent = result.stats.converted;
+          statSafe.textContent = result.stats.safe;
+          statFlagged.textContent = result.stats.flagged;
+
+          var order = ["boxModel", "radius", "inset", "sizing", "align", "overflow", "floatClear"];
+          var labels = {
+            boxModel: "Box model",
+            radius: "Corners",
+            inset: "Position",
+            sizing: "Sizing",
+            align: "Alignment",
+            overflow: "Overflow",
+            floatClear: "Float / clear"
+          };
+          var insightsHTML = "";
+          order.forEach(function (key) {
+            if (result.categoriesUsed[key]) {
+              insightsHTML += '<div class="insight-row"><span class="chip">' + labels[key] + "</span><p>" + NOTES[key] + "</p></div>";
+            }
+          });
+          insightsEl.innerHTML = insightsHTML || '<div class="insight-empty">Paste or load some CSS above to see direction notes specific to your properties.</div>';
+
+          previewPhysical.style.cssText = result.flatPhysical;
+          previewLogical.style.cssText = result.flatLogical;
+
+          updateCaption();
+        }
+
+        function updateCaption() {
+          var dirWord = dirState === "ltr" ? "left-to-right" : "right-to-left";
+          var flowWord = flowState === "horizontal-tb" ? "horizontal" : "vertical";
+          var msg;
+          if (dirState === "ltr" && flowState === "horizontal-tb") {
+            msg = "Currently rendering left-to-right, horizontal — both cards look the same here, because this is the direction physical CSS assumes by default. Try RTL.";
+          } else if (dirState === "rtl") {
+            msg = "Now rendering right-to-left — the physical card's margin, border and rounded corners stay glued to the visual left, fighting the reading direction. The logical card mirrors correctly.";
+          } else {
+            msg = "Now rendering with a vertical flow — logical sizing (inline-size / block-size) reflows with the text direction, while the physical card's width stays a horizontal measurement regardless.";
+          }
+          flowCaptionText.textContent = "Rendering " + dirWord + ", " + flowWord + ". " + msg;
+        }
+
+        function applyStage() {
+          previewRoot.setAttribute("dir", dirState);
+          previewRoot.style.writingMode = flowState;
+          previewLogical.setAttribute("dir", dirState);
+          previewLogical.style.writingMode = flowState;
+        }
+
+        input.addEventListener("input", function () {
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(render, 120);
+        });
+        input.addEventListener("scroll", function () {
+          inputGutter.scrollTop = input.scrollTop;
+        });
+        outputBody.addEventListener("scroll", function () {
+          outputGutter.scrollTop = outputBody.scrollTop;
+        });
+
+        document.getElementById("btnSample").addEventListener("click", function () {
+          clearTimeout(debounceTimer);
+          input.value = SAMPLE;
+          render();
+        });
+        document.getElementById("btnClear").addEventListener("click", function () {
+          clearTimeout(debounceTimer);
+          input.value = "";
+          render();
+          input.focus();
+        });
+
+        function copyText(text, btn) {
+          var labelEl = btn.querySelector(".label");
+          var originalLabel = btn.getAttribute("data-label") || (labelEl ? labelEl.textContent : "Copy");
+          function setLabel(text) {
+            if (labelEl) labelEl.textContent = text;
+            else btn.textContent = text;
+          }
+          function done(ok) {
+            setLabel(ok ? "Copied" : "Select & copy");
+            setTimeout(function () {
+              setLabel(originalLabel);
+            }, 1400);
+          }
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(
+              function () {
+                done(true);
+              },
+              function () {
+                done(false);
+              }
+            );
+          } else {
+            done(false);
+          }
+        }
+        document.getElementById("btnCopyInput").addEventListener("click", function () {
+          copyText(input.value, this);
+        });
+        document.getElementById("btnCopyOutput").addEventListener("click", function () {
+          var result = lastResult || convertSource(input.value);
+          var text = result.rows
+            .map(function (r) {
+              return r.text;
+            })
+            .join("\n");
+          copyText(text, this);
+        });
+
+        document.getElementById("dirDial").addEventListener("click", function (e) {
+          var btn = e.target.closest("button");
+          if (!btn) return;
+          this.querySelectorAll("button").forEach(function (b) {
+            b.classList.remove("active");
+            b.setAttribute("aria-pressed", "false");
+          });
+          btn.classList.add("active");
+          btn.setAttribute("aria-pressed", "true");
+          dirState = btn.getAttribute("data-dir");
+          applyStage();
+          updateCaption();
+        });
+        document.getElementById("flowDial").addEventListener("click", function (e) {
+          var btn = e.target.closest("button");
+          if (!btn) return;
+          this.querySelectorAll("button").forEach(function (b) {
+            b.classList.remove("active");
+            b.setAttribute("aria-pressed", "false");
+          });
+          btn.classList.add("active");
+          btn.setAttribute("aria-pressed", "true");
+          flowState = btn.getAttribute("data-flow");
+          applyStage();
+          updateCaption();
+        });
+
+        input.value = SAMPLE;
+        applyStage();
+        render();
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,2135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Focus Auditor — Keyboard Navigation & Focus Order Analysis</title>
+    <meta name="description" content="Professional keyboard navigation and focus order auditing tool for web accessibility." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" />
+    <style>
+      :root {
+        --bg-0: #090b10;
+        --bg-1: #0e1019;
+        --bg-2: #151821;
+        --bg-3: #1c1f2b;
+        --bg-4: #242838;
+        --border: #2a2e42;
+        --border-s: #1e2135;
+        --txt: #e2e5f0;
+        --txt-2: #969bb2;
+        --txt-3: #5d6279;
+        --accent: #4a8bf5;
+        --accent-d: #365fa0;
+        --accent-g: rgba(74, 139, 245, 0.12);
+        --ok: #34d399;
+        --ok-g: rgba(52, 211, 153, 0.1);
+        --warn: #fbbf24;
+        --warn-g: rgba(251, 191, 36, 0.1);
+        --err: #f87171;
+        --err-g: rgba(248, 113, 113, 0.1);
+        --info: #60a5fa;
+        --r: 8px;
+        --r-s: 5px;
+        --font: "Inter", system-ui, sans-serif;
+        --mono: "JetBrains Mono", "Fira Code", monospace;
+        --tr: 180ms ease;
+      }
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+      }
+      html,
+      body {
+        height: 100%;
+        overflow: hidden;
+        background: var(--bg-0);
+        color: var(--txt);
+        font-family: var(--font);
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      :focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+        border-radius: var(--r-s);
+      }
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: var(--txt-3);
+      }
+      button {
+        font-family: var(--font);
+        cursor: pointer;
+        border: none;
+        background: none;
+        color: var(--txt);
+        font-size: 13px;
+      }
+      input[type="range"] {
+        accent-color: var(--accent);
+      }
+      .app {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
+      .app-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 20px;
+        height: 48px;
+        background: var(--bg-1);
+        border-bottom: 1px solid var(--border-s);
+        flex-shrink: 0;
+      }
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .logo svg {
+        color: var(--accent);
+      }
+      .logo span {
+        font-weight: 700;
+        font-size: 15px;
+        letter-spacing: -0.3px;
+      }
+      .logo small {
+        font-size: 11px;
+        color: var(--txt-3);
+        font-weight: 400;
+        margin-left: 2px;
+      }
+      .header-actions {
+        display: flex;
+        gap: 6px;
+      }
+      .hdr-btn {
+        padding: 6px 12px;
+        border-radius: var(--r-s);
+        font-size: 12px;
+        font-weight: 500;
+        transition: background var(--tr);
+        color: var(--txt-2);
+      }
+      .hdr-btn:hover {
+        background: var(--bg-4);
+        color: var(--txt);
+      }
+
+      .toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 16px;
+        height: 42px;
+        background: var(--bg-2);
+        border-bottom: 1px solid var(--border-s);
+        flex-shrink: 0;
+        gap: 8px;
+      }
+      .tb-group {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+      }
+      .tb-btn {
+        padding: 5px 12px;
+        border-radius: var(--r-s);
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--txt-2);
+        transition: all var(--tr);
+        white-space: nowrap;
+      }
+      .tb-btn:hover {
+        background: var(--bg-4);
+        color: var(--txt);
+      }
+      .tb-btn.primary {
+        background: var(--accent);
+        color: #fff;
+        font-weight: 600;
+      }
+      .tb-btn.primary:hover {
+        background: #5c96f7;
+        transform: translateY(-1px);
+      }
+      .tb-btn.primary:active {
+        transform: translateY(0);
+      }
+      .tb-sep {
+        width: 1px;
+        height: 20px;
+        background: var(--border);
+        margin: 0 4px;
+      }
+      .tb-status {
+        font-size: 11px;
+        color: var(--txt-3);
+        font-family: var(--mono);
+      }
+
+      .app-main {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+        min-height: 0;
+      }
+      .panel {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        min-width: 0;
+      }
+      .panel-editor {
+        width: 35%;
+        background: var(--bg-1);
+        border-right: 1px solid var(--border-s);
+      }
+      .panel-preview {
+        flex: 1;
+        background: var(--bg-0);
+      }
+      .panel-info {
+        width: 30%;
+        background: var(--bg-1);
+        border-left: 1px solid var(--border-s);
+      }
+      .panel-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 14px;
+        height: 36px;
+        border-bottom: 1px solid var(--border-s);
+        flex-shrink: 0;
+      }
+      .panel-head span {
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--txt-3);
+      }
+      .panel-head-actions {
+        display: flex;
+        gap: 4px;
+      }
+      .ph-btn {
+        padding: 3px 8px;
+        border-radius: 3px;
+        font-size: 11px;
+        color: var(--txt-3);
+        transition: all var(--tr);
+      }
+      .ph-btn:hover {
+        background: var(--bg-4);
+        color: var(--txt);
+      }
+      .ph-btn.active {
+        background: var(--accent-g);
+        color: var(--accent);
+      }
+
+      .resizer {
+        width: 4px;
+        cursor: col-resize;
+        background: transparent;
+        transition: background var(--tr);
+        flex-shrink: 0;
+        z-index: 5;
+      }
+      .resizer:hover,
+      .resizer.active {
+        background: var(--accent);
+      }
+
+      .editor-wrap {
+        flex: 1;
+        overflow: hidden;
+        position: relative;
+      }
+      .CodeMirror {
+        height: 100% !important;
+        font-family: var(--mono) !important;
+        font-size: 13px !important;
+        line-height: 1.65 !important;
+        background: var(--bg-1) !important;
+      }
+      .CodeMirror-gutters {
+        background: var(--bg-1) !important;
+        border-right: 1px solid var(--border-s) !important;
+      }
+      .CodeMirror-linenumber {
+        color: var(--txt-3) !important;
+        padding: 0 8px 0 12px !important;
+        font-size: 11px !important;
+      }
+      .CodeMirror-cursor {
+        border-left-color: var(--accent) !important;
+      }
+      .CodeMirror-selected {
+        background: rgba(74, 139, 245, 0.15) !important;
+      }
+      .cm-s-default .cm-tag {
+        color: #f78c6c;
+      }
+      .cm-s-default .cm-attribute {
+        color: #c792ea;
+      }
+      .cm-s-default .cm-string {
+        color: #c3e88d;
+      }
+      .cm-s-default .cm-keyword {
+        color: #89ddff;
+      }
+      .cm-s-default .cm-comment {
+        color: var(--txt-3);
+        font-style: italic;
+      }
+      .cm-s-default .cm-def {
+        color: #82aaff;
+      }
+      .cm-s-default .cm-number {
+        color: #f78c6c;
+      }
+      .cm-s-default .cm-property {
+        color: #e2e5f0;
+      }
+      .CodeMirror-line {
+        color: #bfc7d5 !important;
+      }
+      .drop-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(74, 139, 245, 0.08);
+        border: 2px dashed var(--accent);
+        border-radius: var(--r);
+        z-index: 20;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--accent);
+        pointer-events: none;
+      }
+      .drop-overlay.show {
+        display: flex;
+      }
+
+      .preview-wrap {
+        flex: 1;
+        position: relative;
+        overflow: hidden;
+        background: #fff;
+      }
+      .preview-wrap iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+        display: block;
+      }
+      .empty-state {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        color: var(--txt-3);
+        background: var(--bg-0);
+      }
+      .empty-state svg {
+        opacity: 0.3;
+      }
+      .empty-state p {
+        font-size: 13px;
+        text-align: center;
+        max-width: 280px;
+        line-height: 1.7;
+      }
+      .empty-state kbd {
+        display: inline-block;
+        padding: 2px 6px;
+        background: var(--bg-4);
+        border-radius: 3px;
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--txt-2);
+        border: 1px solid var(--border);
+      }
+
+      .panel-tabs {
+        display: flex;
+        border-bottom: 1px solid var(--border-s);
+        flex-shrink: 0;
+      }
+      .panel-tab {
+        flex: 1;
+        padding: 10px 0;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--txt-3);
+        border-bottom: 2px solid transparent;
+        transition: all var(--tr);
+        text-align: center;
+      }
+      .panel-tab:hover {
+        color: var(--txt-2);
+        background: var(--bg-2);
+      }
+      .panel-tab.active {
+        color: var(--accent);
+        border-bottom-color: var(--accent);
+      }
+      .panel-tab .badge {
+        display: inline-block;
+        min-width: 18px;
+        padding: 1px 5px;
+        border-radius: 9px;
+        font-size: 10px;
+        font-weight: 600;
+        background: var(--bg-4);
+        color: var(--txt-3);
+        margin-left: 4px;
+      }
+      .panel-tab.active .badge {
+        background: var(--accent-g);
+        color: var(--accent);
+      }
+      .tab-body {
+        flex: 1;
+        overflow-y: auto;
+        display: none;
+        padding: 0;
+      }
+      .tab-body.active {
+        display: block;
+      }
+      /* -- Score -- */
+      .score-area {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 16px;
+        border-bottom: 1px solid var(--border-s);
+      }
+      .score-ring {
+        position: relative;
+        width: 64px;
+        height: 64px;
+        flex-shrink: 0;
+      }
+      .score-ring svg {
+        width: 100%;
+        height: 100%;
+        transform: rotate(-90deg);
+      }
+      .score-ring .track {
+        fill: none;
+        stroke: var(--bg-4);
+        stroke-width: 6;
+      }
+      .score-ring .value {
+        fill: none;
+        stroke-width: 6;
+        stroke-linecap: round;
+        transition: stroke-dasharray 0.6s ease;
+      }
+      .score-num {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        font-weight: 700;
+        font-family: var(--mono);
+      }
+      .score-detail {
+        flex: 1;
+      }
+      .score-label {
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 2px;
+      }
+      .score-sub {
+        font-size: 11px;
+        color: var(--txt-3);
+      }
+
+      .issue-filters {
+        display: flex;
+        gap: 4px;
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--border-s);
+      }
+      .issue-filter {
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--txt-3);
+        transition: all var(--tr);
+      }
+      .issue-filter:hover {
+        background: var(--bg-4);
+        color: var(--txt);
+      }
+      .issue-filter.active {
+        background: var(--accent-g);
+        color: var(--accent);
+      }
+      .issue-item {
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--border-s);
+        cursor: pointer;
+        transition: background var(--tr);
+      }
+      .issue-item:hover {
+        background: var(--bg-2);
+      }
+      .issue-item.active {
+        background: var(--accent-g);
+        border-left: 3px solid var(--accent);
+      }
+      .issue-sev {
+        display: inline-block;
+        padding: 1px 6px;
+        border-radius: 3px;
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        margin-right: 6px;
+      }
+      .sev-critical {
+        background: var(--err-g);
+        color: var(--err);
+      }
+      .sev-major {
+        background: var(--warn-g);
+        color: var(--warn);
+      }
+      .sev-minor {
+        background: rgba(93, 98, 121, 0.15);
+        color: var(--txt-2);
+      }
+      .sev-info {
+        background: var(--ok-g);
+        color: var(--ok);
+      }
+      .issue-title {
+        font-size: 13px;
+        font-weight: 500;
+        margin-bottom: 4px;
+      }
+      .issue-desc {
+        font-size: 12px;
+        color: var(--txt-3);
+        line-height: 1.5;
+      }
+      .issue-el {
+        font-size: 11px;
+        font-family: var(--mono);
+        color: var(--txt-3);
+        margin-top: 6px;
+        padding: 4px 8px;
+        background: var(--bg-3);
+        border-radius: var(--r-s);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .issue-detail {
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--border-s);
+        background: var(--bg-2);
+        font-size: 12px;
+        line-height: 1.6;
+        display: none;
+      }
+      .issue-detail.show {
+        display: block;
+      }
+      .issue-detail h4 {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--txt-3);
+        margin-bottom: 4px;
+      }
+      .issue-detail p {
+        color: var(--txt-2);
+        margin-bottom: 10px;
+      }
+      .issue-detail code {
+        font-family: var(--mono);
+        font-size: 11px;
+        padding: 1px 4px;
+        background: var(--bg-4);
+        border-radius: 3px;
+        color: var(--accent);
+      }
+
+      .fo-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 14px;
+        border-bottom: 1px solid var(--border-s);
+        cursor: pointer;
+        transition: background var(--tr);
+        font-size: 12px;
+      }
+      .fo-item:hover {
+        background: var(--bg-2);
+      }
+      .fo-item.active {
+        background: var(--accent-g);
+      }
+      .fo-item.sim-current {
+        background: var(--accent-g);
+        border-left: 3px solid var(--accent);
+      }
+      .fo-num {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: var(--bg-4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: 700;
+        font-family: var(--mono);
+        flex-shrink: 0;
+        color: var(--txt-2);
+      }
+      .fo-item.sim-current .fo-num {
+        background: var(--accent);
+        color: #fff;
+      }
+      .fo-tag {
+        font-family: var(--mono);
+        color: var(--accent);
+        font-size: 11px;
+        flex-shrink: 0;
+      }
+      .fo-name {
+        flex: 1;
+        color: var(--txt-2);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .fo-ti {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--txt-3);
+        padding: 1px 5px;
+        background: var(--bg-4);
+        border-radius: 3px;
+      }
+
+      .insp-empty {
+        padding: 40px 20px;
+        text-align: center;
+        color: var(--txt-3);
+        font-size: 13px;
+      }
+      .insp-section {
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--border-s);
+      }
+      .insp-section h4 {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--txt-3);
+        margin-bottom: 8px;
+      }
+      .insp-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding: 3px 0;
+        font-size: 12px;
+      }
+      .insp-row .label {
+        color: var(--txt-3);
+        flex-shrink: 0;
+        margin-right: 12px;
+      }
+      .insp-row .val {
+        color: var(--txt);
+        font-family: var(--mono);
+        font-size: 11px;
+        text-align: right;
+        word-break: break-all;
+      }
+      .insp-row .val.ok {
+        color: var(--ok);
+      }
+      .insp-row .val.warn {
+        color: var(--warn);
+      }
+      .insp-row .val.err {
+        color: var(--err);
+      }
+      .insp-code {
+        margin-top: 8px;
+        padding: 10px;
+        background: var(--bg-0);
+        border-radius: var(--r-s);
+        font-family: var(--mono);
+        font-size: 11px;
+        color: #bfc7d5;
+        line-height: 1.6;
+        overflow-x: auto;
+        white-space: pre;
+        max-height: 120px;
+      }
+
+      .sim-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 16px;
+        height: 44px;
+        background: var(--bg-2);
+        border-top: 1px solid var(--border-s);
+        flex-shrink: 0;
+      }
+      .sim-btn {
+        padding: 5px 14px;
+        border-radius: var(--r-s);
+        font-size: 12px;
+        font-weight: 500;
+        background: var(--bg-4);
+        transition: all var(--tr);
+      }
+      .sim-btn:hover {
+        background: var(--border);
+        color: #fff;
+      }
+      .sim-btn.playing {
+        background: var(--accent);
+        color: #fff;
+      }
+      .sim-sep {
+        width: 1px;
+        height: 20px;
+        background: var(--border);
+      }
+      .sim-pos {
+        font-size: 12px;
+        font-family: var(--mono);
+        color: var(--txt-3);
+        min-width: 60px;
+        text-align: center;
+      }
+      .sim-speed {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        color: var(--txt-3);
+        margin-left: auto;
+      }
+      .sim-speed input {
+        width: 80px;
+      }
+
+      .modal-bg {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 100;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        backdrop-filter: blur(4px);
+      }
+      .modal-bg.show {
+        display: flex;
+      }
+      .modal {
+        background: var(--bg-2);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        width: 90%;
+        max-width: 560px;
+        max-height: 80vh;
+        overflow: hidden;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        animation: modalIn 0.2s ease;
+      }
+      @keyframes modalIn {
+        from {
+          opacity: 0;
+          transform: scale(0.96) translateY(8px);
+        }
+      }
+      .modal-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border-s);
+      }
+      .modal-head h3 {
+        font-size: 15px;
+        font-weight: 600;
+      }
+      .modal-close {
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        font-size: 18px;
+        color: var(--txt-3);
+        transition: all var(--tr);
+      }
+      .modal-close:hover {
+        background: var(--bg-4);
+        color: var(--txt);
+      }
+      .modal-body {
+        padding: 16px 20px;
+        overflow-y: auto;
+        max-height: 60vh;
+      }
+      .tpl-item {
+        padding: 12px;
+        border: 1px solid var(--border);
+        border-radius: var(--r);
+        margin-bottom: 8px;
+        cursor: pointer;
+        transition: all var(--tr);
+      }
+      .tpl-item:hover {
+        background: var(--bg-3);
+        border-color: var(--accent);
+      }
+      .tpl-item h4 {
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+      .tpl-item p {
+        font-size: 12px;
+        color: var(--txt-3);
+        line-height: 1.5;
+      }
+
+      .export-btn {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        padding: 12px;
+        border: 1px solid var(--border);
+        border-radius: var(--r);
+        margin-bottom: 8px;
+        cursor: pointer;
+        transition: all var(--tr);
+        text-align: left;
+      }
+      .export-btn:hover {
+        background: var(--bg-3);
+        border-color: var(--accent);
+      }
+      .export-btn .icon {
+        font-size: 20px;
+      }
+      .export-btn .info h4 {
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 2px;
+      }
+      .export-btn .info p {
+        font-size: 11px;
+        color: var(--txt-3);
+      }
+
+      .shortcut-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--border-s);
+        font-size: 13px;
+      }
+      .shortcut-row span:last-child {
+        color: var(--txt-3);
+      }
+      .shortcut-row kbd {
+        padding: 2px 7px;
+        background: var(--bg-4);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        font-family: var(--mono);
+        font-size: 11px;
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 60px;
+        left: 50%;
+        transform: translateX(-50%) translateY(20px);
+        padding: 10px 20px;
+        background: var(--bg-3);
+        border: 1px solid var(--border);
+        border-radius: var(--r);
+        font-size: 13px;
+        z-index: 200;
+        opacity: 0;
+        transition: all 0.3s ease;
+        pointer-events: none;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+      }
+      .toast.show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          box-shadow: 0 0 0 0 rgba(74, 139, 245, 0.4);
+        }
+        50% {
+          box-shadow: 0 0 0 8px rgba(74, 139, 245, 0);
+        }
+      }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+      .no-results {
+        padding: 40px 20px;
+        text-align: center;
+        color: var(--txt-3);
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="app-header">
+        <div class="logo">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="3" stroke-dasharray="5 3" />
+            <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" />
+          </svg>
+          <span>Focus Auditor<small> v1.0</small></span>
+        </div>
+        <div class="header-actions">
+          <button class="hdr-btn" id="btnShortcuts" title="Keyboard Shortcuts">Shortcuts</button>
+          <button class="hdr-btn" id="btnExport" title="Export Report">Export</button>
+        </div>
+      </header>
+      <div class="toolbar">
+        <div class="tb-group">
+          <button class="tb-btn" id="btnTemplates">Templates</button>
+          <button class="tb-btn" id="btnLoadFile">Load File</button>
+          <div class="tb-sep"></div>
+          <button class="tb-btn" id="btnFormat">{ } Format</button>
+        </div>
+        <div class="tb-group">
+          <button class="tb-btn primary" id="btnAnalyze">Analyze Focus Order</button>
+        </div>
+        <div class="tb-group">
+          <span class="tb-status" id="statusText" aria-live="polite"></span>
+        </div>
+      </div>
+      <main class="app-main">
+        <section class="panel panel-editor" id="panelEditor">
+          <div class="panel-head">
+            <span>HTML Source</span>
+            <div class="panel-head-actions"><button class="ph-btn" id="btnClear" title="Clear editor">Clear</button></div>
+          </div>
+          <div class="editor-wrap" id="editorWrap">
+            <textarea id="codeEditor"></textarea>
+            <div class="drop-overlay" id="dropOverlay">Drop HTML file here</div>
+          </div>
+        </section>
+        <div class="resizer" id="resizerL"></div>
+        <section class="panel panel-preview">
+          <div class="panel-head">
+            <span>Preview</span>
+            <div class="panel-head-actions">
+              <button class="ph-btn active" id="btnOverlay" title="Toggle overlay badges">Badges</button>
+              <button class="ph-btn active" id="btnLines" title="Toggle connection lines">Lines</button>
+            </div>
+          </div>
+          <div class="preview-wrap" id="previewWrap">
+            <iframe id="previewFrame" sandbox="allow-same-origin allow-scripts" title="HTML Preview"></iframe>
+            <div class="empty-state" id="emptyPreview">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".4">
+                <rect x="3" y="3" width="18" height="18" rx="3" />
+                <path d="M8 12h8M12 8v8" />
+              </svg>
+              <p>Paste or load HTML into the editor, then press <kbd>Ctrl+Enter</kbd> or click <strong>Analyze</strong> to begin.</p>
+            </div>
+          </div>
+        </section>
+        <div class="resizer" id="resizerR"></div>
+        <aside class="panel panel-info" id="panelInfo">
+          <div class="panel-tabs" role="tablist">
+            <button class="panel-tab active" data-tab="issues" role="tab" aria-selected="true" aria-controls="tabIssues">Issues <span class="badge" id="issueBadge">0</span></button>
+            <button class="panel-tab" data-tab="order" role="tab" aria-selected="false" aria-controls="tabOrder">Order</button>
+            <button class="panel-tab" data-tab="inspector" role="tab" aria-selected="false" aria-controls="tabInspector">Inspector</button>
+          </div>
+          <div class="tab-body active" id="tabIssues" role="tabpanel">
+            <div class="no-results" id="issuesEmpty">Run an analysis to see accessibility issues.</div>
+          </div>
+          <div class="tab-body" id="tabOrder" role="tabpanel">
+            <div class="no-results" id="orderEmpty">Run an analysis to see the focus order.</div>
+          </div>
+          <div class="tab-body" id="tabInspector" role="tabpanel">
+            <div class="insp-empty" id="inspEmpty">Click an element in the focus order list or overlay to inspect it.</div>
+          </div>
+        </aside>
+      </main>
+      <footer class="sim-bar">
+        <button class="sim-btn" id="btnPrev" title="Shift+Tab">Shift+Tab</button>
+        <button class="sim-btn" id="btnNext" title="Tab">Tab</button>
+        <div class="sim-sep"></div>
+        <button class="sim-btn" id="btnPlay" title="Space to play/pause">Play</button>
+        <button class="sim-btn" id="btnReset" title="Reset simulation">Reset</button>
+        <div class="sim-sep"></div>
+        <span class="sim-pos" id="simPos">-- / --</span>
+        <div class="sim-speed">
+          <span>Speed</span>
+
+          <input type="range" id="simSpeed" min="200" max="2000" value="800" step="100" aria-label="Simulation speed" />
+        </div>
+      </footer>
+    </div>
+    <input type="file" id="fileInput" accept=".html,.htm,.xhtml,.xml" hidden />
+    <div class="modal-bg" id="modalTemplates">
+      <div class="modal" role="dialog" aria-labelledby="tplTitle">
+        <div class="modal-head">
+          <h3 id="tplTitle">Sample Templates</h3>
+          <button class="modal-close" id="closeTpl" aria-label="Close dialog">&times;</button>
+        </div>
+        <div class="modal-body" id="tplList"></div>
+      </div>
+    </div>
+    <div class="modal-bg" id="modalExport">
+      <div class="modal" role="dialog" aria-labelledby="exportTitle">
+        <div class="modal-head">
+          <h3 id="exportTitle">Export Report</h3>
+          <button class="modal-close" id="closeExport" aria-label="Close dialog">&times;</button>
+        </div>
+        <div class="modal-body">
+          <button class="export-btn" id="expJSON">
+            <span class="icon">{ }</span>
+            <div class="info">
+              <h4>JSON Report</h4>
+              <p>Machine-readable audit data</p>
+            </div>
+          </button>
+          <button class="export-btn" id="expHTML">
+            <span class="icon">HTML</span>
+            <div class="info">
+              <h4>HTML Report</h4>
+              <p>Styled standalone report</p>
+            </div>
+          </button>
+          <button class="export-btn" id="expClip">
+            <span class="icon">Copy</span>
+            <div class="info">
+              <h4>Copy Summary</h4>
+              <p>Copy audit summary to clipboard</p>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-bg" id="modalShortcuts">
+      <div class="modal" role="dialog" aria-labelledby="shortTitle">
+        <div class="modal-head">
+          <h3 id="shortTitle">Keyboard Shortcuts</h3>
+          <button class="modal-close" id="closeShort" aria-label="Close dialog">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="shortcut-row">
+            <span>Analyze</span><span><kbd>Ctrl</kbd>+<kbd>Enter</kbd></span>
+          </div>
+          <div class="shortcut-row">
+            <span>Format HTML</span><span><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd></span>
+          </div>
+          <div class="shortcut-row">
+            <span>Next Element</span><span><kbd>Right Arrow</kbd></span>
+          </div>
+          <div class="shortcut-row">
+            <span>Prev Element</span><span><kbd>Left Arrow</kbd></span>
+          </div>
+          <div class="shortcut-row">
+            <span>Play / Pause</span><span><kbd>Space</kbd></span>
+          </div>
+          <div class="shortcut-row">
+            <span>Reset Simulation</span><span><kbd>Esc</kbd></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/css/css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/htmlmixed/htmlmixed.min.js"></script>
+
+    <script>
+      var state = {
+        tabOrder: [],
+        focusable: [],
+        issues: [],
+        score: 100,
+        simIndex: -1,
+        playing: false,
+        playTimer: null,
+        showBadges: true,
+        showLines: true,
+        activeFilter: "all",
+        analyzed: false,
+        analysisId: 0
+      };
+
+      var templates = [
+        {
+          name: "Form with Accessibility Issues",
+          desc: "Demonstrates common tabindex problems, missing labels, hidden focusables, and more.",
+          html: '<!DOCTYPE html>\n<html lang="en">\n<head><meta charset="UTF-8"><title>Issue Demo<\/title>\n<style>body{font-family:sans-serif;max-width:500px;margin:40px auto;padding:20px}\nlabel{display:block;margin-top:12px;font-size:14px}\ninput,button,select{margin-top:4px;padding:8px 12px;font-size:14px;border-radius:6px;border:1px solid #ccc}\nbutton{cursor:pointer;background:#4a8bf5;color:#fff;border:none}\n.hidden{display:none}\n.offscreen{position:absolute;left:-9999px}\na{color:#4a8bf5}\n<\/style><\/head>\n<body>\n  <h1>Registration<\/h1>\n  <form>\n    <label>Username<\/label>\n    <input type="text" tabindex="5" placeholder="Username">\n\n    <label for="email">Email<\/label>\n    <input type="email" id="email" tabindex="3">\n\n    <input type="password" tabindex="1" placeholder="Password (tabindex 1)">\n\n    <label>Country<\/label>\n    <select><option>Select...<\/option><\/select>\n\n    <button disabled>Submit (disabled)<\/button>\n    <a href="#">Terms of Service<\/a>\n\n    <div class="hidden"><button>Hidden Button<\/button><\/div>\n    <div class="offscreen"><a href="#">Offscreen Link<\/a><\/div>\n\n    <button tabindex="-1">Cancel (removed from tab order)<\/button>\n    <div tabindex="0">Custom div without role<\/div>\n    <a>Link without href<\/a>\n    <button><\/button>\n    <div inert><input type="text" placeholder="Inert input"><\/div>\n  <\/form>\n<\/body>\n<\/html>'
+        },
+        {
+          name: "Navigation Component",
+          desc: "A navbar with dropdowns, skip links, and interactive elements to test logical ordering.",
+          html: '<!DOCTYPE html>\n<html lang="en">\n<head><meta charset="UTF-8"><title>Nav Demo<\/title>\n<style>body{margin:0;font-family:sans-serif}\nnav{background:#1c1f2b;padding:12px 24px;display:flex;gap:16px;align-items:center}\nnav a{color:#e2e5f0;text-decoration:none;padding:6px 12px;border-radius:6px;font-size:14px}\nnav a:hover{background:#2a2e42}\nnav button{background:#4a8bf5;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:14px}\nmain{max-width:640px;margin:40px auto;padding:20px}\n.skip{position:absolute;left:-9999px;background:#4a8bf5;color:#fff;padding:8px 16px;border-radius:6px;z-index:10}\n.skip:focus{left:16px;top:16px}\n.dropdown{display:none;position:absolute;background:#fff;border:1px solid #ddd;border-radius:8px;padding:8px;margin-top:8px}\na,button{font-size:14px}\n<\/style><\/head>\n<body>\n  <a href="#main" class="skip">Skip to content<\/a>\n  <nav aria-label="Main">\n    <a href="#home">Home<\/a>\n    <a href="#about">About<\/a>\n    <div style="position:relative">\n      <button aria-expanded="false" aria-haspopup="true">Products<\/button>\n      <div class="dropdown">\n        <a href="#p1">Analytics<\/a>\n        <a href="#p2">Automation<\/a>\n      <\/div>\n    <\/div>\n    <a href="#contact">Contact<\/a>\n    <div tabindex="0" role="search" style="margin-left:auto;color:#969bb2;font-size:14px">Search<\/div>\n  <\/nav>\n  <main id="main">\n    <h1>Welcome<\/h1>\n    <p>Content goes here.<\/p>\n    <a href="#more">Learn more<\/a>\n    <button>Call to Action<\/button>\n  <\/main>\n<\/body>\n<\/html>'
+        },
+        {
+          name: "Well-Structured Accessible Page",
+          desc: "A properly built page with correct focus order, labels, and ARIA -- for comparison.",
+          html: '<!DOCTYPE html>\n<html lang="en">\n<head><meta charset="UTF-8"><title>Accessible Page<\/title>\n<style>body{font-family:sans-serif;max-width:600px;margin:40px auto;padding:20px;color:#1c1f2b}\nheader{margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid #e5e7eb}\nnav a{margin-right:16px;color:#4a8bf5;text-decoration:none;font-size:14px}\nlabel{display:block;margin-top:14px;font-size:14px;font-weight:500}\ninput,textarea{display:block;width:100%;margin-top:4px;padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:14px}\nbutton{margin-top:16px;padding:10px 20px;background:#4a8bf5;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;margin-right:8px}\nbutton[type="reset"]{background:#6b7280}\nfooter{margin-top:40px;padding-top:16px;border-top:1px solid #e5e7eb}\nfooter a{color:#4a8bf5;margin-right:16px;font-size:13px;text-decoration:none}\n<\/style><\/head>\n<body>\n  <header>\n    <nav aria-label="Main navigation">\n      <a href="/">Home<\/a>\n      <a href="/about">About<\/a>\n      <a href="/services">Services<\/a>\n      <a href="/contact">Contact<\/a>\n    <\/nav>\n  <\/header>\n  <main>\n    <h1>Contact Us<\/h1>\n    <form aria-label="Contact form">\n      <label for="name">Full Name<\/label>\n      <input type="text" id="name" required autocomplete="name">\n      <label for="email">Email Address<\/label>\n      <input type="email" id="email" required autocomplete="email">\n      <label for="msg">Message<\/label>\n      <textarea id="msg" rows="4"><\/textarea>\n      <button type="submit">Send Message<\/button>\n      <button type="reset">Clear<\/button>\n    <\/form>\n  <\/main>\n  <footer>\n    <a href="/privacy">Privacy Policy<\/a>\n    <a href="/terms">Terms of Service<\/a>\n  <\/footer>\n<\/body>\n<\/html>'
+        }
+      ];
+
+      var $ = function (id) {
+        return document.getElementById(id);
+      };
+      var editor;
+      var els = {};
+
+      document.addEventListener("DOMContentLoaded", function () {
+        ["codeEditor", "previewFrame", "previewWrap", "emptyPreview", "dropOverlay", "editorWrap", "btnAnalyze", "btnFormat", "btnTemplates", "btnLoadFile", "btnClear", "btnExport", "btnShortcuts", "btnOverlay", "btnLines", "btnPrev", "btnNext", "btnPlay", "btnReset", "simPos", "simSpeed", "statusText", "panelEditor", "panelInfo", "resizerL", "resizerR", "tabIssues", "tabOrder", "tabInspector", "issueBadge", "issuesEmpty", "orderEmpty", "inspEmpty", "modalTemplates", "closeTpl", "tplList", "modalExport", "closeExport", "expJSON", "expHTML", "expClip", "modalShortcuts", "closeShort", "fileInput", "toast"].forEach(function (id) {
+          els[id] = $(id);
+        });
+        initEditor();
+        initTemplates();
+        initEvents();
+      });
+
+      function initEditor() {
+        editor = CodeMirror.fromTextArea(els.codeEditor, {
+          mode: "htmlmixed",
+          lineNumbers: true,
+          indentWithTabs: false,
+          indentUnit: 2,
+          tabSize: 2,
+          lineWrapping: true,
+
+          viewportMargin: 500
+        });
+        editor.setSize("100%", "100%");
+      }
+
+      function initTemplates() {
+        els.tplList.innerHTML = templates
+          .map(function (t, i) {
+            return '<div class="tpl-item" data-idx="' + i + '"><h4>' + t.name + "<\/h4><p>" + t.desc + "<\/p><\/div>";
+          })
+          .join("");
+      }
+
+      function initEvents() {
+        els.btnAnalyze.addEventListener("click", runAnalysis);
+        els.btnFormat.addEventListener("click", formatHTML);
+        els.btnTemplates.addEventListener("click", function () {
+          toggleModal("modalTemplates", true);
+        });
+        els.closeTpl.addEventListener("click", function () {
+          toggleModal("modalTemplates", false);
+        });
+        els.btnExport.addEventListener("click", function () {
+          toggleModal("modalExport", true);
+        });
+        els.closeExport.addEventListener("click", function () {
+          toggleModal("modalExport", false);
+        });
+        els.btnShortcuts.addEventListener("click", function () {
+          toggleModal("modalShortcuts", true);
+        });
+        els.closeShort.addEventListener("click", function () {
+          toggleModal("modalShortcuts", false);
+        });
+        els.btnLoadFile.addEventListener("click", function () {
+          els.fileInput.click();
+        });
+        els.fileInput.addEventListener("change", function (e) {
+          if (e.target.files[0]) loadFile(e.target.files[0]);
+        });
+        els.btnClear.addEventListener("click", function () {
+          editor.setValue("");
+          resetState();
+        });
+        els.btnOverlay.addEventListener("click", function () {
+          state.showBadges = !state.showBadges;
+          els.btnOverlay.classList.toggle("active", state.showBadges);
+          updateOverlay();
+        });
+        els.btnLines.addEventListener("click", function () {
+          state.showLines = !state.showLines;
+          els.btnLines.classList.toggle("active", state.showLines);
+          updateOverlay();
+        });
+        els.btnPrev.addEventListener("click", function () {
+          simStep(-1);
+        });
+        els.btnNext.addEventListener("click", function () {
+          simStep(1);
+        });
+        els.btnPlay.addEventListener("click", togglePlay);
+        els.btnReset.addEventListener("click", resetSim);
+        els.expJSON.addEventListener("click", function () {
+          exportJSON();
+          toggleModal("modalExport", false);
+        });
+        els.expHTML.addEventListener("click", function () {
+          exportHTMLReport();
+          toggleModal("modalExport", false);
+        });
+        els.expClip.addEventListener("click", function () {
+          copyClipboard();
+          toggleModal("modalExport", false);
+        });
+
+        els.simSpeed.addEventListener("input", function () {
+          if (state.playing) {
+            stopPlay();
+            startPlay();
+          }
+        });
+
+        els.tplList.addEventListener("click", function (e) {
+          var item = e.target.closest(".tpl-item");
+          if (item) {
+            editor.setValue(templates[+item.dataset.idx].html);
+            toggleModal("modalTemplates", false);
+            toast("Template loaded");
+          }
+        });
+
+        document.querySelectorAll(".panel-tab").forEach(function (tab) {
+          tab.addEventListener("click", function () {
+            document.querySelectorAll(".panel-tab").forEach(function (t) {
+              t.classList.remove("active");
+              t.setAttribute("aria-selected", "false");
+            });
+            document.querySelectorAll(".tab-body").forEach(function (t) {
+              t.classList.remove("active");
+            });
+            tab.classList.add("active");
+            tab.setAttribute("aria-selected", "true");
+            $("tab" + capitalize(tab.dataset.tab)).classList.add("active");
+          });
+        });
+
+        document.querySelectorAll(".modal-bg").forEach(function (m) {
+          m.addEventListener("click", function (e) {
+            if (e.target === m) toggleModal(m.id, false);
+          });
+        });
+
+        var ew = els.editorWrap;
+        ew.addEventListener("dragenter", function (e) {
+          e.preventDefault();
+          els.dropOverlay.classList.add("show");
+        });
+        ew.addEventListener("dragover", function (e) {
+          e.preventDefault();
+        });
+        ew.addEventListener("dragleave", function (e) {
+          if (!ew.contains(e.relatedTarget)) els.dropOverlay.classList.remove("show");
+        });
+        ew.addEventListener("drop", function (e) {
+          e.preventDefault();
+          els.dropOverlay.classList.remove("show");
+          if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+        });
+
+        document.addEventListener("keydown", function (e) {
+          if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+            e.preventDefault();
+            runAnalysis();
+          }
+          if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "F") {
+            e.preventDefault();
+            formatHTML();
+          }
+
+          if (!e.target.closest(".CodeMirror") && !e.target.closest("input") && !e.target.closest("textarea")) {
+            if (e.key === "Escape") {
+              var openModals = document.querySelectorAll(".modal-bg.show");
+              if (openModals.length > 0) {
+                openModals.forEach(function (m) {
+                  toggleModal(m.id, false);
+                });
+              } else {
+                resetSim();
+              }
+              e.preventDefault();
+              return;
+            }
+            if (e.key === "ArrowRight") {
+              e.preventDefault();
+              simStep(1);
+            }
+            if (e.key === "ArrowLeft") {
+              e.preventDefault();
+              simStep(-1);
+            }
+            if (e.key === " ") {
+              e.preventDefault();
+              togglePlay();
+            }
+          }
+        });
+
+        initResizer(els.resizerL, els.panelEditor, "left");
+        initResizer(els.resizerR, els.panelInfo, "right");
+      }
+
+      function initResizer(handle, panel, side) {
+        var startX, startW;
+        handle.addEventListener("mousedown", function (e) {
+          e.preventDefault();
+          startX = e.clientX;
+          startW = panel.getBoundingClientRect().width;
+          handle.classList.add("active");
+          function onMove(ev) {
+            var dx = ev.clientX - startX;
+            var nw = side === "left" ? startW + dx : startW - dx;
+            panel.style.width = Math.max(200, Math.min(nw, window.innerWidth * 0.5)) + "px";
+            panel.style.flex = "none";
+          }
+          function onUp() {
+            handle.classList.remove("active");
+            document.removeEventListener("mousemove", onMove);
+            document.removeEventListener("mouseup", onUp);
+          }
+          document.addEventListener("mousemove", onMove);
+          document.addEventListener("mouseup", onUp);
+        });
+      }
+
+      function capitalize(s) {
+        return s.charAt(0).toUpperCase() + s.slice(1);
+      }
+      function toggleModal(id, show) {
+        $(id).classList.toggle("show", show);
+      }
+      function toast(msg) {
+        var t = els.toast;
+        t.textContent = msg;
+        t.classList.add("show");
+        setTimeout(function () {
+          t.classList.remove("show");
+        }, 2200);
+      }
+      function escapeHTML(s) {
+        var d = document.createElement("div");
+        d.textContent = s;
+        return d.innerHTML;
+      }
+
+      function truncTag(el) {
+        var tag = el.tagName.toLowerCase();
+        var cn = String(el.className || "").trim();
+        var cls = cn ? "." + cn.split(/\s+/).slice(0, 2).join(".") : "";
+        var id = el.id ? "#" + el.id : "";
+        var type = el.type ? '[type="' + el.type + '"]' : "";
+        return "<" + tag + id + cls + type + ">";
+      }
+
+      function snippetHTML(el) {
+        var outer = el.outerHTML || "";
+        return outer.length > 160 ? outer.substring(0, 160) + "..." : outer;
+      }
+
+      function loadFile(file) {
+        if (file.size > 2 * 1024 * 1024) {
+          toast("File too large (max 2MB)");
+          return;
+        }
+        var reader = new FileReader();
+        reader.onload = function () {
+          editor.setValue(reader.result);
+          toast("File loaded: " + file.name);
+        };
+        reader.onerror = function () {
+          toast("Error reading file");
+        };
+        reader.readAsText(file);
+      }
+
+      function formatHTML() {
+        var raw = editor.getValue();
+        if (!raw.trim()) return;
+        var out = "",
+          indent = 0;
+        var tab = "  ";
+        var voidTags = /^(area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)$/i;
+        var tokens = raw.replace(/>\s*</g, ">\n<").split("\n");
+        for (var k = 0; k < tokens.length; k++) {
+          var tok = tokens[k].trim();
+          if (!tok) continue;
+          if (/^<\//.test(tok)) {
+            indent = Math.max(0, indent - 1);
+            out += tab.repeat(indent) + tok + "\n";
+          } else if (/\/>$/.test(tok) || voidTags.test((tok.match(/^<(\w+)/) || [])[1] || "")) {
+            out += tab.repeat(indent) + tok + "\n";
+          } else if (/^<[^/!]/.test(tok)) {
+            out += tab.repeat(indent) + tok + "\n";
+            if (tok.indexOf("</") === -1) indent++;
+          } else {
+            out += tab.repeat(indent) + tok + "\n";
+          }
+        }
+        editor.setValue(out.trimEnd());
+        toast("Formatted");
+      }
+
+      function resetState() {
+        state.tabOrder = [];
+        state.focusable = [];
+        state.issues = [];
+        state.score = 100;
+        state.simIndex = -1;
+        state.analyzed = false;
+        stopPlay();
+        els.emptyPreview.style.display = "flex";
+        els.previewFrame.srcdoc = "";
+        els.issuesEmpty.style.display = "block";
+        els.orderEmpty.style.display = "block";
+        els.inspEmpty.style.display = "block";
+        els.tabIssues.querySelectorAll(".score-area,.issue-filters,.issue-item,.issue-detail").forEach(function (e) {
+          e.remove();
+        });
+        els.tabOrder.querySelectorAll(".fo-item").forEach(function (e) {
+          e.remove();
+        });
+        els.tabInspector.querySelectorAll(".insp-section").forEach(function (e) {
+          e.remove();
+        });
+        els.issueBadge.textContent = "0";
+        els.simPos.textContent = "-- / --";
+        els.statusText.textContent = "";
+      }
+
+      /* FOCUS ORDER ENGINE */
+
+      function isNaturallyFocusable(el) {
+        var tag = el.tagName.toLowerCase();
+        if (tag === "a" && el.hasAttribute("href")) return true;
+        if (["button", "select", "textarea"].indexOf(tag) !== -1) return true;
+        if (tag === "input" && el.type !== "hidden") return true;
+        if (tag === "details") return true;
+        if (tag === "summary" && el.parentElement && el.parentElement.tagName.toLowerCase() === "details") return true;
+        if (el.hasAttribute("contenteditable") && el.getAttribute("contenteditable") !== "false") return true;
+        if ((tag === "audio" || tag === "video") && el.hasAttribute("controls")) return true;
+        if (["iframe", "embed", "object"].indexOf(tag) !== -1) return true;
+        return false;
+      }
+
+      function isVisible(el) {
+        try {
+          var win = el.ownerDocument.defaultView;
+          if (!win) return false;
+          var cur = el;
+          while (cur && cur.nodeType === 1) {
+            var s = win.getComputedStyle(cur);
+            if (s.display === "none") return false;
+            cur = cur.parentElement;
+          }
+          var cs = win.getComputedStyle(el);
+          if (cs.visibility === "hidden") return false;
+          if (cs.opacity === "0") return false;
+          return true;
+        } catch (e) {
+          return true;
+        }
+      }
+
+      function getTabIndex(el) {
+        var attr = el.getAttribute("tabindex");
+        if (attr !== null) {
+          var v = parseInt(attr, 10);
+          return isNaN(v) ? null : v;
+        }
+        return isNaturallyFocusable(el) ? 0 : null;
+      }
+
+      function getAccessibleName(el) {
+        var lblId = el.getAttribute("aria-labelledby");
+        if (lblId) {
+          var lbl = el.ownerDocument.getElementById(lblId);
+          if (lbl) return lbl.textContent.trim();
+        }
+        if (el.getAttribute("aria-label")) return el.getAttribute("aria-label");
+        if (el.id) {
+          var label = el.ownerDocument.querySelector('label[for="' + el.id + '"]');
+          if (label) return label.textContent.trim();
+        }
+        var tag = el.tagName.toLowerCase();
+        if (tag === "input" || tag === "textarea" || tag === "select") {
+          var parentLabel = el.closest("label");
+          if (parentLabel) return parentLabel.textContent.trim();
+          if (el.placeholder) return el.placeholder;
+        }
+        if (el.getAttribute("title")) return el.getAttribute("title");
+        if (el.getAttribute("alt")) return el.getAttribute("alt");
+        var text = el.textContent.trim();
+        return text.length > 60 ? text.substring(0, 60) + "..." : text;
+      }
+
+      function isInDisabledFieldset(el) {
+        var fieldset = el.closest("fieldset[disabled]");
+        if (!fieldset) return false;
+
+        var firstLegend = fieldset.querySelector("legend");
+        if (firstLegend && firstLegend.contains(el)) return false;
+        return true;
+      }
+
+      function computeFocusOrder(doc) {
+        var all = doc.querySelectorAll("*");
+        var focusable = [];
+        for (var i = 0; i < all.length; i++) {
+          var el = all[i];
+          if (el.dataset && el.dataset.faOverlay) continue;
+          var ti = getTabIndex(el);
+          var vis = isVisible(el);
+          var disabled = el.disabled === true || isInDisabledFieldset(el);
+          var inert = !!el.closest("[inert]");
+          var natural = isNaturallyFocusable(el);
+          var info = { element: el, tabindex: ti, visible: vis, disabled: disabled, inert: inert, natural: natural, tag: el.tagName.toLowerCase(), type: el.type || null, role: el.getAttribute("role"), ariaLabel: getAccessibleName(el), focusable: false, tabbable: false };
+
+          if (inert || disabled) {
+            info.focusable = false;
+            info.tabbable = false;
+          } else if (ti !== null && ti >= 0 && vis) {
+            info.focusable = true;
+            info.tabbable = true;
+          } else if (ti !== null && ti === -1 && vis) {
+            info.focusable = true;
+            info.tabbable = false;
+          } else if (natural && !vis) {
+            info.focusable = false;
+            info.tabbable = false;
+            info.hiddenFocusable = true;
+          }
+
+          if (info.focusable || info.tabbable || info.hiddenFocusable) focusable.push(info);
+        }
+        var tabbable = focusable.filter(function (f) {
+          return f.tabbable;
+        });
+        var positive = tabbable
+          .filter(function (f) {
+            return f.tabindex > 0;
+          })
+          .sort(function (a, b) {
+            return a.tabindex - b.tabindex;
+          });
+        var zero = tabbable.filter(function (f) {
+          return f.tabindex === 0;
+        });
+        var tabOrder = positive.concat(zero);
+        return { tabOrder: tabOrder, focusable: focusable };
+      }
+
+      function detectIssues(tabOrder, focusable, doc) {
+        var issues = [];
+        function add(sev, title, desc, el, fix, wcag) {
+          issues.push({ severity: sev, title: title, description: desc, element: el, fix: fix, wcag: wcag || null });
+        }
+        for (var i = 0; i < focusable.length; i++) {
+          var info = focusable[i];
+          var el = info.element;
+          if (info.tabindex > 0) add("major", "Positive tabindex", 'Element has tabindex="' + info.tabindex + '" which overrides natural DOM order and makes the page harder to navigate.', el, "Remove tabindex or set it to 0 to follow natural DOM order.", "2.4.3 Focus Order");
+          if (info.hiddenFocusable) add("major", "Hidden but focusable", "This element is hidden (display:none or visibility:hidden) but would normally be focusable. If it receives focus via script, it confuses keyboard users.", el, 'Remove from tab order with tabindex="-1" or ensure it is visible when focused.', "2.4.3 Focus Order");
+          if (info.tabbable && ["button", "a"].indexOf(info.tag) !== -1 && !el.textContent.trim() && !el.getAttribute("aria-label") && !el.getAttribute("title") && !el.querySelector("img[alt]")) add("critical", "Empty interactive element", "This <" + info.tag + "> has no text content or accessible name. Screen readers cannot convey its purpose.", el, "Add text content, aria-label, or title attribute.", "4.1.2 Name, Role, Value");
+          if (info.tabbable && ["input", "select", "textarea"].indexOf(info.tag) !== -1) {
+            var name = getAccessibleName(el);
+            if (!name) add("major", "Missing accessible label", "This <" + info.tag + "> has no associated label, aria-label, or placeholder.", el, "Add a <label> element with for attribute, or add aria-label.", "1.3.1 Info and Relationships");
+          }
+          if (info.tabindex === 0 && !info.natural && !info.role) add("minor", "Focusable element without role", "This <" + info.tag + '> has tabindex="0" but no ARIA role. Assistive technologies won\'t know its purpose.', el, 'Add an appropriate role attribute (e.g., role="button").', "4.1.2 Name, Role, Value");
+          if (info.tabindex === -1 && info.natural) add("info", "Removed from tab order", "This <" + info.tag + '> has tabindex="-1" and is excluded from keyboard tab navigation. This may be intentional.', el, "Verify this is intentional. If the element should be tabbable, remove the tabindex attribute.");
+        }
+        for (var j = 0; j < tabOrder.length; j++) {
+          var tInfo = tabOrder[j];
+          var parent = tInfo.element.parentElement;
+          var cur = parent;
+          while (cur && cur !== doc.body) {
+            if (["A", "BUTTON"].indexOf(cur.tagName) !== -1 && cur !== tInfo.element) {
+              add("critical", "Nested interactive elements", "This <" + tInfo.tag + "> is nested inside a <" + cur.tagName.toLowerCase() + ">. Nested interactive elements create unpredictable behavior.", tInfo.element, "Restructure the HTML so interactive elements are not nested inside each other.", "4.1.2 Name, Role, Value");
+              break;
+            }
+            cur = cur.parentElement;
+          }
+        }
+        if (tabOrder.length > 1) {
+          try {
+            var bodyRect = doc.body.getBoundingClientRect();
+            for (var k = 1; k < tabOrder.length; k++) {
+              var r1 = tabOrder[k - 1].element.getBoundingClientRect();
+              var r2 = tabOrder[k].element.getBoundingClientRect();
+              var dy = r2.top - bodyRect.top - (r1.top - bodyRect.top);
+              if (dy < -200) add("minor", "Focus jumps backward", "Focus jumps backward from element " + k + " to " + (k + 1) + ", which may confuse keyboard users expecting a logical top-to-bottom flow.", tabOrder[k].element, "Reorder DOM elements to match visual layout, or use tabindex carefully.", "2.4.3 Focus Order");
+            }
+          } catch (e) {}
+        }
+        var tiCounts = {};
+        for (var m = 0; m < focusable.length; m++) {
+          if (focusable[m].tabindex > 0) {
+            tiCounts[focusable[m].tabindex] = (tiCounts[focusable[m].tabindex] || 0) + 1;
+          }
+        }
+        var tiKeys = Object.keys(tiCounts);
+        for (var n = 0; n < tiKeys.length; n++) {
+          if (tiCounts[tiKeys[n]] > 1) add("minor", "Duplicate tabindex value", tiCounts[tiKeys[n]] + ' elements share tabindex="' + tiKeys[n] + '". Their relative order falls back to DOM order, which can be confusing.', null, "Use unique tabindex values or remove positive tabindex altogether.");
+        }
+        return issues;
+      }
+
+      function calcScore(issues) {
+        var score = 100;
+        for (var i = 0; i < issues.length; i++) {
+          if (issues[i].severity === "critical") score -= 15;
+          else if (issues[i].severity === "major") score -= 8;
+          else if (issues[i].severity === "minor") score -= 3;
+        }
+        return Math.max(0, Math.min(100, score));
+      }
+
+      function runAnalysis() {
+        var html = editor.getValue().trim();
+        if (!html) {
+          toast("Enter HTML to analyze");
+          return;
+        }
+        resetState();
+
+        state.analysisId++;
+        var thisAnalysisId = state.analysisId;
+        els.statusText.textContent = "Analyzing...";
+        var frame = els.previewFrame;
+        frame.srcdoc = html;
+        els.emptyPreview.style.display = "none";
+        frame.onload = function () {
+          if (thisAnalysisId !== state.analysisId) return;
+          try {
+            var doc = frame.contentDocument;
+            if (!doc || !doc.body) {
+              toast("Could not access iframe document");
+              return;
+            }
+            var result = computeFocusOrder(doc);
+            state.tabOrder = result.tabOrder;
+            state.focusable = result.focusable;
+            state.issues = detectIssues(result.tabOrder, result.focusable, doc);
+            state.score = calcScore(state.issues);
+            state.analyzed = true;
+            renderOverlay();
+            renderIssuesPanel();
+            renderOrderList();
+            resetSim();
+            els.statusText.textContent = result.tabOrder.length + " tabbable | " + state.issues.length + " issues";
+            toast("Analysis complete");
+          } catch (err) {
+            console.error(err);
+            toast("Analysis error: " + err.message);
+            els.statusText.textContent = "Error";
+          }
+        };
+      }
+
+      function renderOverlay() {
+        var doc = els.previewFrame.contentDocument;
+        if (!doc || !doc.body) return;
+        var old = doc.querySelectorAll("[data-fa-overlay]");
+        for (var r = 0; r < old.length; r++) old[r].remove();
+
+        var style = doc.createElement("style");
+        style.dataset.faOverlay = "1";
+        style.textContent = ".fa-container{position:absolute;top:0;left:0;pointer-events:none;z-index:99999}" + ".fa-badge{position:absolute;width:22px;height:22px;border-radius:50%;background:#4a8bf5;color:#fff;font-size:10px;font-weight:700;font-family:Inter,sans-serif;display:flex;align-items:center;justify-content:center;pointer-events:auto;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.3);border:2px solid #fff;transition:transform .15s,box-shadow .15s;z-index:100000}" + ".fa-badge:hover{transform:scale(1.3);box-shadow:0 2px 12px rgba(74,139,245,.6)}" + ".fa-badge.current{background:#fbbf24;color:#1c1f2b;animation:faPulse 1.2s infinite;border-color:#fbbf24}" + ".fa-ring{position:absolute;border:3px solid #4a8bf5;border-radius:4px;pointer-events:none;transition:all .2s;z-index:99998}" + ".fa-ring.current{border-color:#fbbf24;box-shadow:0 0 0 4px rgba(251,191,36,.25)}" + "@keyframes faPulse{0%,100%{box-shadow:0 0 0 0 rgba(251,191,36,.5)}50%{box-shadow:0 0 0 8px rgba(251,191,36,0)}}";
+        doc.head.appendChild(style);
+
+        var container = doc.createElement("div");
+        container.className = "fa-container";
+        container.dataset.faOverlay = "1";
+
+        var bodyPos = doc.defaultView ? doc.defaultView.getComputedStyle(doc.body).position : "static";
+        if (bodyPos === "static") {
+          container.style.position = "absolute";
+          container.style.top = "0";
+          container.style.left = "0";
+        }
+
+        var bodyRect = doc.body.getBoundingClientRect();
+        var coords = [];
+
+        for (var i = 0; i < state.tabOrder.length; i++) {
+          var info = state.tabOrder[i];
+          var rect = info.element.getBoundingClientRect();
+          var x = rect.left - bodyRect.left - 10;
+          var y = rect.top - bodyRect.top - 10;
+          coords.push({ x: rect.left - bodyRect.left + rect.width / 2, y: rect.top - bodyRect.top + rect.height / 2 });
+
+          if (state.showBadges) {
+            var badge = doc.createElement("div");
+            badge.className = "fa-badge";
+            badge.textContent = i + 1;
+            badge.style.left = Math.max(0, x) + "px";
+            badge.style.top = Math.max(0, y) + "px";
+            badge.dataset.faOverlay = "1";
+            badge.dataset.idx = i;
+            (function (idx) {
+              badge.addEventListener("click", function () {
+                inspectElement(idx);
+              });
+            })(i);
+            container.appendChild(badge);
+
+            var ring = doc.createElement("div");
+            ring.className = "fa-ring";
+            ring.style.left = rect.left - bodyRect.left - 2 + "px";
+            ring.style.top = rect.top - bodyRect.top - 2 + "px";
+            ring.style.width = rect.width + 4 + "px";
+            ring.style.height = rect.height + 4 + "px";
+            ring.dataset.faOverlay = "1";
+            ring.dataset.idx = i;
+            container.appendChild(ring);
+          }
+        }
+
+        if (state.showLines && coords.length > 1) {
+          var ns = "http://www.w3.org/2000/svg";
+          var svg = doc.createElementNS(ns, "svg");
+
+          svg.style.cssText = "position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:99997;overflow:hidden";
+          svg.dataset.faOverlay = "1";
+          var sw = doc.body.scrollWidth;
+          var sh = doc.body.scrollHeight;
+          svg.setAttribute("width", sw);
+          svg.setAttribute("height", sh);
+          svg.setAttribute("viewBox", "0 0 " + sw + " " + sh);
+
+          var defs = doc.createElementNS(ns, "defs");
+          var marker = doc.createElementNS(ns, "marker");
+          marker.setAttribute("id", "fa-arrow");
+          marker.setAttribute("markerWidth", "6");
+          marker.setAttribute("markerHeight", "6");
+          marker.setAttribute("refX", "5");
+          marker.setAttribute("refY", "3");
+          marker.setAttribute("orient", "auto");
+          var mp = doc.createElementNS(ns, "path");
+          mp.setAttribute("d", "M0,0 L6,3 L0,6 Z");
+          mp.setAttribute("fill", "rgba(74,139,245,0.5)");
+          marker.appendChild(mp);
+          defs.appendChild(marker);
+          svg.appendChild(defs);
+
+          for (var j = 0; j < coords.length - 1; j++) {
+            var line = doc.createElementNS(ns, "line");
+            line.setAttribute("x1", coords[j].x);
+            line.setAttribute("y1", coords[j].y);
+            line.setAttribute("x2", coords[j + 1].x);
+            line.setAttribute("y2", coords[j + 1].y);
+            line.setAttribute("stroke", "rgba(74,139,245,0.3)");
+            line.setAttribute("stroke-width", "1.5");
+            line.setAttribute("stroke-dasharray", "5 3");
+            line.setAttribute("marker-end", "url(#fa-arrow)");
+            svg.appendChild(line);
+          }
+          container.appendChild(svg);
+        }
+        doc.body.appendChild(container);
+      }
+
+      function updateOverlay() {
+        if (state.analyzed) renderOverlay();
+      }
+
+      function renderIssuesPanel() {
+        var panel = els.tabIssues;
+        panel.querySelectorAll(".score-area,.issue-filters,.issue-item,.issue-detail").forEach(function (e) {
+          e.remove();
+        });
+        els.issuesEmpty.style.display = "none";
+
+        var scoreColor = state.score >= 90 ? "var(--ok)" : state.score >= 70 ? "var(--accent)" : state.score >= 50 ? "var(--warn)" : "var(--err)";
+        var scoreLabel = state.score >= 90 ? "Excellent" : state.score >= 70 ? "Good" : state.score >= 50 ? "Needs Work" : "Poor";
+        var circ = 2 * Math.PI * 26;
+        var dashLen = (state.score / 100) * circ;
+
+        var sa = document.createElement("div");
+        sa.className = "score-area";
+        sa.innerHTML = '<div class="score-ring">' + '<svg viewBox="0 0 64 64"><circle class="track" cx="32" cy="32" r="26"/><circle class="value" cx="32" cy="32" r="26" stroke="' + scoreColor + '" stroke-dasharray="' + dashLen + " " + circ + '"/><\/svg>' + '<div class="score-num" style="color:' + scoreColor + '">' + state.score + "<\/div>" + "<\/div>" + '<div class="score-detail"><div class="score-label" style="color:' + scoreColor + '">' + scoreLabel + '<\/div><div class="score-sub">' + state.tabOrder.length + " tabbable elements | " + state.issues.length + " issues found<\/div><\/div>";
+        panel.insertBefore(sa, panel.firstChild);
+
+        var counts = { all: state.issues.length, critical: 0, major: 0, minor: 0, info: 0 };
+        state.issues.forEach(function (iss) {
+          counts[iss.severity]++;
+        });
+        var filters = document.createElement("div");
+        filters.className = "issue-filters";
+        ["all", "critical", "major", "minor", "info"].forEach(function (f) {
+          var btn = document.createElement("button");
+          btn.className = "issue-filter" + (f === state.activeFilter ? " active" : "");
+          btn.textContent = capitalize(f) + " (" + (counts[f] !== undefined ? counts[f] : 0) + ")";
+          btn.addEventListener("click", function () {
+            state.activeFilter = f;
+            renderIssuesList();
+            document.querySelectorAll(".issue-filter").forEach(function (b) {
+              b.classList.remove("active");
+            });
+            btn.classList.add("active");
+          });
+          filters.appendChild(btn);
+        });
+        sa.insertAdjacentElement("afterend", filters);
+        renderIssuesList();
+        els.issueBadge.textContent = state.issues.length;
+      }
+
+      function renderIssuesList() {
+        els.tabIssues.querySelectorAll(".issue-item,.issue-detail").forEach(function (e) {
+          e.remove();
+        });
+        var filtered =
+          state.activeFilter === "all"
+            ? state.issues
+            : state.issues.filter(function (iss) {
+                return iss.severity === state.activeFilter;
+              });
+
+        if (!filtered.length) {
+          var nr = document.createElement("div");
+          nr.className = "no-results";
+          nr.textContent = state.activeFilter === "all" ? "No issues detected. Great job!" : "No " + state.activeFilter + " issues found.";
+          els.tabIssues.appendChild(nr);
+          return;
+        }
+
+        filtered.forEach(function (issue) {
+          var item = document.createElement("div");
+          item.className = "issue-item";
+          item.innerHTML = '<div class="issue-title"><span class="issue-sev sev-' + issue.severity + '">' + issue.severity + "<\/span>" + escapeHTML(issue.title) + '<\/div><div class="issue-desc">' + escapeHTML(issue.description) + "<\/div>" + (issue.element ? '<div class="issue-el">' + escapeHTML(truncTag(issue.element)) + "<\/div>" : "");
+
+          var detail = document.createElement("div");
+          detail.className = "issue-detail";
+          detail.innerHTML = "<h4>Suggested Fix<\/h4><p>" + escapeHTML(issue.fix) + "<\/p>" + (issue.wcag ? "<h4>WCAG Reference<\/h4><p>WCAG " + escapeHTML(issue.wcag) + "<\/p>" : "") + (issue.element ? '<h4>Element HTML<\/h4><div class="insp-code">' + escapeHTML(snippetHTML(issue.element)) + "<\/div>" : "");
+
+          item.addEventListener("click", function () {
+            var showing = detail.classList.contains("show");
+            els.tabIssues.querySelectorAll(".issue-detail").forEach(function (d) {
+              d.classList.remove("show");
+            });
+            els.tabIssues.querySelectorAll(".issue-item").forEach(function (d) {
+              d.classList.remove("active");
+            });
+            if (!showing) {
+              detail.classList.add("show");
+              item.classList.add("active");
+            }
+            if (issue.element) highlightInPreview(issue.element);
+          });
+
+          els.tabIssues.appendChild(item);
+          els.tabIssues.appendChild(detail);
+        });
+      }
+
+      function renderOrderList() {
+        var panel = els.tabOrder;
+        panel.querySelectorAll(".fo-item").forEach(function (e) {
+          e.remove();
+        });
+        els.orderEmpty.style.display = "none";
+
+        if (!state.tabOrder.length) {
+          els.orderEmpty.textContent = "No tabbable elements found.";
+          els.orderEmpty.style.display = "block";
+          return;
+        }
+
+        state.tabOrder.forEach(function (info, i) {
+          var item = document.createElement("div");
+          item.className = "fo-item";
+          item.dataset.idx = i;
+          item.innerHTML = '<span class="fo-num">' + (i + 1) + '<\/span><span class="fo-tag">&lt;' + info.tag + '&gt;<\/span><span class="fo-name">' + escapeHTML(info.ariaLabel || "(no label)") + "<\/span>" + (info.tabindex !== null && info.tabindex !== 0 ? '<span class="fo-ti">ti=' + info.tabindex + "<\/span>" : "");
+          item.addEventListener("click", function () {
+            inspectElement(i);
+          });
+          panel.appendChild(item);
+        });
+      }
+
+      function inspectElement(idx) {
+        var info = state.tabOrder[idx];
+        if (!info) return;
+        var el = info.element;
+        var panel = els.tabInspector;
+        panel.querySelectorAll(".insp-section").forEach(function (e) {
+          e.remove();
+        });
+        els.inspEmpty.style.display = "none";
+
+        document.querySelectorAll(".panel-tab").forEach(function (t) {
+          t.classList.remove("active");
+          t.setAttribute("aria-selected", "false");
+        });
+        document.querySelectorAll(".tab-body").forEach(function (t) {
+          t.classList.remove("active");
+        });
+        var inspectorTab = document.querySelector('[data-tab="inspector"]');
+        inspectorTab.classList.add("active");
+        inspectorTab.setAttribute("aria-selected", "true");
+        panel.classList.add("active");
+
+        function row(label, val, cls) {
+          return '<div class="insp-row"><span class="label">' + label + '<\/span><span class="val ' + (cls || "") + '">' + val + "<\/span><\/div>";
+        }
+        function sec(title, content) {
+          var s = document.createElement("div");
+          s.className = "insp-section";
+          s.innerHTML = "<h4>" + title + "<\/h4>" + content;
+          panel.appendChild(s);
+        }
+
+        sec("Element", row("Tag", "&lt;" + info.tag + "&gt;") + row("Type", info.type || "--") + row("ID", el.id || "--") + row("Class", el.className ? String(el.className).trim().substring(0, 60) : "--"));
+
+        sec("Focus Behavior", row("Tab Order", "#" + (idx + 1) + " of " + state.tabOrder.length) + row("tabindex", info.tabindex !== null ? info.tabindex : "none (natural)", info.tabindex > 0 ? "warn" : "") + row("Focusable", info.focusable ? "Yes" : "No", info.focusable ? "ok" : "err") + row("Tabbable", info.tabbable ? "Yes" : "No", info.tabbable ? "ok" : "") + row("Visible", info.visible ? "Yes" : "No", info.visible ? "ok" : "err") + row("Disabled", info.disabled ? "Yes" : "No", info.disabled ? "err" : ""));
+
+        sec("Accessibility", row("Accessible Name", escapeHTML(info.ariaLabel || "(none)"), info.ariaLabel ? "" : "warn") + row("Role", info.role || "(implicit: " + info.tag + ")") + (el.getAttribute("aria-expanded") !== null ? row("aria-expanded", el.getAttribute("aria-expanded")) : "") + (el.getAttribute("aria-haspopup") !== null ? row("aria-haspopup", el.getAttribute("aria-haspopup")) : "") + (el.getAttribute("aria-disabled") !== null ? row("aria-disabled", el.getAttribute("aria-disabled")) : ""));
+
+        sec("HTML", '<div class="insp-code">' + escapeHTML(snippetHTML(el)) + "<\/div>");
+
+        highlightInPreview(el);
+        state.simIndex = idx;
+        updateSimUI();
+
+        document.querySelectorAll(".fo-item").forEach(function (f) {
+          f.classList.remove("active");
+        });
+        var foItem = document.querySelector('.fo-item[data-idx="' + idx + '"]');
+        if (foItem) {
+          foItem.classList.add("active");
+          foItem.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        }
+      }
+
+      function highlightInPreview(el) {
+        var doc = els.previewFrame.contentDocument;
+        if (!doc) return;
+        doc.querySelectorAll(".fa-ring.current").forEach(function (r) {
+          r.classList.remove("current");
+        });
+        doc.querySelectorAll(".fa-badge.current").forEach(function (b) {
+          b.classList.remove("current");
+        });
+
+        var idx = state.tabOrder.findIndex(function (item) {
+          return item.element === el;
+        });
+        if (idx >= 0) {
+          var badge = doc.querySelector('.fa-badge[data-idx="' + idx + '"]');
+          var ring = doc.querySelector('.fa-ring[data-idx="' + idx + '"]');
+          if (badge) badge.classList.add("current");
+          if (ring) ring.classList.add("current");
+        }
+        try {
+          el.scrollIntoView({ block: "center", behavior: "smooth" });
+        } catch (e) {}
+      }
+
+      function simStep(dir) {
+        if (!state.tabOrder.length) return;
+        var next = state.simIndex + dir;
+        if (next < 0) next = state.tabOrder.length - 1;
+        if (next >= state.tabOrder.length) next = 0;
+        state.simIndex = next;
+        inspectElement(next);
+      }
+
+      function updateSimUI() {
+        els.simPos.textContent = state.tabOrder.length ? state.simIndex + 1 + " / " + state.tabOrder.length : "-- / --";
+        document.querySelectorAll(".fo-item").forEach(function (f) {
+          f.classList.toggle("sim-current", +f.dataset.idx === state.simIndex);
+        });
+      }
+
+      function togglePlay() {
+        if (state.playing) stopPlay();
+        else startPlay();
+      }
+
+      function startPlay() {
+        if (!state.tabOrder.length) return;
+        state.playing = true;
+        els.btnPlay.classList.add("playing");
+        els.btnPlay.textContent = "Pause";
+        var speed = +els.simSpeed.value;
+        state.playTimer = setInterval(function () {
+          simStep(1);
+        }, speed);
+      }
+
+      function stopPlay() {
+        state.playing = false;
+        els.btnPlay.classList.remove("playing");
+        els.btnPlay.textContent = "Play";
+        clearInterval(state.playTimer);
+        state.playTimer = null;
+      }
+
+      function resetSim() {
+        stopPlay();
+        state.simIndex = -1;
+        updateSimUI();
+        var doc = els.previewFrame.contentDocument;
+        if (doc) {
+          doc.querySelectorAll(".fa-ring.current").forEach(function (r) {
+            r.classList.remove("current");
+          });
+          doc.querySelectorAll(".fa-badge.current").forEach(function (b) {
+            b.classList.remove("current");
+          });
+        }
+        document.querySelectorAll(".fo-item").forEach(function (f) {
+          f.classList.remove("sim-current", "active");
+        });
+      }
+
+      function buildReportData() {
+        return {
+          generatedAt: new Date().toISOString(),
+          score: state.score,
+          tabbableCount: state.tabOrder.length,
+          totalFocusable: state.focusable.length,
+          issues: state.issues.map(function (iss) {
+            return { severity: iss.severity, title: iss.title, description: iss.description, element: iss.element ? truncTag(iss.element) : null, html: iss.element ? snippetHTML(iss.element) : null, fix: iss.fix, wcag: iss.wcag };
+          }),
+          focusOrder: state.tabOrder.map(function (info, i) {
+            return { order: i + 1, tag: info.tag, tabindex: info.tabindex, accessibleName: info.ariaLabel, role: info.role };
+          })
+        };
+      }
+
+      function exportJSON() {
+        var data = buildReportData();
+        var blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+        downloadBlob(blob, "focus-audit-report.json");
+        toast("JSON report exported");
+      }
+
+      function exportHTMLReport() {
+        var data = buildReportData();
+        var scoreColor = data.score >= 90 ? "#34d399" : data.score >= 70 ? "#4a8bf5" : data.score >= 50 ? "#fbbf24" : "#f87171";
+        function esc(s) {
+          return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+        var issuesHTML = data.issues
+          .map(function (iss) {
+            return '<tr><td><span class="sev sev-' + iss.severity + '">' + iss.severity + "<\/span><\/td><td>" + esc(iss.title) + "<\/td><td>" + esc(iss.description) + "<\/td><td><code>" + esc(iss.element || "--") + "<\/code><\/td><td>" + esc(iss.fix) + "<\/td><td>" + esc(iss.wcag || "--") + "<\/td><\/tr>";
+          })
+          .join("");
+        var orderHTML = data.focusOrder
+          .map(function (f) {
+            return "<tr><td>" + f.order + "<\/td><td>&lt;" + f.tag + "&gt;<\/td><td>" + (f.tabindex != null ? f.tabindex : "--") + "<\/td><td>" + esc(f.accessibleName || "--") + "<\/td><td>" + (f.role || "--") + "<\/td><\/tr>";
+          })
+          .join("");
+
+        var html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Focus Audit Report<\/title>' + "<style>*{margin:0;box-sizing:border-box}body{font-family:Inter,sans-serif;background:#0e1019;color:#e2e5f0;padding:40px;max-width:960px;margin:0 auto}" + "h1{font-size:24px;margin-bottom:8px}h2{font-size:16px;margin:32px 0 12px;color:#969bb2}p{color:#969bb2;font-size:14px;margin-bottom:24px}" + ".score{font-size:48px;font-weight:700;color:" + scoreColor + "}" + "table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;padding:8px;border-bottom:2px solid #2a2e42;color:#969bb2;font-size:11px;text-transform:uppercase}" + "td{padding:8px;border-bottom:1px solid #1e2135}code{font-size:11px;color:#4a8bf5}" + ".sev{padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;text-transform:uppercase}" + ".sev-critical{background:rgba(248,113,113,.1);color:#f87171}.sev-major{background:rgba(251,191,36,.1);color:#fbbf24}" + ".sev-minor{background:rgba(150,155,178,.15);color:#969bb2}.sev-info{background:rgba(52,211,153,.1);color:#34d399}" + "<\/style><\/head><body>" + "<h1>Focus Audit Report<\/h1><p>Generated " + data.generatedAt + "<\/p>" + '<div class="score">' + data.score + "<\/div>" + "<p>" + data.tabbableCount + " tabbable elements | " + data.issues.length + " issues<\/p>" + "<h2>Issues (" + data.issues.length + ")<\/h2>" + "<table><thead><tr><th>Severity<\/th><th>Issue<\/th><th>Description<\/th><th>Element<\/th><th>Fix<\/th><th>WCAG<\/th><\/tr><\/thead><tbody>" + issuesHTML + "<\/tbody><\/table>" + "<h2>Tab Order (" + data.focusOrder.length + ")<\/h2>" + "<table><thead><tr><th>#<\/th><th>Tag<\/th><th>tabindex<\/th><th>Name<\/th><th>Role<\/th><\/tr><\/thead><tbody>" + orderHTML + "<\/tbody><\/table>" + "<\/body><\/html>";
+
+        var blob = new Blob([html], { type: "text/html" });
+        downloadBlob(blob, "focus-audit-report.html");
+        toast("HTML report exported");
+      }
+
+      function copyClipboard() {
+        var data = buildReportData();
+        var lines = ["Focus Audit Report -- Score: " + data.score + "/100", data.tabbableCount + " tabbable elements | " + data.issues.length + " issues", "", "-- Issues --"];
+        data.issues.forEach(function (iss) {
+          lines.push("[" + iss.severity.toUpperCase() + "] " + iss.title + ": " + iss.description + (iss.element ? " -> " + iss.element : ""));
+        });
+        lines.push("");
+        lines.push("-- Tab Order --");
+        data.focusOrder.forEach(function (f) {
+          lines.push(f.order + ". <" + f.tag + "> " + (f.accessibleName || "(no label)") + (f.tabindex > 0 ? " [tabindex=" + f.tabindex + "]" : ""));
+        });
+        navigator.clipboard
+          .writeText(lines.join("\n"))
+          .then(function () {
+            toast("Copied to clipboard");
+          })
+          .catch(function () {
+            toast("Failed to copy — clipboard access denied");
+          });
+      }
+
+      function downloadBlob(blob, name) {
+        var a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = name;
+        a.click();
+        setTimeout(function () {
+          URL.revokeObjectURL(a.href);
+        }, 10000);
+      }
+    </script>
+  </body>
+</html>

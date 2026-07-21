@@ -1,0 +1,831 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Command Palette — Design System</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              brand: {
+                50: "#eef2ff",
+                100: "#e0e7ff",
+                200: "#c7d2fe",
+                500: "#6366f1",
+                600: "#4f46e5",
+                700: "#4338ca",
+              },
+            },
+            fontFamily: {
+              sans: ["Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "sans-serif"],
+            },
+          },
+        },
+      };
+    </script>
+
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      /* Backdrop blur */
+      .palette-backdrop {
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+      }
+
+      /* Palette open/close animation */
+      .palette-overlay {
+        transition: opacity 0.2s ease;
+      }
+      .palette-overlay.closing {
+        opacity: 0;
+      }
+      .palette-overlay.closing .palette-modal {
+        transform: scale(0.95);
+        opacity: 0;
+      }
+
+      .palette-modal {
+        transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.15s ease;
+      }
+      .palette-modal.closed {
+        transform: scale(0.95);
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      /* Result item hover/active */
+      .palette-result {
+        transition: background-color 0.08s ease;
+      }
+      .palette-result.active {
+        background-color: rgb(99 102 241 / 0.1);
+      }
+      .dark .palette-result.active {
+        background-color: rgb(99 102 241 / 0.15);
+      }
+      .palette-result:not(.active):hover {
+        background-color: rgb(0 0 0 / 0.03);
+      }
+      .dark .palette-result:not(.active):hover {
+        background-color: rgb(255 255 255 / 0.04);
+      }
+
+      /* Highlight match */
+      .highlight-match {
+        background-color: rgb(253 224 71 / 0.5);
+        border-radius: 2px;
+        padding: 0 1px;
+      }
+      .dark .highlight-match {
+        background-color: rgb(253 224 71 / 0.25);
+      }
+
+      /* Scrollbar styling */
+      .palette-scroll::-webkit-scrollbar {
+        width: 4px;
+      }
+      .palette-scroll::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .palette-scroll::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 2px;
+      }
+      .dark .palette-scroll::-webkit-scrollbar-thumb {
+        background: #475569;
+      }
+
+      /* Group header */
+      .group-header {
+        font-size: 0.65rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-weight: 600;
+      }
+
+      /* Keyboard shortcut badge */
+      .kbd-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.65rem;
+        font-weight: 600;
+        line-height: 1.2;
+      }
+
+      /* Fade-in for demo items */
+      .demo-fade-in {
+        animation: demoFadeIn 0.4s ease-out forwards;
+        opacity: 0;
+      }
+      @keyframes demoFadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(6px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      /* Toast notification */
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(80px);
+        background: #1e293b;
+        color: #f1f5f9;
+        padding: 10px 20px;
+        border-radius: 10px;
+        font-size: 0.875rem;
+        font-weight: 500;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+        opacity: 0;
+        pointer-events: none;
+        z-index: 1000;
+      }
+      .toast.show {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+      }
+      .dark .toast {
+        background: #f1f5f9;
+        color: #1e293b;
+      }
+
+      /* Focus ring */
+      .focus-ring:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.5), 0 0 0 4px rgba(238, 242, 255, 0.2);
+      }
+      .dark .focus-ring:focus-visible {
+        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.6), 0 0 0 4px rgba(15, 23, 42, 0.9);
+      }
+    </style>
+
+    <!-- Preconnect to Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  </head>
+  <body class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 min-h-screen transition-colors duration-300">
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <!-- ===== COMMAND PALETTE OVERLAY ===== -->
+    <div
+      id="paletteOverlay"
+      class="palette-overlay fixed inset-0 z-50 flex items-start justify-center pt-[15vh] sm:pt-[20vh] px-4 pointer-events-none opacity-0"
+    >
+      <!-- Backdrop -->
+      <div
+        id="paletteBackdrop"
+        class="palette-backdrop absolute inset-0 bg-black/30 dark:bg-black/50"
+      ></div>
+
+      <!-- Modal -->
+      <div
+        id="paletteModal"
+        class="palette-modal closed relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden"
+      >
+        <!-- Search Input -->
+        <div class="flex items-center gap-3 px-4 py-3 border-b border-slate-200 dark:border-slate-800">
+          <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            id="paletteInput"
+            type="text"
+            placeholder="Search pages, actions, settings..."
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
+            class="flex-1 bg-transparent text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 border-none outline-none focus:outline-none"
+          />
+          <span class="text-[0.6rem] font-semibold uppercase text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded shrink-0">ESC</span>
+        </div>
+
+        <!-- Results Container -->
+        <div id="paletteResults" class="palette-scroll max-h-[320px] overflow-y-auto">
+          <!-- Results injected by JS -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="paletteEmpty" class="hidden px-4 py-8 text-center">
+          <div class="text-sm font-medium text-slate-500 dark:text-slate-400">No results found</div>
+          <div class="text-xs text-slate-400 dark:text-slate-500 mt-1">Try a different search term</div>
+        </div>
+
+        <!-- Footer -->
+        <div class="px-4 py-2.5 border-t border-slate-200 dark:border-slate-800 flex items-center gap-4 text-[0.6rem] text-slate-400 dark:text-slate-500">
+          <span class="flex items-center gap-1">
+            <span class="kbd-badge bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">&uarr;&darr;</span>
+            Navigate
+          </span>
+          <span class="flex items-center gap-1">
+            <span class="kbd-badge bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">&crarr;</span>
+            Select
+          </span>
+          <span class="flex items-center gap-1">
+            <span class="kbd-badge bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">ESC</span>
+            Close
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PAGE CONTENT ===== -->
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
+      <!-- Header -->
+      <header class="flex items-start justify-between gap-4 mb-10">
+        <div>
+          <p class="text-brand-600 dark:text-brand-500 font-semibold text-sm uppercase tracking-wide">
+            Components
+          </p>
+          <h1 class="text-2xl sm:text-3xl font-bold mt-1">Command Palette</h1>
+          <p class="text-slate-500 dark:text-slate-400 text-sm mt-2 max-w-2xl">
+            A keyboard-first, VS Code / Spotlight-style command overlay with fuzzy search, grouped results, and smooth animations.
+          </p>
+        </div>
+
+        <button
+          id="themeToggle"
+          type="button"
+          aria-label="Toggle dark mode"
+          class="shrink-0 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 focus-ring transition-colors"
+        >
+          <span id="themeIcon" class="text-lg">&#9790;</span>
+        </button>
+      </header>
+
+      <!-- Trigger Area -->
+      <section class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-8 sm:p-12 text-center">
+        <div class="max-w-lg mx-auto">
+          <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-brand-50 dark:bg-brand-500/10 mb-6">
+            <svg class="w-8 h-8 text-brand-600 dark:text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          </div>
+
+          <h2 class="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+            Press <span class="kbd-badge bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm mx-1 px-2 py-1">&#8984;K</span> to open the palette
+          </h2>
+          <p class="text-sm text-slate-500 dark:text-slate-400 mb-6">
+            Navigate pages, run actions, tweak settings — all from one place.
+          </p>
+
+          <button
+            id="openPaletteBtn"
+            type="button"
+            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700 focus-ring transition-colors"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            Open Command Palette
+          </button>
+
+          <p class="text-xs text-slate-400 dark:text-slate-500 mt-4">
+            Or press <strong class="text-slate-600 dark:text-slate-400">Cmd+K</strong> (Mac) /
+            <strong class="text-slate-600 dark:text-slate-400">Ctrl+K</strong> (Windows/Linux)
+          </p>
+        </div>
+      </section>
+
+      <!-- Demo: Sample Pages Grid -->
+      <section class="mt-8">
+        <h2 class="text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-4">
+          Available Commands
+        </h2>
+        <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div class="demo-fade-in bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4" style="animation-delay: 0s">
+            <div class="text-2xl mb-2">&#x1F4CA;</div>
+            <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Dashboard</h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Page — View analytics overview</p>
+          </div>
+          <div class="demo-fade-in bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4" style="animation-delay: 0.05s">
+            <div class="text-2xl mb-2">&#x1F465;</div>
+            <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Team</h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Page — Manage your team</p>
+          </div>
+          <div class="demo-fade-in bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4" style="animation-delay: 0.1s">
+            <div class="text-2xl mb-2">&#x26A1;</div>
+            <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">New Project</h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Action — Create a new project</p>
+          </div>
+          <div class="demo-fade-in bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4" style="animation-delay: 0.15s">
+            <div class="text-2xl mb-2">&#x1F512;</div>
+            <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Security</h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Settings — Configure security</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Footer -->
+      <footer class="text-center mt-12 text-xs text-slate-500 dark:text-slate-400">
+        Built with Tailwind CSS + Vanilla JS. Part of the
+        <a href="https://github.com/praveenscience/One-File-Tools" class="text-brand-600 dark:text-brand-500 hover:underline">One File Tools</a>
+        Design System pillar.
+      </footer>
+    </div>
+
+    <script>
+      // ============================================================
+      //  THEME
+      // ============================================================
+      var THEME_KEY = "cmd_palette_theme_v1";
+      var htmlEl = document.documentElement;
+      var themeToggle = document.getElementById("themeToggle");
+      var themeIcon = document.getElementById("themeIcon");
+
+      function applyTheme(isDark) {
+        htmlEl.classList.toggle("dark", isDark);
+        themeIcon.textContent = isDark ? "\u2600\uFE0F" : "\uD83C\uDF19";
+      }
+
+      function initTheme() {
+        var saved = null;
+        try {
+          saved = localStorage.getItem(THEME_KEY);
+        } catch (e) {}
+        if (saved === "dark" || saved === "light") {
+          applyTheme(saved === "dark");
+          return;
+        }
+        applyTheme(window.matchMedia("(prefers-color-scheme: dark)").matches);
+      }
+      initTheme();
+
+      themeToggle.addEventListener("click", function() {
+        var isDark = !htmlEl.classList.contains("dark");
+        applyTheme(isDark);
+        try {
+          localStorage.setItem(THEME_KEY, isDark ? "dark" : "light");
+        } catch (e) {}
+      });
+
+      // ============================================================
+      //  COMMAND DATA
+      // ============================================================
+      var COMMANDS = [
+        // Pages
+        { id: "p1", group: "Pages", icon: "\uD83D\uDCCA", title: "Dashboard", description: "View analytics and key metrics", shortcut: "G D" },
+        { id: "p2", group: "Pages", icon: "\uD83D\uDCC8", title: "Analytics", description: "Detailed reports and charts", shortcut: "G A" },
+        { id: "p3", group: "Pages", icon: "\u2699\uFE0F", title: "Settings", description: "Manage application settings", shortcut: "G S" },
+        { id: "p4", group: "Pages", icon: "\uD83D\uDC64", title: "Profile", description: "View and edit your profile", shortcut: "G P" },
+        { id: "p5", group: "Pages", icon: "\uD83D\uDC65", title: "Team", description: "Manage team members and roles", shortcut: "G T" },
+        { id: "p6", group: "Pages", icon: "\uD83D\uDCCB", title: "Projects", description: "Browse all projects", shortcut: "G R" },
+        { id: "p7", group: "Pages", icon: "\uD83D\uDCC5", title: "Calendar", description: "Schedule and events", shortcut: "G C" },
+
+        // Actions
+        { id: "a1", group: "Actions", icon: "\u26A1", title: "New Project", description: "Create a brand new project", shortcut: "N P" },
+        { id: "a2", group: "Actions", icon: "\uD83D\uDCE8", title: "Invite Member", description: "Send an invitation to join", shortcut: "I M" },
+        { id: "a3", group: "Actions", icon: "\uD83D\uDCE4", title: "Export Data", description: "Download data as CSV or JSON", shortcut: "E D" },
+        { id: "a4", group: "Actions", icon: "\uD83D\uDCDD", title: "Create Report", description: "Generate a new report", shortcut: "C R" },
+        { id: "a5", group: "Actions", icon: "\uD83D\uDE80", title: "Run Deployment", description: "Deploy the latest build", shortcut: "D P" },
+        { id: "a6", group: "Actions", icon: "\uD83D\uDCCE", title: "Upload File", description: "Upload a file to storage", shortcut: "U F" },
+
+        // Settings
+        { id: "s1", group: "Settings", icon: "\uD83C\uDFA8", title: "Theme", description: "Switch between light and dark mode", shortcut: "" },
+        { id: "s2", group: "Settings", icon: "\uD83D\uDD14", title: "Notifications", description: "Configure notification preferences", shortcut: "" },
+        { id: "s3", group: "Settings", icon: "\uD83D\uDD12", title: "Security", description: "Password and authentication settings", shortcut: "" },
+        { id: "s4", group: "Settings", icon: "\uD83D\uDD11", title: "API Keys", description: "Manage API access tokens", shortcut: "" },
+        { id: "s5", group: "Settings", icon: "\uD83D\uDCB3", title: "Billing", description: "Subscription and payment details", shortcut: "" },
+
+        // Recent
+        { id: "r1", group: "Recent", icon: "\uD83D\uDD50", title: "Analytics Report Q1", description: "Opened 2 minutes ago", shortcut: "" },
+        { id: "r2", group: "Recent", icon: "\uD83D\uDD50", title: "Team Settings", description: "Opened 15 minutes ago", shortcut: "" },
+        { id: "r3", group: "Recent", icon: "\uD83D\uDD50", title: "Project Phoenix", description: "Opened 1 hour ago", shortcut: "" },
+      ];
+
+      // ============================================================
+      //  FUZZY MATCH
+      // ============================================================
+      function fuzzyMatch(text, query) {
+        if (!query) return null;
+        var lowerText = text.toLowerCase();
+        var lowerQuery = query.toLowerCase();
+
+        // Direct substring match (preferred)
+        var idx = lowerText.indexOf(lowerQuery);
+        if (idx !== -1) {
+          return { start: idx, end: idx + query.length, score: 100 - idx };
+        }
+
+        // Fuzzy: characters in order
+        var ti = 0;
+        var matches = [];
+        for (var qi = 0; qi < lowerQuery.length; qi++) {
+          var ch = lowerQuery[qi];
+          while (ti < lowerText.length && lowerText[ti] !== ch) ti++;
+          if (ti >= lowerText.length) return null;
+          matches.push(ti);
+          ti++;
+        }
+        // Score based on how spread out the matches are (tighter = better)
+        var spread = matches[matches.length - 1] - matches[0];
+        var score = 50 - spread - matches[0];
+        return { start: matches[0], end: matches[matches.length - 1] + 1, fuzzy: true, score: score };
+      }
+
+      function highlightText(text, matchInfo) {
+        if (!matchInfo) return escapeHtml(text);
+        var before = escapeHtml(text.slice(0, matchInfo.start));
+        var middle = escapeHtml(text.slice(matchInfo.start, matchInfo.end));
+        var after = escapeHtml(text.slice(matchInfo.end));
+        return before + '<span class="highlight-match">' + middle + '</span>' + after;
+      }
+
+      function escapeHtml(s) {
+        return String(s)
+          .replace(/\x26/g, "\x26amp;")
+          .replace(/</g, "\x26lt;")
+          .replace(/>/g, "\x26gt;")
+          .replace(/"/g, "\x26quot;")
+          .replace(/'/g, "\x26#039;");
+      }
+
+      // ============================================================
+      //  PALETTE STATE
+      // ============================================================
+      var state = {
+        open: false,
+        query: "",
+        results: [],
+        activeIndex: -1,
+      };
+
+      // ============================================================
+      //  DOM REFS
+      // ============================================================
+      var overlay = document.getElementById("paletteOverlay");
+      var modal = document.getElementById("paletteModal");
+      var backdrop = document.getElementById("paletteBackdrop");
+      var input = document.getElementById("paletteInput");
+      var resultsContainer = document.getElementById("paletteResults");
+      var emptyStateEl = document.getElementById("paletteEmpty");
+      var openBtn = document.getElementById("openPaletteBtn");
+      var toast = document.getElementById("toast");
+
+      // ============================================================
+      //  SEARCH / FILTER
+      // ============================================================
+      function filterCommands(query) {
+        var trimmed = query.trim();
+        if (!trimmed) {
+          return COMMANDS;
+        }
+
+        var scored = COMMANDS.map(function(cmd) {
+          var titleMatch = fuzzyMatch(cmd.title, trimmed);
+          var descMatch = fuzzyMatch(cmd.description, trimmed);
+          var groupMatch = fuzzyMatch(cmd.group, trimmed);
+
+          var best = titleMatch;
+          if (!best || (descMatch && descMatch.score > best.score)) best = descMatch;
+          if (!best || (groupMatch && groupMatch.score > best.score)) best = groupMatch;
+
+          return { cmd: cmd, match: best, score: best ? best.score : -999 };
+        });
+
+        return scored
+          .filter(function(s) { return s.match !== null; })
+          .sort(function(a, b) { return b.score - a.score; })
+          .map(function(s) { return s.cmd; });
+      }
+
+      function getGroupedResults(commands) {
+        var groups = {};
+        var groupOrder = ["Recent", "Pages", "Actions", "Settings"];
+        for (var i = 0; i < commands.length; i++) {
+          var cmd = commands[i];
+          if (!groups[cmd.group]) groups[cmd.group] = [];
+          groups[cmd.group].push(cmd);
+        }
+        var sorted = [];
+        var seen = {};
+        for (var g = 0; g < groupOrder.length; g++) {
+          var groupName = groupOrder[g];
+          if (groups[groupName]) {
+            sorted.push({ group: groupName, items: groups[groupName] });
+            seen[groupName] = true;
+          }
+        }
+        for (var key in groups) {
+          if (groups.hasOwnProperty(key) && !seen[key]) {
+            sorted.push({ group: key, items: groups[key] });
+          }
+        }
+        return sorted;
+      }
+
+      // ============================================================
+      //  RENDER
+      // ============================================================
+      function renderPalette() {
+        var query = input.value;
+        state.query = query;
+        var filtered = filterCommands(query);
+        state.results = filtered;
+
+        // Reset active index
+        if (state.activeIndex >= filtered.length) {
+          state.activeIndex = filtered.length - 1;
+        } else if (state.activeIndex === -1 && filtered.length > 0) {
+          state.activeIndex = 0;
+        }
+
+        if (filtered.length === 0) {
+          resultsContainer.innerHTML = "";
+          emptyStateEl.classList.remove("hidden");
+          return;
+        }
+
+        emptyStateEl.classList.add("hidden");
+
+        var grouped = getGroupedResults(filtered);
+        var globalIndex = 0;
+        var html = "";
+
+        for (var gi = 0; gi < grouped.length; gi++) {
+          var group = grouped[gi];
+          html += '<div class="px-4 pt-3 pb-1">' +
+            '<span class="group-header text-slate-400 dark:text-slate-500">' + escapeHtml(group.group) + '</span>' +
+            '</div>';
+
+          for (var ii = 0; ii < group.items.length; ii++) {
+            var item = group.items[ii];
+            var isActive = globalIndex === state.activeIndex;
+            var trimmedQuery = state.query.trim();
+            var titleMatch = trimmedQuery ? fuzzyMatch(item.title, trimmedQuery) : null;
+            var descMatch = trimmedQuery ? fuzzyMatch(item.description, trimmedQuery) : null;
+            var titleHtml = highlightText(item.title, titleMatch);
+            var descHtml = highlightText(item.description, descMatch);
+            var shortcutHtml = item.shortcut
+              ? '<span class="kbd-badge bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 shrink-0 ml-2">' + escapeHtml(item.shortcut) + '</span>'
+              : "";
+
+            html += '<div class="palette-result flex items-center gap-3 px-4 py-2.5 cursor-pointer' +
+              (isActive ? ' active' : '') +
+              '" data-index="' + globalIndex + '" data-id="' + escapeHtml(item.id) + '">' +
+              '<span class="text-lg shrink-0 w-7 text-center">' + item.icon + '</span>' +
+              '<div class="flex-1 min-w-0">' +
+              '<div class="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">' + titleHtml + '</div>' +
+              '<div class="text-xs text-slate-500 dark:text-slate-400 truncate">' + descHtml + '</div>' +
+              '</div>' +
+              shortcutHtml +
+              '</div>';
+            globalIndex++;
+          }
+        }
+
+        resultsContainer.innerHTML = html;
+
+        // Scroll active item into view
+        if (state.activeIndex >= 0) {
+          var activeEl = resultsContainer.querySelector('[data-index="' + state.activeIndex + '"]');
+          if (activeEl) {
+            activeEl.scrollIntoView({ block: "nearest", behavior: "instant" });
+          }
+        }
+      }
+
+      // ============================================================
+      //  OPEN / CLOSE
+      // ============================================================
+      function openPalette() {
+        if (state.open) return;
+        state.open = true;
+        state.activeIndex = 0;
+        input.value = "";
+        state.query = "";
+
+        overlay.classList.remove("pointer-events-none");
+        overlay.style.opacity = "0";
+        modal.classList.remove("closed");
+
+        // Trigger reflow then animate
+        void overlay.offsetHeight;
+        overlay.style.opacity = "1";
+        overlay.classList.remove("closing");
+
+        renderPalette();
+
+        // Focus input after animation
+        setTimeout(function() { input.focus(); }, 80);
+      }
+
+      function closePalette() {
+        if (!state.open) return;
+        state.open = false;
+        overlay.classList.add("closing");
+        overlay.style.opacity = "0";
+        modal.classList.add("closed");
+
+        setTimeout(function() {
+          overlay.classList.add("pointer-events-none");
+          overlay.classList.remove("closing");
+          state.activeIndex = -1;
+        }, 200);
+
+        openBtn.focus();
+      }
+
+      function togglePalette() {
+        if (state.open) closePalette();
+        else openPalette();
+      }
+
+      // ============================================================
+      //  SELECT / EXECUTE
+      // ============================================================
+      function executeCommand(cmd) {
+        var actionMap = {
+          Dashboard: "Navigated to Dashboard",
+          Analytics: "Navigated to Analytics",
+          Settings: "Navigated to Settings page",
+          Profile: "Navigated to Profile",
+          Team: "Navigated to Team page",
+          Projects: "Navigated to Projects",
+          Calendar: "Navigated to Calendar",
+          "New Project": "Created a new project",
+          "Invite Member": "Opened invite dialog",
+          "Export Data": "Started data export",
+          "Create Report": "Creating a new report",
+          "Run Deployment": "Triggering deployment",
+          "Upload File": "Opening file upload",
+          Theme: toggleThemeAction,
+          Notifications: "Opened notification settings",
+          Security: "Opened security settings",
+          "API Keys": "Opened API key management",
+          Billing: "Opened billing settings",
+          "Analytics Report Q1": "Opened Analytics Report Q1",
+          "Team Settings": "Navigated to Team Settings",
+          "Project Phoenix": "Opened Project Phoenix",
+        };
+
+        // Special actions
+        if (cmd.title === "Theme") {
+          toggleThemeAction();
+          showToast("Switched theme");
+          closePalette();
+          return;
+        }
+
+        var action = actionMap[cmd.title];
+        if (action) {
+          if (typeof action === "function") {
+            action();
+          } else {
+            showToast(action);
+          }
+        } else {
+          showToast("Selected: " + cmd.title);
+        }
+        closePalette();
+      }
+
+      function toggleThemeAction() {
+        var isDark = !htmlEl.classList.contains("dark");
+        applyTheme(isDark);
+        try {
+          localStorage.setItem(THEME_KEY, isDark ? "dark" : "light");
+        } catch (e) {}
+      }
+
+      function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add("show");
+        clearTimeout(toast._hideTimer);
+        toast._hideTimer = setTimeout(function() {
+          toast.classList.remove("show");
+        }, 2000);
+      }
+
+      // ============================================================
+      //  NAVIGATION
+      // ============================================================
+      function navigateUp() {
+        if (state.results.length === 0) return;
+        state.activeIndex = (state.activeIndex - 1 + state.results.length) % state.results.length;
+        renderPalette();
+      }
+
+      function navigateDown() {
+        if (state.results.length === 0) return;
+        state.activeIndex = (state.activeIndex + 1) % state.results.length;
+        renderPalette();
+      }
+
+      function selectActive() {
+        if (state.activeIndex >= 0 && state.activeIndex < state.results.length) {
+          var cmd = state.results[state.activeIndex];
+          executeCommand(cmd);
+        }
+      }
+
+      // ============================================================
+      //  EVENT LISTENERS
+      // ============================================================
+
+      // Keyboard shortcuts
+      document.addEventListener("keydown", function(e) {
+        // Cmd+K or Ctrl+K to toggle
+        if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+          e.preventDefault();
+          e.stopPropagation();
+          togglePalette();
+          return;
+        }
+
+        // If palette is not open, ignore other keys
+        if (!state.open) return;
+
+        switch (e.key) {
+          case "Escape":
+            e.preventDefault();
+            closePalette();
+            break;
+          case "ArrowDown":
+            e.preventDefault();
+            navigateDown();
+            break;
+          case "ArrowUp":
+            e.preventDefault();
+            navigateUp();
+            break;
+          case "Enter":
+            e.preventDefault();
+            selectActive();
+            break;
+          case "Tab":
+            e.preventDefault();
+            navigateDown();
+            break;
+        }
+      });
+
+      // Input typing
+      input.addEventListener("input", function() {
+        state.activeIndex = 0;
+        renderPalette();
+      });
+
+      // Click on backdrop to close
+      backdrop.addEventListener("click", function(e) {
+        if (e.target === backdrop) {
+          closePalette();
+        }
+      });
+
+      // Delegate click on results
+      resultsContainer.addEventListener("click", function(e) {
+        var itemEl = e.target.closest(".palette-result");
+        if (!itemEl) return;
+        var index = parseInt(itemEl.dataset.index, 10);
+        if (!isNaN(index) && index >= 0 && index < state.results.length) {
+          state.activeIndex = index;
+          selectActive();
+        }
+      });
+
+      // Open palette button
+      openBtn.addEventListener("click", openPalette);
+
+      // Trap focus inside modal when open
+      overlay.addEventListener("focusin", function(e) {
+        if (state.open && !modal.contains(e.target) && e.target !== backdrop) {
+          input.focus();
+        }
+      });
+
+      // ============================================================
+      //  INIT
+      // ============================================================
+      renderPalette();
+    </script>
+  </body>
+</html>
+
