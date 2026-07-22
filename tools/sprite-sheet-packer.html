@@ -1,0 +1,1602 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AtlasForge | Professional Sprite Packer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+      :root {
+        --bg-base: #0a0a0c;
+        --bg-panel: #121216;
+        --bg-panel-elevated: #1a1a1f;
+        --bg-input: #050506;
+        --border-subtle: #222228;
+        --border-hover: #33333d;
+        --text-primary: #ffffff;
+        --text-secondary: #9494a0;
+        --text-tertiary: #5f5f6b;
+        --accent-color: #00e5ff;
+        --accent-hover: #00c2d9;
+        --accent-glow: rgba(0, 229, 255, 0.15);
+        --selection-bg: rgba(0, 229, 255, 0.1);
+        --danger: #ff4757;
+        --danger-hover: #ff6b81;
+        --font-ui: "Plus Jakarta Sans", sans-serif;
+        --font-mono: "Fira Code", monospace;
+        --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+        --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
+        --radius-sm: 6px;
+        --radius-md: 10px;
+        --radius-lg: 16px;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background-color: var(--bg-base);
+        color: var(--text-primary);
+        font-family: var(--font-ui);
+        font-size: 13px;
+        height: 100vh;
+        min-width: 1024px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--border-subtle);
+        border-radius: 10px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: var(--text-tertiary);
+      }
+      .app-header {
+        height: 56px;
+        background: var(--bg-panel);
+        border-bottom: 1px solid var(--border-subtle);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 24px;
+        z-index: 50;
+        flex-shrink: 0;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 700;
+        font-size: 16px;
+        letter-spacing: -0.02em;
+      }
+      .brand svg {
+        width: 24px;
+        height: 24px;
+        fill: var(--accent-color);
+        filter: drop-shadow(0 0 8px var(--accent-glow));
+      }
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .workspace {
+        display: flex;
+        flex: 1;
+        height: calc(100vh - 56px);
+        position: relative;
+      }
+      .sidebar {
+        background: var(--bg-panel);
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+        position: relative;
+        z-index: 20;
+        flex-shrink: 0;
+      }
+      .sidebar-left {
+        width: 320px;
+        border-right: 1px solid var(--border-subtle);
+      }
+      .sidebar-right {
+        width: 360px;
+        border-left: 1px solid var(--border-subtle);
+      }
+      .main-canvas-area {
+        flex: 1;
+        position: relative;
+        background: var(--bg-base);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        min-width: 300px;
+      }
+      .panel-section {
+        padding: 20px;
+        border-bottom: 1px solid var(--border-subtle);
+        flex-shrink: 0;
+      }
+      .panel-section.flex-fill {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        padding-bottom: 24px;
+      }
+      .panel-section:last-child {
+        border-bottom: none;
+      }
+      .section-header {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--text-secondary);
+        font-weight: 700;
+        margin-bottom: 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .btn {
+        background: var(--bg-panel-elevated);
+        color: var(--text-primary);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-sm);
+        padding: 8px 16px;
+        font-size: 13px;
+        font-family: inherit;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        outline: none;
+      }
+      .btn:hover {
+        background: var(--border-hover);
+        border-color: var(--text-tertiary);
+      }
+      .btn:active {
+        transform: scale(0.98);
+      }
+      .btn-primary {
+        background: var(--accent-color);
+        color: #000;
+        border: none;
+        box-shadow: 0 4px 12px var(--accent-glow);
+      }
+      .btn-primary:hover {
+        background: var(--accent-hover);
+        box-shadow: 0 6px 16px rgba(0, 229, 255, 0.25);
+      }
+      .btn-icon {
+        padding: 6px;
+        background: transparent;
+        border: none;
+        color: var(--text-secondary);
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        transition: 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .btn-icon:hover {
+        background: var(--bg-panel-elevated);
+        color: var(--text-primary);
+      }
+      .form-group {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+      .form-label {
+        color: var(--text-secondary);
+        font-size: 13px;
+        font-weight: 500;
+      }
+      .input-field {
+        background: var(--bg-input);
+        color: var(--text-primary);
+        border: 1px solid var(--border-subtle);
+        padding: 6px 10px;
+        border-radius: var(--radius-sm);
+        font-family: inherit;
+        font-size: 13px;
+        width: 120px;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+      .input-field:focus {
+        border-color: var(--accent-color);
+      }
+      select.input-field {
+        width: 140px;
+        cursor: pointer;
+        appearance: none;
+        background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%239494a0%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E");
+        background-repeat: no-repeat;
+        background-position: right 8px center;
+        padding-right: 24px;
+      }
+      input[type="number"]::-webkit-inner-spin-button,
+      input[type="number"]::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+      input[type="number"] {
+        -moz-appearance: textfield;
+      }
+      .toggle-wrapper {
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+        gap: 12px;
+      }
+      .toggle-input {
+        display: none;
+      }
+      .toggle-bg {
+        width: 36px;
+        height: 20px;
+        background: var(--bg-input);
+        border: 1px solid var(--border-subtle);
+        border-radius: 10px;
+        position: relative;
+        transition: 0.3s;
+      }
+      .toggle-bg::after {
+        content: "";
+        position: absolute;
+        top: 1px;
+        left: 2px;
+        width: 16px;
+        height: 16px;
+        background: var(--text-secondary);
+        border-radius: 50%;
+        transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .toggle-input:checked + .toggle-bg {
+        background: var(--accent-color);
+        border-color: var(--accent-color);
+      }
+      .toggle-input:checked + .toggle-bg::after {
+        transform: translateX(14px);
+        background: #000;
+      }
+      .mini-dropzone {
+        border: 1px dashed var(--border-subtle);
+        border-radius: var(--radius-md);
+        padding: 24px;
+        text-align: center;
+        background: var(--bg-input);
+        transition: all 0.2s;
+        cursor: pointer;
+        position: relative;
+        margin-bottom: 16px;
+      }
+      .mini-dropzone:hover,
+      .mini-dropzone.dragover {
+        border-color: var(--accent-color);
+        background: var(--selection-bg);
+      }
+      .mini-dropzone p {
+        color: var(--text-secondary);
+        font-size: 13px;
+        pointer-events: none;
+      }
+      .mini-dropzone strong {
+        color: var(--accent-color);
+      }
+      .file-hidden {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        cursor: pointer;
+      }
+      .asset-list {
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        flex: 1;
+        overflow-y: auto;
+        max-height: 320px;
+        padding-right: 4px;
+      }
+      .asset-item {
+        display: flex;
+        align-items: center;
+        padding: 8px;
+        background: var(--bg-input);
+        border-radius: var(--radius-sm);
+        border: 1px solid transparent;
+        gap: 12px;
+        cursor: pointer;
+        transition: 0.2s;
+      }
+      .asset-item:hover {
+        background: var(--bg-panel-elevated);
+        border-color: var(--border-hover);
+      }
+      .asset-item.active {
+        background: var(--selection-bg);
+        border-color: var(--accent-color);
+      }
+      .asset-thumb {
+        width: 28px;
+        height: 28px;
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center;
+        background-color: var(--bg-panel);
+        border-radius: 4px;
+      }
+      .asset-details {
+        flex: 1;
+        overflow: hidden;
+      }
+      .asset-name {
+        display: block;
+        font-size: 12px;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .asset-dim {
+        display: block;
+        font-size: 10px;
+        color: var(--text-tertiary);
+        margin-top: 3px;
+        font-family: var(--font-mono);
+      }
+      .btn-delete {
+        color: var(--text-tertiary);
+      }
+      .btn-delete:hover {
+        color: var(--danger);
+      }
+      .canvas-container {
+        width: 100%;
+        height: 100%;
+        cursor: grab;
+        position: relative;
+      }
+      .canvas-container:active {
+        cursor: grabbing;
+      }
+      canvas {
+        display: block;
+      }
+      .floating-controls {
+        position: absolute;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        align-items: center;
+        background: rgba(18, 18, 22, 0.85);
+        backdrop-filter: blur(12px);
+        border: 1px solid var(--border-subtle);
+        border-radius: 20px;
+        padding: 6px;
+        box-shadow: var(--shadow-lg);
+        z-index: 10;
+        gap: 4px;
+      }
+      .zoom-btn {
+        background: transparent;
+        border: none;
+        color: var(--text-primary);
+        width: 28px;
+        height: 28px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-weight: 600;
+        transition: 0.2s;
+      }
+      .zoom-btn:hover {
+        background: var(--bg-panel-elevated);
+      }
+      .zoom-level {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        padding: 0 12px;
+        color: var(--text-secondary);
+      }
+      .stats-bar {
+        position: absolute;
+        top: 24px;
+        left: 24px;
+        display: flex;
+        gap: 16px;
+        background: rgba(18, 18, 22, 0.85);
+        backdrop-filter: blur(12px);
+        border: 1px solid var(--border-subtle);
+        padding: 10px 16px;
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-sm);
+        z-index: 10;
+      }
+      .stat-item {
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+      .stat-val {
+        font-family: var(--font-mono);
+        color: var(--text-primary);
+        font-weight: 500;
+        margin-left: 6px;
+      }
+      .inspector-empty {
+        height: 160px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-tertiary);
+        border: 1px dashed var(--border-subtle);
+        border-radius: var(--radius-md);
+        background: var(--bg-input);
+        font-size: 13px;
+        text-align: center;
+        padding: 20px;
+      }
+      .inspector-empty svg {
+        width: 32px;
+        height: 32px;
+        margin-bottom: 12px;
+        stroke: currentColor;
+      }
+      .sprite-preview-box {
+        width: 100%;
+        height: 140px;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border-subtle);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 20px;
+        padding: 12px;
+        overflow: hidden;
+        background-color: var(--bg-panel-elevated);
+        background-image: linear-gradient(45deg, var(--bg-panel) 25%, transparent 25%, transparent 75%, var(--bg-panel) 75%, var(--bg-panel)), linear-gradient(45deg, var(--bg-panel) 25%, transparent 25%, transparent 75%, var(--bg-panel) 75%, var(--bg-panel));
+        background-size: 16px 16px;
+        background-position:
+          0 0,
+          8px 8px;
+      }
+      .sprite-preview-box img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.5));
+        image-rendering: pixelated;
+      }
+      .prop-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      .prop-card {
+        background: var(--bg-input);
+        border: 1px solid var(--border-subtle);
+        padding: 10px;
+        border-radius: var(--radius-sm);
+      }
+      .prop-full {
+        grid-column: span 2;
+      }
+      .prop-lbl {
+        display: block;
+        font-size: 10px;
+        color: var(--text-tertiary);
+        text-transform: uppercase;
+        font-weight: 700;
+        margin-bottom: 4px;
+      }
+      .prop-val {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .tabs {
+        display: flex;
+        border-bottom: 1px solid var(--border-subtle);
+        margin-bottom: 16px;
+      }
+      .tab {
+        padding: 10px 20px;
+        background: transparent;
+        border: none;
+        color: var(--text-secondary);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        transition: 0.2s;
+      }
+      .tab:hover {
+        color: var(--text-primary);
+      }
+      .tab.active {
+        color: var(--accent-color);
+        border-bottom-color: var(--accent-color);
+      }
+      .code-container {
+        position: relative;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      }
+      .code-area {
+        flex: 1;
+        width: 100%;
+        background: var(--bg-input);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-sm);
+        padding: 16px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: #d4d4d8;
+        resize: none;
+        outline: none;
+        line-height: 1.6;
+      }
+      .code-area:focus {
+        border-color: var(--accent-color);
+      }
+      .btn-copy-code {
+        position: absolute;
+        top: 12px;
+        right: 24px;
+        background: var(--bg-panel-elevated);
+        border: 1px solid var(--border-subtle);
+        color: var(--text-primary);
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        opacity: 0;
+        transition: 0.2s;
+      }
+      .code-container:hover .btn-copy-code {
+        opacity: 1;
+      }
+      .btn-copy-code:hover {
+        background: var(--border-hover);
+      }
+      .landing-wrapper {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: var(--bg-base);
+        z-index: 5;
+        transition: opacity 0.4s;
+      }
+      .landing-wrapper.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .landing-content {
+        text-align: center;
+        max-width: 500px;
+        width: 100%;
+        padding: 0 20px;
+      }
+      .landing-icon {
+        width: 64px;
+        height: 64px;
+        background: var(--selection-bg);
+        border-radius: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 24px auto;
+        border: 1px solid rgba(0, 229, 255, 0.2);
+        box-shadow: 0 0 40px var(--accent-glow);
+      }
+      .landing-icon svg {
+        width: 32px;
+        height: 32px;
+        fill: var(--accent-color);
+      }
+      .landing-title {
+        font-size: 32px;
+        font-weight: 700;
+        margin-bottom: 8px;
+        letter-spacing: -0.02em;
+      }
+      .landing-desc {
+        color: var(--text-secondary);
+        font-size: 15px;
+        margin-bottom: 40px;
+        line-height: 1.5;
+      }
+      .huge-dropzone {
+        border: 2px dashed var(--border-subtle);
+        border-radius: var(--radius-lg);
+        padding: 60px 40px;
+        background: rgba(255, 255, 255, 0.01);
+        transition: 0.3s;
+        cursor: pointer;
+        position: relative;
+      }
+      .huge-dropzone:hover,
+      .huge-dropzone.dragover {
+        border-color: var(--accent-color);
+        background: var(--selection-bg);
+        transform: translateY(-2px);
+      }
+      .huge-dropzone p {
+        font-size: 16px;
+        color: var(--text-secondary);
+        pointer-events: none;
+      }
+      .huge-dropzone strong {
+        color: var(--accent-color);
+        font-weight: 600;
+      }
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(4px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+        opacity: 0;
+        pointer-events: none;
+        transition: 0.3s;
+      }
+      .modal-overlay.active {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .modal-box {
+        background: var(--bg-panel);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-lg);
+        width: 100%;
+        max-width: 600px;
+        box-shadow: var(--shadow-lg);
+        transform: translateY(20px);
+        transition: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .modal-overlay.active .modal-box {
+        transform: translateY(0);
+      }
+      .modal-header {
+        padding: 24px;
+        border-bottom: 1px solid var(--border-subtle);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .modal-title {
+        font-size: 18px;
+        font-weight: 700;
+      }
+      .modal-close {
+        background: transparent;
+        border: none;
+        color: var(--text-secondary);
+        cursor: pointer;
+        padding: 4px;
+        border-radius: 4px;
+        display: flex;
+      }
+      .modal-close:hover {
+        background: var(--bg-panel-elevated);
+        color: var(--text-primary);
+      }
+      .modal-body {
+        padding: 24px;
+        color: var(--text-secondary);
+        line-height: 1.6;
+        font-size: 14px;
+        max-height: 60vh;
+        overflow-y: auto;
+      }
+      .modal-body h3 {
+        color: var(--text-primary);
+        margin: 20px 0 8px 0;
+        font-size: 15px;
+        font-weight: 600;
+      }
+      .modal-body ul {
+        padding-left: 20px;
+        margin-bottom: 16px;
+      }
+      .modal-body li {
+        margin-bottom: 6px;
+      }
+      .global-drag {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 229, 255, 0.05);
+        z-index: 999;
+        border: 4px dashed var(--accent-color);
+        opacity: 0;
+        pointer-events: none;
+        transition: 0.2s;
+      }
+      .global-drag.active {
+        opacity: 1;
+        pointer-events: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand">
+        <svg viewBox="0 0 24 24">
+          <path d="M4 4h6v6H4V4zm10 0h6v6h-6V4zM4 14h6v6H4v-6zm10 0h6v6h-6v-6z" opacity="0.3" />
+          <path d="M2 2h8v8H2V2zm12 0h8v8h-8V2zM2 14h8v8H2v-8zm12 0h8v8h-8v-8z" />
+        </svg>
+        AtlasForge
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-icon" onclick="app.showModal()" title="Help & Instructions">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+        </button>
+        <button class="btn" onclick="app.clearAll()">Clear Workspace</button>
+        <button class="btn btn-primary" onclick="app.exportPackage()">Download ZIP</button>
+      </div>
+    </header>
+    <div class="workspace">
+      <aside class="sidebar sidebar-left">
+        <div class="panel-section" style="padding-bottom: 12px">
+          <div class="section-header">Import Assets</div>
+          <div class="mini-dropzone" id="sidebar-dropzone">
+            <p>Drop images or <strong>Browse</strong></p>
+            <input type="file" class="file-hidden" id="file-input" multiple accept="image/png, image/jpeg, image/webp, image/svg+xml" />
+          </div>
+        </div>
+        <div class="panel-section" style="padding-top: 0; padding-bottom: 0; flex: 1; display: flex; flex-direction: column; overflow: hidden; border-bottom: none">
+          <ul class="asset-list" id="asset-list"></ul>
+        </div>
+        <div class="panel-section" style="border-top: 1px solid var(--border-subtle)">
+          <div class="section-header">Packing Configuration</div>
+          <div class="form-group">
+            <label class="form-label">Algorithm</label>
+            <select class="input-field" id="set-algo">
+              <option value="maxrects">MaxRects Optimal</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Padding (px)</label>
+            <input type="number" class="input-field" id="set-padding" value="2" min="0" max="100" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">CSS Output Scale</label>
+            <select class="input-field" id="set-scale">
+              <option value="1">1x (Standard)</option>
+              <option value="2">2x (Retina)</option>
+              <option value="3">3x (Super Retina)</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-top: 20px">
+            <label class="form-label">Force Power of Two</label>
+            <label class="toggle-wrapper">
+              <input type="checkbox" class="toggle-input" id="set-pot" checked />
+              <div class="toggle-bg"></div>
+            </label>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Force Square Atlas</label>
+            <label class="toggle-wrapper">
+              <input type="checkbox" class="toggle-input" id="set-square" />
+              <div class="toggle-bg"></div>
+            </label>
+          </div>
+        </div>
+      </aside>
+      <main class="main-canvas-area" id="main-area">
+        <div class="landing-wrapper" id="landing-state">
+          <div class="landing-content">
+            <div class="landing-icon">
+              <svg viewBox="0 0 24 24"><path d="M2 2h8v8H2V2zm12 0h8v8h-8V2zM2 14h8v8H2v-8zm12 0h8v8h-8v-8z" /></svg>
+            </div>
+            <h1 class="landing-title">Start Building Your Atlas</h1>
+            <p class="landing-desc">AtlasForge uses an advanced bin-packing algorithm to generate optimized sprite sheets, CSS, and robust SVG symbol maps entirely in your browser.</p>
+            <div class="huge-dropzone" id="hero-dropzone">
+              <p>Drag and drop PNG, JPG, WebP, or SVG files here<br /><br />or <strong>Click to Browse</strong></p>
+              <input type="file" class="file-hidden" id="hero-file-input" multiple accept="image/png, image/jpeg, image/webp, image/svg+xml" />
+            </div>
+          </div>
+        </div>
+        <div class="stats-bar" id="stats-bar" style="display: none">
+          <div class="stat-item">Size<span class="stat-val" id="stat-size">0 × 0</span></div>
+          <div class="stat-item">Assets<span class="stat-val" id="stat-count">0</span></div>
+          <div class="stat-item">Density<span class="stat-val" id="stat-eff">0%</span></div>
+        </div>
+        <div class="canvas-container" id="canvas-container">
+          <canvas id="main-canvas"></canvas>
+        </div>
+        <div class="floating-controls" id="zoom-controls" style="display: none">
+          <button class="zoom-btn" onclick="app.zoomOut()">-</button>
+          <div class="zoom-level" id="zoom-text">100%</div>
+          <button class="zoom-btn" onclick="app.zoomIn()">+</button>
+          <div style="width: 1px; height: 16px; background: var(--border-subtle); margin: 0 4px"></div>
+          <button class="btn btn-icon" style="font-size: 11px; padding: 4px 8px; width: auto" onclick="app.resetZoom()">Fit</button>
+        </div>
+      </main>
+      <aside class="sidebar sidebar-right">
+        <div class="panel-section">
+          <div class="section-header">Inspector</div>
+          <div id="inspector-content">
+            <div class="inspector-empty">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              </svg>
+              Select a packed sprite to inspect its properties
+            </div>
+          </div>
+        </div>
+        <div class="panel-section flex-fill">
+          <div class="section-header">Generated Output</div>
+          <div class="tabs">
+            <button class="tab active" data-target="out-css">CSS</button>
+            <button class="tab" data-target="out-json">JSON</button>
+            <button class="tab" data-target="out-svg">SVG</button>
+          </div>
+          <div class="code-container">
+            <button class="btn-copy-code" onclick="app.copyCode()">Copy</button>
+            <textarea class="code-area" id="out-css" readonly spellcheck="false"></textarea>
+            <textarea class="code-area" id="out-json" readonly spellcheck="false" style="display: none"></textarea>
+            <textarea class="code-area" id="out-svg" readonly spellcheck="false" style="display: none"></textarea>
+          </div>
+        </div>
+      </aside>
+    </div>
+    <div class="modal-overlay" id="help-modal">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h2 class="modal-title">Welcome to AtlasForge</h2>
+          <button class="modal-close" onclick="app.closeModal()">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <p>AtlasForge is a professional, entirely client-side tool for packing multiple images into highly optimized sprite sheets.</p>
+          <h3>Key Features</h3>
+          <ul>
+            <li><strong>MaxRects Algorithm:</strong> Uses a mathematically rigorous bin-packing heuristic (Best Short Side Fit) to heavily minimize wasted texture space.</li>
+            <li><strong>SVG Symbol Maps:</strong> Upload vector <code>.svg</code> files, and the app will generate a production-ready <code>&lt;symbol&gt;</code> map with rewritten namespace IDs to prevent DOM collisions.</li>
+            <li><strong>Retina Scaling:</strong> Easily export CSS coordinates dynamically scaled down for high-DPI <code>@2x</code> or <code>@3x</code> displays.</li>
+            <li><strong>100% Private:</strong> All processing happens directly in your browser tab. No assets are ever uploaded to any external server.</li>
+          </ul>
+          <h3>Supported Formats</h3>
+          <p>Accepts PNG, JPEG, WebP, and SVG files via batch upload or drag-and-drop.</p>
+        </div>
+      </div>
+    </div>
+    <div class="global-drag" id="global-drag"></div>
+    <script>
+      class MaxRectsPacker {
+        constructor(width, height) {
+          this.width = width;
+          this.height = height;
+          this.freeRects = [{ x: 0, y: 0, width: width, height: height }];
+        }
+        insert(width, height) {
+          let bestNode = { x: 0, y: 0, width: 0, height: 0 };
+          let bestShortFit = Number.MAX_VALUE;
+          let bestLongFit = Number.MAX_VALUE;
+          let bestIndex = -1;
+          for (let i = 0; i < this.freeRects.length; i++) {
+            let rect = this.freeRects[i];
+            if (rect.width >= width && rect.height >= height) {
+              let leftoverW = Math.abs(rect.width - width);
+              let leftoverH = Math.abs(rect.height - height);
+              let shortFit = Math.min(leftoverW, leftoverH);
+              let longFit = Math.max(leftoverW, leftoverH);
+              if (shortFit < bestShortFit || (shortFit === bestShortFit && longFit < bestLongFit)) {
+                bestNode.x = rect.x;
+                bestNode.y = rect.y;
+                bestNode.width = width;
+                bestNode.height = height;
+                bestShortFit = shortFit;
+                bestLongFit = longFit;
+                bestIndex = i;
+              }
+            }
+          }
+          if (bestIndex === -1) return null;
+          let numRects = this.freeRects.length;
+          for (let i = 0; i < numRects; i++) {
+            if (this.splitFreeNode(this.freeRects[i], bestNode)) {
+              this.freeRects.splice(i, 1);
+              i--;
+              numRects--;
+            }
+          }
+          this.pruneFreeList();
+          return bestNode;
+        }
+        splitFreeNode(freeNode, usedNode) {
+          if (usedNode.x >= freeNode.x + freeNode.width || usedNode.x + usedNode.width <= freeNode.x || usedNode.y >= freeNode.y + freeNode.height || usedNode.y + usedNode.height <= freeNode.y) {
+            return false;
+          }
+          if (usedNode.x < freeNode.x + freeNode.width && usedNode.x + usedNode.width > freeNode.x) {
+            if (usedNode.y > freeNode.y && usedNode.y < freeNode.y + freeNode.height) {
+              let newNode = { ...freeNode };
+              newNode.height = usedNode.y - newNode.y;
+              this.freeRects.push(newNode);
+            }
+            if (usedNode.y + usedNode.height < freeNode.y + freeNode.height) {
+              let newNode = { ...freeNode };
+              newNode.y = usedNode.y + usedNode.height;
+              newNode.height = freeNode.y + freeNode.height - (usedNode.y + usedNode.height);
+              this.freeRects.push(newNode);
+            }
+          }
+          if (usedNode.y < freeNode.y + freeNode.height && usedNode.y + usedNode.height > freeNode.y) {
+            if (usedNode.x > freeNode.x && usedNode.x < freeNode.x + freeNode.width) {
+              let newNode = { ...freeNode };
+              newNode.width = usedNode.x - newNode.x;
+              this.freeRects.push(newNode);
+            }
+            if (usedNode.x + usedNode.width < freeNode.x + freeNode.width) {
+              let newNode = { ...freeNode };
+              newNode.x = usedNode.x + usedNode.width;
+              newNode.width = freeNode.x + freeNode.width - (usedNode.x + usedNode.width);
+              this.freeRects.push(newNode);
+            }
+          }
+          return true;
+        }
+        pruneFreeList() {
+          for (let i = 0; i < this.freeRects.length; i++) {
+            for (let j = i + 1; j < this.freeRects.length; j++) {
+              if (this.isContainedIn(this.freeRects[i], this.freeRects[j])) {
+                this.freeRects.splice(i, 1);
+                i--;
+                break;
+              }
+              if (this.isContainedIn(this.freeRects[j], this.freeRects[i])) {
+                this.freeRects.splice(j, 1);
+                j--;
+              }
+            }
+          }
+        }
+        isContainedIn(a, b) {
+          return a.x >= b.x && a.y >= b.y && a.x + a.width <= b.x + b.width && a.y + a.height <= b.y + b.height;
+        }
+      }
+      const app = {
+        images: [],
+        atlas: null,
+        offscreen: document.createElement("canvas"),
+        transform: { x: 0, y: 0, scale: 1 },
+        isDraggingCanvas: false,
+        dragStart: { x: 0, y: 0 },
+        hoveredSprite: null,
+        selectedSprite: null,
+        isFirstPack: true,
+        buildTimeout: null,
+        activeTabId: "out-css",
+        init() {
+          if (typeof JSZip === "undefined") {
+            console.warn("JSZip failed to load");
+          }
+          this.cacheDOM();
+          this.bindEvents();
+          this.offCtx = this.offscreen.getContext("2d", { willReadFrequently: true });
+          this.renderLoop();
+        },
+        cacheDOM() {
+          this.canvas = document.getElementById("main-canvas");
+          this.ctx = this.canvas.getContext("2d");
+          this.container = document.getElementById("canvas-container");
+          this.ui = {
+            landing: document.getElementById("landing-state"),
+            statsBar: document.getElementById("stats-bar"),
+            zoomControls: document.getElementById("zoom-controls"),
+            assetList: document.getElementById("asset-list"),
+            inspector: document.getElementById("inspector-content"),
+            modal: document.getElementById("help-modal"),
+            globalDrag: document.getElementById("global-drag"),
+            statSize: document.getElementById("stat-size"),
+            statCount: document.getElementById("stat-count"),
+            statEff: document.getElementById("stat-eff"),
+            zoomText: document.getElementById("zoom-text"),
+            inputs: {
+              padding: document.getElementById("set-padding"),
+              pot: document.getElementById("set-pot"),
+              square: document.getElementById("set-square"),
+              scale: document.getElementById("set-scale")
+            }
+          };
+        },
+        bindEvents() {
+          Object.values(this.ui.inputs).forEach((input) => {
+            input.addEventListener("change", () => this.queueBuild());
+          });
+          window.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            this.ui.globalDrag.classList.add("active");
+          });
+          window.addEventListener("dragleave", (e) => {
+            if (e.target === this.ui.globalDrag) this.ui.globalDrag.classList.remove("active");
+          });
+          window.addEventListener("drop", (e) => {
+            e.preventDefault();
+            this.ui.globalDrag.classList.remove("active");
+            if (e.dataTransfer.files) this.handleFiles(e.dataTransfer.files);
+          });
+          document.getElementById("file-input").addEventListener("change", (e) => this.handleFiles(e.target.files));
+          document.getElementById("hero-file-input").addEventListener("change", (e) => this.handleFiles(e.target.files));
+          this.container.addEventListener("wheel", this.handleWheel.bind(this));
+          this.container.addEventListener("mousedown", this.handleMouseDown.bind(this));
+          window.addEventListener("mousemove", this.handleMouseMove.bind(this));
+          window.addEventListener("mouseup", this.handleMouseUp.bind(this));
+          document.querySelectorAll(".tab").forEach((tab) => {
+            tab.addEventListener("click", () => {
+              document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+              document.querySelectorAll(".code-area").forEach((ta) => (ta.style.display = "none"));
+              tab.classList.add("active");
+              this.activeTabId = tab.dataset.target;
+              document.getElementById(this.activeTabId).style.display = "block";
+            });
+          });
+        },
+        showModal() {
+          this.ui.modal.classList.add("active");
+        },
+        closeModal() {
+          this.ui.modal.classList.remove("active");
+        },
+        async handleFiles(fileList) {
+          let toProcess = Array.from(fileList).filter((f) => f.type.match("image.*"));
+          if (toProcess.length === 0) return;
+          this.ui.landing.classList.add("hidden");
+          this.ui.statsBar.style.display = "flex";
+          this.ui.zoomControls.style.display = "flex";
+          let loadPromises = toProcess.map(async (file) => {
+            let baseName = file.name;
+            let count = 1;
+            while (this.images.some((i) => i.name === baseName)) {
+              let split = file.name.lastIndexOf(".");
+              if (split === -1) baseName = `${file.name}-${count}`;
+              else baseName = `${file.name.substring(0, split)}-${count}${file.name.substring(split)}`;
+              count++;
+            }
+            const isSvg = file.type.includes("svg");
+            const objectUrl = URL.createObjectURL(file);
+            return new Promise((resolve) => {
+              const img = new Image();
+              img.onload = async () => {
+                let imgData = {
+                  name: baseName,
+                  img: img,
+                  width: img.width,
+                  height: img.height,
+                  isSvg: isSvg,
+                  objectUrl: objectUrl
+                };
+                if (isSvg) {
+                  try {
+                    const text = await file.text();
+                    imgData.svgContent = text;
+                  } catch (e) {
+                    console.error(e);
+                  }
+                }
+                resolve(imgData);
+              };
+              img.onerror = () => {
+                URL.revokeObjectURL(objectUrl);
+                resolve(null);
+              };
+              img.src = objectUrl;
+            });
+          });
+          let results = await Promise.all(loadPromises);
+          results.forEach((res) => {
+            if (res) this.images.push(res);
+          });
+          this.queueBuild();
+        },
+        removeImage(index) {
+          if (this.selectedSprite && this.selectedSprite.image === this.images[index]) {
+            this.selectedSprite = null;
+            this.updateInspector();
+          }
+          URL.revokeObjectURL(this.images[index].objectUrl);
+          this.images.splice(index, 1);
+          this.queueBuild();
+        },
+        clearAll() {
+          this.images.forEach((i) => URL.revokeObjectURL(i.objectUrl));
+          this.images = [];
+          this.atlas = null;
+          this.selectedSprite = null;
+          this.isFirstPack = true;
+          this.ui.landing.classList.remove("hidden");
+          this.ui.statsBar.style.display = "none";
+          this.ui.zoomControls.style.display = "none";
+          this.updateInspector();
+          this.renderAssetList();
+          this.generateOutput();
+          this.offscreen.width = 0;
+        },
+        queueBuild() {
+          clearTimeout(this.buildTimeout);
+          this.buildTimeout = setTimeout(() => this.buildAtlas(), 50);
+        },
+        buildAtlas() {
+          this.renderAssetList();
+          if (this.images.length === 0) {
+            this.atlas = null;
+            this.updateStats();
+            this.generateOutput();
+            return;
+          }
+          const padding = parseInt(this.ui.inputs.padding.value, 10) || 0;
+          const forcePot = this.ui.inputs.pot.checked;
+          const forceSquare = this.ui.inputs.square.checked;
+          let sorted = [...this.images].sort((a, b) => b.width * b.height - a.width * a.height);
+          let totalArea = sorted.reduce((sum, img) => sum + (img.width + padding) * (img.height + padding), 0);
+          let maxW = Math.max(...sorted.map((i) => i.width + padding));
+          let maxH = Math.max(...sorted.map((i) => i.height + padding));
+          let w = Math.max(32, Math.ceil(Math.sqrt(totalArea)), maxW);
+          let h = forceSquare ? Math.max(w, maxH) : Math.max(Math.ceil(totalArea / w), maxH);
+          if (forceSquare && w !== h) w = h;
+          if (forcePot) {
+            w = this.nextPowerOfTwo(w);
+            h = this.nextPowerOfTwo(h);
+          }
+          let packed = false;
+          let result = [];
+          let maxTries = 40;
+          while (!packed && maxTries > 0) {
+            let packer = new MaxRectsPacker(w, h);
+            let success = true;
+            result = [];
+            for (let img of sorted) {
+              let node = packer.insert(img.width + padding, img.height + padding);
+              if (node) {
+                result.push({ image: img, x: node.x, y: node.y, width: img.width, height: img.height });
+              } else {
+                success = false;
+                break;
+              }
+            }
+            if (success) packed = true;
+            else {
+              if (forcePot) {
+                if (forceSquare) {
+                  w *= 2;
+                  h *= 2;
+                } else {
+                  if (w <= h) w *= 2;
+                  else h *= 2;
+                }
+              } else {
+                if (forceSquare) {
+                  w += 128;
+                  h += 128;
+                } else {
+                  if (w <= h) w += 128;
+                  else h += 128;
+                }
+              }
+            }
+            maxTries--;
+          }
+          if (!forcePot && !forceSquare && packed) {
+            let maxX = 0,
+              maxY = 0;
+            for (let s of result) {
+              maxX = Math.max(maxX, s.x + s.width);
+              maxY = Math.max(maxY, s.y + s.height);
+            }
+            w = maxX + padding;
+            h = maxY + padding;
+          }
+          this.atlas = { width: w, height: h, sprites: result };
+          this.offscreen.width = w;
+          this.offscreen.height = h;
+          this.offCtx.clearRect(0, 0, w, h);
+          for (let s of this.atlas.sprites) {
+            this.offCtx.drawImage(s.image.img, s.x, s.y, s.width, s.height);
+          }
+          this.updateStats();
+          this.generateOutput();
+          if (this.selectedSprite) this.updateInspector();
+          if (this.isFirstPack && this.atlas.width > 0) {
+            this.resetZoom();
+            this.isFirstPack = false;
+          }
+        },
+        nextPowerOfTwo(n) {
+          return Math.pow(2, Math.ceil(Math.log2(n)));
+        },
+        cleanCssName(name) {
+          return name
+            .replace(/\.[^/.]+$/, "")
+            .replace(/[^a-zA-Z0-9-]/g, "-")
+            .toLowerCase();
+        },
+        renderAssetList() {
+          this.ui.assetList.innerHTML = "";
+          this.images.forEach((img, i) => {
+            const li = document.createElement("li");
+            li.className = "asset-item";
+            if (this.selectedSprite && this.selectedSprite.image === img) li.classList.add("active");
+            li.innerHTML = `
+<div class="asset-thumb" style="background-image: url('${img.objectUrl}')"></div>
+<div class="asset-details">
+<span class="asset-name" title="${img.name}">${img.name}</span>
+<span class="asset-dim">${img.width} × ${img.height}</span>
+</div>
+<button class="btn-icon btn-delete" title="Remove Asset">
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+</button>
+`;
+            li.querySelector(".btn-delete").onclick = (e) => {
+              e.stopPropagation();
+              this.removeImage(i);
+            };
+            li.onmouseenter = () => {
+              if (this.atlas) this.hoveredSprite = this.atlas.sprites.find((s) => s.image === img);
+            };
+            li.onmouseleave = () => {
+              this.hoveredSprite = null;
+            };
+            li.onclick = () => {
+              this.selectedSprite = this.atlas ? this.atlas.sprites.find((s) => s.image === img) : null;
+              this.renderAssetList();
+              this.updateInspector();
+            };
+            this.ui.assetList.appendChild(li);
+          });
+        },
+        updateStats() {
+          if (!this.atlas) return;
+          const used = this.atlas.sprites.reduce((sum, s) => sum + s.width * s.height, 0);
+          const total = this.atlas.width * this.atlas.height;
+          const eff = total === 0 ? 0 : ((used / total) * 100).toFixed(1);
+          this.ui.statSize.textContent = `${this.atlas.width} × ${this.atlas.height}`;
+          this.ui.statCount.textContent = this.atlas.sprites.length;
+          this.ui.statEff.textContent = `${eff}%`;
+        },
+        updateInspector() {
+          if (!this.selectedSprite) {
+            this.ui.inspector.innerHTML = `
+<div class="inspector-empty">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+Select a packed sprite to inspect its properties
+</div>`;
+            return;
+          }
+          let s = this.selectedSprite;
+          let cssName = this.cleanCssName(s.image.name);
+          let scale = parseInt(this.ui.inputs.scale.value, 10) || 1;
+          this.ui.inspector.innerHTML = `
+<div class="sprite-preview-box checker-bg">
+<img src="${s.image.objectUrl}">
+</div>
+<div class="prop-grid">
+<div class="prop-card prop-full">
+<span class="prop-lbl">Source File</span>
+<span class="prop-val" title="${s.image.name}">${s.image.name}</span>
+</div>
+<div class="prop-card prop-full">
+<span class="prop-lbl">CSS Identifier</span>
+<span class="prop-val">.sprite-${cssName}</span>
+</div>
+<div class="prop-card">
+<span class="prop-lbl">Export Width</span>
+<span class="prop-val">${Number((s.width / scale).toFixed(2))}px</span>
+</div>
+<div class="prop-card">
+<span class="prop-lbl">Export Height</span>
+<span class="prop-val">${Number((s.height / scale).toFixed(2))}px</span>
+</div>
+<div class="prop-card">
+<span class="prop-lbl">Offset X</span>
+<span class="prop-val">${Number((s.x / scale).toFixed(2))}px</span>
+</div>
+<div class="prop-card">
+<span class="prop-lbl">Offset Y</span>
+<span class="prop-val">${Number((s.y / scale).toFixed(2))}px</span>
+</div>
+</div>
+`;
+        },
+        generateOutput() {
+          if (!this.atlas) {
+            document.getElementById("out-css").value = "";
+            document.getElementById("out-json").value = "{}";
+            document.getElementById("out-svg").value = "";
+            return;
+          }
+          let scale = parseInt(this.ui.inputs.scale.value, 10) || 1;
+          let css = `.sprite {\n  background-image: url('sprite.png');\n  background-repeat: no-repeat;\n  display: inline-block;\n`;
+          if (scale > 1) css += `  background-size: ${Number((this.atlas.width / scale).toFixed(2))}px ${Number((this.atlas.height / scale).toFixed(2))}px;\n`;
+          css += `}\n\n`;
+          for (let s of this.atlas.sprites) {
+            let cls = this.cleanCssName(s.image.name);
+            css += `.sprite-${cls} {\n`;
+            css += `  width: ${Number((s.width / scale).toFixed(2))}px;\n`;
+            css += `  height: ${Number((s.height / scale).toFixed(2))}px;\n`;
+            css += `  background-position: -${Number((s.x / scale).toFixed(2))}px -${Number((s.y / scale).toFixed(2))}px;\n`;
+            css += `}\n`;
+          }
+          document.getElementById("out-css").value = css;
+          let json = {
+            frames: [],
+            meta: {
+              app: "AtlasForge",
+              image: "sprite.png",
+              format: "RGBA8888",
+              size: { w: this.atlas.width, h: this.atlas.height },
+              scale: scale
+            }
+          };
+          for (let s of this.atlas.sprites) {
+            json.frames.push({
+              filename: s.image.name,
+              frame: { x: s.x, y: s.y, w: s.width, h: s.height },
+              rotated: false,
+              trimmed: false,
+              spriteSourceSize: { x: 0, y: 0, w: s.width, h: s.height },
+              sourceSize: { w: s.width, h: s.height }
+            });
+          }
+          document.getElementById("out-json").value = JSON.stringify(json, null, 2);
+          let hasSvg = false;
+          let svg = `<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">\n  <defs>\n`;
+          const parser = new DOMParser();
+          for (let s of this.atlas.sprites) {
+            if (s.image.isSvg && s.image.svgContent) {
+              hasSvg = true;
+              let spriteId = this.cleanCssName(s.image.name);
+              let doc = parser.parseFromString(s.image.svgContent, "image/svg+xml");
+              let svgEl = doc.querySelector("svg");
+              if (svgEl) {
+                let viewBox = svgEl.getAttribute("viewBox") || `0 0 ${s.width} ${s.height}`;
+                let inner = svgEl.innerHTML.trim();
+                let idRegex = /\bid="([^"]+)"/g;
+                let match,
+                  ids = [];
+                while ((match = idRegex.exec(inner)) !== null) ids.push(match[1]);
+                ids.forEach((oldId) => {
+                  let newId = `${spriteId}-${oldId}`;
+                  inner = inner.split(`id="${oldId}"`).join(`id="${newId}"`);
+                  inner = inner.split(`url(#${oldId})`).join(`url(#${newId})`);
+                  inner = inner.split(`href="#${oldId}"`).join(`href="#${newId}"`);
+                });
+                svg += `    <symbol id="icon-${spriteId}" viewBox="${viewBox}">\n      ${inner}\n    </symbol>\n`;
+              }
+            }
+          }
+          svg += `  </defs>\n</svg>`;
+          document.getElementById("out-svg").value = hasSvg ? svg : "";
+        },
+        copyCode() {
+          const area = document.getElementById(this.activeTabId);
+          area.select();
+          navigator.clipboard.writeText(area.value);
+          const btn = document.querySelector(".btn-copy-code");
+          const prev = btn.innerText;
+          btn.innerText = "Copied!";
+          btn.style.color = "var(--accent-color)";
+          setTimeout(() => {
+            btn.innerText = prev;
+            btn.style.color = "";
+          }, 1500);
+        },
+        async exportPackage() {
+          if (!this.atlas) return;
+          if (typeof JSZip === "undefined") return;
+          const btn = document.querySelector(".btn-primary");
+          const origText = btn.innerText;
+          btn.innerText = "Packaging...";
+          btn.style.opacity = "0.7";
+          btn.disabled = true;
+          try {
+            const zip = new JSZip();
+            const dataUrl = this.offscreen.toDataURL("image/png");
+            const base64 = dataUrl.split(",")[1];
+            zip.file("sprite.png", base64, { base64: true });
+            zip.file("sprite.css", document.getElementById("out-css").value);
+            zip.file("sprite.json", document.getElementById("out-json").value);
+            const svgVal = document.getElementById("out-svg").value;
+            if (svgVal && svgVal.length > 0) {
+              zip.file("symbols.svg", svgVal);
+            }
+            const blob = await zip.generateAsync({ type: "blob" });
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = "AtlasForge_Export.zip";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(a.href), 100);
+          } catch (e) {}
+          btn.innerText = origText;
+          btn.style.opacity = "1";
+          btn.disabled = false;
+        },
+        updateZoomText() {
+          this.ui.zoomText.innerText = Math.round(this.transform.scale * 100) + "%";
+        },
+        resetZoom() {
+          if (!this.atlas || this.atlas.width === 0) return;
+          const cw = this.container.clientWidth;
+          const ch = this.container.clientHeight;
+          const padding = 120;
+          const scaleX = (cw - padding) / this.atlas.width;
+          const scaleY = (ch - padding) / this.atlas.height;
+          const newScale = Math.min(1, scaleX, scaleY);
+          this.transform.scale = Math.max(0.05, newScale);
+          this.transform.x = (cw - this.atlas.width * this.transform.scale) / 2;
+          this.transform.y = (ch - this.atlas.height * this.transform.scale) / 2;
+          this.updateZoomText();
+        },
+        zoomIn() {
+          this.transform.scale = Math.min(this.transform.scale * 1.25, 20);
+          this.updateZoomText();
+        },
+        zoomOut() {
+          this.transform.scale = Math.max(this.transform.scale / 1.25, 0.05);
+          this.updateZoomText();
+        },
+        handleWheel(e) {
+          e.preventDefault();
+          const zoomIntensity = 0.002;
+          const zoom = Math.exp(-e.deltaY * zoomIntensity);
+          const rect = this.canvas.getBoundingClientRect();
+          const mouseX = e.clientX - rect.left;
+          const mouseY = e.clientY - rect.top;
+          const newScale = this.transform.scale * zoom;
+          if (newScale < 0.05 || newScale > 20) return;
+          this.transform.x = mouseX - (mouseX - this.transform.x) * zoom;
+          this.transform.y = mouseY - (mouseY - this.transform.y) * zoom;
+          this.transform.scale = newScale;
+          this.updateZoomText();
+        },
+        handleMouseDown(e) {
+          if (e.button !== 0 && e.button !== 1) return;
+          this.isDraggingCanvas = true;
+          this.dragStart = { x: e.clientX, y: e.clientY };
+          if (e.button === 0) {
+            if (this.hoveredSprite && this.selectedSprite !== this.hoveredSprite) {
+              this.selectedSprite = this.hoveredSprite;
+              this.updateInspector();
+              this.renderAssetList();
+            } else if (!this.hoveredSprite && this.selectedSprite) {
+              this.selectedSprite = null;
+              this.updateInspector();
+              this.renderAssetList();
+            }
+          }
+        },
+        handleMouseMove(e) {
+          if (this.isDraggingCanvas) {
+            this.transform.x += e.clientX - this.dragStart.x;
+            this.transform.y += e.clientY - this.dragStart.y;
+            this.dragStart = { x: e.clientX, y: e.clientY };
+            return;
+          }
+          if (!this.atlas) return;
+          const rect = this.canvas.getBoundingClientRect();
+          const worldX = (e.clientX - rect.left - this.transform.x) / this.transform.scale;
+          const worldY = (e.clientY - rect.top - this.transform.y) / this.transform.scale;
+          let hit = null;
+          for (let s of this.atlas.sprites) {
+            if (worldX >= s.x && worldX <= s.x + s.width && worldY >= s.y && worldY <= s.y + s.height) {
+              hit = s;
+              break;
+            }
+          }
+          if (this.hoveredSprite !== hit) {
+            this.hoveredSprite = hit;
+            this.canvas.style.cursor = hit ? "pointer" : "grab";
+          }
+        },
+        handleMouseUp() {
+          this.isDraggingCanvas = false;
+        },
+        drawCheckerboard(w, h) {
+          const size = 16;
+          this.ctx.fillStyle = "#17171d";
+          for (let y = 0; y < h; y += size) {
+            for (let x = 0; x < w; x += size) {
+              if ((x / size + y / size) % 2 === 0) {
+                this.ctx.fillRect(x, y, size, size);
+              }
+            }
+          }
+        },
+        renderLoop() {
+          this.canvas.width = this.container.clientWidth;
+          this.canvas.height = this.container.clientHeight;
+          this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+          this.ctx.save();
+          this.ctx.translate(this.transform.x, this.transform.y);
+          this.ctx.scale(this.transform.scale, this.transform.scale);
+          if (this.atlas && this.atlas.width > 0) {
+            this.ctx.fillStyle = "#0f0f13";
+            this.ctx.shadowColor = "rgba(0,0,0,0.8)";
+            this.ctx.shadowBlur = 40 * (1 / this.transform.scale);
+            this.ctx.shadowOffsetY = 10 * (1 / this.transform.scale);
+            this.ctx.fillRect(0, 0, this.atlas.width, this.atlas.height);
+            this.ctx.shadowColor = "transparent";
+            this.ctx.shadowBlur = 0;
+            this.ctx.shadowOffsetY = 0;
+            this.drawCheckerboard(this.atlas.width, this.atlas.height);
+            this.ctx.imageSmoothingEnabled = false;
+            this.ctx.drawImage(this.offscreen, 0, 0);
+            let invScale = 1 / this.transform.scale;
+            this.ctx.lineWidth = Math.max(1.5 * invScale, 1);
+            for (let s of this.atlas.sprites) {
+              let isSel = s === this.selectedSprite;
+              let isHov = s === this.hoveredSprite;
+              if (isSel) {
+                this.ctx.strokeStyle = "#00e5ff";
+                this.ctx.fillStyle = "rgba(0, 229, 255, 0.15)";
+                this.ctx.fillRect(s.x, s.y, s.width, s.height);
+                this.ctx.strokeRect(s.x - invScale, s.y - invScale, s.width + invScale * 2, s.height + invScale * 2);
+              } else if (isHov) {
+                this.ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+                this.ctx.strokeRect(s.x, s.y, s.width, s.height);
+              }
+            }
+          }
+          this.ctx.restore();
+          requestAnimationFrame(this.renderLoop.bind(this));
+        }
+      };
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", () => app.init());
+      } else {
+        app.init();
+      }
+    </script>
+  </body>
+</html>
