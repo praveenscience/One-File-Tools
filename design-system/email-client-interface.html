@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Folio — Mail</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500;1,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root{
+    --paper:#FAF8F3; --paper-raised:#FFFFFF; --paper-sunk:#F1EDE3;
+    --ink:#211E1A; --ink-soft:#5B564E; --ink-faint:#948E80;
+    --rule:#E4DFD1; --rule-strong:#D5CEBB;
+    --stamp:#C1440E; --stamp-soft:#F3DDD2; --stamp-ink:#8F3309;
+    --seal:#B8862B; --seal-soft:#F1E4C6;
+    --sage:#5F7761; --sage-soft:#E4EAE1;
+    --ring:#C1440E;
+  }
+  html.dark{
+    --paper:#17181A; --paper-raised:#1F2123; --paper-sunk:#141516;
+    --ink:#EDEAE3; --ink-soft:#A6A099; --ink-faint:#716C63;
+    --rule:#2C2E30; --rule-strong:#3A3C3E;
+    --stamp:#E2703A; --stamp-soft:#3A2620; --stamp-ink:#F2B08D;
+    --seal:#D6A94A; --seal-soft:#332B18;
+    --sage:#86A08A; --sage-soft:#1E2620;
+    --ring:#E2703A;
+  }
+  * { scrollbar-width: thin; scrollbar-color: var(--rule-strong) transparent; }
+  *::-webkit-scrollbar{ width:8px; height:8px; }
+  *::-webkit-scrollbar-thumb{ background:var(--rule-strong); border-radius:8px; }
+  body{ font-family:'Inter',sans-serif; background:var(--paper); color:var(--ink); }
+  .font-display{ font-family:'Fraunces',serif; }
+  .font-mono{ font-family:'IBM Plex Mono',monospace; }
+  .clamp-1{ display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden; }
+  .perf-divider{
+    background-image: repeating-linear-gradient(90deg, var(--rule) 0 6px, transparent 6px 12px);
+    height:1px; width:100%;
+  }
+  .stamp-btn{
+    border: 3px double var(--stamp-soft);
+    background: var(--stamp);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+  }
+  html.dark .stamp-btn{ box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+  .seal-dot{ background: var(--stamp); box-shadow: 0 0 0 3px var(--stamp-soft); }
+  .focus-ring:focus-visible{ outline:2px solid var(--ring); outline-offset:2px; }
+  .fade-in{ animation: fadeIn .18s ease-out; }
+  @keyframes fadeIn{ from{ opacity:0; transform:translateY(2px);} to{opacity:1; transform:translateY(0);} }
+  @media (prefers-reduced-motion: reduce){ .fade-in{ animation:none; } * { transition:none !important; } }
+  .email-row.active{ background: var(--paper-sunk); box-shadow: inset 3px 0 0 var(--stamp); }
+  input[type=checkbox]{ accent-color: var(--stamp); }
+</style>
+</head>
+<body class="h-screen w-screen overflow-hidden">
+
+<div id="app" class="h-full w-full flex flex-col" style="background:var(--paper);">
+
+  <!-- Top bar -->
+  <header class="flex items-center gap-3 px-4 py-2.5 border-b shrink-0" style="border-color:var(--rule);">
+    <button id="hamburgerBtn" class="lg:hidden p-1.5 rounded focus-ring" aria-label="Open folders" style="color:var(--ink-soft);">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+
+    <div class="flex items-center gap-2 shrink-0">
+      <div class="w-7 h-7 rounded-full flex items-center justify-center seal-dot"></div>
+      <span class="font-display italic text-xl font-semibold tracking-tight" style="color:var(--ink);">Folio</span>
+    </div>
+
+    <div class="flex-1 max-w-2xl mx-auto flex items-center gap-2 rounded-lg px-3 py-1.5" style="background:var(--paper-sunk); border:1px solid var(--rule);">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--ink-faint);"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="searchInput" type="text" placeholder="Search mail" class="bg-transparent outline-none text-sm flex-1 min-w-0" style="color:var(--ink);">
+      <select id="filterSelect" class="bg-transparent text-xs font-mono outline-none shrink-0 cursor-pointer" style="color:var(--ink-soft);">
+        <option value="all">All mail</option>
+        <option value="unread">Unread</option>
+        <option value="starred">Starred</option>
+        <option value="attach">Attachments</option>
+      </select>
+    </div>
+
+    <button id="themeToggle" class="p-1.5 rounded focus-ring shrink-0" aria-label="Toggle dark mode" style="color:var(--ink-soft);">
+      <svg id="sunIcon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="hidden"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      <svg id="moonIcon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+    </button>
+
+    <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0" style="background:var(--sage-soft); color:var(--sage);">YOU</div>
+  </header>
+
+  <div class="flex-1 flex overflow-hidden relative">
+
+    <!-- Mobile drawer overlay -->
+    <div id="drawerOverlay" class="hidden lg:hidden fixed inset-0 z-30" style="background:rgba(0,0,0,0.35);"></div>
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="hidden lg:flex fixed lg:static z-40 top-0 left-0 h-full w-64 flex-col border-r shrink-0 -translate-x-full lg:translate-x-0 transition-transform"
+      style="background:var(--paper-raised); border-color:var(--rule);">
+      <div class="p-4">
+        <button id="composeBtn" class="stamp-btn w-full rounded-lg py-2.5 px-4 flex items-center justify-center gap-2 text-sm font-semibold text-white focus-ring">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          New letter
+        </button>
+      </div>
+      <nav class="px-2 flex-1 overflow-y-auto">
+        <button data-folder="inbox" class="folder-item w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm mb-0.5 focus-ring" style="background:var(--paper-sunk); color:var(--ink);">
+          <span class="flex items-center gap-2.5"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16v12H4z"/><path d="M4 6l8 6 8-6"/></svg>Inbox</span>
+          <span class="font-mono text-[11px] px-1.5 py-0.5 rounded" style="background:var(--stamp-soft); color:var(--stamp);">12</span>
+        </button>
+        <button data-folder="sent" class="folder-item w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm mb-0.5 focus-ring" style="color:var(--ink-soft);">
+          <span class="flex items-center gap-2.5"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg>Sent</span>
+        </button>
+        <button data-folder="drafts" class="folder-item w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm mb-0.5 focus-ring" style="color:var(--ink-soft);">
+          <span class="flex items-center gap-2.5"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Drafts</span>
+          <span class="font-mono text-[11px] px-1.5 py-0.5 rounded" style="background:var(--rule); color:var(--ink-soft);">3</span>
+        </button>
+        <button data-folder="trash" class="folder-item w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm mb-0.5 focus-ring" style="color:var(--ink-soft);">
+          <span class="flex items-center gap-2.5"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18"/><path d="M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>Trash</span>
+        </button>
+      </nav>
+      <div class="p-4 text-xs font-mono" style="color:var(--ink-faint);">
+        <div class="perf-divider mb-3"></div>
+        3.2 GB of 15 GB used
+      </div>
+    </aside>
+
+    <!-- Email list -->
+    <section id="listPanel" class="flex flex-col w-full md:w-[380px] shrink-0 border-r" style="border-color:var(--rule);">
+      <div class="flex items-center gap-2 px-3 py-2 border-b shrink-0" style="border-color:var(--rule);">
+        <input id="selectAll" type="checkbox" class="w-4 h-4 rounded focus-ring">
+        <div id="defaultToolbar" class="flex items-center gap-1">
+          <button title="Refresh" class="p-1.5 rounded focus-ring" style="color:var(--ink-soft);">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.13-3.36L23 10M1 14l5.36 4.36A9 9 0 0020.49 15"/></svg>
+          </button>
+        </div>
+        <div id="bulkToolbar" class="hidden items-center gap-1">
+          <span id="selectedCount" class="text-xs font-mono mr-1" style="color:var(--ink-soft);"></span>
+          <button title="Mark as read" class="p-1.5 rounded focus-ring" style="color:var(--ink-soft);">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+          </button>
+          <button title="Archive" class="p-1.5 rounded focus-ring" style="color:var(--ink-soft);">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="5"/><path d="M4 9v10h16V9M10 13h4"/></svg>
+          </button>
+          <button title="Delete" class="p-1.5 rounded focus-ring" style="color:var(--stamp);">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+          </button>
+        </div>
+        <span class="ml-auto text-xs font-mono" style="color:var(--ink-faint);"><span id="folderTitle">Inbox</span></span>
+      </div>
+      <div id="emailList" class="flex-1 overflow-y-auto"></div>
+    </section>
+
+    <!-- Reading pane -->
+    <section id="readingPanel" class="hidden md:flex flex-1 flex-col overflow-hidden" style="background:var(--paper);">
+      <div id="readingContent" class="flex-1 overflow-y-auto"></div>
+    </section>
+  </div>
+</div>
+
+<!-- Compose modal -->
+<div id="composeModal" class="hidden fixed bottom-0 right-6 z-50 w-[420px] max-w-[92vw] rounded-t-xl shadow-2xl flex flex-col fade-in" style="background:var(--paper-raised); border:1px solid var(--rule); border-bottom:none;">
+  <div class="flex items-center justify-between px-4 py-2.5 rounded-t-xl cursor-pointer" style="background:var(--stamp);" id="composeHeader">
+    <span class="text-sm font-semibold text-white font-display italic">New letter</span>
+    <div class="flex items-center gap-1">
+      <button id="composeMin" class="text-white/90 hover:text-white p-1 focus-ring" aria-label="Minimize"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+      <button id="composeClose" class="text-white/90 hover:text-white p-1 focus-ring" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="6" y1="6" x2="18" y2="18"/><line x1="6" y1="18" x2="18" y2="6"/></svg></button>
+    </div>
+  </div>
+  <div id="composeBody" class="flex flex-col">
+    <input placeholder="To" class="px-4 py-2.5 text-sm bg-transparent outline-none border-b" style="border-color:var(--rule); color:var(--ink);">
+    <input placeholder="Subject" class="px-4 py-2.5 text-sm bg-transparent outline-none border-b" style="border-color:var(--rule); color:var(--ink);">
+    <textarea placeholder="Write your letter…" class="px-4 py-3 text-sm bg-transparent outline-none resize-none h-56" style="color:var(--ink);"></textarea>
+    <div class="flex items-center justify-between px-4 py-3 border-t" style="border-color:var(--rule);">
+      <button class="stamp-btn text-white text-sm font-semibold px-5 py-2 rounded-lg focus-ring">Send</button>
+      <button id="composeDiscard" class="text-sm focus-ring" style="color:var(--ink-faint);">Discard</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const emails = {
+  inbox: [
+    {id:1, sender:"Priya Nataraj", initials:"PN", tint:"var(--stamp-soft)", tintColor:"var(--stamp)", subject:"Component library review — final pass", preview:"Ran through the button and input states again, left comments on the spacing tokens for the compact density variant.", time:"9:41 AM", unread:true, starred:true, attach:true,
+      body:"Hi team,\n\nRan through the button and input states again this morning. A few notes on the compact density variant:\n\n— The 8px vertical padding feels tight next to the 14px label size. Worth testing 10px.\n— Focus ring offset looks inconsistent between the filled and outline variants.\n— Loving the new disabled state treatment, much clearer than before.\n\nAttached the annotated frames. Let me know if you want to hop on a call before Friday's review.\n\nBest,\nPriya"},
+    {id:2, sender:"Marcus Webb", initials:"MW", tint:"var(--sage-soft)", tintColor:"var(--sage)", subject:"Re: Q3 budget approvals", preview:"Thanks for sending this over — approved on my end, looping in finance for the final sign-off.", time:"8:15 AM", unread:true, starred:false, attach:false,
+      body:"Thanks for sending this over — approved on my end. Looping in finance for the final sign-off this week.\n\nOne question on line item 4, the contractor line seems higher than last quarter. Can you confirm that's the new design contractor and not a duplicate?\n\nMarcus"},
+    {id:3, sender:"Ines Fontaine", initials:"IF", tint:"var(--seal-soft)", tintColor:"var(--seal)", subject:"Studio offsite — save the date", preview:"We've locked in the venue for October 14–16. Details and RSVP link inside.", time:"Yesterday", unread:true, starred:false, attach:false,
+      body:"Hi all,\n\nWe've locked in the venue for October 14–16 — a small lodge upstate with room for workshops and downtime alike.\n\nPlease RSVP by end of week so we can finalize catering. Travel details to follow once numbers are in.\n\nLooking forward to it,\nInes"},
+    {id:4, sender:"GitHub", initials:"GH", tint:"var(--rule)", tintColor:"var(--ink-soft)", subject:"[design-tokens] 3 new pull requests", preview:"kwatanabe opened: fix contrast ratio on disabled chip. Review requested.", time:"Yesterday", unread:false, starred:false, attach:false,
+      body:"kwatanabe opened a pull request: \"fix contrast ratio on disabled chip\"\n\nThis PR adjusts the disabled state opacity from 0.4 to 0.55 to meet WCAG AA against both paper backgrounds.\n\nReview requested from 2 people."},
+    {id:5, sender:"Talia Rhee", initials:"TR", tint:"var(--stamp-soft)", tintColor:"var(--stamp)", subject:"Typography scale — feedback needed", preview:"Tried the new type ramp across three product surfaces. It mostly holds up, one exception in dense tables.", time:"Tue", unread:false, starred:true, attach:true,
+      body:"Tried the new type ramp across three product surfaces. It mostly holds up — one exception in dense tables where the 13px body size reads a little large next to 11px captions.\n\nWondering if we need an explicit 'data' size in the scale rather than reusing caption.\n\nMock attached.\n\nTalia"},
+    {id:6, sender:"Omar Siddiqui", initials:"OS", tint:"var(--sage-soft)", tintColor:"var(--sage)", subject:"Vendor invoice #4471", preview:"Invoice for last month's print run is attached, due net 30.", time:"Tue", unread:false, starred:false, attach:true,
+      body:"Invoice for last month's print run is attached, due net 30.\n\nLet me know if you need it re-issued to a different billing entity.\n\nOmar"},
+    {id:7, sender:"Folio Weekly", initials:"FW", tint:"var(--seal-soft)", tintColor:"var(--seal)", subject:"5 patterns for empty states that don't feel like errors", preview:"This week: writing for the moment before there's anything to show.", time:"Mon", unread:false, starred:false, attach:false,
+      body:"This week: writing for the moment before there's anything to show.\n\nAn empty state is an invitation, not an apology. We look at three products that get this right, and one that really doesn't.\n\nRead more on the site."},
+    {id:8, sender:"Devon Ash", initials:"DA", tint:"var(--rule)", tintColor:"var(--ink-soft)", subject:"Onboarding flow — user testing notes", preview:"Ran 5 sessions this week. Biggest friction point was step 3, the permissions screen.", time:"Mon", unread:false, starred:false, attach:true,
+      body:"Ran 5 sessions this week. Biggest friction point was step 3, the permissions screen — 4 of 5 participants hesitated before continuing.\n\nFull notes and clips attached. Recommend we simplify the copy there before next sprint.\n\nDevon"},
+    {id:9, sender:"Priya Nataraj", initials:"PN", tint:"var(--stamp-soft)", tintColor:"var(--stamp)", subject:"Icon set — stroke weight question", preview:"Should we standardize on 1.5px or 2px stroke across the whole set?", time:"Last week", unread:false, starred:false, attach:false,
+      body:"Should we standardize on 1.5px or 2px stroke across the whole set? Right now it's mixed depending on who drew the icon.\n\n2px reads better at 16px but a little heavy at 24px. Curious what you think.\n\nPriya"},
+    {id:10, sender:"Building Ops", initials:"BO", tint:"var(--sage-soft)", tintColor:"var(--sage)", subject:"Elevator maintenance — Thursday", preview:"Elevator B will be out of service Thursday 9am–1pm for scheduled maintenance.", time:"Last week", unread:false, starred:false, attach:false,
+      body:"Elevator B will be out of service Thursday 9am–1pm for scheduled maintenance. Elevator A remains available.\n\nApologies for the inconvenience."},
+    {id:11, sender:"Sana Okafor", initials:"SO", tint:"var(--seal-soft)", tintColor:"var(--seal)", subject:"Client walkthrough went well", preview:"They loved the new dashboard direction, a few small requests on the color legend.", time:"2 weeks ago", unread:false, starred:false, attach:false,
+      body:"They loved the new dashboard direction — a few small requests on the color legend, nothing structural.\n\nFull notes to follow, but wanted to share the good news right away.\n\nSana"},
+    {id:12, sender:"Folio Weekly", initials:"FW", tint:"var(--seal-soft)", tintColor:"var(--seal)", subject:"The case for fewer border-radius values", preview:"Most systems ship with six. You probably need two.", time:"3 weeks ago", unread:false, starred:false, attach:false,
+      body:"Most systems ship with six border-radius values. You probably need two.\n\nWe walk through how to audit an existing product and consolidate without a visual regression."},
+  ],
+  sent: [
+    {id:101, sender:"To: Priya Nataraj", initials:"PN", tint:"var(--rule)", tintColor:"var(--ink-soft)", subject:"Re: Component library review", preview:"Agreed on the spacing note, pushing a fix to the compact variant today.", time:"10:02 AM", unread:false, starred:false, attach:false,
+      body:"Agreed on the spacing note — pushing a fix to the compact variant today.\n\nWill flag the focus ring inconsistency to the engineering pairing this afternoon too.\n\nThanks for the thorough pass."},
+    {id:102, sender:"To: Studio All", initials:"SA", tint:"var(--rule)", tintColor:"var(--ink-soft)", subject:"Offsite RSVP", preview:"Count me in for all three days, happy to help coordinate transport.", time:"Yesterday", unread:false, starred:false, attach:false,
+      body:"Count me in for all three days — happy to help coordinate transport if that's useful."},
+    {id:103, sender:"To: Omar Siddiqui", initials:"OS", tint:"var(--rule)", tintColor:"var(--ink-soft)", subject:"Re: Vendor invoice #4471", preview:"Approved, will process payment by Friday.", time:"Tue", unread:false, starred:false, attach:false,
+      body:"Approved — will process payment by Friday."},
+  ],
+  drafts: [
+    {id:201, sender:"Marcus Webb", initials:"MW", tint:"var(--rule)", tintColor:"var(--ink-soft)", subject:"Q4 planning notes (draft)", preview:"Still gathering thoughts on headcount for the design team next quarter…", time:"Mon", unread:false, starred:false, attach:false,
+      body:"Still gathering thoughts on headcount for the design team next quarter. Want to align with Marcus before sending this out more broadly.\n\n[unfinished draft]"},
+    {id:202, sender:"Ines Fontaine", initials:"IF", tint:"var(--rule)", tintColor:"var(--ink-soft)", subject:"(no subject)", preview:"Hey — following up on the venue contract, do we need to…", time:"Last week", unread:false, starred:false, attach:false,
+      body:"Hey — following up on the venue contract, do we need to get legal to look at the cancellation clause before we sign?\n\n[unfinished draft]"},
+    {id:203, sender:"Talia Rhee", initials:"TR", tint:"var(--rule)", tintColor:"var(--ink-soft)", subject:"Type scale proposal v2", preview:"Attaching the revised scale with the new data-size token added…", time:"2 weeks ago", unread:false, starred:false, attach:true,
+      body:"Attaching the revised scale with the new data-size token added in.\n\n[unfinished draft]"},
+  ],
+  trash: [
+    {id:301, sender:"No Reply", initials:"NR", tint:"var(--rule)", tintColor:"var(--ink-soft)", subject:"Your subscription receipt", preview:"Thanks for your payment of $12.00.", time:"3 weeks ago", unread:false, starred:false, attach:false, body:"Thanks for your payment of $12.00. This is an automated receipt."},
+    {id:302, sender:"Newsletter Bot", initials:"NB", tint:"var(--rule)", tintColor:"var(--ink-soft)", subject:"You won't believe this one trick", preview:"Designers hate this: one weird spacing tip.", time:"1 month ago", unread:false, starred:false, attach:false, body:"Designers hate this: one weird spacing tip that changes everything."},
+    {id:303, sender:"Devon Ash", initials:"DA", tint:"var(--rule)", tintColor:"var(--ink-soft)", subject:"Old test invite", preview:"This event has already passed, safe to delete.", time:"1 month ago", unread:false, starred:false, attach:false, body:"This event has already passed, safe to delete."},
+    {id:304, sender:"System", initials:"SY", tint:"var(--rule)", tintColor:"var(--ink-soft)", subject:"Password changed successfully", preview:"Your password was changed on Jan 3.", time:"2 months ago", unread:false, starred:false, attach:false, body:"Your password was changed on Jan 3. If this wasn't you, contact support immediately."},
+  ]
+};
+
+let currentFolder = 'inbox';
+let activeEmailId = null;
+let selectedIds = new Set();
+let mobileView = 'list';
+
+const listEl = document.getElementById('emailList');
+const readingEl = document.getElementById('readingContent');
+const folderTitle = document.getElementById('folderTitle');
+const searchInput = document.getElementById('searchInput');
+const filterSelect = document.getElementById('filterSelect');
+
+function currentData(){ return emails[currentFolder]; }
+
+function filteredData(){
+  const q = searchInput.value.trim().toLowerCase();
+  const f = filterSelect.value;
+  return currentData().filter(e => {
+    if (q && !(e.sender.toLowerCase().includes(q) || e.subject.toLowerCase().includes(q) || e.preview.toLowerCase().includes(q))) return false;
+    if (f === 'unread' && !e.unread) return false;
+    if (f === 'starred' && !e.starred) return false;
+    if (f === 'attach' && !e.attach) return false;
+    return true;
+  });
+}
+
+function renderList(){
+  const data = filteredData();
+  if (data.length === 0){
+    listEl.innerHTML = `<div class="p-8 text-center text-sm font-display italic" style="color:var(--ink-faint);">Nothing here yet.</div>`;
+    return;
+  }
+  listEl.innerHTML = data.map((e, idx) => `
+    <div>
+      <div class="email-row flex items-start gap-3 px-3 py-3 cursor-pointer ${e.id===activeEmailId ? 'active' : ''}" data-id="${e.id}">
+        <input type="checkbox" class="row-check mt-1 w-4 h-4 rounded focus-ring shrink-0" data-id="${e.id}" ${selectedIds.has(e.id) ? 'checked' : ''} onclick="event.stopPropagation()">
+        <div class="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0" style="background:${e.tint}; color:${e.tintColor};">${e.initials}</div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-sm ${e.unread ? 'font-semibold' : 'font-medium'} truncate flex items-center gap-1.5" style="color:var(--ink);">
+              ${e.unread ? '<span class="inline-block w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--stamp);"></span>' : ''}
+              ${e.sender}
+            </span>
+            <span class="font-mono text-[11px] shrink-0" style="color:var(--ink-faint);">${e.time}</span>
+          </div>
+          <div class="text-sm truncate ${e.unread ? 'font-medium' : ''}" style="color:var(--ink);">${e.subject}</div>
+          <div class="text-xs clamp-1" style="color:var(--ink-soft);">${e.preview}</div>
+        </div>
+        <button class="star-btn shrink-0 mt-1 p-0.5 focus-ring" data-id="${e.id}" onclick="event.stopPropagation()" aria-label="Toggle star">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="${e.starred ? 'var(--seal)' : 'none'}" stroke="${e.starred ? 'var(--seal)' : 'var(--ink-faint)'}" stroke-width="1.6"><polygon points="12 2 15 9 22 9.5 17 14.5 18.5 22 12 18 5.5 22 7 14.5 2 9.5 9 9"/></svg>
+        </button>
+      </div>
+      ${idx < data.length - 1 ? '<div class="perf-divider"></div>' : ''}
+    </div>
+  `).join('');
+
+  document.querySelectorAll('.email-row').forEach(row => {
+    row.addEventListener('click', () => selectEmail(parseInt(row.dataset.id)));
+  });
+  document.querySelectorAll('.star-btn').forEach(btn => {
+    btn.addEventListener('click', () => toggleStar(parseInt(btn.dataset.id)));
+  });
+  document.querySelectorAll('.row-check').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const id = parseInt(cb.dataset.id);
+      if (cb.checked) selectedIds.add(id); else selectedIds.delete(id);
+      updateBulkToolbar();
+    });
+  });
+}
+
+function toggleStar(id){
+  const e = currentData().find(x => x.id === id);
+  if (e){ e.starred = !e.starred; renderList(); if (activeEmailId === id) renderReading(); }
+}
+
+function selectEmail(id){
+  activeEmailId = id;
+  const e = currentData().find(x => x.id === id);
+  if (e) e.unread = false;
+  renderList();
+  renderReading();
+  mobileView = 'detail';
+  applyMobileView();
+}
+
+function renderReading(){
+  const e = currentData().find(x => x.id === activeEmailId);
+  if (!e){
+    readingEl.innerHTML = `<div class="h-full flex items-center justify-center text-center px-8">
+      <div>
+        <div class="font-display italic text-lg mb-1" style="color:var(--ink-faint);">Select a letter to read</div>
+        <div class="text-xs font-mono" style="color:var(--ink-faint);">Nothing selected</div>
+      </div>
+    </div>`;
+    return;
+  }
+  readingEl.innerHTML = `
+    <div class="p-6 max-w-2xl mx-auto fade-in">
+      <button id="backToList" class="md:hidden flex items-center gap-1.5 text-sm mb-4 focus-ring" style="color:var(--ink-soft);">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg> Back
+      </button>
+      <div class="flex items-start justify-between gap-3 mb-1">
+        <h1 class="font-display font-semibold text-2xl leading-snug" style="color:var(--ink);">${e.subject}</h1>
+        <div class="flex items-center gap-1 shrink-0">
+          <button title="Star" id="readStarBtn" class="p-1.5 rounded focus-ring">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="${e.starred ? 'var(--seal)' : 'none'}" stroke="${e.starred ? 'var(--seal)' : 'var(--ink-faint)'}" stroke-width="1.6"><polygon points="12 2 15 9 22 9.5 17 14.5 18.5 22 12 18 5.5 22 7 14.5 2 9.5 9 9"/></svg>
+          </button>
+          <button title="Archive" class="p-1.5 rounded focus-ring" style="color:var(--ink-soft);">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="5"/><path d="M4 9v10h16V9M10 13h4"/></svg>
+          </button>
+          <button title="Delete" class="p-1.5 rounded focus-ring" style="color:var(--stamp);">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18"/><path d="M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="perf-divider my-4"></div>
+      <div class="flex items-center gap-3 mb-6">
+        <div class="w-10 h-10 rounded-full flex items-center justify-center text-xs font-semibold shrink-0" style="background:${e.tint}; color:${e.tintColor};">${e.initials}</div>
+        <div class="min-w-0">
+          <div class="text-sm font-semibold" style="color:var(--ink);">${e.sender}</div>
+          <div class="text-xs font-mono" style="color:var(--ink-faint);">${e.time}${e.attach ? ' · has attachment' : ''}</div>
+        </div>
+      </div>
+      <div class="text-sm leading-relaxed whitespace-pre-line mb-8" style="color:var(--ink);">${e.body}</div>
+
+      <div class="flex items-center gap-2 mb-6">
+        <button class="reply-btn flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg focus-ring" data-mode="Reply" style="border:1px solid var(--rule); color:var(--ink);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 17l-5-5 5-5"/><path d="M4 12h11a5 5 0 0 1 5 5v1"/></svg> Reply
+        </button>
+        <button class="reply-btn flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg focus-ring" data-mode="Forward" style="border:1px solid var(--rule); color:var(--ink);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 17l5-5-5-5"/><path d="M20 12H9a5 5 0 0 0-5 5v1"/></svg> Forward
+        </button>
+      </div>
+      <div id="inlineReply"></div>
+    </div>
+  `;
+  document.getElementById('backToList')?.addEventListener('click', () => { mobileView = 'list'; applyMobileView(); });
+  document.getElementById('readStarBtn')?.addEventListener('click', () => toggleStar(e.id));
+  document.querySelectorAll('.reply-btn').forEach(btn => {
+    btn.addEventListener('click', () => showInlineReply(btn.dataset.mode, e));
+  });
+}
+
+function showInlineReply(mode, e){
+  const box = document.getElementById('inlineReply');
+  box.innerHTML = `
+    <div class="rounded-lg fade-in" style="border:1px solid var(--rule); background:var(--paper-raised);">
+      <div class="px-4 py-2 border-b text-xs font-mono flex items-center justify-between" style="border-color:var(--rule); color:var(--ink-soft);">
+        <span>${mode} · ${mode === 'Forward' ? 'To: —' : e.sender}</span>
+      </div>
+      <textarea class="w-full px-4 py-3 text-sm bg-transparent outline-none resize-none h-28" placeholder="${mode === 'Forward' ? 'Add a note…' : 'Write your reply…'}" style="color:var(--ink);"></textarea>
+      <div class="flex items-center gap-2 px-4 py-3 border-t" style="border-color:var(--rule);">
+        <button class="stamp-btn text-white text-sm font-semibold px-4 py-1.5 rounded-lg focus-ring">Send</button>
+        <button id="discardInline" class="text-sm focus-ring" style="color:var(--ink-faint);">Discard</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('discardInline').addEventListener('click', () => box.innerHTML = '');
+}
+
+function updateBulkToolbar(){
+  const bulk = document.getElementById('bulkToolbar');
+  const def = document.getElementById('defaultToolbar');
+  const count = document.getElementById('selectedCount');
+  if (selectedIds.size > 0){
+    bulk.classList.remove('hidden'); bulk.classList.add('flex');
+    def.classList.add('hidden');
+    count.textContent = selectedIds.size + ' selected';
+  } else {
+    bulk.classList.add('hidden'); bulk.classList.remove('flex');
+    def.classList.remove('hidden');
+  }
+}
+
+document.getElementById('selectAll').addEventListener('change', (ev) => {
+  const data = filteredData();
+  if (ev.target.checked){ data.forEach(e => selectedIds.add(e.id)); }
+  else { data.forEach(e => selectedIds.delete(e.id)); }
+  renderList();
+  updateBulkToolbar();
+});
+
+document.querySelectorAll('.folder-item').forEach(btn => {
+  btn.addEventListener('click', () => {
+    currentFolder = btn.dataset.folder;
+    activeEmailId = null;
+    selectedIds.clear();
+    document.getElementById('selectAll').checked = false;
+    updateBulkToolbar();
+    document.querySelectorAll('.folder-item').forEach(b => {
+      b.style.background = 'transparent';
+      b.style.color = 'var(--ink-soft)';
+    });
+    btn.style.background = 'var(--paper-sunk)';
+    btn.style.color = 'var(--ink)';
+    folderTitle.textContent = btn.dataset.folder.charAt(0).toUpperCase() + btn.dataset.folder.slice(1);
+    renderList();
+    renderReading();
+    closeDrawer();
+  });
+});
+
+searchInput.addEventListener('input', renderList);
+filterSelect.addEventListener('change', renderList);
+
+// Mobile drawer
+const sidebar = document.getElementById('sidebar');
+const overlay = document.getElementById('drawerOverlay');
+function openDrawer(){ sidebar.classList.remove('-translate-x-full'); sidebar.classList.remove('hidden'); sidebar.classList.add('flex'); overlay.classList.remove('hidden'); }
+function closeDrawer(){ sidebar.classList.add('-translate-x-full'); overlay.classList.add('hidden'); setTimeout(()=>{ if(window.innerWidth < 1024) sidebar.classList.add('hidden'); }, 200); }
+document.getElementById('hamburgerBtn').addEventListener('click', openDrawer);
+overlay.addEventListener('click', closeDrawer);
+
+// Mobile list/detail toggle
+function applyMobileView(){
+  const listPanel = document.getElementById('listPanel');
+  const readPanel = document.getElementById('readingPanel');
+  if (window.innerWidth < 768){
+    if (mobileView === 'detail'){
+      listPanel.classList.add('hidden'); listPanel.classList.remove('flex');
+      readPanel.classList.remove('hidden'); readPanel.classList.add('flex');
+    } else {
+      readPanel.classList.add('hidden'); readPanel.classList.remove('flex');
+      listPanel.classList.remove('hidden'); listPanel.classList.add('flex');
+    }
+  } else {
+    listPanel.classList.remove('hidden'); listPanel.classList.add('flex');
+    readPanel.classList.remove('hidden'); readPanel.classList.add('flex');
+  }
+}
+window.addEventListener('resize', applyMobileView);
+
+// Theme toggle
+const themeToggle = document.getElementById('themeToggle');
+const sunIcon = document.getElementById('sunIcon');
+const moonIcon = document.getElementById('moonIcon');
+themeToggle.addEventListener('click', () => {
+  document.documentElement.classList.toggle('dark');
+  const isDark = document.documentElement.classList.contains('dark');
+  sunIcon.classList.toggle('hidden', !isDark);
+  moonIcon.classList.toggle('hidden', isDark);
+});
+
+// Compose modal
+const composeModal = document.getElementById('composeModal');
+const composeBody = document.getElementById('composeBody');
+document.getElementById('composeBtn').addEventListener('click', () => {
+  composeModal.classList.remove('hidden');
+  composeBody.style.display = 'flex';
+  composeModal.classList.add('flex'); composeModal.classList.add('flex-col');
+});
+document.getElementById('composeClose').addEventListener('click', () => composeModal.classList.add('hidden'));
+document.getElementById('composeDiscard').addEventListener('click', () => composeModal.classList.add('hidden'));
+let composeMinimized = false;
+document.getElementById('composeHeader').addEventListener('click', (ev) => {
+  if (ev.target.closest('button')) return;
+  composeMinimized = !composeMinimized;
+  composeBody.style.display = composeMinimized ? 'none' : 'flex';
+});
+document.getElementById('composeMin').addEventListener('click', () => {
+  composeMinimized = !composeMinimized;
+  composeBody.style.display = composeMinimized ? 'none' : 'flex';
+});
+
+// Init
+renderList();
+renderReading();
+applyMobileView();
+</script>
+</body>
+</html>
