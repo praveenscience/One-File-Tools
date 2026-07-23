@@ -78,6 +78,7 @@ check("tools", "tools.json", "tools", "Tools");
 check("quests", "quests.json", "quests", "Quests");
 check("quizzes", "quizzes.json", "quizzes", "Quizzes");
 check("design-system", "design-system.json", "designs", "Design System");
+check("instruments", "instruments.json", "instruments", "Instruments");
 
 console.log("");
 if (issues.length === 0) {

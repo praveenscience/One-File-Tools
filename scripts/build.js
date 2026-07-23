@@ -43,6 +43,12 @@ const dsDataRaw = fs.existsSync(dsPath) ? JSON.parse(fs.readFileSync(dsPath, "ut
 const dsCategories = dsDataRaw.categories || [];
 const designs = dsDataRaw.designs || [];
 
+// Instruments registry is optional — build should not fail if it doesn't exist yet.
+const instrumentsPath = path.join(rootDir, "data", "instruments.json");
+const instrumentsDataRaw = fs.existsSync(instrumentsPath) ? JSON.parse(fs.readFileSync(instrumentsPath, "utf-8")) : { categories: [], instruments: [] };
+const instrumentCategories = instrumentsDataRaw.categories || [];
+const instruments = instrumentsDataRaw.instruments || [];
+
 // ──────────────────────────────────────────────
 // Helpers
 // ──────────────────────────────────────────────
@@ -166,6 +172,10 @@ function quizThumbnailExists(quizId) {
 
 function dsThumbnailExists(dsId) {
   return fs.existsSync(path.join(rootDir, "design-system", dsId + ".png"));
+}
+
+function instrumentThumbnailExists(instrumentId) {
+  return fs.existsSync(path.join(rootDir, "instruments", instrumentId + ".png"));
 }
 
 // ──────────────────────────────────────────────
@@ -312,6 +322,40 @@ dsCategories.forEach((c) => { dsCountByCategory[c.id] = 0; });
 dsDataBuilt.forEach((d) => { if (dsCountByCategory[d.category] !== undefined) dsCountByCategory[d.category]++; });
 
 // ──────────────────────────────────────────────
+// Build instruments data
+// ──────────────────────────────────────────────
+
+const instrumentCategoryMap = {};
+instrumentCategories.forEach((c) => {
+  instrumentCategoryMap[c.id] = c;
+});
+
+const instrumentsDataBuilt = instruments.map((inst) => ({
+  id: inst.id,
+  name: inst.name,
+  shortDescription: inst.shortDescription,
+  longDescriptionHtml: markdownToHtml(inst.longDescription),
+  category: inst.category,
+  categoryName: instrumentCategoryMap[inst.category]?.name || inst.category,
+  categoryIcon: instrumentCategoryMap[inst.category]?.icon || "",
+  tags: inst.tags || [],
+  techStack: inst.techStack || [],
+  difficulty: inst.difficulty || "Easy",
+  status: inst.status || "idea",
+  hasThumbnail: instrumentThumbnailExists(inst.id),
+  file: `instruments/${inst.id}.html`,
+  thumbnail: `instruments/${inst.id}.png`,
+  github: `${site.github}/blob/main/instruments/${inst.id}.html`,
+  live: `${site.url}/instruments/${inst.id}`
+}));
+
+const totalInstrumentCount = instrumentsDataBuilt.length;
+
+const instrumentCountByCategory = {};
+instrumentCategories.forEach((c) => { instrumentCountByCategory[c.id] = 0; });
+instrumentsDataBuilt.forEach((inst) => { if (instrumentCountByCategory[inst.category] !== undefined) instrumentCountByCategory[inst.category]++; });
+
+// ──────────────────────────────────────────────
 // Template-based index.html generation
 // ──────────────────────────────────────────────
 
@@ -372,6 +416,13 @@ function buildPillarCards() {
       count: totalDsCount + " design" + (totalDsCount === 1 ? "" : "s"),
       desc: "Premium UI showcases \u2014 dashboards, landing pages, and components built with CSS frameworks and JS libraries via CDN.",
       icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'
+    },
+    {
+      id: "instruments",
+      title: "One File Instruments",
+      count: totalInstrumentCount + " instrument" + (totalInstrumentCount === 1 ? "" : "s"),
+      desc: "Real, playable musical tools \u2014 synthesizers, drum machines, chord libraries, and ear trainers, in a single HTML file.",
+      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>'
     },
     {
       id: "soon",
@@ -565,6 +616,46 @@ function buildDsCards() {
   }).join("\n");
 }
 
+// ── Build instrument filter pills (static HTML) ──
+
+function buildInstrumentFilterPills() {
+  const pills = ['              <button class="pill" type="button" data-cat="all" aria-pressed="true"><span class="pi" aria-hidden="true">\u25A6</span> All <span class="pill-count">(' + totalInstrumentCount + ')</span></button>'];
+  instrumentCategories.forEach((c) => {
+    const count = instrumentCountByCategory[c.id] || 0;
+    if (count === 0) return;
+    pills.push('              <button class="pill" type="button" data-cat="' + escapeAttr(c.id) + '" aria-pressed="false"><span class="pi" aria-hidden="true">' + c.icon + '</span> ' + escapeHtml(c.name) + ' <span class="pill-count">(' + count + ')</span></button>');
+  });
+  return pills.join("\n");
+}
+
+// ── Build instrument cards (static HTML) ──
+
+function buildInstrumentCards() {
+  return instrumentsDataBuilt.map((inst) => {
+    const cat = instrumentCategoryMap[inst.category];
+    const diff = inst.difficulty.toLowerCase();
+    const searchData = (inst.name + " " + inst.shortDescription + " " + inst.tags.join(" ")).toLowerCase();
+    const liveUrl = site.url + "/instruments/" + inst.id;
+
+    const thumbHtml = inst.hasThumbnail
+      ? '<img class="card-thumb" src="instruments/' + escapeAttr(inst.id) + '.png" alt="' + escapeAttr(inst.name) + '" loading="lazy" />'
+      : '<div class="card-thumb-placeholder">' + (cat ? cat.icon : '') + '</div>';
+
+    return '            <article class="card" data-id="' + escapeAttr(inst.id) + '" data-category="' + escapeAttr(inst.category) + '" data-search="' + escapeAttr(searchData) + '" tabindex="0" role="button" aria-label="View details for ' + escapeAttr(inst.name) + '">' +
+      thumbHtml +
+      '<div class="card-body">' +
+      '<div class="card-top"><h4>' + escapeHtml(inst.name) + '</h4>' +
+      '<span class="badge-cat"><span aria-hidden="true">' + (cat ? cat.icon : '') + '</span> ' + escapeHtml(inst.categoryName) + '</span></div>' +
+      '<p class="desc">' + escapeHtml(inst.shortDescription) + '</p>' +
+      '<div class="path mono">instruments/' + escapeHtml(inst.id) + '.html</div>' +
+      '<div class="card-foot">' +
+      '<span class="badge-diff ' + diff + '">' + escapeHtml(inst.difficulty) + '</span>' +
+      '<span class="card-links">' +
+      '<a class="link-btn primary" href="' + escapeAttr(liveUrl) + '" target="_blank" rel="noopener noreferrer" data-nomodal>Play <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg></a>' +
+      '</span></div></div></article>';
+  }).join("\n");
+}
+
 // ── Build resume/portfolio showcase cards (static HTML) ──
 
 function buildThemeCard(t, glyph) {
@@ -632,6 +723,11 @@ const dsJson = JSON.stringify(dsDataBuilt.map((d) => ({
   category: d.category, tags: d.tags, techStack: d.techStack, frameworks: d.frameworks, difficulty: d.difficulty
 })));
 const dsCategoriesJson = JSON.stringify(dsCategories.map((c) => ({ id: c.id, name: c.name, icon: c.icon })));
+const instrumentsJson = JSON.stringify(instrumentsDataBuilt.map((inst) => ({
+  id: inst.id, name: inst.name, shortDescription: inst.shortDescription, longDescription: instruments.find((x) => x.id === inst.id)?.longDescription || "",
+  category: inst.category, tags: inst.tags, techStack: inst.techStack, difficulty: inst.difficulty
+})));
+const instrumentCategoriesJson = JSON.stringify(instrumentCategories.map((c) => ({ id: c.id, name: c.name, icon: c.icon })));
 
 // ── Inject into template ──
 
@@ -657,6 +753,9 @@ let html = template
   .replace(/\{\{DS_COUNT\}\}/g, String(totalDsCount))
   .replace("{{DS_FILTER_PILLS}}", buildDsFilterPills())
   .replace("{{DS_CARDS}}", buildDsCards())
+  .replace(/\{\{INSTRUMENT_COUNT\}\}/g, String(totalInstrumentCount))
+  .replace("{{INSTRUMENT_FILTER_PILLS}}", buildInstrumentFilterPills())
+  .replace("{{INSTRUMENT_CARDS}}", buildInstrumentCards())
   .replace("{{SITE_JSON}}", siteJson)
   .replace("{{CATEGORIES_JSON}}", categoriesJson)
   .replace("{{TOOLS_JSON}}", toolsJson)
@@ -667,7 +766,9 @@ let html = template
   .replace("{{QUIZZES_JSON}}", quizzesJson)
   .replace("{{QUIZ_CATEGORIES_JSON}}", quizCategoriesJson)
   .replace("{{DS_JSON}}", dsJson)
-  .replace("{{DS_CATEGORIES_JSON}}", dsCategoriesJson);
+  .replace("{{DS_CATEGORIES_JSON}}", dsCategoriesJson)
+  .replace("{{INSTRUMENTS_JSON}}", instrumentsJson)
+  .replace("{{INSTRUMENT_CATEGORIES_JSON}}", instrumentCategoriesJson);
 
 // ──────────────────────────────────────────────
 // Write output
@@ -681,5 +782,6 @@ console.log("  " + totalCount + " tools across " + categories.length + " categor
 console.log("  " + totalQuestCount + " quests across " + questCategories.length + " categories");
 console.log("  " + totalQuizCount + " quizzes across " + quizCategories.length + " categories");
 console.log("  " + totalDsCount + " designs across " + dsCategories.length + " categories");
+console.log("  " + totalInstrumentCount + " instruments across " + instrumentCategories.length + " categories");
 console.log("  Template: " + templatePath);
 console.log("  Output: " + outPath);

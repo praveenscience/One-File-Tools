@@ -95,6 +95,21 @@ if (Array.isArray(data.designs)) {
   }
 }
 
+// Normalize and sort instruments (instruments.json)
+if (Array.isArray(data.instruments)) {
+  data.instruments.sort((a, b) => a.name.localeCompare(b.name));
+
+  for (const instrument of data.instruments) {
+    if (Array.isArray(instrument.tags)) {
+      instrument.tags = [...new Set(instrument.tags.map(normalizeTag).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    }
+
+    if (Array.isArray(instrument.techStack)) {
+      instrument.techStack.sort((a, b) => a.localeCompare(b));
+    }
+  }
+}
+
 // Sort theme arrays (themes.json: { resume: [...], portfolio: [...] })
 for (const pillar of ["resume", "portfolio"]) {
   if (Array.isArray(data[pillar])) {
