@@ -54,6 +54,14 @@ function check(dir, jsonFile, key, label) {
         if (!items.some((t) => t.id === id)) issues.push(`ORPHAN: ${dir}/${f}`);
       });
 
+    // Orphan PNGs
+    fs.readdirSync(dirPath)
+      .filter((f) => f.endsWith(".png"))
+      .forEach((f) => {
+        const id = f.replace(/\.png$/, "");
+        if (!items.some((t) => t.id === id)) issues.push(`ORPHAN PNG: ${dir}/${f}`);
+      });
+
     // Case-mismatch PNGs
     fs.readdirSync(dirPath)
       .filter((f) => f.endsWith(".png"))
