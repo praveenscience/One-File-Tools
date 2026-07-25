@@ -1,0 +1,832 @@
+<!--
+  JWT Builder & Signer
+  Build and sign JSON Web Tokens with HMAC algorithms — entirely in your browser.
+  Built for One File Tools.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Build and sign JSON Web Tokens (JWT) with HS256/HS384/HS512 using Web Crypto API — entirely in your browser." />
+    <title>JWT Builder & Signer — One File Tools</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <script>
+      (function () {
+        var t = localStorage.getItem("jwt-builder-theme");
+        if (t === "light") document.documentElement.setAttribute("data-theme", "light");
+      })();
+    </script>
+
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --bg: #0e1a2b;
+        --grid-line: #16263d;
+        --panel: #142440;
+        --panel-border: #23385c;
+        --accent: #ff6b35;
+        --cyan: #5eead4;
+        --green: #4ade80;
+        --yellow: #facc15;
+        --red: #f87171;
+        --text: #e9eff7;
+        --text-muted: #8aa0c2;
+        --text-dim: #4f6388;
+        --radius-sm: 8px;
+        --radius-md: 14px;
+        --jwt-header: #f472b6;
+        --jwt-payload: #facc15;
+        --jwt-sig: #818cf8;
+      }
+
+      :root[data-theme="light"] {
+        --bg: #f0f4f8;
+        --grid-line: #dce3ed;
+        --panel: #ffffff;
+        --panel-border: #c8d4e2;
+        --text: #1a2332;
+        --text-muted: #556b8a;
+        --text-dim: #8a9bb5;
+        --jwt-header: #c0437a;
+        --jwt-payload: #b8960a;
+        --jwt-sig: #5b64d4;
+      }
+
+      body {
+        font-family: "Inter", system-ui, sans-serif;
+        background-color: var(--bg);
+        background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+        background-size: 28px 28px;
+        color: var(--text);
+        padding: 48px 20px 80px;
+        min-height: 100vh;
+      }
+
+      .app {
+        max-width: 780px;
+        margin: 0 auto;
+      }
+
+      .hero {
+        text-align: center;
+        margin-bottom: 40px;
+        animation: rise 0.45s ease both;
+      }
+      .hero-top {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+      .eyebrow {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        color: var(--cyan);
+        text-transform: uppercase;
+      }
+      .theme-toggle {
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        color: var(--text-muted);
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition:
+          border-color 0.2s,
+          color 0.2s;
+      }
+      .theme-toggle:hover {
+        border-color: var(--text-muted);
+        color: var(--text);
+      }
+      .theme-toggle svg {
+        width: 16px;
+        height: 16px;
+      }
+      .wordmark {
+        font-family: "Space Grotesk", sans-serif;
+        font-weight: 700;
+        font-size: clamp(38px, 7vw, 56px);
+        letter-spacing: -0.01em;
+        line-height: 1;
+      }
+      .tagline {
+        color: var(--text-muted);
+        font-size: 15px;
+        margin-top: 10px;
+      }
+
+      .studio {
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-md);
+        padding: 28px 28px 32px;
+        box-shadow: 0 24px 48px -14px rgba(0, 0, 0, 0.5);
+        animation: rise 0.45s ease 0.08s both;
+      }
+
+      .section-label {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text-dim);
+        margin-bottom: 8px;
+      }
+
+      .config-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-bottom: 20px;
+      }
+      @media (max-width: 520px) {
+        .config-row {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .field-group label {
+        display: block;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text-dim);
+        margin-bottom: 6px;
+      }
+      .field-group select,
+      .field-group input {
+        width: 100%;
+        background: var(--bg);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 10px 14px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 13px;
+        color: var(--text);
+        outline: none;
+        transition:
+          border-color 0.2s,
+          box-shadow 0.2s;
+      }
+      .field-group select:focus,
+      .field-group input:focus {
+        border-color: var(--cyan);
+        box-shadow: 0 0 0 2px rgba(94, 234, 212, 0.15);
+      }
+      .field-group select {
+        cursor: pointer;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238aa0c2' viewBox='0 0 24 24'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 12px center;
+        padding-right: 32px;
+      }
+      .field-group select option {
+        background: var(--panel);
+        color: var(--text);
+      }
+
+      .editors-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-bottom: 20px;
+      }
+      @media (max-width: 580px) {
+        .editors-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .editor-card {
+        background: var(--bg);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+      .editor-card-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--panel-border);
+      }
+      .part-pill {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        padding: 3px 9px;
+        border-radius: 999px;
+      }
+      .pill-header {
+        background: rgba(244, 114, 182, 0.15);
+        color: var(--jwt-header);
+      }
+      .pill-payload {
+        background: rgba(250, 204, 21, 0.15);
+        color: var(--jwt-payload);
+      }
+      .editor-status {
+        margin-left: auto;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 10px;
+        letter-spacing: 0.06em;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .editor-status .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+      }
+      .editor-status.valid {
+        color: var(--green);
+      }
+      .editor-status.valid .dot {
+        background: var(--green);
+      }
+      .editor-status.error {
+        color: var(--red);
+      }
+      .editor-status.error .dot {
+        background: var(--red);
+      }
+
+      .json-editor {
+        width: 100%;
+        min-height: 160px;
+        background: transparent;
+        border: none;
+        padding: 14px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        line-height: 1.7;
+        color: var(--text);
+        resize: vertical;
+        outline: none;
+        tab-size: 2;
+      }
+      .json-editor::placeholder {
+        color: var(--text-dim);
+      }
+
+      .divider {
+        border: none;
+        border-top: 1px solid var(--panel-border);
+        margin: 24px 0;
+      }
+
+      .output-section {
+        margin-top: 0;
+      }
+
+      .token-output {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 13px;
+        line-height: 1.65;
+        word-break: break-all;
+        padding: 16px;
+        background: var(--bg);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        min-height: 60px;
+        margin-bottom: 16px;
+        user-select: all;
+      }
+      .part-h {
+        color: var(--jwt-header);
+      }
+      .part-dot {
+        color: var(--text-dim);
+      }
+      .part-p {
+        color: var(--jwt-payload);
+      }
+      .part-s {
+        color: var(--jwt-sig);
+      }
+
+      .error-output {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        color: var(--red);
+        padding: 12px 16px;
+        background: rgba(248, 113, 113, 0.08);
+        border: 1px solid rgba(248, 113, 113, 0.2);
+        border-radius: var(--radius-sm);
+        min-height: 48px;
+        display: none;
+        margin-bottom: 16px;
+      }
+      .error-output.visible {
+        display: block;
+      }
+
+      .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font-family: "Inter", sans-serif;
+        font-size: 13px;
+        font-weight: 600;
+        border: none;
+        border-radius: var(--radius-sm);
+        padding: 10px 18px;
+        cursor: pointer;
+        transition: all 0.18s;
+      }
+      .btn svg {
+        width: 15px;
+        height: 15px;
+        flex-shrink: 0;
+      }
+      .btn-primary {
+        background: var(--accent);
+        color: #1a0f08;
+      }
+      .btn-primary:hover {
+        background: #ff7a4a;
+        transform: translateY(-1px);
+      }
+      .btn-secondary {
+        background: var(--bg);
+        color: var(--text);
+        border: 1px solid var(--panel-border);
+      }
+      .btn-secondary:hover {
+        border-color: var(--text-muted);
+      }
+      .btn-ghost {
+        background: transparent;
+        color: var(--text-muted);
+        border: 1px solid transparent;
+        padding: 10px 14px;
+      }
+      .btn-ghost:hover {
+        color: var(--text);
+        border-color: var(--panel-border);
+      }
+      .spacer {
+        flex: 1;
+      }
+
+      .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 5px 12px;
+        border-radius: 999px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .status-badge .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+      }
+      .status-signed {
+        background: rgba(74, 222, 128, 0.12);
+        color: var(--green);
+      }
+      .status-signed .dot {
+        background: var(--green);
+      }
+      .status-error {
+        background: rgba(248, 113, 113, 0.12);
+        color: var(--red);
+      }
+      .status-error .dot {
+        background: var(--red);
+      }
+
+      .secret-wrap {
+        position: relative;
+      }
+      .secret-wrap input {
+        padding-right: 42px;
+      }
+      .secret-toggle {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        color: var(--text-dim);
+        padding: 4px;
+        display: flex;
+        align-items: center;
+        transition: color 0.15s;
+      }
+      .secret-toggle:hover {
+        color: var(--text);
+      }
+      .secret-toggle svg {
+        width: 16px;
+        height: 16px;
+      }
+
+      @keyframes rise {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @media (max-width: 500px) {
+        .toolbar {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .toolbar .spacer {
+          display: none;
+        }
+        .btn {
+          justify-content: center;
+        }
+      }
+
+      ::-webkit-scrollbar {
+        width: 4px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--panel-border);
+        border-radius: 2px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="app">
+      <header class="hero">
+        <div class="hero-top">
+          <div class="eyebrow">JSON &amp; API</div>
+          <button class="theme-toggle" id="themeToggle" title="Toggle theme" aria-label="Toggle light/dark theme">
+            <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="5" />
+              <line x1="12" y1="1" x2="12" y2="3" />
+              <line x1="12" y1="21" x2="12" y2="23" />
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+              <line x1="1" y1="12" x2="3" y2="12" />
+              <line x1="21" y1="12" x2="23" y2="12" />
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+            </svg>
+          </button>
+        </div>
+        <h1 class="wordmark">JWT Builder</h1>
+        <p class="tagline">Build and sign JSON Web Tokens with HMAC — 100 % client-side.</p>
+      </header>
+
+      <main class="studio">
+        <div class="config-row">
+          <div class="field-group">
+            <label for="algSelect">Algorithm</label>
+            <select id="algSelect">
+              <option value="HS256" selected>HS256 — HMAC + SHA-256</option>
+              <option value="HS384">HS384 — HMAC + SHA-384</option>
+              <option value="HS512">HS512 — HMAC + SHA-512</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label for="secretInput">Secret Key</label>
+            <div class="secret-wrap">
+              <input type="password" id="secretInput" value="your-256-bit-secret" spellcheck="false" autocomplete="off" aria-label="HMAC secret key" />
+              <button class="secret-toggle" id="secretToggle" title="Show/hide secret" aria-label="Toggle secret visibility">
+                <svg id="eyeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="editors-grid">
+          <div class="editor-card">
+            <div class="editor-card-header">
+              <span class="part-pill pill-header">Header</span>
+              <span class="editor-status valid" id="headerStatus"><span class="dot"></span>Valid</span>
+            </div>
+            <textarea class="json-editor" id="headerEditor" spellcheck="false" autocomplete="off" aria-label="JWT header JSON"></textarea>
+          </div>
+
+          <div class="editor-card">
+            <div class="editor-card-header">
+              <span class="part-pill pill-payload">Payload</span>
+              <span class="editor-status valid" id="payloadStatus"><span class="dot"></span>Valid</span>
+            </div>
+            <textarea class="json-editor" id="payloadEditor" spellcheck="false" autocomplete="off" aria-label="JWT payload JSON"></textarea>
+          </div>
+        </div>
+
+        <hr class="divider" />
+
+        <div class="output-section">
+          <div class="section-label">Generated Token</div>
+          <div class="error-output" id="errorOutput"></div>
+          <div class="token-output" id="tokenOutput"><span class="part-h" id="outHeader"></span><span class="part-dot" id="outDot1"></span><span class="part-p" id="outPayload"></span><span class="part-dot" id="outDot2"></span><span class="part-s" id="outSig"></span></div>
+
+          <div class="toolbar">
+            <button class="btn btn-primary" id="copyBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="11" height="11" rx="2" />
+                <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
+              </svg>
+              <span id="copyLabel">Copy JWT</span>
+            </button>
+            <button class="btn btn-ghost" id="resetBtn" title="Reset to defaults">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="1 4 1 10 7 10" />
+                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+              </svg>
+              Reset
+            </button>
+            <div class="spacer"></div>
+            <div id="statusBadge" class="status-badge status-signed" style="display: none"><span class="dot"></span><span id="statusText">Signed</span></div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script>
+      var headerEditor = document.getElementById("headerEditor");
+      var payloadEditor = document.getElementById("payloadEditor");
+      var algSelect = document.getElementById("algSelect");
+      var secretInput = document.getElementById("secretInput");
+      var secretToggle = document.getElementById("secretToggle");
+      var eyeIcon = document.getElementById("eyeIcon");
+      var outHeader = document.getElementById("outHeader");
+      var outPayload = document.getElementById("outPayload");
+      var outSig = document.getElementById("outSig");
+      var outDot1 = document.getElementById("outDot1");
+      var outDot2 = document.getElementById("outDot2");
+      var errorOutput = document.getElementById("errorOutput");
+      var copyBtn = document.getElementById("copyBtn");
+      var copyLabel = document.getElementById("copyLabel");
+      var resetBtn = document.getElementById("resetBtn");
+      var statusBadge = document.getElementById("statusBadge");
+      var statusText = document.getElementById("statusText");
+      var headerStatus = document.getElementById("headerStatus");
+      var payloadStatus = document.getElementById("payloadStatus");
+      var themeToggle = document.getElementById("themeToggle");
+      var themeIcon = document.getElementById("themeIcon");
+
+      var ALG_MAP = {
+        HS256: { name: "HMAC", hash: "SHA-256" },
+        HS384: { name: "HMAC", hash: "SHA-384" },
+        HS512: { name: "HMAC", hash: "SHA-512" }
+      };
+
+      var defaultHeader = '{\n  "alg": "HS256",\n  "typ": "JWT"\n}';
+      var defaultPayload = '{\n  "sub": "1234567890",\n  "name": "John Doe",\n  "iat": 1516239022\n}';
+
+      headerEditor.value = defaultHeader;
+      payloadEditor.value = defaultPayload;
+
+      function escapeHtml(str) {
+        return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+      }
+
+      function base64UrlEncode(uint8) {
+        var bin = "";
+        for (var i = 0; i < uint8.length; i++) bin += String.fromCharCode(uint8[i]);
+        return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      }
+
+      function strToBase64Url(str) {
+        var bytes = new TextEncoder().encode(str);
+        return base64UrlEncode(bytes);
+      }
+
+      function setEditorStatus(el, valid) {
+        if (valid) {
+          el.className = "editor-status valid";
+          el.innerHTML = '<span class="dot"></span>Valid';
+        } else {
+          el.className = "editor-status error";
+          el.innerHTML = '<span class="dot"></span>Error';
+        }
+      }
+
+      function showError(msg) {
+        errorOutput.textContent = msg;
+        errorOutput.classList.add("visible");
+        outHeader.textContent = "";
+        outPayload.textContent = "";
+        outSig.textContent = "";
+        outDot1.textContent = "";
+        outDot2.textContent = "";
+        statusBadge.style.display = "inline-flex";
+        statusBadge.className = "status-badge status-error";
+        statusText.textContent = "Error";
+      }
+
+      function clearError() {
+        errorOutput.classList.remove("visible");
+        errorOutput.textContent = "";
+      }
+
+      var pending = 0;
+
+      async function buildJWT() {
+        var id = ++pending;
+        clearError();
+
+        var headerValid = true;
+        var payloadValid = true;
+        var headerObj, payloadObj;
+
+        try {
+          headerObj = JSON.parse(headerEditor.value);
+        } catch (e) {
+          headerValid = false;
+        }
+        try {
+          payloadObj = JSON.parse(payloadEditor.value);
+        } catch (e) {
+          payloadValid = false;
+        }
+
+        setEditorStatus(headerStatus, headerValid);
+        setEditorStatus(payloadStatus, payloadValid);
+
+        if (!headerValid || !payloadValid) {
+          var parts = [];
+          if (!headerValid) parts.push("header");
+          if (!payloadValid) parts.push("payload");
+          showError("Invalid JSON in " + parts.join(" and "));
+          return;
+        }
+
+        var secret = secretInput.value;
+        if (!secret) {
+          showError("Secret key is required");
+          return;
+        }
+
+        var alg = algSelect.value;
+        var algInfo = ALG_MAP[alg];
+        if (!algInfo) {
+          showError("Unsupported algorithm");
+          return;
+        }
+
+        var headerB64 = strToBase64Url(JSON.stringify(headerObj));
+        var payloadB64 = strToBase64Url(JSON.stringify(payloadObj));
+        var signingInput = headerB64 + "." + payloadB64;
+
+        try {
+          var keyData = new TextEncoder().encode(secret);
+          var cryptoKey = await crypto.subtle.importKey("raw", keyData, { name: algInfo.name, hash: algInfo.hash }, false, ["sign"]);
+          var sig = await crypto.subtle.sign("HMAC", cryptoKey, new TextEncoder().encode(signingInput));
+
+          if (id !== pending) return;
+
+          var sigB64 = base64UrlEncode(new Uint8Array(sig));
+
+          outHeader.textContent = headerB64;
+          outDot1.textContent = ".";
+          outPayload.textContent = payloadB64;
+          outDot2.textContent = ".";
+          outSig.textContent = sigB64;
+
+          statusBadge.style.display = "inline-flex";
+          statusBadge.className = "status-badge status-signed";
+          statusText.textContent = "Signed";
+        } catch (e) {
+          if (id !== pending) return;
+          showError("Signing failed: " + e.message);
+        }
+      }
+
+      function getJWT() {
+        var h = outHeader.textContent;
+        var p = outPayload.textContent;
+        var s = outSig.textContent;
+        if (!h || !p || !s) return "";
+        return h + "." + p + "." + s;
+      }
+
+      algSelect.addEventListener("change", function () {
+        var alg = algSelect.value;
+        try {
+          var h = JSON.parse(headerEditor.value);
+          h.alg = alg;
+          headerEditor.value = JSON.stringify(h, null, 2);
+        } catch (e) {
+          // leave header as-is if invalid
+        }
+        buildJWT();
+      });
+
+      headerEditor.addEventListener("input", buildJWT);
+      payloadEditor.addEventListener("input", buildJWT);
+      secretInput.addEventListener("input", buildJWT);
+
+      secretToggle.addEventListener("click", function () {
+        var isPassword = secretInput.type === "password";
+        secretInput.type = isPassword ? "text" : "password";
+        if (isPassword) {
+          eyeIcon.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" />';
+        } else {
+          eyeIcon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />';
+        }
+      });
+
+      copyBtn.addEventListener("click", function () {
+        var jwt = getJWT();
+        if (!jwt) return;
+        navigator.clipboard
+          .writeText(jwt)
+          .then(function () {
+            copyLabel.textContent = "Copied!";
+            setTimeout(function () {
+              copyLabel.textContent = "Copy JWT";
+            }, 2000);
+          })
+          .catch(function () {
+            copyLabel.textContent = "Failed";
+            setTimeout(function () {
+              copyLabel.textContent = "Copy JWT";
+            }, 2000);
+          });
+      });
+
+      resetBtn.addEventListener("click", function () {
+        algSelect.value = "HS256";
+        headerEditor.value = defaultHeader;
+        payloadEditor.value = defaultPayload;
+        secretInput.value = "your-256-bit-secret";
+        secretInput.type = "password";
+        eyeIcon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />';
+        buildJWT();
+      });
+
+      var sunSVG = '<circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />';
+      var moonSVG = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />';
+
+      function updateThemeIcon() {
+        var isLight = document.documentElement.getAttribute("data-theme") === "light";
+        themeIcon.innerHTML = isLight ? moonSVG : sunSVG;
+      }
+
+      themeToggle.addEventListener("click", function () {
+        var isLight = document.documentElement.getAttribute("data-theme") === "light";
+        if (isLight) {
+          document.documentElement.removeAttribute("data-theme");
+          localStorage.setItem("jwt-builder-theme", "dark");
+        } else {
+          document.documentElement.setAttribute("data-theme", "light");
+          localStorage.setItem("jwt-builder-theme", "light");
+        }
+        updateThemeIcon();
+      });
+
+      updateThemeIcon();
+      buildJWT();
+    </script>
+  </body>
+</html>
