@@ -76,6 +76,21 @@ if (Array.isArray(data.quests)) {
   }
 }
 
+// Normalize and sort quizzes
+if (Array.isArray(data.quizzes)) {
+  data.quizzes.sort((a, b) => a.name.localeCompare(b.name));
+
+  for (const quiz of data.quizzes) {
+    if (Array.isArray(quiz.tags)) {
+      quiz.tags = [...new Set(quiz.tags.map(normalizeTag).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    }
+
+    if (Array.isArray(quiz.techStack)) {
+      quiz.techStack.sort((a, b) => a.localeCompare(b));
+    }
+  }
+}
+
 // Normalize and sort designs (design-system.json)
 if (Array.isArray(data.designs)) {
   data.designs.sort((a, b) => a.name.localeCompare(b.name));
