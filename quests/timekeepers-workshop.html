@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>The Timekeeper's Workshop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --wood-dark: #0f0a06;
+    --wood-panel: #1a120c;
+    --wood-light: #2c1e13;
+    --brass-dark: #4a3b22;
+    --brass: #b58d3d;
+    --brass-bright: #e8c678;
+    --brass-glow: rgba(232, 198, 120, 0.4);
+    --copper: #9e4f32;
+    --iron: #24262b;
+    --parchment: #e3dac9;
+    --parchment-dim: #bbaea0;
+    --font-display: 'Cinzel Decorative', serif;
+    --font-body: 'EB Garamond', serif;
+    --font-mono: 'Space Mono', monospace;
+  }
+  
+  * { box-sizing: border-box; }
+  
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+    background-color: var(--wood-dark);
+    background-image: 
+      radial-gradient(circle at 50% 30%, rgba(44, 30, 19, 0.8) 0%, rgba(15, 10, 6, 1) 80%),
+      url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><filter id="noiseFilter"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noiseFilter)" opacity="0.05"/></svg>');
+    font-family: var(--font-body);
+    color: var(--parchment);
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+  }
+  
+  #app { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: var(--brass-dark); border-radius: 4px; border: 1px solid var(--wood-dark); }
+  ::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); border-radius: 4px; }
+
+  .mote {
+    position: absolute; width: 2.5px; height: 2.5px; border-radius: 50%;
+    background: var(--brass-bright); opacity: 0.15; filter: blur(1px);
+    animation: drift linear infinite; pointer-events: none; z-index: 15;
+  }
+  @keyframes drift {
+    0% { transform: translateY(110vh) translateX(0); opacity: 0; }
+    20% { opacity: 0.4; filter: blur(0.5px); }
+    80% { opacity: 0.2; filter: blur(2px); }
+    100% { transform: translateY(-10vh) translateX(40px); opacity: 0; }
+  }
+
+  .screen {
+    position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity 1.2s cubic-bezier(0.4, 0, 0.2, 1), transform 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: scale(1.03); z-index: 10;
+  }
+  .screen.active { opacity: 1; pointer-events: auto; transform: scale(1); }
+
+  #landing { 
+    text-align: center; padding: 40px; 
+    background: radial-gradient(circle at center, rgba(30, 22, 15, 0.85) 0%, var(--wood-dark) 100%); 
+    z-index: 50; overflow: hidden;
+  }
+
+  .landing-bg-gears {
+    position: absolute; inset: -20%; pointer-events: none; z-index: 0;
+    opacity: 0.08; display: flex; justify-content: center; align-items: center;
+  }
+  .landing-bg-gears svg {
+    width: 140vw; height: 140vh; max-width: none; max-height: none;
+    animation: slowTurn 120s linear infinite;
+  }
+  @keyframes slowTurn { to { transform: rotate(360deg); } }
+
+  .corner-decor {
+    position: absolute; width: 120px; height: 120px; z-index: 5; opacity: 0.6; pointer-events: none;
+  }
+  .corner-tl { top: 20px; left: 20px; }
+  .corner-tr { top: 20px; right: 20px; transform: scaleX(-1); }
+  .corner-bl { bottom: 20px; left: 20px; transform: scaleY(-1); }
+  .corner-br { bottom: 20px; right: 20px; transform: scale(-1, -1); }
+
+  .landing-content {
+    position: relative; z-index: 20; display: flex; flex-direction: column; align-items: center;
+    background: radial-gradient(circle at center, rgba(15, 10, 6, 0.7) 0%, transparent 70%);
+    padding: 60px; border-radius: 50%;
+  }
+
+  .hero-crest { 
+    width: 200px; height: 200px; margin-bottom: 24px; filter: drop-shadow(0 15px 30px rgba(0,0,0,0.9)); 
+    animation: float 6s ease-in-out infinite;
+  }
+  @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+  .hero-crest .ring-outer { stroke-dasharray: 1000; stroke-dashoffset: 1000; animation: drawCrest 3s forwards ease-in-out; }
+  .hero-crest .gear-inner { animation: spinGear 20s linear infinite; transform-origin: 100px 100px; }
+  @keyframes drawCrest { to { stroke-dashoffset: 0; } }
+  @keyframes spinGear { to { transform: rotate(360deg); } }
+
+  h1.title {
+    font-family: var(--font-display); font-size: clamp(40px, 6vw, 76px); letter-spacing: 0.08em;
+    margin: 0 0 16px 0; background: linear-gradient(180deg, #fff7e6 0%, var(--brass-bright) 40%, var(--brass) 70%, #5c4314 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: 0 5px 25px var(--brass-glow); font-weight: 900;
+  }
+  
+  .subtitle { 
+    font-size: clamp(18px, 2.2vw, 26px); color: var(--parchment); max-width: 650px; 
+    line-height: 1.6; margin-bottom: 48px; text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+    font-weight: 400; letter-spacing: 0.02em;
+  }
+
+  button.btn {
+    font-family: var(--font-display); font-size: 17px; font-weight: 900; letter-spacing: 0.12em;
+    padding: 18px 40px; background: linear-gradient(to bottom, #ebd197, #b58d3d, #73531c); color: #140d07;
+    border: 1px solid #ffeba8; border-radius: 3px; cursor: pointer;
+    box-shadow: 0 6px 0 #3b2a0c, 0 15px 30px rgba(0,0,0,0.8), inset 0 2px 2px rgba(255,255,255,0.6);
+    text-transform: uppercase; transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1); position: relative; overflow: hidden;
+  }
+  button.btn::after {
+    content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+    background: linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.3) 50%, transparent 60%);
+    transform: translateX(-100%); transition: transform 0.7s ease;
+  }
+  button.btn:hover::after { transform: translateX(100%); }
+  button.btn:hover { 
+    transform: translateY(-2px); 
+    box-shadow: 0 8px 0 #3b2a0c, 0 20px 40px rgba(0,0,0,0.9), inset 0 2px 2px rgba(255,255,255,0.7); 
+    filter: brightness(1.1);
+  }
+  button.btn:active { 
+    transform: translateY(6px); 
+    box-shadow: 0 0 0 #3b2a0c, 0 5px 10px rgba(0,0,0,0.8), inset 0 -1px 2px rgba(0,0,0,0.5); 
+  }
+  button.btn:disabled { filter: grayscale(1) brightness(0.6); opacity: 0.7; pointer-events: none; box-shadow: 0 4px 0 #1a120c, 0 5px 10px rgba(0,0,0,0.5); }
+
+  #workspace { display: flex; flex-direction: column; opacity: 0; pointer-events: none; transition: opacity 1.2s ease; z-index: 20; position: absolute; inset: 0; }
+  #workspace.active { opacity: 1; pointer-events: auto; }
+
+  header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 36px; background: linear-gradient(180deg, rgba(20, 14, 10, 0.98), rgba(15, 10, 6, 0.95)); 
+    border-bottom: 2px solid var(--brass-dark);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.9); z-index: 30; backdrop-filter: blur(8px);
+  }
+  
+  .brand { display: flex; align-items: center; gap: 14px; font-family: var(--font-display); font-size: 20px; color: var(--brass-bright); font-weight: 900; letter-spacing: 0.08em; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
+  .commission-status { font-family: var(--font-mono); font-size: 15px; font-weight: 700; color: var(--brass-bright); background: linear-gradient(180deg, var(--wood-light), var(--wood-panel)); padding: 8px 24px; border: 1px solid var(--brass-dark); border-radius: 3px; box-shadow: inset 0 2px 8px rgba(0,0,0,0.8), 0 2px 4px rgba(0,0,0,0.5); letter-spacing: 0.05em; }
+  
+  .controls { display: flex; gap: 16px; }
+  .icon-btn {
+    width: 40px; height: 40px; background: linear-gradient(135deg, var(--wood-light), var(--wood-panel));
+    border: 1px solid var(--brass-dark); color: var(--brass-bright); cursor: pointer; display: flex; justify-content: center; align-items: center; font-family: var(--font-mono); font-size: 18px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.6), inset 0 1px 1px rgba(255,255,255,0.1); transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); border-radius: 3px;
+  }
+  .icon-btn:hover { background: var(--brass-dark); border-color: var(--brass); transform: translateY(-2px) scale(1.05); box-shadow: 0 6px 12px rgba(0,0,0,0.8); }
+  .icon-btn:active { transform: translateY(2px) scale(0.95); box-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+
+  main.workshop-grid {
+    flex: 1; display: grid; grid-template-columns: 340px 1fr 360px; gap: 28px;
+    padding: 28px; overflow: hidden;
+  }
+
+  .panel {
+    background: linear-gradient(to bottom right, rgba(35, 25, 18, 0.85), rgba(15, 10, 6, 0.95));
+    border: 1px solid var(--brass-dark); border-radius: 4px; box-shadow: inset 0 0 50px rgba(0,0,0,0.9), 0 15px 35px rgba(0,0,0,0.8);
+    display: flex; flex-direction: column; position: relative; overflow: hidden;
+  }
+  .panel::before {
+    content: ''; position: absolute; inset: 0; pointer-events: none; border: 1px solid rgba(232, 198, 120, 0.08); margin: 6px; border-radius: 2px;
+  }
+
+  .panel-header {
+    font-family: var(--font-display); font-size: 15px; color: var(--brass-bright); letter-spacing: 0.15em;
+    padding: 14px 20px; border-bottom: 1px solid var(--brass-dark); background: linear-gradient(90deg, rgba(0,0,0,0.6), rgba(0,0,0,0.2));
+    display: flex; align-items: center; gap: 10px; font-weight: 900; text-transform: uppercase; flex-shrink: 0;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+  }
+
+  .code-blueprint { flex: 1; padding: 20px; overflow-y: auto; font-family: var(--font-mono); font-size: 14px; line-height: 1.9; color: var(--parchment-dim); }
+  .code-line { display: flex; padding: 6px 10px; margin-bottom: 4px; border-radius: 3px; transition: all 0.3s ease; border-left: 2px solid transparent; }
+  .code-line .line-num { color: #6e5223; width: 28px; user-select: none; font-weight: 700; }
+  .code-line .line-content { white-space: pre-wrap; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+  .code-line.hl { background: rgba(181, 141, 61, 0.15); border-left-color: var(--brass-bright); color: var(--parchment); text-shadow: 0 0 8px rgba(232,198,120,0.4); box-shadow: inset 0 0 15px rgba(0,0,0,0.5); }
+
+  .blueprint-legend { padding: 18px 20px; border-top: 1px solid var(--brass-dark); background: rgba(0,0,0,0.4); font-family: var(--font-mono); font-size: 12px; color: var(--parchment-dim); flex-shrink: 0; box-shadow: inset 0 5px 10px rgba(0,0,0,0.3); }
+  .legend-item { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .swatch { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+  .swatch.sync { background: radial-gradient(circle at 30% 30%, #d4d4d4, #737373); }
+  .swatch.micro { background: radial-gradient(circle at 30% 30%, #8ebfda, #39637c); }
+  .swatch.macro { background: radial-gradient(circle at 30% 30%, #d88668, #823e25); }
+
+  .mechanism-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; padding: 20px; }
+  #mechSvg { width: 100%; height: 100%; filter: drop-shadow(0 20px 40px rgba(0,0,0,0.9)); }
+  
+  .mech-overlay { position: absolute; inset: 0; pointer-events: none; display: flex; flex-direction: column; justify-content: flex-end; padding: 30px; }
+  .mech-status { text-align: center; font-family: var(--font-display); font-size: 19px; color: var(--brass-bright); letter-spacing: 0.08em; text-shadow: 0 2px 6px rgba(0,0,0,0.9); background: linear-gradient(180deg, rgba(20,14,10,0.85), rgba(10,6,4,0.95)); padding: 12px 24px; border: 1px solid var(--brass-dark); border-radius: 4px; align-self: center; transition: opacity 0.3s; box-shadow: 0 10px 20px rgba(0,0,0,0.7); font-weight: 700; }
+
+  .sequence-track { flex: 1 1 50%; padding: 20px; border-bottom: 1px solid var(--brass-dark); background: rgba(0,0,0,0.25); display: flex; flex-direction: column; gap: 12px; overflow-y: auto; box-shadow: inset 0 -10px 20px rgba(0,0,0,0.3); }
+  .inventory-tray { flex: 1 1 50%; display: flex; flex-direction: column; gap: 14px; padding: 20px; overflow-y: auto; }
+  
+  .track-slot {
+    min-height: 54px; border: 2px dashed var(--brass-dark); border-radius: 4px; background: rgba(0,0,0,0.5);
+    display: flex; align-items: center; justify-content: flex-start; padding: 0 16px; gap: 14px; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    font-family: var(--font-mono); font-size: 13px; color: var(--parchment-dim); flex-shrink: 0;
+  }
+  .track-slot.drag-over { border-color: var(--brass-bright); background: rgba(181, 141, 61, 0.15); transform: scale(1.03); box-shadow: inset 0 0 15px rgba(232, 198, 120, 0.2); }
+  .track-slot.filled { border-style: solid; border-color: var(--brass); background: linear-gradient(90deg, rgba(60,45,30,0.9), rgba(20,15,10,0.9)); color: var(--parchment); box-shadow: 0 4px 10px rgba(0,0,0,0.6), inset 0 0 10px rgba(0,0,0,0.5); }
+  .slot-num { font-family: var(--font-display); font-size: 16px; color: var(--brass-dark); font-weight: 900; }
+  .track-slot.filled .slot-num { color: var(--brass-bright); text-shadow: 0 0 4px rgba(232,198,120,0.5); }
+  
+  .gear-item {
+    background: linear-gradient(180deg, rgba(60, 45, 30, 0.95), rgba(25, 18, 12, 0.95));
+    border: 1px solid var(--brass-dark); padding: 12px 16px; display: flex; align-items: center; gap: 14px; cursor: grab;
+    font-family: var(--font-mono); font-size: 13px; color: var(--parchment); box-shadow: 0 6px 12px rgba(0,0,0,0.6), inset 0 1px 1px rgba(255,255,255,0.1);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); border-radius: 4px; flex-shrink: 0;
+  }
+  .gear-item:hover { border-color: var(--brass); background: linear-gradient(180deg, rgba(75, 55, 35, 0.95), rgba(35, 25, 18, 0.95)); transform: translateY(-3px); box-shadow: 0 8px 16px rgba(0,0,0,0.8), inset 0 1px 1px rgba(255,255,255,0.2); }
+  .gear-item:active { cursor: grabbing; transform: scale(0.97) translateY(0); box-shadow: 0 2px 4px rgba(0,0,0,0.8); }
+  .gear-item.dragging { opacity: 0.4; filter: grayscale(1); transform: scale(0.95); }
+  .gear-item.placed { display: none; }
+  
+  .mini-gear-icon { width: 32px; height: 32px; flex-shrink: 0; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+
+  .action-area { padding: 20px; background: rgba(0,0,0,0.4); border-top: 1px solid var(--brass-dark); display: flex; justify-content: center; flex-shrink: 0; box-shadow: inset 0 10px 20px rgba(0,0,0,0.3); }
+  .action-area .btn { width: 100%; padding: 16px; font-size: 15px; }
+
+  #modalOverlay {
+    position: absolute; inset: 0; background: rgba(10, 6, 4, 0.9); backdrop-filter: blur(12px);
+    display: flex; align-items: center; justify-content: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  #modalOverlay.active { opacity: 1; pointer-events: auto; }
+  .modal-box {
+    background: url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23n)" opacity="0.05"/></svg>'), linear-gradient(135deg, #241a12, #0a0604);
+    border: 2px solid var(--brass); padding: 40px 50px; border-radius: 6px; max-width: 650px; width: 90%;
+    box-shadow: 0 30px 60px rgba(0,0,0,1), inset 0 0 0 1px rgba(232, 198, 120, 0.2), inset 0 0 30px rgba(0,0,0,0.8); 
+    text-align: center; transform: translateY(30px) scale(0.95); transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); position: relative;
+  }
+  #modalOverlay.active .modal-box { transform: translateY(0) scale(1); }
+  .modal-box h2 { font-family: var(--font-display); color: var(--brass-bright); font-size: 32px; margin: 0 0 20px 0; letter-spacing: 0.08em; text-shadow: 0 4px 10px rgba(0,0,0,0.8); font-weight: 900; }
+  .modal-box p { font-size: 20px; color: var(--parchment); line-height: 1.7; margin: 0 0 30px 0; font-family: var(--font-body); }
+  .modal-box .diag { font-family: var(--font-mono); color: #ff8c7a; font-size: 15px; background: rgba(0,0,0,0.6); padding: 16px; border: 1px solid #d66453; border-radius: 4px; margin-bottom: 30px; display: none; box-shadow: inset 0 2px 8px rgba(0,0,0,0.8); }
+  .modal-box .btn { padding: 16px 36px; font-size: 16px; }
+
+  @media (max-width: 1100px) {
+    main.workshop-grid { grid-template-columns: 1fr; grid-template-rows: minmax(250px, auto) 500px auto; overflow-y: auto; }
+    .panel { min-height: unset; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="dustLayer"></div>
+
+  <section id="landing" class="screen active">
+    
+    <div class="landing-bg-gears">
+      <svg viewBox="0 0 1000 1000">
+        <g stroke="#b58d3d" stroke-width="2" fill="none" opacity="0.4">
+          <circle cx="500" cy="500" r="400" stroke-dasharray="20 15" stroke-width="4"/>
+          <circle cx="500" cy="500" r="380" stroke-width="1"/>
+          <circle cx="500" cy="500" r="250" stroke-dasharray="10 30" stroke-width="8"/>
+          <circle cx="500" cy="500" r="100" stroke-dasharray="5 10"/>
+          <path d="M 100 500 L 900 500 M 500 100 L 500 900 M 217 217 L 783 783 M 217 783 L 783 217" stroke-width="1" opacity="0.5"/>
+        </g>
+      </svg>
+    </div>
+
+    <svg class="corner-decor corner-tl" viewBox="0 0 100 100">
+      <path d="M 0 0 L 100 0 C 80 20 60 40 60 100 L 0 100 Z" fill="none" stroke="#b58d3d" stroke-width="2"/>
+      <circle cx="20" cy="20" r="5" fill="#e8c678"/>
+    </svg>
+    <svg class="corner-decor corner-tr" viewBox="0 0 100 100">
+      <path d="M 0 0 L 100 0 C 80 20 60 40 60 100 L 0 100 Z" fill="none" stroke="#b58d3d" stroke-width="2"/>
+      <circle cx="20" cy="20" r="5" fill="#e8c678"/>
+    </svg>
+    <svg class="corner-decor corner-bl" viewBox="0 0 100 100">
+      <path d="M 0 0 L 100 0 C 80 20 60 40 60 100 L 0 100 Z" fill="none" stroke="#b58d3d" stroke-width="2"/>
+      <circle cx="20" cy="20" r="5" fill="#e8c678"/>
+    </svg>
+    <svg class="corner-decor corner-br" viewBox="0 0 100 100">
+      <path d="M 0 0 L 100 0 C 80 20 60 40 60 100 L 0 100 Z" fill="none" stroke="#b58d3d" stroke-width="2"/>
+      <circle cx="20" cy="20" r="5" fill="#e8c678"/>
+    </svg>
+
+    <div class="landing-content">
+      <svg class="hero-crest" viewBox="0 0 200 200">
+        <defs>
+          <radialGradient id="brassGrad" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#e8c678"/>
+            <stop offset="70%" stop-color="#b58d3d"/>
+            <stop offset="100%" stop-color="#5c4314"/>
+          </radialGradient>
+        </defs>
+        <circle cx="100" cy="100" r="90" fill="rgba(20, 14, 10, 0.8)" stroke="url(#brassGrad)" stroke-width="6" class="ring-outer"/>
+        <circle cx="100" cy="100" r="78" fill="none" stroke="#e8c678" stroke-width="1.5" stroke-dasharray="4 6"/>
+        <circle cx="100" cy="100" r="60" fill="none" stroke="#b58d3d" stroke-width="1" stroke-dasharray="1 4"/>
+        
+        <g class="gear-inner">
+          <path d="M100 25 L100 35 M100 165 L100 175 M25 100 L35 100 M165 100 L175 100" stroke="#e8c678" stroke-width="4" stroke-linecap="round"/>
+          <circle cx="100" cy="100" r="45" fill="none" stroke="#b58d3d" stroke-width="8" stroke-dasharray="15 10"/>
+        </g>
+        
+        <path d="M100 35 L100 100 L140 120" fill="none" stroke="url(#brassGrad)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="100" cy="100" r="10" fill="#e8c678" filter="drop-shadow(0 2px 4px rgba(0,0,0,0.8))"/>
+      </svg>
+      <h1 class="title">The Timekeeper's Workshop</h1>
+      <p class="subtitle">Repair the broken clockwork schedules. Master the physical mechanics of the Call Stack, Microtask Springs, and Macrotask Flywheels to restore order to time itself.</p>
+      <button class="btn" id="startBtn">Unlock the Workshop</button>
+    </div>
+  </section>
+
+  <section id="workspace">
+    <header>
+      <div class="brand">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--brass-bright);"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        THE TIMEKEEPER'S WORKSHOP
+      </div>
+      <div class="commission-status" id="levelIndicator">Commission I</div>
+      <div class="controls">
+        <button class="icon-btn" id="resetBtn" title="Reset Blueprint">↺</button>
+      </div>
+    </header>
+
+    <main class="workshop-grid">
+      <div class="panel">
+        <div class="panel-header">❖ Blueprint</div>
+        <div class="code-blueprint" id="codeContainer"></div>
+        <div class="blueprint-legend">
+          <div class="legend-item"><span class="swatch sync"></span> Synchronous Gear (Call Stack)</div>
+          <div class="legend-item"><span class="swatch micro"></span> Microtask Spring (Promise)</div>
+          <div class="legend-item"><span class="swatch macro"></span> Macrotask Flywheel (Timer)</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">❖ Mechanism</div>
+        <div class="mechanism-stage">
+          <svg id="mechSvg" viewBox="0 0 600 600"></svg>
+          <div class="mech-overlay">
+            <div class="mech-status" id="mechStatus">Awaiting components...</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">❖ Assembly</div>
+        <div class="sequence-track" id="sequenceTrack"></div>
+        <div class="panel-header" style="border-top: 1px solid var(--brass-dark); border-bottom: none; background: rgba(0,0,0,0.25); padding-top: 20px;">Parts Inventory</div>
+        <div class="inventory-tray" id="inventoryTray"></div>
+        <div class="action-area">
+          <button class="btn" id="evaluateBtn" disabled>Wind Mechanism</button>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <div id="modalOverlay">
+    <div class="modal-box">
+      <h2 id="modalTitle"></h2>
+      <p id="modalDesc"></p>
+      <div class="diag" id="modalDiag"></div>
+      <button class="btn" id="modalActionBtn">Continue</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function() {
+  "use strict";
+
+  const app = {
+    audioCtx: null,
+    level: 0,
+    running: false,
+    draggedId: null,
+    placedGears: [],
+    
+    levels: [
+      {
+        title: "The Apprentice's Basic Drive",
+        desc: "A simple, unhindered gear train. Synchronous gears mesh directly in sequence.",
+        code: [
+          { id: 'A', type: 'sync', text: 'console.log("A");' },
+          { id: 'B', type: 'sync', text: 'console.log("B");' },
+          { id: 'C', type: 'sync', text: 'console.log("C");' }
+        ],
+        truth: ['A', 'B', 'C']
+      },
+      {
+        title: "The Flywheel Introduction",
+        desc: "A macrotask flywheel requires time to spool up. It will wait until the main stack is entirely clear.",
+        code: [
+          { id: 'A', type: 'sync', text: 'console.log("A");' },
+          { id: 'B', type: 'macro', text: 'setTimeout(() => console.log("B"), 0);' },
+          { id: 'C', type: 'sync', text: 'console.log("C");' }
+        ],
+        truth: ['A', 'C', 'B']
+      },
+      {
+        title: "The Priority Spring",
+        desc: "Microtask springs possess absolute precedence over macrotasks. They unwind completely before any flywheel is engaged.",
+        code: [
+          { id: 'A', type: 'sync', text: 'console.log("A");' },
+          { id: 'B', type: 'macro', text: 'setTimeout(() => console.log("B"), 0);' },
+          { id: 'C', type: 'micro', text: 'Promise.resolve().then(() => console.log("C"));' },
+          { id: 'D', type: 'sync', text: 'console.log("D");' }
+        ],
+        truth: ['A', 'D', 'C', 'B']
+      },
+      {
+        title: "The Compound Escapement",
+        desc: "Multiple springs and flywheels. Remember: the engine unwinds EVERY microtask spring before touching a single macrotask flywheel.",
+        code: [
+          { id: 'A', type: 'macro', text: 'setTimeout(() => console.log("A"), 0);' },
+          { id: 'B', type: 'micro', text: 'Promise.resolve().then(() => console.log("B"));' },
+          { id: 'C', type: 'sync', text: 'console.log("C");' },
+          { id: 'D', type: 'micro', text: 'Promise.resolve().then(() => console.log("D"));' },
+          { id: 'E', type: 'macro', text: 'setTimeout(() => console.log("E"), 0);' }
+        ],
+        truth: ['C', 'B', 'D', 'A', 'E']
+      },
+      {
+        title: "The Masterpiece Configuration",
+        desc: "A spring loaded within a spring. The microtask queue must be entirely drained, even if new microtasks are added during the draining process.",
+        code: [
+          { id: 'A', type: 'sync', text: 'console.log("A");' },
+          { id: 'B', type: 'macro', text: 'setTimeout(() => console.log("B"), 0);' },
+          { id: 'C', type: 'micro', text: 'Promise.resolve().then(() => {\n  console.log("C");' },
+          { id: 'D', type: 'micro', text: '  Promise.resolve().then(() => console.log("D"));\n});' },
+          { id: 'E', type: 'sync', text: 'console.log("E");' },
+          { id: 'F', type: 'macro', text: 'setTimeout(() => console.log("F"), 0);' }
+        ],
+        truth: ['A', 'E', 'C', 'D', 'B', 'F']
+      }
+    ]
+  };
+
+  function initAudio() {
+    if(!app.audioCtx) {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      app.audioCtx = new AudioContext();
+    }
+    if(app.audioCtx.state === 'suspended') app.audioCtx.resume();
+  }
+
+  function playTone(freq, type, duration, vol) {
+    if(!app.audioCtx) return;
+    const osc = app.audioCtx.createOscillator();
+    const gain = app.audioCtx.createGain();
+    const filter = app.audioCtx.createBiquadFilter();
+    
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, app.audioCtx.currentTime);
+    
+    filter.type = 'lowpass';
+    filter.frequency.value = 2000;
+    
+    gain.gain.setValueAtTime(vol, app.audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, app.audioCtx.currentTime + duration);
+    
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(app.audioCtx.destination);
+    
+    osc.start();
+    osc.stop(app.audioCtx.currentTime + duration);
+  }
+
+  function sfxClack() { playTone(300, 'square', 0.1, 0.1); }
+  function sfxMesh() { playTone(800, 'sawtooth', 0.1, 0.05); setTimeout(()=>playTone(600, 'square', 0.1, 0.05), 50); }
+  function sfxSuccess() { playTone(440, 'sine', 0.5, 0.2); setTimeout(()=>playTone(660, 'sine', 0.8, 0.2), 200); }
+  function sfxFail() { playTone(200, 'sawtooth', 0.3, 0.15); setTimeout(()=>playTone(180, 'sawtooth', 0.4, 0.15), 150); }
+
+  function createDust() {
+    const layer = document.getElementById('dustLayer');
+    for(let i=0; i<40; i++) {
+      let m = document.createElement('div');
+      m.className = 'mote';
+      m.style.left = Math.random() * 100 + '%';
+      m.style.animationDuration = (12 + Math.random() * 25) + 's';
+      m.style.animationDelay = (Math.random() * 15) + 's';
+      layer.appendChild(m);
+    }
+  }
+
+  function gearPath(cx, cy, radius, teeth, depth) {
+    let pts = [];
+    let angle = (Math.PI * 2) / teeth;
+    for(let i=0; i<teeth; i++) {
+      let a = i * angle;
+      let rOut = radius + depth;
+      let a1 = a + angle*0.1;
+      let a2 = a + angle*0.35;
+      let a3 = a + angle*0.65;
+      let a4 = a + angle*0.9;
+      
+      if(i===0) pts.push(`M ${cx + Math.cos(a)*radius} ${cy + Math.sin(a)*radius}`);
+      pts.push(`L ${cx + Math.cos(a1)*radius} ${cy + Math.sin(a1)*radius}`);
+      pts.push(`L ${cx + Math.cos(a2)*rOut} ${cy + Math.sin(a2)*rOut}`);
+      pts.push(`L ${cx + Math.cos(a3)*rOut} ${cy + Math.sin(a3)*rOut}`);
+      pts.push(`L ${cx + Math.cos(a4)*radius} ${cy + Math.sin(a4)*radius}`);
+      pts.push(`L ${cx + Math.cos(a+angle)*radius} ${cy + Math.sin(a+angle)*radius}`);
+    }
+    return pts.join(' ') + ' Z';
+  }
+
+  function getGearColors(type) {
+    if(type === 'sync') return { fill: '#3b3b3b', stroke: '#999', center: '#ccc' };
+    if(type === 'micro') return { fill: '#1d2e38', stroke: '#5a8eab', center: '#8ebfda' };
+    return { fill: '#3a2016', stroke: '#b56345', center: '#d88668' }; 
+  }
+
+  function drawMechBase(svg, totalSlots) {
+    svg.innerHTML = '';
+    
+    let defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    defs.innerHTML = `
+      <radialGradient id="baseGrad" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#3a2f22"/>
+        <stop offset="100%" stop-color="#14100b"/>
+      </radialGradient>
+      <filter id="glow"><feGaussianBlur stdDeviation="4" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    `;
+    svg.appendChild(defs);
+
+    let base = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    base.setAttribute('cx', 300); base.setAttribute('cy', 300); base.setAttribute('r', 280);
+    base.setAttribute('fill', 'url(#baseGrad)'); base.setAttribute('stroke', '#5c4314'); base.setAttribute('stroke-width', '4');
+    svg.appendChild(base);
+    
+    let ring = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    ring.setAttribute('cx', 300); ring.setAttribute('cy', 300); ring.setAttribute('r', 255);
+    ring.setAttribute('fill', 'none'); ring.setAttribute('stroke', '#241a10'); ring.setAttribute('stroke-width', '12');
+    svg.appendChild(ring);
+    
+    let innerRing = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    innerRing.setAttribute('cx', 300); innerRing.setAttribute('cy', 300); innerRing.setAttribute('r', 110);
+    innerRing.setAttribute('fill', 'none'); innerRing.setAttribute('stroke', '#241a10'); innerRing.setAttribute('stroke-width', '2');
+    svg.appendChild(innerRing);
+
+    for(let i=0; i<totalSlots; i++) {
+      let a = Math.PI - (i * (Math.PI / (totalSlots-1 || 1)));
+      let r = 185;
+      let cx = 300 + Math.cos(a)*r;
+      let cy = 300 - Math.sin(a)*r;
+      
+      let pegOut = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      pegOut.setAttribute('cx', cx); pegOut.setAttribute('cy', cy); pegOut.setAttribute('r', 16);
+      pegOut.setAttribute('fill', '#1a120c'); pegOut.setAttribute('stroke', '#5c4314'); pegOut.setAttribute('stroke-width', '3');
+      svg.appendChild(pegOut);
+
+      let peg = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      peg.setAttribute('cx', cx); peg.setAttribute('cy', cy); peg.setAttribute('r', 10);
+      peg.setAttribute('fill', '#0a0805'); peg.setAttribute('stroke', '#b58d3d'); peg.setAttribute('stroke-width', '2');
+      peg.id = `peg-${i}`;
+      svg.appendChild(peg);
+      
+      let num = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      num.setAttribute('x', cx); num.setAttribute('y', cy + 4);
+      num.setAttribute('text-anchor', 'middle'); num.setAttribute('fill', '#b58d3d');
+      num.setAttribute('font-family', 'Space Mono'); num.setAttribute('font-size', '11');
+      num.setAttribute('font-weight', 'bold');
+      num.textContent = i + 1;
+      svg.appendChild(num);
+    }
+    
+    let mainGear = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    mainGear.setAttribute('d', gearPath(300, 300, 75, 24, 12));
+    mainGear.setAttribute('fill', '#14100b'); mainGear.setAttribute('stroke', '#b58d3d'); mainGear.setAttribute('stroke-width', '3');
+    mainGear.id = 'mainEngineGear';
+    mainGear.style.transformOrigin = '300px 300px';
+    svg.appendChild(mainGear);
+    
+    let centerOuter = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    centerOuter.setAttribute('cx', 300); centerOuter.setAttribute('cy', 300); centerOuter.setAttribute('r', 28);
+    centerOuter.setAttribute('fill', '#3a2b18'); centerOuter.setAttribute('stroke', '#e8c678'); centerOuter.setAttribute('stroke-width', '2');
+    svg.appendChild(centerOuter);
+
+    let center = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    center.setAttribute('cx', 300); center.setAttribute('cy', 300); center.setAttribute('r', 18);
+    center.setAttribute('fill', '#e8c678'); center.setAttribute('filter', 'url(#glow)');
+    svg.appendChild(center);
+  }
+
+  function spawnGearOnMech(slotIdx, type, label, totalSlots) {
+    let svg = document.getElementById('mechSvg');
+    let a = Math.PI - (slotIdx * (Math.PI / (totalSlots-1 || 1)));
+    let d = 185;
+    let cx = 300 + Math.cos(a)*d;
+    let cy = 300 - Math.sin(a)*d;
+    
+    let r = type === 'sync' ? 48 : (type === 'micro' ? 38 : 58);
+    let teeth = type === 'sync' ? 14 : (type === 'micro' ? 10 : 18);
+    let depth = 8;
+    
+    let g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.id = `mechGear-${slotIdx}`;
+    g.style.transformOrigin = `${cx}px ${cy}px`;
+    g.style.transition = 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
+    
+    let cols = getGearColors(type);
+    
+    let p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p.setAttribute('d', gearPath(cx, cy, r, teeth, depth));
+    p.setAttribute('fill', cols.fill); p.setAttribute('stroke', cols.stroke); p.setAttribute('stroke-width', '2.5');
+    g.appendChild(p);
+    
+    let cOuter = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    cOuter.setAttribute('cx', cx); cOuter.setAttribute('cy', cy); cOuter.setAttribute('r', 15);
+    cOuter.setAttribute('fill', 'rgba(0,0,0,0.4)'); cOuter.setAttribute('stroke', cols.center); cOuter.setAttribute('stroke-width', '1');
+    g.appendChild(cOuter);
+
+    let c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    c.setAttribute('cx', cx); c.setAttribute('cy', cy); c.setAttribute('r', 10);
+    c.setAttribute('fill', cols.center);
+    g.appendChild(c);
+    
+    let t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    t.setAttribute('x', cx); t.setAttribute('y', cy + 4.5);
+    t.setAttribute('text-anchor', 'middle'); t.setAttribute('fill', '#fff');
+    t.setAttribute('font-family', 'Space Mono'); t.setAttribute('font-weight', 'bold'); t.setAttribute('font-size', '14');
+    t.textContent = label;
+    g.appendChild(t);
+    
+    svg.appendChild(g);
+  }
+
+  function getMiniGearIcon(type) {
+    let c = getGearColors(type);
+    return `<svg class="mini-gear-icon" viewBox="0 0 100 100">
+      <path d="${gearPath(50, 50, 38, 10, 8)}" fill="${c.fill}" stroke="${c.stroke}" stroke-width="4"/>
+      <circle cx="50" cy="50" r="14" fill="rgba(0,0,0,0.3)" stroke="${c.center}" stroke-width="2"/>
+      <circle cx="50" cy="50" r="8" fill="${c.center}"/>
+    </svg>`;
+  }
+
+  function renderLevel(idx) {
+    let lvl = app.levels[idx];
+    document.getElementById('levelIndicator').textContent = `Commission ${idx + 1} of ${app.levels.length}`;
+    
+    let codeHtml = '';
+    lvl.code.forEach((line, i) => {
+      codeHtml += `<div class="code-line" id="codeLine-${line.id}"><span class="line-num">${i+1}</span><span class="line-content">${line.text}</span></div>`;
+    });
+    document.getElementById('codeContainer').innerHTML = codeHtml;
+
+    let track = document.getElementById('sequenceTrack');
+    track.innerHTML = '';
+    lvl.code.forEach((_, i) => {
+      let slot = document.createElement('div');
+      slot.className = 'track-slot';
+      slot.dataset.idx = i;
+      slot.innerHTML = `<span class="slot-num">${i+1}</span><span class="slot-label">Awaiting component...</span>`;
+      
+      slot.addEventListener('dragover', e => { 
+        e.preventDefault(); 
+        if(!app.running) slot.classList.add('drag-over'); 
+      });
+      slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
+      slot.addEventListener('drop', e => {
+        e.preventDefault(); 
+        slot.classList.remove('drag-over');
+        let droppedId = app.draggedId || e.dataTransfer.getData('text/plain');
+        if(!app.running && droppedId) placeGear(droppedId, i);
+      });
+      slot.addEventListener('click', () => {
+        if(!app.running && app.placedGears[i]) removeGear(i);
+      });
+      track.appendChild(slot);
+    });
+
+    let tray = document.getElementById('inventoryTray');
+    tray.innerHTML = '';
+    let shuffled = [...lvl.code].sort(() => Math.random() - 0.5);
+    shuffled.forEach(line => {
+      let gear = document.createElement('div');
+      gear.className = 'gear-item';
+      gear.draggable = true;
+      gear.id = `invGear-${line.id}`;
+      gear.dataset.id = line.id;
+      gear.dataset.type = line.type;
+      
+      let label = line.type === 'sync' ? 'Stack' : (line.type === 'micro' ? 'Spring' : 'Flywheel');
+      gear.innerHTML = `${getMiniGearIcon(line.type)} <span>Gear <strong>${line.id}</strong> - ${label}</span>`;
+      
+      gear.addEventListener('dragstart', (e) => { 
+        if(!app.running) { 
+          app.draggedId = line.id; 
+          gear.classList.add('dragging'); 
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', line.id);
+        } 
+      });
+      gear.addEventListener('dragend', () => { app.draggedId = null; gear.classList.remove('dragging'); });
+      gear.addEventListener('click', () => {
+        if(app.running) return;
+        let firstEmpty = app.placedGears.findIndex(g => !g);
+        if(firstEmpty === -1 && app.placedGears.length < lvl.code.length) firstEmpty = app.placedGears.length;
+        if(firstEmpty !== -1 && firstEmpty < lvl.code.length) placeGear(line.id, firstEmpty);
+      });
+      
+      tray.appendChild(gear);
+    });
+
+    app.placedGears = new Array(lvl.code.length).fill(null);
+    drawMechBase(document.getElementById('mechSvg'), lvl.code.length);
+    document.getElementById('evaluateBtn').disabled = true;
+    document.getElementById('evaluateBtn').textContent = 'Wind Mechanism';
+    setStatus(`"${lvl.title}" — Formulate execution sequence.`);
+  }
+
+  function setStatus(msg) {
+    document.getElementById('mechStatus').textContent = msg;
+  }
+
+  function placeGear(id, slotIdx) {
+    let existingSlot = app.placedGears.findIndex(g => g === id);
+    if(existingSlot !== -1) removeGear(existingSlot);
+    if(app.placedGears[slotIdx]) removeGear(slotIdx);
+    
+    app.placedGears[slotIdx] = id;
+    
+    let invGear = document.getElementById(`invGear-${id}`);
+    invGear.classList.add('placed');
+    
+    let lvl = app.levels[app.level];
+    let line = lvl.code.find(l => l.id === id);
+    
+    let slot = document.querySelector(`.track-slot[data-idx="${slotIdx}"]`);
+    slot.classList.add('filled');
+    slot.innerHTML = `<span class="slot-num">${slotIdx+1}</span>${getMiniGearIcon(line.type)} <span>Gear <strong>${id}</strong></span>`;
+    
+    sfxClack();
+    spawnGearOnMech(slotIdx, line.type, id, lvl.code.length);
+    checkReady();
+  }
+
+  function removeGear(slotIdx) {
+    let id = app.placedGears[slotIdx];
+    if(!id) return;
+    
+    app.placedGears[slotIdx] = null;
+    let invGear = document.getElementById(`invGear-${id}`);
+    if(invGear) invGear.classList.remove('placed');
+    
+    let slot = document.querySelector(`.track-slot[data-idx="${slotIdx}"]`);
+    if(slot) {
+      slot.classList.remove('filled');
+      slot.innerHTML = `<span class="slot-num">${slotIdx+1}</span><span class="slot-label">Awaiting component...</span>`;
+    }
+    
+    let mechSvg = document.getElementById('mechSvg');
+    let mg = document.getElementById(`mechGear-${slotIdx}`);
+    if(mg) mechSvg.removeChild(mg);
+    
+    checkReady();
+  }
+
+  function checkReady() {
+    let lvl = app.levels[app.level];
+    let ready = app.placedGears.filter(g => g).length === lvl.code.length;
+    document.getElementById('evaluateBtn').disabled = !ready;
+  }
+
+  async function evaluateSequence() {
+    app.running = true;
+    document.getElementById('evaluateBtn').disabled = true;
+    
+    let lvl = app.levels[app.level];
+    let isCorrect = JSON.stringify(app.placedGears) === JSON.stringify(lvl.truth);
+    
+    let mainGear = document.getElementById('mainEngineGear');
+    mainGear.style.transition = 'transform 3.5s cubic-bezier(0.4, 0, 0.2, 1)';
+    mainGear.style.transform = 'rotate(360deg)';
+    
+    for(let i=0; i<lvl.truth.length; i++) {
+      let expectedId = lvl.truth[i];
+      let actualPlacedId = app.placedGears[i];
+      
+      document.querySelectorAll('.code-line').forEach(el => el.classList.remove('hl'));
+      let codeLine = document.getElementById(`codeLine-${expectedId}`);
+      if(codeLine) codeLine.classList.add('hl');
+      
+      let mg = document.getElementById(`mechGear-${i}`);
+      if(mg) {
+        mg.style.transform += ` rotate(${i%2===0?180:-180}deg)`;
+      }
+      
+      if(expectedId === actualPlacedId) {
+        setStatus(`Gear ${expectedId} engaged perfectly.`);
+        sfxMesh();
+        let slot = document.querySelector(`.track-slot[data-idx="${i}"]`);
+        if(slot) slot.style.borderColor = '#5ab871';
+      } else {
+        setStatus(`Jam detected at position ${i+1}! Expected ${expectedId}.`);
+        sfxFail();
+        let slot = document.querySelector(`.track-slot[data-idx="${i}"]`);
+        if(slot) slot.style.borderColor = '#ff8c7a';
+        if(codeLine) codeLine.classList.remove('hl');
+        break;
+      }
+      
+      await new Promise(r => setTimeout(r, 850));
+    }
+    
+    setTimeout(() => {
+      document.querySelectorAll('.code-line').forEach(el => el.classList.remove('hl'));
+      if(isCorrect) {
+        sfxSuccess();
+        if(app.level === app.levels.length - 1) {
+          showModal('Master Clockmaker', 'You have flawlessly restored the natural order of time. The workshops are entirely calibrated.', true);
+        } else {
+          showModal('Mechanism Calibrated', 'The gears mesh perfectly. You comprehend the flow of execution.', false);
+        }
+      } else {
+        showModal('Mechanism Jammed', 'The execution flow was broken. Analyze the difference between Synchronous execution, Microtask precedence, and Macrotask delays.', false, `Correct sequence: ${lvl.truth.join(' → ')}`);
+      }
+      app.running = false;
+    }, 600);
+  }
+
+  function showModal(title, desc, isEnd, diagMsg = null) {
+    document.getElementById('modalTitle').textContent = title;
+    document.getElementById('modalDesc').textContent = desc;
+    let diag = document.getElementById('modalDiag');
+    if(diagMsg) {
+      diag.textContent = diagMsg;
+      diag.style.display = 'block';
+    } else {
+      diag.style.display = 'none';
+    }
+    
+    let btn = document.getElementById('modalActionBtn');
+    if(isEnd) {
+      btn.textContent = 'Restart Journey';
+      btn.onclick = () => { closeModal(); app.level = 0; renderLevel(app.level); };
+    } else if(diagMsg) {
+      btn.textContent = 'Recalibrate';
+      btn.onclick = () => { closeModal(); renderLevel(app.level); };
+    } else {
+      btn.textContent = 'Next Commission';
+      btn.onclick = () => { closeModal(); app.level++; renderLevel(app.level); };
+    }
+    
+    document.getElementById('modalOverlay').classList.add('active');
+  }
+
+  function closeModal() {
+    document.getElementById('modalOverlay').classList.remove('active');
+  }
+
+  document.getElementById('startBtn').addEventListener('click', () => {
+    initAudio();
+    document.getElementById('landing').classList.remove('active');
+    setTimeout(() => {
+      document.getElementById('workspace').classList.add('active');
+      renderLevel(app.level);
+    }, 600);
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    if(!app.running) renderLevel(app.level);
+  });
+
+  document.getElementById('evaluateBtn').addEventListener('click', () => {
+    if(!app.running) evaluateSequence();
+  });
+
+  createDust();
+
+})();
+</script>
+</body>
+</html>
