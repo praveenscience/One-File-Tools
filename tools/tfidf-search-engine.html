@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Client-Side Full-Text Search Engine with TF-IDF Ranking</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel-2: #1e222b;
+    --border: #2a2f3a;
+    --text: #e6e8ec;
+    --muted: #8a90a0;
+    --accent: #5b8cff;
+    --accent-2: #7fd1a8;
+    --highlight: #ffd166;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    padding: 24px 32px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 {
+    margin: 0 0 4px;
+    font-size: 22px;
+  }
+  header p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    padding: 24px 32px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .panel h2 {
+    margin: 0 0 10px;
+    font-size: 15px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  textarea {
+    width: 100%;
+    min-height: 120px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 10px 12px;
+    font-size: 14px;
+    resize: vertical;
+    font-family: inherit;
+  }
+  .doc-add-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 9px 14px;
+    font-size: 14px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  button.secondary {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  button:hover { filter: brightness(1.1); }
+  .doc-list {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 420px;
+    overflow-y: auto;
+  }
+  .doc-card {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    position: relative;
+  }
+  .doc-card .doc-title {
+    font-size: 13px;
+    color: var(--accent-2);
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+  .doc-card .doc-text {
+    font-size: 13px;
+    color: var(--muted);
+    max-height: 60px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .doc-card .remove-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: transparent;
+    color: var(--muted);
+    border: none;
+    padding: 2px 6px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .doc-card .remove-btn:hover { color: #ff6b6b; }
+  .search-box {
+    display: flex;
+    gap: 8px;
+  }
+  .search-box input {
+    flex: 1;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+  .stats {
+    margin-top: 8px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .results {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .result-card {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .result-title {
+    font-weight: 600;
+    color: var(--text);
+    font-size: 14px;
+  }
+  .result-score {
+    font-size: 12px;
+    background: rgba(91,140,255,0.15);
+    color: var(--accent);
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-family: monospace;
+  }
+  .result-snippet {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  mark {
+    background: var(--highlight);
+    color: #1a1a1a;
+    padding: 0 2px;
+    border-radius: 3px;
+  }
+  .empty {
+    color: var(--muted);
+    font-size: 13px;
+    padding: 8px 0;
+  }
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 2px 6px;
+    margin-left: 6px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🔎 Client-Side Full-Text Search Engine — TF-IDF Ranking</h1>
+  <p>Paste documents, build an in-browser inverted index, and search with relevance-ranked results. No backend, no database, no external libraries.</p>
+</header>
+
+<div class="layout">
+
+  <!-- LEFT: Document indexing -->
+  <div class="panel">
+    <h2>1. Add Documents</h2>
+    <textarea id="docInput" placeholder="Paste a document or paragraph here..."></textarea>
+    <div class="doc-add-row">
+      <button id="addDocBtn">➕ Add Document</button>
+      <button class="secondary" id="loadSampleBtn">Load Sample Docs</button>
+      <button class="secondary" id="clearAllBtn">Clear All</button>
+    </div>
+
+    <h2 style="margin-top:20px;">Indexed Documents (<span id="docCount">0</span>)</h2>
+    <div class="doc-list" id="docList">
+      <div class="empty">No documents indexed yet. Add one above to get started.</div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Search -->
+  <div class="panel">
+    <h2>2. Search</h2>
+    <div class="search-box">
+      <input type="text" id="searchInput" placeholder="Type a search query..." autocomplete="off">
+      <button id="searchBtn">Search</button>
+    </div>
+    <div class="stats" id="statsLine"></div>
+
+    <div class="results" id="results">
+      <div class="empty">Results will appear here after you search.</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  // ---------- State ----------
+  let documents = []; // { id, title, text, tokens: [...] }
+  let docIdCounter = 0;
+  let invertedIndex = {}; // term -> { docId: termFrequencyCount }
+  let idfCache = {}; // term -> idf value
+
+  // ---------- DOM refs ----------
+  const docInput = document.getElementById('docInput');
+  const addDocBtn = document.getElementById('addDocBtn');
+  const loadSampleBtn = document.getElementById('loadSampleBtn');
+  const clearAllBtn = document.getElementById('clearAllBtn');
+  const docList = document.getElementById('docList');
+  const docCount = document.getElementById('docCount');
+  const searchInput = document.getElementById('searchInput');
+  const searchBtn = document.getElementById('searchBtn');
+  const results = document.getElementById('results');
+  const statsLine = document.getElementById('statsLine');
+
+  // ---------- Tokenizer ----------
+  function tokenize(text) {
+    return (text.toLowerCase().match(/[a-z0-9]+/g) || []);
+  }
+
+  // ---------- Index building ----------
+  function rebuildIndex() {
+    invertedIndex = {};
+    idfCache = {};
+
+    documents.forEach(doc => {
+      const termCounts = {};
+      doc.tokens.forEach(t => {
+        termCounts[t] = (termCounts[t] || 0) + 1;
+      });
+      Object.keys(termCounts).forEach(term => {
+        if (!invertedIndex[term]) invertedIndex[term] = {};
+        invertedIndex[term][doc.id] = termCounts[term];
+      });
+    });
+
+    const N = documents.length;
+    Object.keys(invertedIndex).forEach(term => {
+      const df = Object.keys(invertedIndex[term]).length;
+      // smoothed IDF, avoids divide-by-zero / negative values
+      idfCache[term] = Math.log((N + 1) / (df + 1)) + 1;
+    });
+  }
+
+  // ---------- Rendering document list ----------
+  function renderDocList() {
+    docCount.textContent = documents.length;
+    if (documents.length === 0) {
+      docList.innerHTML = '<div class="empty">No documents indexed yet. Add one above to get started.</div>';
+      return;
+    }
+    docList.innerHTML = '';
+    documents.forEach(doc => {
+      const card = document.createElement('div');
+      card.className = 'doc-card';
+      card.innerHTML = `
+        <button class="remove-btn" data-id="${doc.id}" title="Remove">✕</button>
+        <div class="doc-title">Doc #${doc.id} <span class="badge">${doc.tokens.length} tokens</span></div>
+        <div class="doc-text">${escapeHtml(doc.text.slice(0, 160))}${doc.text.length > 160 ? '…' : ''}</div>
+      `;
+      docList.appendChild(card);
+    });
+    docList.querySelectorAll('.remove-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = Number(btn.getAttribute('data-id'));
+        documents = documents.filter(d => d.id !== id);
+        rebuildIndex();
+        renderDocList();
+        results.innerHTML = '<div class="empty">Results will appear here after you search.</div>';
+        statsLine.textContent = '';
+      });
+    });
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  // ---------- Add document ----------
+  function addDocument(text) {
+    text = text.trim();
+    if (!text) return;
+    const tokens = tokenize(text);
+    documents.push({ id: docIdCounter++, text, tokens });
+    rebuildIndex();
+    renderDocList();
+  }
+
+  addDocBtn.addEventListener('click', () => {
+    addDocument(docInput.value);
+    docInput.value = '';
+    docInput.focus();
+  });
+
+  docInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      addDocument(docInput.value);
+      docInput.value = '';
+    }
+  });
+
+  clearAllBtn.addEventListener('click', () => {
+    documents = [];
+    docIdCounter = 0;
+    rebuildIndex();
+    renderDocList();
+    results.innerHTML = '<div class="empty">Results will appear here after you search.</div>';
+    statsLine.textContent = '';
+  });
+
+  loadSampleBtn.addEventListener('click', () => {
+    const samples = [
+      "The quick brown fox jumps over the lazy dog. Foxes are known for their agility and cunning in the wild.",
+      "Search engines use inverted indexes to quickly find documents containing specific terms. TF-IDF helps rank results by relevance.",
+      "Machine learning models often rely on vector representations of text, such as TF-IDF or word embeddings, to compare documents.",
+      "The lazy cat slept all day while the dog barked at the mailman outside the window.",
+      "Client side JavaScript can build powerful tools without any backend server, database, or external dependencies at all.",
+      "Term frequency measures how often a word appears in a document, while inverse document frequency measures how rare that word is across all documents."
+    ];
+    samples.forEach(addDocument);
+  });
+
+  // ---------- Search ----------
+  function search(query) {
+    const queryTokens = tokenize(query);
+    if (queryTokens.length === 0 || documents.length === 0) return [];
+
+    const scores = {}; // docId -> score
+
+    queryTokens.forEach(term => {
+      const postings = invertedIndex[term];
+      if (!postings) return;
+      const idf = idfCache[term] || 0;
+      Object.keys(postings).forEach(docIdStr => {
+        const docId = Number(docIdStr);
+        const doc = documents.find(d => d.id === docId);
+        if (!doc) return;
+        const tf = postings[docId] / doc.tokens.length; // normalized term frequency
+        const tfidf = tf * idf;
+        scores[docId] = (scores[docId] || 0) + tfidf;
+      });
+    });
+
+    return Object.keys(scores)
+      .map(docId => ({ doc: documents.find(d => d.id === Number(docId)), score: scores[docId] }))
+      .filter(r => r.doc)
+      .sort((a, b) => b.score - a.score);
+  }
+
+  function highlight(text, queryTokens) {
+    if (queryTokens.length === 0) return escapeHtml(text);
+    const pattern = new RegExp('\\b(' + queryTokens.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')\\b', 'gi');
+    return escapeHtml(text).replace(pattern, m => `<mark>${m}</mark>`);
+  }
+
+  function buildSnippet(text, queryTokens, maxLen = 220) {
+    const lower = text.toLowerCase();
+    let idx = -1;
+    for (const t of queryTokens) {
+      const found = lower.indexOf(t);
+      if (found !== -1 && (idx === -1 || found < idx)) idx = found;
+    }
+    if (idx === -1) return text.slice(0, maxLen) + (text.length > maxLen ? '…' : '');
+    const start = Math.max(0, idx - 60);
+    const end = Math.min(text.length, start + maxLen);
+    return (start > 0 ? '…' : '') + text.slice(start, end) + (end < text.length ? '…' : '');
+  }
+
+  function runSearch() {
+    const query = searchInput.value.trim();
+    const queryTokens = tokenize(query);
+
+    if (!query) {
+      results.innerHTML = '<div class="empty">Type a query above and hit Search.</div>';
+      statsLine.textContent = '';
+      return;
+    }
+    if (documents.length === 0) {
+      results.innerHTML = '<div class="empty">Add some documents first before searching.</div>';
+      statsLine.textContent = '';
+      return;
+    }
+
+    const t0 = performance.now();
+    const ranked = search(query);
+    const t1 = performance.now();
+
+    statsLine.textContent = `${ranked.length} result${ranked.length !== 1 ? 's' : ''} found in ${(t1 - t0).toFixed(2)} ms`;
+
+    if (ranked.length === 0) {
+      results.innerHTML = '<div class="empty">No matching documents found.</div>';
+      return;
+    }
+
+    results.innerHTML = '';
+    ranked.forEach(r => {
+      const card = document.createElement('div');
+      card.className = 'result-card';
+      const snippet = buildSnippet(r.doc.text, queryTokens);
+      card.innerHTML = `
+        <div class="result-header">
+          <span class="result-title">Document #${r.doc.id}</span>
+          <span class="result-score">score: ${r.score.toFixed(4)}</span>
+        </div>
+        <div class="result-snippet">${highlight(snippet, queryTokens)}</div>
+      `;
+      results.appendChild(card);
+    });
+  }
+
+  searchBtn.addEventListener('click', runSearch);
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') runSearch();
+  });
+
+  // Initial render
+  renderDocList();
+})();
+</script>
+
+</body>
+</html>
