@@ -1,0 +1,1613 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Flexbox Frenzy: The Alignment Heist</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💎</text></svg>" />
+
+    <!-- ══════════════════════════════════════════════════════════════
+     FLEXBOX FRENZY: THE ALIGNMENT HEIST
+     Every vault lock is a Flexbox puzzle. Your CSS is applied to real
+     DOM and measured with getBoundingClientRect — the browser's own
+     layout engine is the referee. CSS is the engine AND the judge.
+     Pure HTML + CSS + vanilla JS. No framework. No build step.
+     ══════════════════════════════════════════════════════════════ -->
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,600;0,800;1,400&display=swap" rel="stylesheet" />
+
+    <style>
+      /* ══════════════════════════════════════════════════════════════
+   THE VAULT AT NIGHT
+   Palette: gunmetal vault-steel · laser red · heist gold ·
+   seated-green · alarm amber · blueprint cyan · terminal cream.
+   Distinct from the other five quests: cold vault-steel with warm
+   heist-gold and a single laser-red for targets/alarms.
+   ══════════════════════════════════════════════════════════════ */
+      :root {
+        --vault: #0a0e14;
+        --steel: #121924;
+        --steel-lit: #1a2433;
+        --edge: #2a3a52;
+        --laser: #ff3b52;
+        --gold: #f5c542;
+        --gold-b: #ffe08a;
+        --seated: #47e08a;
+        --alarm: #ff9f45;
+        --blueprint: #5ab0e0;
+        --cream: #e8eaf0;
+        --ink: #9fb0c8;
+        --ink-dim: #566683;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        background: radial-gradient(ellipse 130% 90% at 50% -10%, #16202e 0%, transparent 55%), var(--vault);
+        color: var(--ink);
+        font-family: "JetBrains Mono", ui-monospace, monospace;
+        font-size: 15px;
+        overflow: hidden;
+      }
+      ::selection {
+        background: #22354d;
+        color: var(--gold-b);
+      }
+      .display {
+        font-family: "Oswald", sans-serif;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      #app {
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        z-index: 10;
+      }
+
+      /* ── HUD ───────────────────────────────────────────────────────── */
+      #hud {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        padding: 9px 16px;
+        border-bottom: 1px solid var(--edge);
+        background: rgba(10, 14, 20, 0.92);
+      }
+      .hud-chip {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        border: 1px solid var(--edge);
+        border-radius: 3px;
+        padding: 4px 9px;
+        color: var(--gold);
+        background: var(--steel);
+      }
+      #vaultChip {
+        color: var(--gold-b);
+      }
+      #seatedChip {
+        color: var(--seated);
+      }
+      #propChip {
+        color: var(--blueprint);
+      }
+      #scoreChip {
+        color: var(--gold);
+      }
+      #timerChip {
+        color: var(--alarm);
+        display: none;
+      }
+      #floorChip {
+        flex: 1;
+        text-align: right;
+        border: none;
+        background: none;
+        color: var(--blueprint);
+        font-size: 12px;
+        letter-spacing: 0.14em;
+      }
+
+      /* ── Stage ─────────────────────────────────────────────────────── */
+      #stage {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        padding: 12px;
+        gap: 12px;
+        overflow-y: auto;
+      }
+      #briefBar {
+        text-align: center;
+        font-family: "Oswald", sans-serif;
+        font-size: clamp(15px, 3vw, 22px);
+        color: var(--cream);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      #briefSub {
+        text-align: center;
+        font-size: 12px;
+        color: var(--ink-dim);
+        margin-top: -4px;
+      }
+
+      /* The vault: a real flex container with gold bars + target ghosts */
+      #vaultWrap {
+        display: flex;
+        justify-content: center;
+      }
+      #vaultArea {
+        position: relative;
+        width: min(720px, 94vw);
+        height: 300px;
+        border: 2px solid var(--edge);
+        border-radius: 10px;
+        background: repeating-linear-gradient(0deg, transparent 0 23px, rgba(90, 176, 224, 0.05) 23px 24px), repeating-linear-gradient(90deg, transparent 0 23px, rgba(90, 176, 224, 0.05) 23px 24px), radial-gradient(ellipse 80% 60% at 50% 0%, rgba(245, 197, 66, 0.05), transparent 70%), var(--steel);
+        box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.5);
+        overflow: hidden;
+      }
+      /* Target ghost slots (absolute, drawn where each bar must land) */
+      .target {
+        position: absolute;
+        border: 2px dashed var(--laser);
+        border-radius: 6px;
+        background: rgba(255, 59, 82, 0.06);
+        pointer-events: none;
+        box-shadow: 0 0 12px rgba(255, 59, 82, 0.15) inset;
+        transition:
+          border-color 0.3s,
+          background 0.3s;
+      }
+      .target.seated {
+        border-color: var(--seated);
+        background: rgba(71, 224, 138, 0.12);
+        box-shadow: 0 0 16px rgba(71, 224, 138, 0.25) inset;
+      }
+      .target .tnum {
+        position: absolute;
+        top: 2px;
+        left: 5px;
+        font-size: 10px;
+        color: var(--laser);
+        opacity: 0.7;
+      }
+      .target.seated .tnum {
+        color: var(--seated);
+      }
+
+      /* THE flex container the player controls (fills the vault) */
+      #flexbox {
+        position: absolute;
+        inset: 0;
+        display: flex; /* properties injected live */
+        padding: 0;
+      }
+      .bar {
+        /* fixed-size gold bars unless a grow puzzle overrides */
+        width: 88px;
+        height: 52px;
+        border-radius: 6px;
+        background: linear-gradient(160deg, var(--gold-b), var(--gold));
+        border: 1px solid #b8901f;
+        box-shadow:
+          0 3px 10px rgba(0, 0, 0, 0.4),
+          inset 0 1px 0 rgba(255, 255, 255, 0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: "Oswald", sans-serif;
+        font-weight: 700;
+        color: #4a3708;
+        font-size: 18px;
+        transition: all 0.55s cubic-bezier(0.34, 1.2, 0.4, 1);
+        flex-shrink: 0;
+      }
+      .bar.seated {
+        box-shadow:
+          0 0 18px rgba(71, 224, 138, 0.5),
+          inset 0 1px 0 rgba(255, 255, 255, 0.4);
+      }
+      .bar.grow {
+        flex-shrink: 1;
+      }
+
+      /* ── Toolkit ───────────────────────────────────────────────────── */
+      #toolkit {
+        border: 1px solid var(--edge);
+        border-radius: 10px;
+        background: #070b11;
+        max-width: 760px;
+        width: 100%;
+        margin: 0 auto;
+        padding: 14px 16px;
+      }
+      #toolkitLabel {
+        font-size: 10px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--ink-dim);
+        margin-bottom: 10px;
+      }
+      .prop-group {
+        margin-bottom: 12px;
+      }
+      .prop-name {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12.5px;
+        color: var(--blueprint);
+        margin-bottom: 5px;
+      }
+      .prop-name b {
+        color: var(--cream);
+      }
+      .chips {
+        display: flex;
+        gap: 7px;
+        flex-wrap: wrap;
+      }
+      .chip {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        cursor: pointer;
+        border: 1px solid var(--edge);
+        border-radius: 4px;
+        background: var(--steel);
+        color: var(--ink);
+        padding: 6px 10px;
+        transition:
+          border-color 0.15s,
+          color 0.15s,
+          background 0.15s,
+          transform 0.08s;
+      }
+      .chip:hover {
+        border-color: var(--gold);
+        color: var(--gold);
+        transform: translateY(-1px);
+      }
+      .chip.active {
+        border-color: var(--gold);
+        color: #2a2000;
+        background: var(--gold);
+        font-weight: 600;
+      }
+
+      #appliedRow {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 6px;
+        flex-wrap: wrap;
+        border-top: 1px solid var(--edge);
+        padding-top: 10px;
+      }
+      #appliedLabel {
+        font-size: 10px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--ink-dim);
+      }
+      #appliedCss {
+        flex: 1;
+        min-width: 200px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 13px;
+        color: var(--cream);
+      }
+      #appliedCss .k {
+        color: var(--blueprint);
+      }
+      #appliedCss .v {
+        color: var(--gold);
+      }
+      #appliedCss .muted {
+        color: var(--ink-dim);
+      }
+
+      #actionRow {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        margin-top: 12px;
+        flex-wrap: wrap;
+      }
+      .btn {
+        font-family: "Oswald", sans-serif;
+        font-size: 14px;
+        cursor: pointer;
+        border: 2px solid var(--gold);
+        border-radius: 6px;
+        background: transparent;
+        color: var(--gold-b);
+        padding: 10px 22px;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        transition:
+          background 0.15s,
+          transform 0.08s,
+          opacity 0.2s;
+      }
+      .btn:hover:not(:disabled) {
+        background: rgba(245, 197, 66, 0.14);
+      }
+      .btn:active:not(:disabled) {
+        transform: scale(0.97);
+      }
+      .btn:disabled {
+        opacity: 0.32;
+        cursor: not-allowed;
+      }
+      .btn.laser {
+        border-color: var(--laser);
+        color: var(--laser);
+      }
+      .btn.laser:hover:not(:disabled) {
+        background: rgba(255, 59, 82, 0.14);
+      }
+      .btn.ghost {
+        border-color: var(--edge);
+        color: var(--ink-dim);
+      }
+      .btn.ghost:hover:not(:disabled) {
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--ink);
+      }
+
+      #finesseWrap {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 10px;
+      }
+      #finesseLabel {
+        font-size: 11px;
+        color: var(--ink-dim);
+      }
+      #finesseGauge {
+        flex: 1;
+        height: 8px;
+        border: 1px solid var(--edge);
+        border-radius: 4px;
+        background: #070b11;
+        overflow: hidden;
+      }
+      #finesseFill {
+        height: 100%;
+        width: 0%;
+        background: var(--gold);
+        transition:
+          width 0.3s,
+          background 0.3s;
+      }
+      #finesseText {
+        font-size: 12px;
+        color: var(--gold);
+        min-width: 96px;
+        text-align: right;
+      }
+
+      #result {
+        text-align: center;
+        min-height: 30px;
+        margin-top: 6px;
+      }
+      #result .r {
+        font-family: "Oswald", sans-serif;
+        font-size: clamp(20px, 4vw, 30px);
+        text-transform: uppercase;
+      }
+      #result .r.crack {
+        color: var(--seated);
+        text-shadow: 0 0 20px rgba(71, 224, 138, 0.4);
+      }
+      #result .r.flawless {
+        color: var(--gold-b);
+        text-shadow: 0 0 22px rgba(245, 197, 66, 0.5);
+      }
+      #result .detail {
+        font-size: 12.5px;
+        color: var(--ink-dim);
+        margin-top: 2px;
+      }
+      #hintLine {
+        text-align: center;
+        font-size: 12.5px;
+        color: var(--ink-dim);
+        min-height: 18px;
+        margin-top: 6px;
+      }
+      #hintLine b {
+        color: var(--gold);
+      }
+
+      /* ── Log ───────────────────────────────────────────────────────── */
+      #log {
+        height: 92px;
+        border-top: 1px solid var(--edge);
+        background: #060a10;
+        display: flex;
+        flex-direction: column;
+      }
+      #logBar {
+        font-size: 9.5px;
+        letter-spacing: 0.2em;
+        color: var(--ink-dim);
+        padding: 4px 14px;
+        border-bottom: 1px solid var(--edge);
+        text-transform: uppercase;
+      }
+      #logOut {
+        flex: 1;
+        overflow-y: auto;
+        padding: 6px 14px;
+        font-size: 12.5px;
+        line-height: 1.5;
+      }
+      .l-log {
+        color: var(--ink);
+      }
+      .l-ok {
+        color: var(--seated);
+      }
+      .l-bad {
+        color: var(--laser);
+      }
+      .l-sys {
+        color: var(--gold);
+        font-style: italic;
+      }
+      .l-crack {
+        color: var(--gold-b);
+        text-shadow: 0 0 6px rgba(245, 197, 66, 0.4);
+      }
+      .l-dim {
+        color: var(--ink-dim);
+      }
+
+      /* ── Overlays ─────────────────────────────────────────────────── */
+      .overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 60;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 26px;
+        background: rgba(6, 9, 14, 0.95);
+        overflow-y: auto;
+      }
+      .title-main {
+        font-family: "Oswald", sans-serif;
+        font-weight: 700;
+        font-size: clamp(30px, 7vw, 66px);
+        color: var(--gold-b);
+        line-height: 1.02;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+        text-shadow:
+          0 0 30px rgba(245, 197, 66, 0.35),
+          2px 2px 0 var(--laser);
+      }
+      .title-sub {
+        font-size: 12px;
+        letter-spacing: 0.34em;
+        color: var(--ink-dim);
+        text-transform: uppercase;
+        margin: 12px 0 24px;
+      }
+      .story {
+        max-width: 640px;
+        font-size: 14.5px;
+        line-height: 1.75;
+        color: var(--ink);
+        margin: 0 auto 22px;
+        text-align: left;
+      }
+      .story b {
+        color: var(--gold-b);
+      }
+      .story .laser {
+        color: var(--laser);
+      }
+      .story .bp {
+        color: var(--blueprint);
+      }
+      .story code {
+        color: var(--cream);
+        background: rgba(90, 176, 224, 0.12);
+        padding: 1px 6px;
+        border-radius: 3px;
+        font-size: 0.92em;
+      }
+      .small-warning {
+        margin-top: 20px;
+        font-size: 10.5px;
+        color: var(--ink-dim);
+      }
+
+      /* Scorecard */
+      .scorecard {
+        background: #0e1622;
+        border: 1px solid var(--edge);
+        color: var(--cream);
+        border-radius: 8px;
+        padding: 18px 22px;
+        max-width: 560px;
+        width: 100%;
+        margin: 0 auto 22px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+      }
+      .scorecard h3 {
+        font-family: "Oswald", sans-serif;
+        margin: 0 0 12px;
+        font-size: 18px;
+        color: var(--gold-b);
+        text-align: center;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .sc-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      .sc-table th,
+      .sc-table td {
+        border: 1px solid var(--edge);
+        padding: 5px 8px;
+        text-align: center;
+      }
+      .sc-table th {
+        background: var(--steel);
+        font-weight: 700;
+        color: var(--blueprint);
+      }
+      .sc-table td.good {
+        color: var(--seated);
+        font-weight: 700;
+      }
+      .sc-total {
+        display: flex;
+        justify-content: space-around;
+        margin-top: 14px;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      .sc-total .v {
+        font-family: "Oswald", sans-serif;
+        font-size: 26px;
+        color: var(--gold-b);
+      }
+      .sc-total .k {
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-dim);
+        text-align: center;
+      }
+
+      /* Vault-door banner between floors */
+      #doorBanner {
+        position: fixed;
+        inset: 0;
+        z-index: 58;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        opacity: 0;
+        background: radial-gradient(ellipse at center, rgba(10, 14, 20, 0.6), rgba(10, 14, 20, 0.93));
+      }
+      #doorBanner.show {
+        animation: door-in 1.4s ease;
+      }
+      #doorBanner .db-num {
+        font-family: "Oswald", sans-serif;
+        font-size: clamp(26px, 6vw, 52px);
+        color: var(--gold-b);
+        text-transform: uppercase;
+        text-shadow: 0 0 24px rgba(245, 197, 66, 0.4);
+      }
+      #doorBanner .db-name {
+        font-size: 13px;
+        letter-spacing: 0.26em;
+        text-transform: uppercase;
+        color: var(--laser);
+        margin-top: 8px;
+      }
+      #doorBanner .db-brief {
+        font-size: 12px;
+        color: var(--ink-dim);
+        margin-top: 6px;
+      }
+      @keyframes door-in {
+        0% {
+          opacity: 0;
+        }
+        22%,
+        72% {
+          opacity: 1;
+        }
+        100% {
+          opacity: 0;
+        }
+      }
+
+      /* ── Effect layers ─────────────────────────────────────────────── */
+      #particles {
+        position: fixed;
+        inset: 0;
+        z-index: 40;
+        pointer-events: none;
+        width: 100%;
+        height: 100%;
+      }
+      #vig {
+        position: fixed;
+        inset: 0;
+        z-index: 41;
+        pointer-events: none;
+        background: radial-gradient(ellipse at center, transparent 55%, rgba(3, 5, 8, 0.9) 100%);
+      }
+      #alarmFlash {
+        position: fixed;
+        inset: 0;
+        z-index: 43;
+        pointer-events: none;
+        box-shadow: inset 0 0 120px rgba(255, 59, 82, 0.5);
+        opacity: 0;
+      }
+      #alarmFlash.run {
+        animation: alarm-p 0.6s ease-out;
+      }
+      @keyframes alarm-p {
+        0% {
+          opacity: 1;
+        }
+        100% {
+          opacity: 0;
+        }
+      }
+      #crackFlash {
+        position: fixed;
+        inset: 0;
+        z-index: 44;
+        pointer-events: none;
+        background: radial-gradient(ellipse at center, rgba(245, 197, 66, 0.22), transparent 62%);
+        opacity: 0;
+      }
+      #crackFlash.run {
+        animation: crack-p 0.7s ease-out;
+      }
+      @keyframes crack-p {
+        0% {
+          opacity: 0.85;
+        }
+        100% {
+          opacity: 0;
+        }
+      }
+      .shake {
+        animation: shk 0.4s linear;
+      }
+      @keyframes shk {
+        20% {
+          transform: translate(-4px, 2px);
+        }
+        40% {
+          transform: translate(5px, -2px);
+        }
+        60% {
+          transform: translate(-5px, 1px);
+        }
+        80% {
+          transform: translate(4px, -1px);
+        }
+      }
+
+      #logOut::-webkit-scrollbar {
+        width: 8px;
+      }
+      #logOut::-webkit-scrollbar-thumb {
+        background: #1a2739;
+        border-radius: 4px;
+      }
+
+      @media (max-width: 720px) {
+        #vaultArea {
+          height: 240px;
+        }
+        .bar {
+          width: 62px;
+          height: 40px;
+          font-size: 15px;
+        }
+        #log {
+          height: 76px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .shake,
+        #alarmFlash.run,
+        #crackFlash.run,
+        #doorBanner.show {
+          animation: none !important;
+        }
+        #doorBanner.show {
+          opacity: 1;
+        }
+        .bar,
+        .target {
+          transition: none !important;
+        }
+      }
+      :focus-visible {
+        outline: 2px solid var(--gold);
+        outline-offset: 3px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>
+      <div style="padding: 40px; color: #9fb0c8; font-family: monospace; background: #0a0e14">This heist needs JavaScript — the browser's layout engine is the referee.</div>
+    </noscript>
+
+    <canvas id="particles"></canvas>
+    <div id="vig"></div>
+    <div id="alarmFlash"></div>
+    <div id="crackFlash"></div>
+    <div id="doorBanner">
+      <div style="text-align: center">
+        <div class="db-num"></div>
+        <div class="db-name"></div>
+        <div class="db-brief"></div>
+      </div>
+    </div>
+
+    <script>
+      /* ══════════════════════════════════════════════════════════════════
+   FLEXBOX FRENZY — engine
+   Part A: vault generator (verified solutions), real-layout seating
+   via getBoundingClientRect, audio, particles, effects.
+   The browser's layout engine is the referee; nothing is faked.
+   ══════════════════════════════════════════════════════════════════ */
+      "use strict";
+
+      const $ = (s) => document.querySelector(s);
+      const $id = (id) => document.getElementById(id);
+      const REDUCED = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+      const rInt = (n) => Math.floor(Math.random() * n);
+      const pick = (a) => a[rInt(a.length)];
+
+      /* ══════════ VAULT DEFINITIONS ════════════════════════════════════════
+   The honesty model: a vault names a SET of CSS properties (the intended
+   solution) plus the bar count. To place the ghost targets, we apply the
+   intended solution to a hidden "oracle" flex container laid out by the
+   REAL browser, read where each bar lands, and pin the targets there.
+   The player then manipulates the visible container; when their bars'
+   getBoundingClientRect overlaps the targets (which came from the real
+   layout of the intended solution), the vault opens. So targets and
+   judging both derive from the browser's own Flexbox — not a lookup. */
+
+      /* Property vocabularies per floor. Values are real CSS. */
+      const JUSTIFY = ["flex-start", "center", "flex-end", "space-between", "space-around", "space-evenly"];
+      const ALIGN = ["flex-start", "center", "flex-end", "stretch"];
+      const DIRECTION = ["row", "column", "row-reverse", "column-reverse"];
+
+      /* A vault spec = { props: {cssProp: value,...}, bars: n, grow?: bool }.
+   Generators pick a random achievable combo for the floor's concept. */
+      function genFloor1() {
+        // main axis only
+        return { props: { "justify-content": pick(JUSTIFY) }, bars: 3 };
+      }
+      function genFloor2() {
+        // main + cross
+        return { props: { "justify-content": pick(JUSTIFY), "align-items": pick(["flex-start", "center", "flex-end"]) }, bars: 3 };
+      }
+      function genFloor3() {
+        // direction flips
+        const dir = pick(DIRECTION);
+        const p = { "flex-direction": dir, "justify-content": pick(JUSTIFY) };
+        if (Math.random() < 0.6) p["align-items"] = pick(["flex-start", "center", "flex-end"]);
+        return { props: p, bars: 3 };
+      }
+      function genFloor4() {
+        // gap + grow + align
+        const p = { "justify-content": pick(["flex-start", "center", "space-between"]), "align-items": pick(["center", "flex-start", "flex-end"]) };
+        const mode = rInt(3);
+        if (mode === 0) p["gap"] = pick(["16px", "24px", "32px"]);
+        else if (mode === 1)
+          return { props: { "align-items": pick(["center", "flex-start", "flex-end"]) }, bars: 3, grow: true }; // grow puzzle
+        else {
+          p["flex-direction"] = "column";
+          p["gap"] = pick(["12px", "20px"]);
+        }
+        return { props: p, bars: 3 };
+      }
+      function genBoss() {
+        // any concept, quick-fire
+        const gens = [genFloor1, genFloor2, genFloor3, genFloor4];
+        return pick(gens)();
+      }
+
+      /* Canonical property order for display + minimal-set scoring. */
+      const PROP_ORDER = ["flex-direction", "justify-content", "align-items", "align-content", "gap", "flex-wrap"];
+
+      /* ══════════ THE ORACLE ════════════════════════════════════════════════
+   Given a vault's intended props, lay them out for real in a hidden
+   container matching the visible vault's geometry, and return each bar's
+   rect relative to the container. These become the ghost target slots. */
+      function computeTargets(spec, W, H, growMode) {
+        const oracle = document.createElement("div");
+        oracle.style.cssText = "position:absolute;left:-99999px;top:0;display:flex;box-sizing:border-box;";
+        oracle.style.width = W + "px";
+        oracle.style.height = H + "px";
+        for (const k in spec.props) oracle.style[toCamel(k)] = spec.props[k];
+        const barW = W < 520 ? 62 : 88,
+          barH = W < 520 ? 40 : 52;
+        const bars = [];
+        for (let i = 0; i < spec.bars; i++) {
+          const b = document.createElement("div");
+          b.style.cssText = "border-radius:6px;flex-shrink:0;";
+          b.style.width = barW + "px";
+          b.style.height = barH + "px";
+          if (growMode) {
+            b.style.flexGrow = "1";
+            b.style.flexShrink = "1";
+          }
+          oracle.appendChild(b);
+          bars.push(b);
+        }
+        document.body.appendChild(oracle);
+        const orect = oracle.getBoundingClientRect();
+        const targets = bars.map((b) => {
+          const r = b.getBoundingClientRect();
+          return { x: r.left - orect.left, y: r.top - orect.top, w: r.width, h: r.height };
+        });
+        document.body.removeChild(oracle);
+        return targets;
+      }
+      function toCamel(prop) {
+        return prop.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+      }
+
+      /* ══════════ SEATING CHECK ═════════════════════════════════════════════
+   A bar is "seated" when its center is within tolerance of its target's
+   center AND sizes roughly match. Pure rect math — easy to reason about
+   and to unit-test with synthetic rects (see tests). Center-based so it's
+   robust to sub-pixel layout differences between oracle and live box. */
+      function rectsSeated(barRect, target, containerRect, tol) {
+        const bx = barRect.left - containerRect.left + barRect.width / 2;
+        const by = barRect.top - containerRect.top + barRect.height / 2;
+        const tx = target.x + target.w / 2;
+        const ty = target.y + target.h / 2;
+        const t = tol || 8;
+        const centerOk = Math.abs(bx - tx) <= t && Math.abs(by - ty) <= t;
+        const sizeOk = Math.abs(barRect.width - target.w) <= t * 2 && Math.abs(barRect.height - target.h) <= t * 2;
+        return centerOk && sizeOk;
+      }
+
+      /* ── AUDIO ─────────────────────────────────────────────────────────── */
+      const AudioFX = (() => {
+        let ctx = null,
+          amb = null;
+        const ac = () => {
+          if (!ctx) {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (!AC) return null;
+            ctx = new AC();
+          }
+          if (ctx.state === "suspended") ctx.resume();
+          return ctx;
+        };
+        const env = (g, t0, a, peak, d) => {
+          g.gain.setValueAtTime(0.0001, t0);
+          g.gain.exponentialRampToValueAtTime(peak, t0 + a);
+          g.gain.exponentialRampToValueAtTime(0.0001, t0 + a + d);
+        };
+        const osc = (type, f0, f1, dur, peak) => {
+          const c = ac();
+          if (!c) return;
+          const o = c.createOscillator(),
+            g = c.createGain();
+          o.type = type;
+          o.frequency.setValueAtTime(f0, c.currentTime);
+          if (f1) o.frequency.exponentialRampToValueAtTime(f1, c.currentTime + dur);
+          env(g, c.currentTime, 0.006, peak || 0.09, dur);
+          o.connect(g);
+          g.connect(c.destination);
+          o.start();
+          o.stop(c.currentTime + dur + 0.05);
+        };
+        const noise = (dur, peak, freq, type) => {
+          const c = ac();
+          if (!c) return;
+          const b = c.createBuffer(1, Math.floor(c.sampleRate * dur), c.sampleRate);
+          const d = b.getChannelData(0);
+          for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+          const s = c.createBufferSource();
+          s.buffer = b;
+          const f = c.createBiquadFilter();
+          f.type = type || "bandpass";
+          f.frequency.value = freq || 900;
+          const g = c.createGain();
+          env(g, c.currentTime, 0.008, peak || 0.12, dur);
+          s.connect(f);
+          f.connect(g);
+          g.connect(c.destination);
+          s.start();
+        };
+        return {
+          unlock() {
+            ac();
+          },
+          startAmb() {
+            const c = ac();
+            if (!c || amb) return;
+            const o = c.createOscillator();
+            o.type = "sine";
+            o.frequency.value = 58;
+            const lfo = c.createOscillator();
+            lfo.type = "sine";
+            lfo.frequency.value = 0.1;
+            const lg = c.createGain();
+            lg.gain.value = 0.012;
+            const g = c.createGain();
+            g.gain.value = 0.03;
+            lfo.connect(lg);
+            lg.connect(g.gain);
+            o.connect(g);
+            g.connect(c.destination);
+            o.start();
+            lfo.start();
+            amb = { o, lfo, g };
+          },
+          stopAmb() {
+            if (!amb) return;
+            try {
+              amb.g.gain.value = 0;
+              amb.o.stop();
+              amb.lfo.stop();
+            } catch (e) {}
+            amb = null;
+          },
+          chip() {
+            osc("square", 380 + rInt(60), null, 0.02, 0.03);
+          },
+          seat() {
+            osc("sine", 660, 990, 0.1, 0.08);
+            noise(0.05, 0.04, 3000);
+          },
+          unseat() {
+            osc("sine", 500, 360, 0.08, 0.05);
+          },
+          crack() {
+            [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => osc("sine", f, null, 0.4, 0.09), i * 90));
+            noise(0.3, 0.06, 2600);
+          },
+          flawless() {
+            [659, 880, 1109, 1319, 1760].forEach((f, i) => setTimeout(() => osc("sine", f, null, 0.4, 0.09), i * 80));
+          },
+          alarm() {
+            osc("sawtooth", 720, 760, 0.25, 0.08);
+            setTimeout(() => osc("sawtooth", 620, 660, 0.25, 0.08), 150);
+          },
+          tick() {
+            osc("square", 900, null, 0.03, 0.05);
+          },
+          win() {
+            [523, 659, 784, 1047, 1319].forEach((f, i) => setTimeout(() => osc("sine", f, null, 0.5, 0.09), i * 140));
+          },
+          lose() {
+            osc("sawtooth", 300, 50, 1.1, 0.13);
+            noise(0.8, 0.09, 400, "lowpass");
+          }
+        };
+      })();
+
+      /* ── PARTICLES ─────────────────────────────────────────────────────── */
+      const Particles = (() => {
+        const cv = $id("particles");
+        const cx = cv.getContext && cv.getContext("2d");
+        let parts = [],
+          running = false;
+        const size = () => {
+          cv.width = innerWidth;
+          cv.height = innerHeight;
+        };
+        addEventListener("resize", size);
+        size();
+        const frame = () => {
+          if (!cx) return;
+          if (!parts.length) {
+            running = false;
+            cx.clearRect(0, 0, cv.width, cv.height);
+            return;
+          }
+          cx.clearRect(0, 0, cv.width, cv.height);
+          parts = parts.filter((p) => p.life > 0);
+          for (const p of parts) {
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += p.g;
+            p.life--;
+            cx.globalAlpha = Math.max(0, p.life / p.max);
+            cx.fillStyle = p.color;
+            cx.fillRect(p.x, p.y, p.s, p.s);
+          }
+          cx.globalAlpha = 1;
+          if (parts.length) requestAnimationFrame(frame);
+          else running = false;
+        };
+        const spawn = (list) => {
+          if (REDUCED || !cx) return;
+          parts = parts.concat(list);
+          if (!running) {
+            running = true;
+            requestAnimationFrame(frame);
+          }
+        };
+        return {
+          gold(n) {
+            const cs = ["#f5c542", "#ffe08a", "#ffffff", "#47e08a"];
+            const out = [];
+            for (let i = 0; i < (n || 100); i++) out.push({ x: innerWidth / 2 + (Math.random() - 0.5) * 240, y: innerHeight * 0.5, vx: (Math.random() - 0.5) * 9, vy: -(3 + Math.random() * 8), g: 0.16, s: 3 + Math.random() * 4, life: 70 + Math.random() * 50, max: 120, color: cs[i % cs.length] });
+            spawn(out);
+          },
+          burstAt(sel, color, n) {
+            const el = typeof sel === "string" ? $(sel) : sel;
+            if (!el) return;
+            const b = el.getBoundingClientRect(),
+              x = b.left + b.width / 2,
+              y = b.top + b.height / 2;
+            const out = [];
+            for (let i = 0; i < (n || 18); i++) {
+              const a = Math.random() * 6.28,
+                sp = 1 + Math.random() * 4;
+              out.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: 0.05, s: 2 + Math.random() * 3, life: 28 + Math.random() * 18, max: 46, color });
+            }
+            spawn(out);
+          }
+        };
+      })();
+
+      const FX = {
+        shake() {
+          if (REDUCED) return;
+          const a = $id("app");
+          if (a) {
+            a.classList.add("shake");
+            setTimeout(() => a.classList.remove("shake"), 420);
+          }
+        },
+        crackFlash() {
+          const f = $id("crackFlash");
+          f.classList.remove("run");
+          void f.offsetWidth;
+          f.classList.add("run");
+        },
+        alarmFlash() {
+          const f = $id("alarmFlash");
+          f.classList.remove("run");
+          void f.offsetWidth;
+          f.classList.add("run");
+        }
+      };
+    </script>
+
+    <script>
+      /* ══════════════════════════════════════════════════════════════════
+   Part B: game state, floor flow, live CSS application, seating,
+   finesse scoring, rendering.
+   ══════════════════════════════════════════════════════════════════ */
+      "use strict";
+
+      const FLOORS = [
+        { name: "The Lobby Job", vaults: 3, gen: genFloor1, timed: false, concept: "justify-content", blurb: "Main axis only. Slide the gold along the row.", toolkit: ["justify-content"] },
+        { name: "The Cross-Axis Caper", vaults: 3, gen: genFloor2, timed: false, concept: "align-items", blurb: "Now the vertical axis too.", toolkit: ["justify-content", "align-items"] },
+        { name: "Direction Reversal", vaults: 4, gen: genFloor3, timed: false, concept: "flex-direction", blurb: "flex-direction flips the axes. Watch what your old habits do.", toolkit: ["flex-direction", "justify-content", "align-items"] },
+        { name: "The Gap & Grow Vault", vaults: 4, gen: genFloor4, timed: false, concept: "gap / flex-grow", blurb: "Spacing and growth for precise layouts.", toolkit: ["flex-direction", "justify-content", "align-items", "gap"] },
+        { name: "The Vault-Crack Finale", vaults: 5, gen: genBoss, timed: true, timeLimit: 75, concept: "everything", blurb: "One alarm, rising. Crack them fast — finesse buys time.", toolkit: ["flex-direction", "justify-content", "align-items", "gap"] }
+      ];
+
+      /* Chip options offered per property in the toolkit. */
+      const CHIP_OPTIONS = {
+        "flex-direction": DIRECTION,
+        "justify-content": JUSTIFY,
+        "align-items": ALIGN,
+        gap: ["0px", "12px", "16px", "20px", "24px", "32px"]
+      };
+
+      const G = {
+        screen: "title",
+        floorIndex: 0,
+        vaultInFloor: 0,
+        spec: null, // current vault spec {props, bars, grow}
+        targets: [], // computed target rects (container-relative)
+        applied: {}, // player's current CSS props
+        cracked: false,
+        timeLeft: 0,
+        timerId: null,
+        // scoring
+        vaultsCracked: 0,
+        totalProps: 0, // sum of properties used across cracked vaults
+        totalOptimal: 0, // sum of intended-solution property counts (par)
+        flawless: 0, // vaults cracked at optimal property count
+        bestFlawlessStreak: 0,
+        flawlessStreak: 0,
+        scorecard: [],
+        startTime: null
+      };
+
+      let logLines = [];
+      function log(type, text) {
+        logLines.push({ type, text });
+        const out = $id("logOut");
+        if (out) {
+          const d = document.createElement("div");
+          d.className = "l-" + type;
+          d.textContent = text;
+          out.appendChild(d);
+          out.scrollTop = out.scrollHeight;
+          while (out.children.length > 80) out.removeChild(out.firstChild);
+        }
+      }
+
+      function mountPlay() {
+        const root = $id("root");
+        root.innerHTML = "";
+        const app = document.createElement("div");
+        app.id = "app";
+        app.innerHTML = '<header id="hud">' + '<span class="hud-chip" id="vaultChip"></span>' + '<span class="hud-chip" id="seatedChip"></span>' + '<span class="hud-chip" id="propChip"></span>' + '<span class="hud-chip" id="scoreChip"></span>' + '<span class="hud-chip" id="timerChip"></span>' + '<span class="hud-chip" id="floorChip"></span>' + "</header>" + '<main id="stage">' + '<div id="briefBar"></div><div id="briefSub"></div>' + '<div id="vaultWrap"><div id="vaultArea"><div id="flexbox"></div></div></div>' + '<div id="toolkit">' + '<div id="toolkitLabel">heist toolkit \u2014 apply css to the container</div>' + '<div id="propGroups"></div>' + '<div id="appliedRow"><span id="appliedLabel">.container {</span><span id="appliedCss"></span><span id="appliedLabel">}</span></div>' + '<div id="finesseWrap"><span id="finesseLabel">finesse</span><div id="finesseGauge"><div id="finesseFill"></div></div><span id="finesseText"></span></div>' + '<div id="result"></div>' + '<div id="actionRow">' + '<button class="btn ghost" id="resetBtn">reset</button>' + '<button class="btn" id="nextBtn" style="display:none">next vault \u2192</button>' + '<button class="btn ghost" id="hintBtn">hint</button>' + "</div>" + '<div id="hintLine"></div>' + "</div>" + "</main>" + '<footer id="log"><div id="logBar">\u25b8 comms</div><div id="logOut"></div></footer>';
+        root.appendChild(app);
+
+        $id("resetBtn").addEventListener("click", resetVault);
+        $id("nextBtn").addEventListener("click", () => nextVault(false));
+        $id("hintBtn").addEventListener("click", useHint);
+
+        const out = $id("logOut");
+        logLines.slice(-30).forEach((l) => {
+          const d = document.createElement("div");
+          d.className = "l-" + l.type;
+          d.textContent = l.text;
+          out.appendChild(d);
+        });
+        out.scrollTop = out.scrollHeight;
+      }
+
+      function renderHUD() {
+        const floor = FLOORS[G.floorIndex];
+        if (!floor) return; // floor index advanced past the end during an async transition (e.g. boss timer tick after win)
+        $id("vaultChip").textContent = "VAULT " + (G.vaultsCracked + 1);
+        const seated = countSeated();
+        $id("seatedChip").textContent = "SEATED " + seated + "/" + (G.spec ? G.spec.bars : 0);
+        $id("propChip").textContent = "PROPS " + Object.keys(G.applied).length;
+        $id("scoreChip").textContent = "CRACKED " + G.vaultsCracked;
+        const timer = $id("timerChip");
+        if (floor.timed) {
+          timer.style.display = "";
+          timer.textContent = "\u23f1 " + G.timeLeft + "s";
+        } else timer.style.display = "none";
+        $id("floorChip").textContent = floor.name;
+      }
+
+      /* Build the toolkit chips for the current floor. */
+      function renderToolkit() {
+        const floor = FLOORS[G.floorIndex];
+        const groups = $id("propGroups");
+        groups.innerHTML = "";
+        floor.toolkit.forEach((prop) => {
+          const g = document.createElement("div");
+          g.className = "prop-group";
+          const label = document.createElement("div");
+          label.className = "prop-name";
+          label.innerHTML = "<b>" + prop + "</b>:";
+          g.appendChild(label);
+          const chips = document.createElement("div");
+          chips.className = "chips";
+          CHIP_OPTIONS[prop].forEach((val) => {
+            const c = document.createElement("button");
+            c.className = "chip";
+            c.textContent = val;
+            c.dataset.prop = prop;
+            c.dataset.val = val;
+            c.addEventListener("click", () => toggleProp(prop, val));
+            chips.appendChild(c);
+          });
+          g.appendChild(chips);
+          groups.appendChild(g);
+        });
+      }
+
+      function refreshChips() {
+        document.querySelectorAll(".chip").forEach((c) => {
+          const on = G.applied[c.dataset.prop] === c.dataset.val;
+          c.classList.toggle("active", on);
+        });
+      }
+
+      /* ── Apply / toggle a property, then re-layout + re-check ─────────── */
+      function toggleProp(prop, val) {
+        if (G.cracked) return;
+        AudioFX.chip();
+        if (G.applied[prop] === val)
+          delete G.applied[prop]; // tapping the active value clears it
+        else G.applied[prop] = val;
+        applyCss();
+        refreshChips();
+        renderAppliedCss();
+        const seated = evaluateSeating();
+        renderHUD();
+        updateFinesse();
+        if (seated === G.spec.bars && !G.cracked) crackVault();
+      }
+
+      function applyCss() {
+        const fb = $id("flexbox");
+        // Reset to a clean flex baseline, then apply the player's props.
+        fb.style.cssText = "position:absolute;inset:0;display:flex;padding:0;";
+        for (const k in G.applied) fb.style[toCamel(k)] = G.applied[k];
+      }
+
+      function renderAppliedCss() {
+        const el = $id("appliedCss");
+        const keys = Object.keys(G.applied);
+        if (!keys.length) {
+          el.innerHTML = '<span class="muted">/* apply properties to move the gold */</span>';
+          return;
+        }
+        el.innerHTML = keys.map((k) => '<span class="k">' + k + '</span>: <span class="v">' + G.applied[k] + "</span>;").join(" ");
+      }
+
+      /* Measure seating against the real layout. Returns count seated and
+   marks bars/targets. This is the browser-as-referee moment. */
+      function evaluateSeating() {
+        const fb = $id("flexbox");
+        const area = $id("vaultArea");
+        if (!fb || !area) return 0;
+        const crect = area.getBoundingClientRect();
+        const bars = [...fb.querySelectorAll(".bar")];
+        const targetEls = [...area.querySelectorAll(".target")];
+        let seated = 0;
+        bars.forEach((bar, i) => {
+          const t = G.targets[i];
+          const br = bar.getBoundingClientRect();
+          const ok = t && rectsSeated(br, t, crect, 8);
+          const wasSeated = bar.classList.contains("seated");
+          bar.classList.toggle("seated", ok);
+          if (targetEls[i]) targetEls[i].classList.toggle("seated", ok);
+          if (ok) {
+            seated++;
+            if (!wasSeated) AudioFX.seat();
+          } else if (wasSeated) AudioFX.unseat();
+        });
+        return seated;
+      }
+      function countSeated() {
+        return [...($id("flexbox") ? $id("flexbox").querySelectorAll(".bar.seated") : [])].length;
+      }
+
+      /* ── Finesse: fewer props than the intended solution = higher rating ── */
+      function updateFinesse() {
+        const used = Object.keys(G.applied).length;
+        const opt = Object.keys(G.spec.props).length;
+        const fill = $id("finesseFill"),
+          txt = $id("finesseText");
+        // Only meaningful once (or if) the vault is solved; show a live proxy.
+        const ratio = used === 0 ? 0 : Math.min(1, opt / used); // 1.0 when using <= optimal
+        fill.style.width = Math.round(ratio * 100) + "%";
+        fill.style.background = ratio >= 1 ? "var(--seated)" : ratio >= 0.6 ? "var(--gold)" : "var(--alarm)";
+        txt.textContent = used + " prop" + (used === 1 ? "" : "s") + (used ? " (par " + opt + ")" : "");
+      }
+
+      /* ══════════ CRACK ═════════════════════════════════════════════════════ */
+      function crackVault() {
+        G.cracked = true;
+        const used = Object.keys(G.applied).length;
+        const opt = Object.keys(G.spec.props).length;
+        const flawless = used <= opt; // matched or beat the intended property count
+        G.vaultsCracked += 1;
+        G.totalProps += used;
+        G.totalOptimal += opt;
+        if (flawless) {
+          G.flawless += 1;
+          G.flawlessStreak += 1;
+          G.bestFlawlessStreak = Math.max(G.bestFlawlessStreak, G.flawlessStreak);
+        } else G.flawlessStreak = 0;
+        G.scorecard.push({ vault: G.vaultsCracked, concept: FLOORS[G.floorIndex].concept, used, opt, flawless });
+
+        const res = $id("result");
+        if (flawless) {
+          res.innerHTML = '<div class="r flawless">FLAWLESS CRACK</div><div class="detail">' + used + " propert" + (used === 1 ? "y" : "ies") + " \u2014 par " + opt + "</div>";
+          AudioFX.flawless();
+          Particles.gold(120);
+          log("crack", "FLAWLESS \u2014 vault cracked in " + used + " (par " + opt + ")");
+        } else {
+          res.innerHTML = '<div class="r crack">VAULT CRACKED</div><div class="detail">' + used + " properties \u2014 par " + opt + " (try fewer next time)</div>";
+          AudioFX.crack();
+          Particles.gold(80);
+          log("ok", "cracked in " + used + " (par " + opt + ")");
+        }
+        FX.crackFlash();
+        // On a timed floor, once the last vault is cracked the alarm is beaten —
+        // stop the timer immediately so it can't fire during the pre-"next" gap.
+        const floorNow = FLOORS[G.floorIndex];
+        if (floorNow && floorNow.timed && G.vaultInFloor >= floorNow.vaults - 1) stopTimer();
+        $id("nextBtn").style.display = "";
+        $id("nextBtn").focus();
+        $id("hintBtn").disabled = true;
+        renderHUD();
+      }
+
+      function resetVault() {
+        if (G.cracked) return;
+        G.applied = {};
+        applyCss();
+        refreshChips();
+        renderAppliedCss();
+        evaluateSeating();
+        renderHUD();
+        updateFinesse();
+        AudioFX.unseat();
+        log("dim", "container reset.");
+      }
+
+      function useHint() {
+        if (G.cracked) return;
+        const floor = FLOORS[G.floorIndex];
+        // Reveal one intended property the player hasn't matched yet.
+        const missing = Object.keys(G.spec.props).find((k) => G.applied[k] !== G.spec.props[k]);
+        if (missing) {
+          $id("hintLine").innerHTML = "<b>intel:</b> try <code>" + missing + ": " + G.spec.props[missing] + "</code> (there may be a shorter route)";
+          log("dim", "intel used.");
+        } else {
+          $id("hintLine").innerHTML = "<b>intel:</b> you're matching the intended props \u2014 a bar may just need a nudge.";
+        }
+      }
+
+      /* ══════════ VAULT / FLOOR FLOW ════════════════════════════════════════ */
+      function buildVault() {
+        const floor = FLOORS[G.floorIndex];
+        const spec = floor.gen();
+        G.spec = spec;
+        G.applied = {};
+        G.cracked = false;
+
+        const area = $id("vaultArea");
+        const fb = $id("flexbox");
+        // Clear previous targets + bars.
+        [...area.querySelectorAll(".target")].forEach((t) => t.remove());
+        fb.innerHTML = "";
+        applyCss();
+
+        // Size the vault, compute targets from the real oracle layout.
+        const arect = area.getBoundingClientRect();
+        const W = arect.width || 720,
+          H = arect.height || 300;
+        G.targets = computeTargets(spec, W, H, spec.grow);
+
+        // Draw ghost target slots.
+        G.targets.forEach((t, i) => {
+          const el = document.createElement("div");
+          el.className = "target";
+          el.style.left = t.x + "px";
+          el.style.top = t.y + "px";
+          el.style.width = t.w + "px";
+          el.style.height = t.h + "px";
+          el.innerHTML = '<span class="tnum">' + (i + 1) + "</span>";
+          area.appendChild(el);
+        });
+        // Create the player's gold bars.
+        for (let i = 0; i < spec.bars; i++) {
+          const b = document.createElement("div");
+          b.className = "bar" + (spec.grow ? " grow" : "");
+          b.textContent = i + 1;
+          fb.appendChild(b);
+        }
+
+        $id("result").innerHTML = "";
+        $id("hintLine").innerHTML = "";
+        $id("nextBtn").style.display = "none";
+        $id("hintBtn").disabled = false;
+        renderToolkit();
+        refreshChips();
+        renderAppliedCss();
+        evaluateSeating();
+        renderHUD();
+        updateFinesse();
+      }
+
+      function startFloor() {
+        const floor = FLOORS[G.floorIndex];
+        G.vaultInFloor = 0;
+        if (floor.timed) {
+          G.timeLeft = floor.timeLimit;
+          startTimer();
+        }
+        showBanner(floor);
+        renderHUD();
+        setTimeout(
+          () => {
+            nextVault(true);
+          },
+          REDUCED ? 200 : 1000
+        );
+      }
+      function nextVault(first) {
+        if (G.screen !== "play") return; // ignore stray calls after win/lose
+        if (first !== true) G.vaultInFloor += 1;
+        const floor = FLOORS[G.floorIndex];
+        if (!floor) return; // already past the last floor
+        if (G.vaultInFloor >= floor.vaults) {
+          if (floor.timed) stopTimer();
+          G.floorIndex += 1;
+          if (G.floorIndex >= FLOORS.length) {
+            winGame();
+            return;
+          }
+          startFloor();
+          return;
+        }
+        buildVault();
+      }
+
+      function startTimer() {
+        stopTimer();
+        G.timerId = setInterval(() => {
+          G.timeLeft -= 1;
+          if (G.timeLeft <= 10) {
+            AudioFX.tick();
+          }
+          if (G.timeLeft === 15) {
+            AudioFX.alarm();
+            FX.alarmFlash();
+            log("bad", "alarm rising \u2014 15 seconds!");
+          }
+          renderHUD();
+          if (G.timeLeft <= 0) {
+            stopTimer();
+            loseGame();
+          }
+        }, 1000);
+      }
+      function stopTimer() {
+        if (G.timerId) {
+          clearInterval(G.timerId);
+          G.timerId = null;
+        }
+      }
+
+      function showBanner(floor) {
+        const b = $id("doorBanner");
+        const idx = G.floorIndex;
+        b.querySelector(".db-num").textContent = idx === FLOORS.length - 1 ? "FINAL VAULT" : "FLOOR " + (idx + 1);
+        b.querySelector(".db-name").textContent = floor.name;
+        b.querySelector(".db-brief").textContent = floor.blurb;
+        b.classList.remove("show");
+        void b.offsetWidth;
+        b.classList.add("show");
+        log("sys", floor.name + " \u2014 " + floor.blurb);
+        if (floor.timed) log("bad", "The alarm is armed. Crack all " + floor.vaults + " before it triggers.");
+      }
+    </script>
+
+    <script>
+      /* ══════════════════════════════════════════════════════════════════
+   Part C: title, win (heist scorecard), lose, lifecycle, boot.
+   ══════════════════════════════════════════════════════════════════ */
+      "use strict";
+
+      function showTitle() {
+        G.screen = "title";
+        const root = $id("root");
+        root.innerHTML = "";
+        const ov = document.createElement("div");
+        ov.className = "overlay";
+        ov.innerHTML = '<h1 class="title-main">Flexbox Frenzy</h1>' + '<div class="title-sub">the alignment heist</div>' + '<div class="story">' + '<p>Every vault in this building is locked with a <b>Flexbox puzzle</b>. The gold bars have to sit exactly on the <span class="laser">laser-marked target slots</span> \u2014 and the only way to move them is to write real CSS on their container.</p>' + '<p>Here\u2019s the catch that keeps everyone honest: your CSS is applied to <b>actual elements</b> and the bars are measured with <code>getBoundingClientRect</code>. The browser\u2019s own layout engine decides whether you cracked the lock. <span class="bp">CSS isn\u2019t simulated here \u2014 it\u2019s the engine and the judge.</span></p>' + "<p>Cracking a vault is the entry fee. Your real score is <b>finesse</b>: do it in as few properties as possible. <code>place-content: center</code> beats two separate declarations, and down the line those saved properties matter.</p>" + "<p>Five floors, from the Lobby Job to the one-alarm <b>Vault-Crack Finale</b>. The axes will flip on you. Watch the gold, and trust what the browser shows you.</p>" + "</div>" + '<button class="btn" id="startBtn">\ud83d\udd13 start the heist</button>' + '<p class="small-warning">\ud83c\udfa7 sound on for the full caper \u00b7 tap a property\u2019s active value again to clear it \u00b7 there\u2019s always a cleaner crack</p>';
+        root.appendChild(ov);
+        $id("startBtn").addEventListener("click", startRun);
+      }
+
+      function startRun() {
+        AudioFX.unlock();
+        AudioFX.startAmb();
+        G.screen = "play";
+        G.floorIndex = 0;
+        G.vaultInFloor = 0;
+        G.vaultsCracked = 0;
+        G.totalProps = 0;
+        G.totalOptimal = 0;
+        G.flawless = 0;
+        G.flawlessStreak = 0;
+        G.bestFlawlessStreak = 0;
+        G.scorecard = [];
+        G.startTime = Date.now();
+        logLines = [];
+        mountPlay();
+        log("sys", "We're in. The building's layout engine is watching every move.");
+        startFloor();
+      }
+
+      function scorecardHTML() {
+        const rows = G.scorecard.map((r) => "<tr><td>" + r.vault + "</td><td style='text-align:left'>" + r.concept + "</td><td>" + r.opt + "</td><td>" + r.used + "</td><td class='" + (r.flawless ? "good" : "") + "'>" + (r.flawless ? "\u2605" : "\u2013") + "</td></tr>").join("");
+        return '<div class="scorecard"><h3>\ud83d\udcb0 Heist Scorecard</h3>' + '<table class="sc-table"><thead><tr><th>#</th><th style="text-align:left">Lock</th><th>Par</th><th>Props</th><th>Flawless</th></tr></thead><tbody>' + rows + "</tbody></table>" + '<div class="sc-total">' + '<div><div class="v">' + G.vaultsCracked + '</div><div class="k">vaults cracked</div></div>' + '<div><div class="v">' + G.totalProps + '</div><div class="k">total properties</div></div>' + '<div><div class="v">' + G.flawless + '</div><div class="k">flawless cracks</div></div>' + '<div><div class="v">' + G.bestFlawlessStreak + '</div><div class="k">best streak</div></div>' + "</div></div>";
+      }
+
+      function winGame() {
+        G.screen = "win";
+        stopTimer();
+        AudioFX.stopAmb();
+        AudioFX.win();
+        Particles.gold(160);
+        setTimeout(() => Particles.gold(90), 700);
+        const ms = Date.now() - (G.startTime || Date.now());
+        const mm = Math.floor(ms / 60000),
+          ss = Math.floor((ms % 60000) / 1000);
+        const efficiency = G.totalOptimal && G.totalProps ? Math.round((G.totalOptimal / G.totalProps) * 100) : 100;
+        const verdict = G.totalProps <= G.totalOptimal ? "a perfect, minimal heist \u2014 not one wasted property" : efficiency >= 80 ? "clean work, barely a wasted move" : "the gold\u2019s yours, but there was a leaner way through";
+        const root = $id("root");
+        root.innerHTML = "";
+        const ov = document.createElement("div");
+        ov.className = "overlay";
+        ov.innerHTML = '<h1 class="title-main" style="color:var(--seated)">Clean Getaway</h1>' + '<div class="title-sub">the whole building, cracked</div>' + '<div class="story" style="text-align:center;max-width:560px"><p>Every vault is open and the gold is loaded \u2014 <b>' + verdict + '</b>. You\u2019ll never again guess which axis <code>justify-content</code> works on. You watched it, floor after floor.</p><p style="color:var(--ink-dim);font-size:12.5px">finished in ' + mm + "m " + String(ss).padStart(2, "0") + "s \u00b7 " + efficiency + "% property efficiency</p></div>" + scorecardHTML() + '<button class="btn" id="replayBtn">\u21bb pull another job</button>' + '<p class="small-warning">fresh vaults every run \u2014 chase a lower property count</p>';
+        root.appendChild(ov);
+        $id("replayBtn").addEventListener("click", startRun);
+      }
+
+      function loseGame() {
+        G.screen = "lose";
+        stopTimer();
+        AudioFX.stopAmb();
+        AudioFX.lose();
+        FX.alarmFlash();
+        const floor = FLOORS[G.floorIndex];
+        const root = $id("root");
+        root.innerHTML = "";
+        const ov = document.createElement("div");
+        ov.className = "overlay";
+        ov.innerHTML = '<h1 class="title-main" style="color:var(--laser)">Alarm Triggered</h1>' + '<div class="title-sub">the vault sealed itself</div>' + '<div class="story" style="text-align:center;max-width:560px"><p>The clock beat you on <b>' + floor.name + "</b>. The faster route was always fewer properties \u2014 learn the shorthands and the alarm never catches you.</p></div>" + scorecardHTML() + '<button class="btn laser" id="retryBtn">\u21bb case the joint again</button>';
+        root.appendChild(ov);
+        $id("retryBtn").addEventListener("click", startRun);
+      }
+
+      /* Recompute targets on resize (layout geometry changes). */
+      let _resizeT = null;
+      addEventListener("resize", () => {
+        if (G.screen !== "play" || !G.spec || G.cracked) return;
+        clearTimeout(_resizeT);
+        _resizeT = setTimeout(() => {
+          const area = $id("vaultArea");
+          if (!area) return;
+          const arect = area.getBoundingClientRect();
+          G.targets = computeTargets(G.spec, arect.width, arect.height, G.spec.grow);
+          [...area.querySelectorAll(".target")].forEach((el, i) => {
+            const t = G.targets[i];
+            if (!t) return;
+            el.style.left = t.x + "px";
+            el.style.top = t.y + "px";
+            el.style.width = t.w + "px";
+            el.style.height = t.h + "px";
+          });
+          evaluateSeating();
+          renderHUD();
+        }, 200);
+      });
+
+      /* ── BOOT ─────────────────────────────────────────────────────────── */
+      showTitle();
+    </script>
+  </body>
+</html>
