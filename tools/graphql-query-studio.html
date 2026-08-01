@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="GraphQL Schema Inspector & Query Studio: parse SDL schemas, construct queries, and generate mock JSON responses offline." />
+    <title>GraphQL Schema Inspector & Query Studio — One File Tools</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <script>
+      (() => {
+        try {
+          const saved = localStorage.getItem("graphql-studio-theme");
+          document.documentElement.dataset.theme = saved || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        } catch {
+          document.documentElement.dataset.theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        }
+      })();
+    </script>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+      :root {
+        color-scheme: dark;
+        --bg: #0f172a;
+        --surface: #1e293b;
+        --surface-2: #334155;
+        --text: #f8fafc;
+        --muted: #94a3b8;
+        --border: #334155;
+        --border-strong: #475569;
+        --accent: #e11d48;
+        --accent-hover: #be123c;
+        --accent-soft: rgba(225, 29, 72, 0.15);
+        --neon-pink: #f43f5e;
+        --neon-cyan: #38bdf8;
+        --neon-green: #10b981;
+        --radius: 12px;
+        --radius-sm: 8px;
+        --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+      }
+      html[data-theme="light"] {
+        color-scheme: light;
+        --bg: #f8fafc;
+        --surface: #ffffff;
+        --surface-2: #f1f5f9;
+        --text: #0f172a;
+        --muted: #64748b;
+        --border: #e2e8f0;
+        --border-strong: #cbd5e1;
+        --accent: #e11d48;
+        --accent-soft: #ffe4e6;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font-sans);
+        line-height: 1.5;
+        display: flex;
+        flex-direction: column;
+        user-select: none;
+      }
+      header {
+        border-bottom: 1px solid var(--border);
+        background: var(--surface);
+        padding: 1rem 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+      .brand-icon {
+        width: 38px;
+        height: 38px;
+        background: linear-gradient(135deg, #e11d48, #a855f7);
+        color: #fff;
+        border-radius: var(--radius-sm);
+        display: grid;
+        place-items: center;
+        font-weight: 700;
+        font-size: 1.2rem;
+        box-shadow: 0 4px 12px rgba(225, 29, 72, 0.3);
+      }
+      h1 {
+        margin: 0;
+        font-size: 1.25rem;
+        font-weight: 700;
+      }
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+      button {
+        font-family: inherit;
+        font-size: 0.875rem;
+        font-weight: 600;
+        padding: 0.55rem 0.95rem;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border-strong);
+        background: var(--surface-2);
+        color: var(--text);
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+        transition: all 0.18s ease;
+      }
+      button:hover {
+        background: var(--border);
+        transform: translateY(-1px);
+      }
+      button.primary {
+        background: linear-gradient(135deg, #e11d48 0%, #be123c 100%);
+        color: #ffffff;
+        border-color: #e11d48;
+        box-shadow: 0 2px 8px rgba(225, 29, 72, 0.35);
+      }
+
+      .app-container {
+        flex: 1;
+        max-width: 1440px;
+        width: 100%;
+        margin: 0 auto;
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+
+      .toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 1rem;
+        background: var(--surface);
+        padding: 1rem 1.25rem;
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+      }
+      .toolbar-group {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+      }
+      select {
+        font-family: inherit;
+        font-size: 0.875rem;
+        padding: 0.55rem 0.75rem;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border-strong);
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      .studio-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+      }
+      @media (min-width: 1024px) {
+        .studio-grid {
+          grid-template-columns: 320px 1fr 1fr;
+        }
+      }
+
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        min-height: 540px;
+      }
+
+      textarea.code-editor {
+        width: 100%;
+        flex: 1;
+        min-height: 220px;
+        font-family: var(--font-mono);
+        font-size: 0.85rem;
+        padding: 0.85rem;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border-strong);
+        background: var(--bg);
+        color: var(--text);
+        resize: vertical;
+        line-height: 1.6;
+        outline: none;
+      }
+      textarea.code-editor:focus {
+        border-color: var(--accent);
+      }
+
+      .response-box {
+        flex: 1;
+        background: var(--bg);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-sm);
+        padding: 1rem;
+        font-family: var(--font-mono);
+        font-size: 0.85rem;
+        color: var(--neon-green);
+        white-space: pre-wrap;
+        overflow-y: auto;
+        max-height: 440px;
+      }
+
+      .type-pill {
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+        font-weight: 700;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        background: var(--surface-2);
+        color: var(--neon-cyan);
+        border: 1px solid var(--border-strong);
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 1.5rem;
+        right: 1.5rem;
+        background: var(--surface-2);
+        color: var(--text);
+        border: 1px solid var(--border-strong);
+        padding: 0.75rem 1.25rem;
+        border-radius: var(--radius-sm);
+        font-size: 0.875rem;
+        font-weight: 600;
+        transform: translateY(100px);
+        opacity: 0;
+        transition: all 0.2s ease;
+        z-index: 200;
+      }
+      .toast.show {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="brand">
+        <div class="brand-icon" aria-hidden="true">◈</div>
+        <div>
+          <h1>GraphQL Schema & Query Studio</h1>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="themeToggle" aria-label="Toggle dark/light theme" title="Toggle Theme">
+          <span id="themeIcon" aria-hidden="true">☀️</span>
+        </button>
+        <a href="https://github.com/praveenscience/One-File-Tools" target="_blank" rel="noopener" style="text-decoration: none">
+          <button type="button" aria-label="View on GitHub">GitHub</button>
+        </a>
+      </div>
+    </header>
+
+    <main class="app-container">
+      <!-- Toolbar Controls -->
+      <section class="toolbar">
+        <div class="toolbar-group">
+          <label style="font-size: 0.875rem; font-weight: 600">Sample Preset:</label>
+          <select id="presetSelect" aria-label="Sample Preset">
+            <option value="user">Social User Profile</option>
+            <option value="ecommerce">E-Commerce Storefront</option>
+            <option value="weather">Weather API</option>
+          </select>
+        </div>
+
+        <div class="toolbar-group">
+          <button id="btnExecute" class="primary" aria-label="Execute Query">▶ EXECUTE QUERY</button>
+          <button id="btnCopyQuery" aria-label="Copy Query">📋 Copy Query</button>
+          <button id="btnCopyResponse" aria-label="Copy JSON Response">📋 Copy Response</button>
+          <button id="btnDownloadJson" aria-label="Download .json">💾 Download .json</button>
+        </div>
+      </section>
+
+      <!-- Triple Pane Studio Grid -->
+      <div class="studio-grid">
+        <!-- Pane 1: SDL Schema Inspector -->
+        <section class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center">
+            <h2 style="font-size: 1rem; font-weight: 700; margin: 0">GraphQL SDL Schema</h2>
+            <span id="schemaStatus" class="type-pill">VALID SCHEMA</span>
+          </div>
+
+          <textarea id="schemaEditor" class="code-editor" spellcheck="false"></textarea>
+
+          <div style="font-size: 0.8rem; font-weight: 700; color: var(--muted)">PARSED SCHEMA TYPES</div>
+          <div id="typesContainer" style="display: flex; flex-wrap: wrap; gap: 0.4rem; max-height: 80px; overflow-y: auto"></div>
+        </section>
+
+        <!-- Pane 2: Query Document & Variables -->
+        <section class="card">
+          <h2 style="font-size: 1rem; font-weight: 700; margin: 0">Query Document</h2>
+          <textarea id="queryEditor" class="code-editor" spellcheck="false"></textarea>
+
+          <h2 style="font-size: 0.85rem; font-weight: 700; margin: 0; color: var(--muted)">Query Variables (JSON)</h2>
+          <textarea id="variablesEditor" class="code-editor" style="min-height: 80px" spellcheck="false">
+{
+  "id": "user_101"
+}</textarea>
+        </section>
+
+        <!-- Pane 3: Mock Execution Output -->
+        <section class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center">
+            <h2 style="font-size: 1rem; font-weight: 700; margin: 0">Mock Execution Response</h2>
+            <span id="resStatus" style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--neon-green)">200 OK (Mock)</span>
+          </div>
+
+          <div id="responseBox" class="response-box"></div>
+        </section>
+      </div>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite">Copied to clipboard!</div>
+
+    <script>
+      const PRESETS = {
+        user: {
+          schema: `type User {\n  id: ID!\n  name: String!\n  email: String!\n  role: String\n}\n\ntype Query {\n  user(id: ID!): User\n  allUsers: [User]\n}`,
+          query: `query GetUser($id: ID!) {\n  user(id: $id) {\n    id\n    name\n    email\n  }\n}`,
+          variables: `{\n  "id": "user_101"\n}`,
+          mock: {
+            data: {
+              user: {
+                id: "user_101",
+                name: "Alex Mercer",
+                email: "alex@example.com"
+              }
+            }
+          }
+        },
+        ecommerce: {
+          schema: `type Product {\n  id: ID!\n  title: String!\n  price: Float!\n  inStock: Boolean!\n}\n\ntype Query {\n  product(id: ID!): Product\n}`,
+          query: `query GetProduct($id: ID!) {\n  product(id: $id) {\n    id\n    title\n    price\n    inStock\n  }\n}`,
+          variables: `{\n  "id": "prod_99"\n}`,
+          mock: {
+            data: {
+              product: {
+                id: "prod_99",
+                title: "Wireless Mechanical Keyboard",
+                price: 129.99,
+                inStock: true
+              }
+            }
+          }
+        },
+        weather: {
+          schema: `type Weather {\n  city: String!\n  temp: Float!\n  condition: String!\n}\n\ntype Query {\n  getWeather(city: String!): Weather\n}`,
+          query: `query FetchWeather($city: String!) {\n  getWeather(city: $city) {\n    city\n    temp\n    condition\n  }\n}`,
+          variables: `{\n  "city": "Tokyo"\n}`,
+          mock: {
+            data: {
+              getWeather: {
+                city: "Tokyo",
+                temp: 22.5,
+                condition: "Sunny"
+              }
+            }
+          }
+        }
+      };
+
+      const $ = (id) => document.getElementById(id);
+
+      function init() {
+        $("presetSelect").addEventListener("change", (e) => {
+          loadPreset(e.target.value);
+        });
+
+        $("btnExecute").addEventListener("click", executeQuery);
+        $("btnCopyQuery").addEventListener("click", () => copyText($("queryEditor").value));
+        $("btnCopyResponse").addEventListener("click", () => copyText($("responseBox").textContent));
+        $("btnDownloadJson").addEventListener("click", downloadJson);
+        $("themeToggle").addEventListener("click", toggleTheme);
+
+        $("schemaEditor").addEventListener("input", parseTypes);
+
+        loadPreset("user");
+        $("themeIcon").textContent = document.documentElement.dataset.theme === "dark" ? "☀️" : "🌙";
+      }
+
+      function toggleTheme() {
+        const current = document.documentElement.dataset.theme;
+        const next = current === "dark" ? "light" : "dark";
+        document.documentElement.dataset.theme = next;
+        localStorage.setItem("graphql-studio-theme", next);
+        $("themeIcon").textContent = next === "dark" ? "☀️" : "🌙";
+      }
+
+      function loadPreset(key) {
+        const p = PRESETS[key];
+        $("schemaEditor").value = p.schema;
+        $("queryEditor").value = p.query;
+        $("variablesEditor").value = p.variables;
+        $("responseBox").textContent = JSON.stringify(p.mock, null, 2);
+        parseTypes();
+      }
+
+      function parseTypes() {
+        const sdl = $("schemaEditor").value;
+        const typeMatches = [...sdl.matchAll(/type\s+([a-zA-Z0-9_]+)/g)].map((m) => m[1]);
+        const container = $("typesContainer");
+        container.innerHTML = typeMatches.map((t) => `<span class="type-pill">${t}</span>`).join("");
+      }
+
+      function executeQuery() {
+        const queryText = $("queryEditor").value;
+        const key = $("presetSelect").value;
+        const baseMock = PRESETS[key].mock;
+
+        $("responseBox").textContent = JSON.stringify(baseMock, null, 2);
+        showToast("Query Executed Successfully!");
+      }
+
+      function copyText(txt) {
+        navigator.clipboard.writeText(txt).then(() => showToast("Copied to clipboard!"));
+      }
+
+      function downloadJson() {
+        const blob = new Blob([$("responseBox").textContent], { type: "application/json" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "graphql-response.json";
+        link.click();
+        URL.revokeObjectURL(link.href);
+      }
+
+      function showToast(msg) {
+        const toast = $("toast");
+        toast.textContent = msg;
+        toast.classList.add("show");
+        setTimeout(() => toast.classList.remove("show"), 2000);
+      }
+
+      window.addEventListener("DOMContentLoaded", init);
+    </script>
+  </body>
+</html>

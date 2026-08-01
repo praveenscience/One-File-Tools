@@ -1,0 +1,1509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>The Glassblower's Immutable Forge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-void: #0c0a09;
+    --bg-charcoal: #16130f;
+    --bg-panel: #1d1815;
+    --bg-panel-hi: #251f1a;
+    --line: rgba(255,208,158,0.12);
+    --line-strong: rgba(255,208,158,0.22);
+    --amber: #ff9a52;
+    --amber-hot: #ffb877;
+    --amber-dim: #c9713a;
+    --ember: #ff5a4e;
+    --glass-cool: #9fd8d0;
+    --success: #7fc9a0;
+    --ink: #f3e9dd;
+    --ink-dim: #b8a996;
+    --ink-faint: #7d6f60;
+    --shatter: #ff4b3e;
+    --radius-lg: 2rem;
+    --radius-md: 1.1rem;
+    --font-display: 'Fraunces', serif;
+    --font-body: 'Outfit', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{
+    width:100%; height:100%; overflow:hidden;
+    background:var(--bg-void); color:var(--ink);
+    font-family:var(--font-body);
+    -webkit-font-smoothing:antialiased;
+  }
+  #app{position:relative; width:100vw; height:100dvh; overflow:hidden;}
+
+  /* ===================== SHARED: EMBER PARTICLE FIELD ===================== */
+  .ember-field{position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:1;}
+  .ember-particle{
+    position:absolute; bottom:-10px; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #ffe8c9, var(--amber) 55%, transparent 75%);
+    filter: blur(0.3px);
+    animation: emberRise linear infinite;
+    opacity:0;
+  }
+  @keyframes emberRise{
+    0%{ transform:translateY(0) translateX(0) scale(0.4); opacity:0;}
+    8%{ opacity:0.9;}
+    50%{ transform:translateY(-50vh) translateX(var(--drift,10px)) scale(1);}
+    92%{ opacity:0.5;}
+    100%{ transform:translateY(-105vh) translateX(calc(var(--drift,10px) * 2)) scale(0.2); opacity:0;}
+  }
+
+  /* ===================== LANDING / HERO ===================== */
+  #landing{
+    position:absolute; inset:0; z-index:5;
+    display:flex; flex-direction:column;
+    background:
+      radial-gradient(ellipse 70% 60% at 82% 88%, rgba(255,138,61,0.30), transparent 62%),
+      radial-gradient(ellipse 40% 35% at 8% 12%, rgba(255,90,78,0.08), transparent 65%),
+      linear-gradient(160deg, #0a0807 0%, #14100d 40%, #1b130d 72%, #201408 100%);
+    transition: opacity 0.9s cubic-bezier(0.65,0,0.35,1), transform 0.9s cubic-bezier(0.65,0,0.35,1), filter 0.9s ease;
+  }
+  #landing.leaving{ opacity:0; transform:scale(1.06); filter:blur(6px); pointer-events:none;}
+
+  .landing-nav{
+    position:relative; z-index:4; display:flex; align-items:center; justify-content:space-between;
+    padding: clamp(1.2rem,2.4vw,1.8rem) clamp(1.4rem,3.6vw,3rem);
+  }
+  .landing-nav .brandmark span{ font-size:1rem; letter-spacing:0.02em; color:var(--ink-dim); }
+  .landing-nav .brandmark svg{ width:24px; height:24px; opacity:0.9; }
+  .nav-link{
+    font-family:var(--font-mono); font-size:0.76rem; letter-spacing:0.08em; text-transform:uppercase;
+    color:var(--ink-faint); background:none; border:none; cursor:pointer; padding:0.5rem 0.2rem;
+    transition:color 0.3s ease; border-bottom:1px solid transparent;
+  }
+  .nav-link:hover{ color:var(--amber-hot); border-color:var(--amber-dim); }
+
+  .forge-glow-floor{
+    position:absolute; left:0; right:0; bottom:0; height:50%;
+    background: radial-gradient(ellipse 75% 100% at 62% 100%, rgba(255,124,45,0.5), rgba(255,90,20,0.06) 55%, transparent 75%);
+    animation: floorPulse 6s ease-in-out infinite;
+    z-index:0;
+  }
+  @keyframes floorPulse{ 0%,100%{opacity:0.75;} 50%{opacity:1;} }
+
+  .brick-texture{
+    position:absolute; inset:0; z-index:0; opacity:0.05; pointer-events:none;
+    background-image:
+      repeating-linear-gradient(0deg, transparent 0 38px, rgba(255,208,158,0.5) 38px 39px),
+      repeating-linear-gradient(90deg, transparent 0 74px, rgba(255,208,158,0.5) 74px 75px);
+  }
+
+  .hero-wrap{
+    position:relative; z-index:2; flex:1; width:min(1440px, 94vw); margin:0 auto;
+    display:grid; grid-template-columns: 1.05fr 0.95fr; align-items:center;
+    gap: clamp(1.5rem, 4vw, 2.5rem);
+    padding: 0 0 1rem;
+  }
+  .hero-copy{ position:relative; padding-right: clamp(0.5rem,2vw,1rem); }
+  .kicker{
+    display:inline-flex; align-items:center; gap:0.6rem;
+    font-family:var(--font-mono); font-size:clamp(0.66rem,1vw,0.76rem);
+    letter-spacing:0.2em; text-transform:uppercase; color:var(--amber-hot);
+    padding: 0.4rem 0.9rem; border:1px solid var(--line-strong); border-radius:100px;
+    background:rgba(255,154,82,0.06);
+    margin-bottom: clamp(1.3rem, 2.4vw, 1.9rem);
+  }
+  .kicker::before{ content:''; width:6px; height:6px; border-radius:50%; background:var(--amber); box-shadow:0 0 10px 3px var(--amber); animation:kickerBlink 2s ease-in-out infinite;}
+  @keyframes kickerBlink{0%,100%{opacity:1;} 50%{opacity:0.35;}}
+
+  h1.hero-title{
+    font-family:var(--font-display); font-weight:600;
+    font-size: clamp(2.5rem, 5vw, 4.4rem);
+    line-height:1.03; letter-spacing:-0.01em;
+    color: var(--ink);
+    margin-bottom: clamp(1.1rem, 2vw, 1.5rem);
+  }
+  h1.hero-title em{
+    font-style:italic; font-weight:500;
+    background: linear-gradient(100deg, var(--amber-hot), var(--amber) 45%, #ffdca8 70%, var(--amber-hot));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    position:relative;
+  }
+  p.hero-sub{
+    font-size: clamp(0.98rem, 1.2vw, 1.14rem); line-height:1.68;
+    color: var(--ink-dim); max-width:50ch;
+    margin-bottom: clamp(1.9rem, 3vw, 2.4rem);
+  }
+  .hero-actions{ display:flex; align-items:center; gap:1.1rem; flex-wrap:wrap; margin-bottom: clamp(1.8rem,3vw,2.6rem); }
+
+  .concept-legend{
+    display:flex; gap: clamp(1.1rem,2.4vw,2rem); flex-wrap:wrap;
+    padding-top: clamp(1.4rem,2.4vw,1.8rem); border-top:1px solid var(--line);
+  }
+  .concept-legend .item{ display:flex; align-items:center; gap:0.55rem; }
+  .concept-legend .dot{ width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+  .concept-legend .dot.d1{ background:var(--amber); box-shadow:0 0 8px 2px rgba(255,154,82,0.5);}
+  .concept-legend .dot.d2{ background:var(--glass-cool); box-shadow:0 0 8px 2px rgba(159,216,208,0.5);}
+  .concept-legend .dot.d3{ background:var(--success); box-shadow:0 0 8px 2px rgba(127,201,160,0.5);}
+  .concept-legend .dot.d4{ background:#bcd6ea; box-shadow:0 0 8px 2px rgba(188,214,234,0.5);}
+  .concept-legend span{ font-family:var(--font-mono); font-size:0.76rem; color:var(--ink-faint); letter-spacing:0.03em; white-space:nowrap;}
+
+  .btn{
+    font-family:var(--font-body); font-weight:600; font-size:0.98rem; cursor:pointer;
+    border:none; outline:none; border-radius:100px; letter-spacing:0.01em;
+    transition: transform 0.45s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.35s ease, background 0.3s ease;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .btn:active{ transform:scale(0.96) translateY(1px); }
+  .btn-primary{
+    padding: 1rem 2rem; color:#20120a;
+    background: linear-gradient(135deg, var(--amber-hot), var(--amber) 60%, var(--amber-dim));
+    box-shadow: 0 12px 30px -10px rgba(255,138,61,0.55), inset 0 1px 0 rgba(255,255,255,0.35);
+    position:relative; overflow:hidden;
+  }
+  .btn-primary:hover{ transform:translateY(-3px); box-shadow: 0 18px 38px -8px rgba(255,138,61,0.7), inset 0 1px 0 rgba(255,255,255,0.4);}
+  .btn-primary .shine{
+    position:absolute; top:0; left:-60%; width:40%; height:100%;
+    background:linear-gradient(120deg, transparent, rgba(255,255,255,0.55), transparent);
+    transform:skewX(-20deg); animation:shineSweep 3.2s ease-in-out infinite;
+  }
+  @keyframes shineSweep{ 0%{left:-60%;} 40%{left:130%;} 100%{left:130%;} }
+
+  .btn-ghost{
+    padding:1rem 1.7rem; color:var(--ink); background:transparent;
+    border:1px solid var(--line-strong);
+  }
+  .btn-ghost:hover{ background:rgba(255,208,158,0.06); border-color:var(--amber-dim); transform:translateY(-2px);}
+
+  /* Hero glass sculpture */
+  .hero-art{
+    position:relative; display:flex; align-items:center; justify-content:center;
+    height:clamp(380px,46vw,600px); perspective:1200px;
+  }
+  .furnace-ring{
+    position:absolute; width:82%; aspect-ratio:1/1; border-radius:50%;
+    border: 1px dashed rgba(255,180,110,0.16);
+    animation: ringSpin 44s linear infinite;
+  }
+  .furnace-ring.r2{ width:98%; border-color:rgba(255,120,70,0.09); animation-duration:70s; animation-direction:reverse;}
+  @keyframes ringSpin{ from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
+
+  #heroSceneSvg{ width:100%; max-width:560px; will-change:transform; transition:transform 0.25s ease-out; }
+  .hero-layer-far{ transition:transform 0.35s ease-out; }
+  .hero-layer-near{ transition:transform 0.18s ease-out; }
+
+  /* ===================== TOP BAR (in-game) ===================== */
+  #gameScreen{ position:absolute; inset:0; z-index:4; opacity:0; pointer-events:none; transform:translateY(14px); transition:opacity 0.7s ease, transform 0.7s cubic-bezier(0.22,1,0.36,1);}
+  #gameScreen.active{ opacity:1; pointer-events:all; transform:translateY(0);}
+
+  .game-bg{
+    position:absolute; inset:0; z-index:0;
+    background:
+      radial-gradient(ellipse 55% 40% at 50% 100%, rgba(255,120,45,0.20), transparent 65%),
+      linear-gradient(180deg, #0f0c0a 0%, #171210 55%, #1c140d 100%);
+  }
+
+  .topbar{
+    position:relative; z-index:3; display:flex; align-items:center; justify-content:space-between;
+    padding: clamp(0.9rem,1.8vw,1.3rem) clamp(1.2rem,3vw,2.6rem);
+    border-bottom:1px solid var(--line);
+    background:rgba(12,10,9,0.35); backdrop-filter:blur(10px);
+  }
+  .brandmark{ display:flex; align-items:center; gap:0.7rem; }
+  .brandmark svg{ width:28px; height:28px; }
+  .brandmark span{ font-family:var(--font-display); font-weight:600; font-size:1.05rem; letter-spacing:0.01em; }
+
+  .level-pips{ display:flex; align-items:center; gap:0.55rem; }
+  .pip{
+    width:38px; height:6px; border-radius:100px; background:rgba(255,208,158,0.14);
+    position:relative; overflow:hidden;
+  }
+  .pip .fill{ position:absolute; inset:0; width:0%; background:linear-gradient(90deg,var(--amber-dim),var(--amber-hot)); transition:width 0.6s cubic-bezier(0.22,1,0.36,1); border-radius:100px;}
+  .pip.done .fill{ width:100%; }
+  .pip.current .fill{ width:100%; box-shadow:0 0 10px 2px rgba(255,154,82,0.6);}
+
+  .topbar-actions{ display:flex; gap:0.6rem; align-items:center;}
+  .icon-btn{
+    width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    background:var(--bg-panel); border:1px solid var(--line-strong); cursor:pointer; color:var(--ink-dim);
+    transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .icon-btn:hover{ color:var(--amber-hot); border-color:var(--amber-dim); transform:translateY(-2px) rotate(-6deg); background:var(--bg-panel-hi);}
+  .icon-btn svg{ width:18px; height:18px;}
+
+  /* ===================== GAME LAYOUT ===================== */
+  .game-body{
+    position:relative; z-index:2; height:calc(100% - 74px); min-height:0;
+    display:grid; grid-template-columns: 1.35fr 1fr; gap: clamp(1rem,2vw,1.6rem);
+    padding: clamp(1rem,2.2vw,1.8rem) clamp(1.2rem,3vw,2.6rem);
+  }
+  @media (max-width: 880px){
+    .game-body{ grid-template-columns:1fr; grid-template-rows:auto auto; overflow-y:auto; }
+  }
+
+  .stage-panel{
+    position:relative; border-radius:var(--radius-lg); border:1px solid var(--line);
+    background: linear-gradient(160deg, rgba(37,31,26,0.7), rgba(22,19,15,0.75));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 30px 60px -30px rgba(0,0,0,0.6);
+    display:flex; flex-direction:column; overflow:hidden; min-height:0;
+  }
+  .stage-header{ padding: clamp(1.1rem,2vw,1.6rem) clamp(1.2rem,2.2vw,1.8rem) 0.4rem; flex-shrink:0; }
+  .stage-eyebrow{ font-family:var(--font-mono); font-size:0.7rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--amber-hot); margin-bottom:0.5rem; display:flex; align-items:center; gap:0.5rem;}
+  .stage-eyebrow::before{ content:''; width:5px; height:5px; border-radius:50%; background:var(--amber); box-shadow:0 0 8px 2px var(--amber);}
+  .stage-title{ font-family:var(--font-display); font-weight:600; font-size:clamp(1.3rem,2.2vw,1.7rem); margin-bottom:0.5rem;}
+  .stage-desc{ color:var(--ink-dim); font-size:0.94rem; line-height:1.6; max-width:62ch;}
+
+  .stage-progress{
+    display:flex; align-items:center; gap:0.7rem; margin-top:0.9rem;
+  }
+  .stage-progress .track{ flex:1; height:7px; border-radius:100px; background:rgba(255,208,158,0.1); overflow:hidden; }
+  .stage-progress .fill{ height:100%; width:0%; border-radius:100px; background:linear-gradient(90deg,var(--amber-dim),var(--amber-hot)); transition:width 0.35s cubic-bezier(0.22,1,0.36,1); }
+  .stage-progress .pct{ font-family:var(--font-mono); font-size:0.72rem; color:var(--ink-faint); min-width:2.6em; text-align:right; }
+  .stage-progress.hidden{ display:none; }
+
+  .stage-canvas-wrap{
+    flex:1; min-height:0; position:relative; display:flex; align-items:center; justify-content:center;
+    padding: 0.75rem;
+  }
+  .kiln-floor-glow{
+    position:absolute; left:10%; right:10%; bottom:6%; height:30%; border-radius:50%;
+    background:radial-gradient(ellipse, rgba(255,124,45,0.4), transparent 70%);
+    filter:blur(6px); pointer-events:none;
+  }
+  #stageSvg{ width:100%; height:100%; max-width:520px; max-height:520px; touch-action:none; user-select:none; display:block; }
+
+  .toast-banner{
+    position:absolute; left:50%; top:14px; transform:translate(-50%,-140%);
+    padding:0.7rem 1.3rem; border-radius:100px; font-size:0.86rem; font-weight:600;
+    font-family:var(--font-body); z-index:10; white-space:nowrap; display:flex; align-items:center; gap:0.5rem;
+    box-shadow: 0 14px 30px -8px rgba(0,0,0,0.5);
+    transition: transform 0.55s cubic-bezier(0.34,1.56,0.64,1), opacity 0.4s ease;
+    opacity:0; pointer-events:none;
+  }
+  .toast-banner.show{ transform:translate(-50%,0%); opacity:1; }
+  .toast-banner.ok{ background:linear-gradient(135deg,#a4e6bf,#6fbf94); color:#0f2a1c; }
+  .toast-banner.err{ background:linear-gradient(135deg,#ff9a8f,var(--shatter)); color:#3a0803; }
+  .toast-banner.info{ background:linear-gradient(135deg,#ffd7a8,var(--amber)); color:#301907;}
+
+  .stage-controls{ display:flex; flex-wrap:wrap; gap:0.7rem; padding: 0.5rem clamp(1.2rem,2.2vw,1.8rem) clamp(1.2rem,2vw,1.6rem); border-top:1px solid var(--line); flex-shrink:0; }
+  .act-btn{
+    flex:1; min-width:150px; padding:0.85rem 1.1rem; border-radius:var(--radius-md);
+    background:var(--bg-panel-hi); border:1px solid var(--line-strong); color:var(--ink);
+    font-family:var(--font-body); font-weight:600; font-size:0.88rem; cursor:pointer;
+    display:flex; flex-direction:column; align-items:flex-start; gap:0.15rem;
+    transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1), border-color 0.3s ease, background 0.3s ease;
+  }
+  .act-btn:hover:not(:disabled){ transform:translateY(-3px); border-color:var(--amber-dim); background:linear-gradient(160deg, rgba(255,154,82,0.09), var(--bg-panel-hi));}
+  .act-btn:active:not(:disabled){ transform:scale(0.97) translateY(0); }
+  .act-btn:disabled{ opacity:0.35; cursor:not-allowed; }
+  .act-btn small{ font-family:var(--font-mono); font-weight:400; font-size:0.72rem; color:var(--ink-faint); }
+  .act-btn.danger:hover:not(:disabled){ border-color:var(--ember); }
+
+  /* right side panel: code + console */
+  .side-col{ display:flex; flex-direction:column; gap: clamp(1rem,2vw,1.4rem); min-height:0; }
+  .panel{
+    border-radius:var(--radius-lg); border:1px solid var(--line);
+    background: linear-gradient(160deg, rgba(37,31,26,0.7), rgba(22,19,15,0.75));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+    overflow:hidden; display:flex; flex-direction:column; min-height:0;
+  }
+  .panel-head{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0.9rem 1.2rem; border-bottom:1px solid var(--line);
+  }
+  .panel-head .dots{ display:flex; gap:0.4rem;}
+  .panel-head .dots span{ width:9px; height:9px; border-radius:50%; display:block;}
+  .panel-head .dots span:nth-child(1){ background:#ff6259;}
+  .panel-head .dots span:nth-child(2){ background:#ffbd2e;}
+  .panel-head .dots span:nth-child(3){ background:#28c93f;}
+  .panel-head .label{ font-family:var(--font-mono); font-size:0.74rem; color:var(--ink-faint); letter-spacing:0.05em;}
+
+  #codePanel{ flex:1.15; min-height:0; }
+  #codeBody{
+    flex:1; min-height:0;
+    padding:1.1rem 1.3rem; font-family:var(--font-mono); font-size:0.84rem; line-height:1.75;
+    overflow-y:auto; color:var(--ink-dim); white-space:pre-wrap; word-break:break-word;
+  }
+  #codeBody .kw{ color:#ff9a52; }
+  #codeBody .fn{ color:#9fd8d0; }
+  #codeBody .str{ color:#f0c988; }
+  #codeBody .cm{ color:var(--ink-faint); font-style:italic;}
+  #codeBody .hl{ background:rgba(255,154,82,0.14); border-radius:4px; padding:0 3px; }
+
+  #consolePanel{ flex:0.85; min-height:0; }
+  #consoleBody{
+    flex:1; min-height:0;
+    padding:0.9rem 1.3rem; font-family:var(--font-mono); font-size:0.78rem; line-height:1.9;
+    overflow-y:auto; color:var(--ink-faint); display:flex; flex-direction:column-reverse; gap:0.15rem;
+  }
+  .log-line{ opacity:0; transform:translateY(6px); animation: logIn 0.4s ease forwards; display:flex; gap:0.5rem;}
+  @keyframes logIn{ to{opacity:1; transform:translateY(0);} }
+  .log-line .tag{ flex-shrink:0; }
+  .log-line.ok .tag{ color:var(--success); }
+  .log-line.err .tag{ color:var(--shatter); }
+  .log-line.info .tag{ color:var(--amber-hot); }
+
+  #codeBody::-webkit-scrollbar, #consoleBody::-webkit-scrollbar{ width:6px; }
+  #codeBody::-webkit-scrollbar-thumb, #consoleBody::-webkit-scrollbar-thumb{ background:rgba(255,208,158,0.18); border-radius:10px;}
+
+  /* ===================== FIELD GUIDE MODAL ===================== */
+  .modal-overlay{
+    position:fixed; inset:0; z-index:50; background:rgba(8,6,5,0.72); backdrop-filter:blur(6px);
+    display:flex; align-items:center; justify-content:center; padding:2rem;
+    opacity:0; pointer-events:none; transition:opacity 0.4s ease;
+  }
+  .modal-overlay.show{ opacity:1; pointer-events:all; }
+  .modal-card{
+    width:min(920px,94vw); max-height:86vh; overflow-y:auto; border-radius:var(--radius-lg);
+    background: linear-gradient(165deg, #201911, #16110c);
+    border:1px solid var(--line-strong); box-shadow: 0 60px 100px -30px rgba(0,0,0,0.7);
+    padding: clamp(1.6rem,3vw,2.6rem);
+    transform:scale(0.94) translateY(18px); transition:transform 0.5s cubic-bezier(0.22,1,0.36,1);
+  }
+  .modal-overlay.show .modal-card{ transform:scale(1) translateY(0); }
+  .modal-card::-webkit-scrollbar{ width:8px;}
+  .modal-card::-webkit-scrollbar-thumb{ background:rgba(255,208,158,0.18); border-radius:10px;}
+
+  .modal-head{ display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:1.6rem; gap:1rem;}
+  .modal-head h2{ font-family:var(--font-display); font-weight:600; font-size:clamp(1.5rem,2.6vw,2rem);}
+  .modal-head p{ color:var(--ink-dim); margin-top:0.4rem; font-size:0.95rem; max-width:60ch;}
+  .close-x{
+    width:38px; height:38px; border-radius:50%; border:1px solid var(--line-strong); background:var(--bg-panel);
+    color:var(--ink-dim); cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center;
+    transition:all 0.3s ease;
+  }
+  .close-x:hover{ color:var(--ember); transform:rotate(90deg); border-color:var(--ember);}
+
+  .guide-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:1.1rem; }
+  @media (max-width:640px){ .guide-grid{ grid-template-columns:1fr; } }
+  .guide-item{
+    border:1px solid var(--line); border-radius:var(--radius-md); padding:1.2rem;
+    background:rgba(255,208,158,0.03);
+  }
+  .guide-item h3{ font-family:var(--font-display); font-size:1.05rem; font-weight:600; margin-bottom:0.5rem; color:var(--amber-hot);}
+  .guide-item p{ color:var(--ink-dim); font-size:0.87rem; line-height:1.6; margin-bottom:0.7rem;}
+  .guide-item pre{
+    font-family:var(--font-mono); font-size:0.76rem; background:#100c0a; border:1px solid var(--line);
+    border-radius:0.6rem; padding:0.8rem; overflow-x:auto; color:var(--glass-cool); line-height:1.6;
+  }
+
+  /* ===================== COMPLETION SCREEN ===================== */
+  #completeScreen{
+    position:absolute; inset:0; z-index:6; display:flex; align-items:center; justify-content:center;
+    background: radial-gradient(ellipse 60% 55% at 50% 40%, rgba(255,154,82,0.18), transparent 65%), linear-gradient(160deg,#0c0a09,#191209);
+    opacity:0; pointer-events:none; transform:scale(1.05); transition:opacity 0.8s ease, transform 0.8s cubic-bezier(0.22,1,0.36,1);
+  }
+  #completeScreen.show{ opacity:1; pointer-events:all; transform:scale(1); }
+  .cert{
+    width:min(680px,92vw); border-radius:var(--radius-lg); padding:clamp(2rem,4vw,3.2rem);
+    text-align:center; border:1px solid var(--line-strong);
+    background:linear-gradient(160deg, rgba(37,31,26,0.85), rgba(20,16,13,0.9));
+    box-shadow:0 60px 120px -40px rgba(255,120,40,0.25);
+  }
+  .cert .medal{ width:96px; height:96px; margin:0 auto 1.4rem; }
+  .cert h2{ font-family:var(--font-display); font-weight:700; font-size:clamp(1.8rem,3.4vw,2.6rem); margin-bottom:0.6rem;}
+  .cert p.sub{ color:var(--ink-dim); margin-bottom:1.8rem; font-size:1rem; }
+  .cert .skills{ display:flex; flex-wrap:wrap; gap:0.6rem; justify-content:center; margin-bottom:2rem;}
+  .cert .skills span{
+    font-family:var(--font-mono); font-size:0.76rem; padding:0.5rem 0.9rem; border-radius:100px;
+    border:1px solid var(--line-strong); color:var(--amber-hot); background:rgba(255,154,82,0.06);
+  }
+
+  /* SVG glass gradients used across the app rely on classes below */
+  .glass-fill{ transition: d 0.05s linear, filter 0.4s ease; }
+
+  /* shatter shard animation */
+  .shard{ transform-origin:center; opacity:0; }
+  .shard.go{ animation: shardFly 0.9s cubic-bezier(0.22,1,0.36,1) forwards; }
+  @keyframes shardFly{
+    0%{ opacity:1; transform: translate(0,0) rotate(0) scale(1);}
+    100%{ opacity:0; transform: translate(var(--sx), var(--sy)) rotate(var(--sr)) scale(0.4);}
+  }
+  .crack-line{ stroke-dasharray: 220; stroke-dashoffset:220; opacity:0; }
+  .crack-line.go{ animation: crackDraw 0.5s ease forwards; }
+  @keyframes crackDraw{ 0%{opacity:1; stroke-dashoffset:220;} 100%{opacity:1; stroke-dashoffset:0;} }
+
+  .pulse-ring{ animation: pulseRing 2.2s ease-in-out infinite; }
+  @keyframes pulseRing{ 0%,100%{opacity:0.35; transform:scale(1);} 50%{opacity:0.7; transform:scale(1.06);} }
+
+  ::selection{ background:rgba(255,154,82,0.3); }
+
+  @media (max-width:880px){
+    .hero-wrap{ grid-template-columns:1fr; text-align:center; padding-top:0.5rem; }
+    .hero-copy{ padding-right:0; order:2; }
+    .hero-art{ order:1; height:clamp(260px,60vw,360px); margin-bottom:0.5rem; }
+    .hero-actions{ justify-content:center; }
+    .concept-legend{ justify-content:center; }
+    p.hero-sub{ margin-left:auto; margin-right:auto; }
+    .landing-nav .brandmark span{ display:none; }
+    .stage-controls{ flex-direction:column; }
+    .act-btn{ min-width:100%; }
+    .game-body{ overflow-y:auto; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="ember-field" id="emberField"></div>
+
+  <!-- ===================== LANDING ===================== -->
+  <section id="landing">
+    <div class="brick-texture"></div>
+    <div class="forge-glow-floor"></div>
+
+    <nav class="landing-nav">
+      <div class="brandmark">
+        <svg viewBox="0 0 32 32" fill="none"><path d="M16 4C22 4 26 9 25 15C24 21 20 24 16 24C12 24 8 21 7 15C6 9 10 4 16 4Z" fill="#ff8a3d"/><rect x="13" y="24" width="6" height="4" rx="1" fill="#c9713a"/></svg>
+        <span>Immutable Forge</span>
+      </div>
+      <button class="nav-link" id="heroGuideBtnTop">Field Guide</button>
+    </nav>
+
+    <div class="hero-wrap">
+      <div class="hero-copy">
+        <div class="kicker">A Play-By-Learn Workshop</div>
+        <h1 class="hero-title">The Glassblower's<br><em>Immutable</em> Forge</h1>
+        <p class="hero-sub">Every object you touch here is a piece of molten glass — some soft enough to reshape with your bare hands, some cooled solid in the kiln forever. Learn <strong style="color:var(--ink);">mutability, <code style="font-family:var(--font-mono); color:var(--amber-hot); font-size:0.92em;">const</code>, and <code style="font-family:var(--font-mono); color:var(--amber-hot); font-size:0.92em;">Object.freeze()</code></strong> by actually shaping the glass — not by answering quizzes.</p>
+        <div class="hero-actions">
+          <button class="btn btn-primary" id="enterForgeBtn"><span class="shine"></span>Enter the Forge</button>
+          <button class="btn btn-ghost" id="heroGuideBtn">Read the Field Guide</button>
+        </div>
+        <div class="concept-legend">
+          <div class="item"><span class="dot d1"></span><span>01 · Mutation</span></div>
+          <div class="item"><span class="dot d2"></span><span>02 · const</span></div>
+          <div class="item"><span class="dot d3"></span><span>03 · push vs spread</span></div>
+          <div class="item"><span class="dot d4"></span><span>04 · Object.freeze</span></div>
+        </div>
+      </div>
+
+      <div class="hero-art" id="heroArt">
+        <div class="furnace-ring"></div>
+        <div class="furnace-ring r2"></div>
+        <svg id="heroSceneSvg" viewBox="0 0 480 560">
+          <defs>
+            <radialGradient id="heroGlow" cx="42%" cy="34%" r="70%">
+              <stop offset="0%" stop-color="#fff2df"/>
+              <stop offset="35%" stop-color="#ffb877"/>
+              <stop offset="70%" stop-color="#ff8a3d"/>
+              <stop offset="100%" stop-color="#b8501f"/>
+            </radialGradient>
+            <linearGradient id="archGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#2a1c12"/>
+              <stop offset="100%" stop-color="#140d09"/>
+            </linearGradient>
+            <radialGradient id="mouthGrad" cx="50%" cy="80%" r="75%">
+              <stop offset="0%" stop-color="#ff8a3d" stop-opacity="0.55"/>
+              <stop offset="55%" stop-color="#5a2410" stop-opacity="0.4"/>
+              <stop offset="100%" stop-color="#0c0a09" stop-opacity="0"/>
+            </radialGradient>
+            <linearGradient id="pipeGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#3a3028"/>
+              <stop offset="50%" stop-color="#6b5a48"/>
+              <stop offset="100%" stop-color="#2a2119"/>
+            </linearGradient>
+            <filter id="heroSoft" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="1.2"/>
+            </filter>
+            <filter id="heroGlowFx" x="-80%" y="-80%" width="260%" height="260%">
+              <feGaussianBlur stdDeviation="8" result="b"/>
+              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+
+          <!-- far layer: furnace arch structure -->
+          <g class="hero-layer-far" id="heroLayerFar">
+            <path d="M40,540 L40,260 Q40,60 240,60 Q440,60 440,260 L440,540 Z" fill="url(#archGrad)" stroke="rgba(255,180,110,0.14)" stroke-width="2"/>
+            <path d="M90,540 L90,270 Q90,110 240,110 Q390,110 390,270 L390,540 Z" fill="#0c0908"/>
+            <ellipse cx="240" cy="500" rx="150" ry="90" fill="url(#mouthGrad)"/>
+          </g>
+
+          <!-- mid layer: coals + glow floor -->
+          <g id="heroLayerMid">
+            <ellipse cx="240" cy="505" rx="120" ry="20" fill="#ff8a3d" opacity="0.5" filter="url(#heroSoft)"/>
+            <g opacity="0.85">
+              <ellipse cx="190" cy="512" rx="14" ry="7" fill="#ffb877"/>
+              <ellipse cx="240" cy="516" rx="18" ry="8" fill="#ff9a52"/>
+              <ellipse cx="290" cy="510" rx="13" ry="6" fill="#ff8a3d"/>
+            </g>
+          </g>
+
+          <!-- near layer: molten glass on the pipe -->
+          <g class="hero-layer-near" id="heroLayerNear">
+            <rect x="270" y="330" width="150" height="10" rx="5" fill="url(#pipeGrad)" transform="rotate(18 270 335)"/>
+            <ellipse cx="235" cy="345" rx="8" ry="10" fill="#8a7358" transform="rotate(18 235 345)"/>
+            <ellipse cx="200" cy="360" rx="120" ry="16" fill="#000" opacity="0.3" filter="url(#heroSoft)"/>
+            <path id="heroBlobPath" fill="url(#heroGlow)" filter="url(#heroGlowFx)" d="M200,220 C280,220 320,290 310,360 C300,430 250,460 200,460 C150,460 100,430 90,360 C80,290 120,220 200,220 Z"/>
+            <ellipse cx="165" cy="270" rx="24" ry="13" fill="#fff" opacity="0.4"/>
+          </g>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== GAME SCREEN ===================== -->
+  <section id="gameScreen">
+    <div class="game-bg"></div>
+
+    <div class="topbar">
+      <div class="brandmark">
+        <svg viewBox="0 0 32 32" fill="none"><path d="M16 4C22 4 26 9 25 15C24 21 20 24 16 24C12 24 8 21 7 15C6 9 10 4 16 4Z" fill="#ff8a3d"/><rect x="13" y="24" width="6" height="4" rx="1" fill="#c9713a"/></svg>
+        <span>Immutable Forge</span>
+      </div>
+      <div class="level-pips" id="levelPips"></div>
+      <div class="topbar-actions">
+        <div class="icon-btn" id="guideBtn" title="Field Guide">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 19V5a2 2 0 0 1 2-2h11.5a1.5 1.5 0 0 1 1.5 1.5v14"/><path d="M4 19a2 2 0 0 0 2 2h13.5a1.5 1.5 0 0 0 0-3H6a2 2 0 0 0-2 2Z"/></svg>
+        </div>
+        <div class="icon-btn" id="restartBtn" title="Restart Forge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>
+        </div>
+      </div>
+    </div>
+
+    <div class="game-body">
+      <div class="stage-panel">
+        <div class="stage-header">
+          <div class="stage-eyebrow" id="stageEyebrow">Level 1 · Molten Reshaping</div>
+          <div class="stage-title" id="stageTitle">The Soft Glass</div>
+          <div class="stage-desc" id="stageDesc">Drag the glowing anchor points to reshape the piece.</div>
+          <div class="stage-progress hidden" id="stageProgress">
+            <div class="track"><div class="fill" id="stageProgressFill"></div></div>
+            <div class="pct" id="stageProgressPct">0%</div>
+          </div>
+        </div>
+        <div class="stage-canvas-wrap">
+          <div class="kiln-floor-glow"></div>
+          <div class="toast-banner" id="toastBanner"></div>
+          <svg id="stageSvg" viewBox="0 0 480 480"></svg>
+        </div>
+        <div class="stage-controls" id="stageControls"></div>
+      </div>
+
+      <div class="side-col">
+        <div class="panel" id="codePanel">
+          <div class="panel-head">
+            <div class="dots"><span></span><span></span><span></span></div>
+            <div class="label">forge.js</div>
+          </div>
+          <div id="codeBody"></div>
+        </div>
+        <div class="panel" id="consolePanel">
+          <div class="panel-head">
+            <div class="dots"><span></span><span></span><span></span></div>
+            <div class="label">console</div>
+          </div>
+          <div id="consoleBody"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== COMPLETION ===================== -->
+  <section id="completeScreen">
+    <div class="cert">
+      <svg class="medal" viewBox="0 0 100 100" fill="none">
+        <circle cx="50" cy="42" r="30" fill="url(#medalGrad)"/>
+        <defs>
+          <radialGradient id="medalGrad" cx="40%" cy="30%" r="70%">
+            <stop offset="0%" stop-color="#fff2df"/><stop offset="45%" stop-color="#ffb877"/><stop offset="100%" stop-color="#c9713a"/>
+          </radialGradient>
+        </defs>
+        <path d="M38 62 L28 92 L50 80 L72 92 L62 62" fill="#8a3f1a"/>
+        <circle cx="50" cy="42" r="30" fill="none" stroke="#fff" stroke-opacity="0.4" stroke-width="1.5"/>
+        <path d="M40 42 L47 49 L61 33" stroke="#3a1a08" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+      <h2>Master of the Forge</h2>
+      <p class="sub">You've earned the right to say: you understand mutability from the inside out.</p>
+      <div class="skills">
+        <span>Object Mutation</span><span>const ≠ frozen</span><span>push() vs [...spread]</span><span>Object.freeze()</span>
+      </div>
+      <div class="hero-actions" style="justify-content:center;">
+        <button class="btn btn-primary" id="replayBtn"><span class="shine"></span>Reforge From Level 1</button>
+        <button class="btn btn-ghost" id="completeGuideBtn">Review Field Guide</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== FIELD GUIDE MODAL ===================== -->
+  <div class="modal-overlay" id="guideModal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <h2>The Apprentice's Field Guide</h2>
+          <p>Four truths every glassblower — and every JavaScript developer — must know before touching the furnace.</p>
+        </div>
+        <button class="close-x" id="closeGuide">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="guide-grid">
+        <div class="guide-item">
+          <h3>1. Objects are Soft Glass</h3>
+          <p>When you hand someone an object, you hand them the <em>same piece</em>, not a copy. Reshape it, and everyone holding that piece sees the new shape — because there was only ever one piece of glass.</p>
+          <pre>let glass = { color: "amber" };
+let apprenticeHolds = glass;
+apprenticeHolds.color = "rose";
+// glass.color is now "rose" too —
+// same reference, same glass.</pre>
+        </div>
+        <div class="guide-item">
+          <h3>2. const Locks the Grip, Not the Glass</h3>
+          <p><code>const</code> only prevents you from swapping which piece your hand holds. You can still reshape the glass in your grip — you just can't grab a different piece entirely.</p>
+          <pre>const glass = { temp: 500 };
+glass.temp = 900;      // fine — same piece, reshaped
+glass = { temp: 20 };  // TypeError:
+// Assignment to constant variable.</pre>
+        </div>
+        <div class="guide-item">
+          <h3>3. Mutate the Rack, or Cast a New One</h3>
+          <p><code>push()</code>, <code>splice()</code>, and index assignment change the array in place — everyone with a reference sees it. Spreading with <code>[...rack]</code> pours the same pieces into a brand new rack, leaving the original untouched.</p>
+          <pre>const rack = [cup, vase];
+rack.push(bowl);          // mutates rack directly
+
+const displayRack = [...rack, bowl];
+// a NEW array — rack itself is untouched</pre>
+        </div>
+        <div class="guide-item">
+          <h3>4. Object.freeze() Cools It Forever</h3>
+          <p>Freezing is the kiln-cooling step. Once cooled, the glass is solid — any attempt to reshape it silently fails (or throws in strict mode). The piece doesn't bend anymore. It cracks instead.</p>
+          <pre>const heirloom = Object.freeze({ color: "gold" });
+heirloom.color = "grey";
+// strict mode → TypeError: Cannot assign to
+// read only property 'color' of object
+console.log(heirloom.color); // still "gold"</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ============================================================
+     EMBER PARTICLE FIELD
+  ============================================================ */
+  const emberField = document.getElementById('emberField');
+  function spawnEmbers(count){
+    for(let i=0;i<count;i++){
+      const p = document.createElement('div');
+      p.className = 'ember-particle';
+      const size = 2 + Math.random()*4;
+      p.style.width = size+'px';
+      p.style.height = size+'px';
+      p.style.left = (Math.random()*100)+'%';
+      p.style.setProperty('--drift', (Math.random()*80-40)+'px');
+      p.style.animationDuration = (6+Math.random()*8)+'s';
+      p.style.animationDelay = (Math.random()*10)+'s';
+      emberField.appendChild(p);
+    }
+  }
+  spawnEmbers(42);
+
+  /* ============================================================
+     HERO BLOB IDLE ANIMATION
+  ============================================================ */
+  const heroBlobPath = document.getElementById('heroBlobPath');
+  const landingEl = document.getElementById('landing');
+  let heroT = 0;
+  function animateHeroBlob(){
+    heroT += 0.012;
+    const wob = (i)=> Math.sin(heroT + i) * 6;
+    const d = `M200,${80+wob(0)} C280,${80+wob(1)} ${320+wob(2)},150 ${310+wob(3)},220
+               C${300+wob(4)},290 250,${320+wob(5)} 200,${320+wob(6)}
+               C150,${320+wob(7)} ${100+wob(8)},290 ${90+wob(9)},220
+               C${80+wob(10)},150 120,${80+wob(11)} 200,${80+wob(0)} Z`;
+    heroBlobPath.setAttribute('d', d);
+    if(landingEl.style.display !== 'none'){
+      requestAnimationFrame(animateHeroBlob);
+    }
+  }
+  animateHeroBlob();
+
+  /* Hero parallax on mouse move (desktop) */
+  const heroArt = document.getElementById('heroArt');
+  const heroLayerFar = document.getElementById('heroLayerFar');
+  const heroLayerNear = document.getElementById('heroLayerNear');
+  if(heroArt && window.matchMedia('(pointer:fine)').matches){
+    heroArt.addEventListener('mousemove', (e)=>{
+      const rect = heroArt.getBoundingClientRect();
+      const px = (e.clientX - rect.left)/rect.width - 0.5;
+      const py = (e.clientY - rect.top)/rect.height - 0.5;
+      heroLayerFar.style.transform = `translate(${px*6}px, ${py*4}px)`;
+      heroLayerNear.style.transform = `translate(${px*-14}px, ${py*-10}px)`;
+    });
+    heroArt.addEventListener('mouseleave', ()=>{
+      heroLayerFar.style.transform = 'translate(0,0)';
+      heroLayerNear.style.transform = 'translate(0,0)';
+    });
+  }
+
+  /* ============================================================
+     NAVIGATION: landing -> game -> complete, + modal
+  ============================================================ */
+  const landing = document.getElementById('landing');
+  const gameScreen = document.getElementById('gameScreen');
+  const completeScreen = document.getElementById('completeScreen');
+  const guideModal = document.getElementById('guideModal');
+
+  function openGuide(){ guideModal.classList.add('show'); }
+  function closeGuideFn(){ guideModal.classList.remove('show'); }
+  document.getElementById('heroGuideBtn').addEventListener('click', openGuide);
+  document.getElementById('heroGuideBtnTop').addEventListener('click', openGuide);
+  document.getElementById('guideBtn').addEventListener('click', openGuide);
+  document.getElementById('completeGuideBtn').addEventListener('click', openGuide);
+  document.getElementById('closeGuide').addEventListener('click', closeGuideFn);
+  guideModal.addEventListener('click', (e)=>{ if(e.target === guideModal) closeGuideFn(); });
+
+  document.getElementById('enterForgeBtn').addEventListener('click', ()=>{
+    landing.classList.add('leaving');
+    setTimeout(()=>{
+      landing.style.display='none';
+      gameScreen.classList.add('active');
+      initLevel(0);
+    }, 850);
+  });
+
+  document.getElementById('restartBtn').addEventListener('click', ()=>{
+    if(confirm('Return to Level 1? Your current progress on this run will reset.')){
+      initLevel(0);
+    }
+  });
+
+  document.getElementById('replayBtn').addEventListener('click', ()=>{
+    completeScreen.classList.remove('show');
+    setTimeout(()=>{
+      gameScreen.classList.add('active');
+      initLevel(0);
+    }, 500);
+  });
+
+  /* ============================================================
+     SHARED UI HELPERS: console log, code panel, toast, pips
+  ============================================================ */
+  const consoleBody = document.getElementById('consoleBody');
+  function logLine(text, kind){
+    kind = kind || 'info';
+    const line = document.createElement('div');
+    line.className = 'log-line ' + kind;
+    const tag = kind==='ok' ? '✓' : kind==='err' ? '✕' : '›';
+    line.innerHTML = `<span class="tag">${tag}</span><span>${text}</span>`;
+    consoleBody.appendChild(line);
+    while(consoleBody.children.length > 30){ consoleBody.removeChild(consoleBody.firstChild); }
+  }
+  function clearConsole(){ consoleBody.innerHTML=''; }
+
+  const codeBody = document.getElementById('codeBody');
+  function setCode(lines){
+    codeBody.innerHTML = lines;
+  }
+
+  const toastBanner = document.getElementById('toastBanner');
+  let toastTimer = null;
+  const TOAST_ICONS = {
+    ok: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
+    err: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>',
+    info: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v.01M12 11v5"/></svg>'
+  };
+  function showToast(text, kind){
+    clearTimeout(toastTimer);
+    toastBanner.className = 'toast-banner show ' + kind;
+    toastBanner.innerHTML = (TOAST_ICONS[kind]||'') + '<span>' + text + '</span>';
+    toastTimer = setTimeout(()=>{ toastBanner.classList.remove('show'); }, 2600);
+  }
+
+  const levelPipsWrap = document.getElementById('levelPips');
+  function buildPips(){
+    levelPipsWrap.innerHTML = '';
+    for(let i=0;i<LEVELS.length;i++){
+      const pip = document.createElement('div');
+      pip.className = 'pip';
+      pip.innerHTML = '<div class="fill"></div>';
+      levelPipsWrap.appendChild(pip);
+    }
+  }
+  function updatePips(current, doneUpTo){
+    const pips = levelPipsWrap.children;
+    for(let i=0;i<pips.length;i++){
+      pips[i].classList.remove('done','current');
+      if(i < doneUpTo) pips[i].classList.add('done');
+      else if(i === current) pips[i].classList.add('current');
+    }
+  }
+
+  const stageSvg = document.getElementById('stageSvg');
+  const stageControls = document.getElementById('stageControls');
+  const stageEyebrow = document.getElementById('stageEyebrow');
+  const stageTitle = document.getElementById('stageTitle');
+  const stageDesc = document.getElementById('stageDesc');
+  const stageProgress = document.getElementById('stageProgress');
+  const stageProgressFill = document.getElementById('stageProgressFill');
+  const stageProgressPct = document.getElementById('stageProgressPct');
+
+  function setStageProgress(pct){
+    stageProgress.classList.remove('hidden');
+    const clamped = Math.max(0, Math.min(100, Math.round(pct)));
+    stageProgressFill.style.width = clamped + '%';
+    stageProgressPct.textContent = clamped + '%';
+  }
+  function hideStageProgress(){
+    stageProgress.classList.add('hidden');
+    stageProgressFill.style.width = '0%';
+    stageProgressPct.textContent = '0%';
+  }
+
+  function svgEl(tag, attrs){
+    const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for(const k in attrs){ el.setAttribute(k, attrs[k]); }
+    return el;
+  }
+
+  function commonDefs(){
+    return `
+    <defs>
+      <radialGradient id="moltenGrad" cx="40%" cy="32%" r="75%">
+        <stop offset="0%" stop-color="#fff2df"/>
+        <stop offset="35%" stop-color="#ffb877"/>
+        <stop offset="70%" stop-color="#ff8a3d"/>
+        <stop offset="100%" stop-color="#a8481c"/>
+      </radialGradient>
+      <radialGradient id="coolGrad" cx="40%" cy="32%" r="75%">
+        <stop offset="0%" stop-color="#f2fbfa"/>
+        <stop offset="40%" stop-color="#cdeee7"/>
+        <stop offset="75%" stop-color="#9fd8d0"/>
+        <stop offset="100%" stop-color="#5c9c94"/>
+      </radialGradient>
+      <radialGradient id="frozenGrad" cx="40%" cy="30%" r="75%">
+        <stop offset="0%" stop-color="#eef6ff"/>
+        <stop offset="45%" stop-color="#bcd6ea"/>
+        <stop offset="100%" stop-color="#7a97ab"/>
+      </radialGradient>
+      <filter id="softBlur" x="-60%" y="-60%" width="220%" height="220%">
+        <feGaussianBlur stdDeviation="1.1"/>
+      </filter>
+      <filter id="glowFilter" x="-100%" y="-100%" width="300%" height="300%">
+        <feGaussianBlur stdDeviation="4" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>`;
+  }
+
+  /* ============================================================
+     LEVEL STATE MACHINE
+  ============================================================ */
+  let currentLevelIndex = 0;
+  let levelInstance = null;
+
+  const LEVELS = [];
+
+  function goToLevel(i){
+    if(i >= LEVELS.length){
+      finishGame();
+      return;
+    }
+    currentLevelIndex = i;
+    initLevel(i);
+  }
+
+  function initLevel(i){
+    if(i===0){ /* fresh start resets pips fully */ }
+    currentLevelIndex = i;
+    updatePips(i, i);
+    clearConsole();
+    hideStageProgress();
+    stageSvg.innerHTML = '';
+    stageControls.innerHTML = '';
+    if(levelInstance && levelInstance.destroy) levelInstance.destroy();
+    levelInstance = LEVELS[i].build();
+    stageEyebrow.textContent = `Level ${i+1} · ${LEVELS[i].eyebrow}`;
+    stageTitle.textContent = LEVELS[i].title;
+    stageDesc.textContent = LEVELS[i].desc;
+    logLine(`Entering Level ${i+1}: ${LEVELS[i].title}`, 'info');
+  }
+
+  function completeLevel(){
+    const idx = currentLevelIndex;
+    showToast('Piece complete — advancing the forge.', 'ok');
+    logLine('Objective complete.', 'ok');
+    updatePips(idx, idx+1);
+    setTimeout(()=>{ goToLevel(idx+1); }, 1400);
+  }
+
+  function finishGame(){
+    updatePips(-1, LEVELS.length);
+    gameScreen.classList.remove('active');
+    setTimeout(()=>{ completeScreen.classList.add('show'); }, 300);
+  }
+
+  function makeActBtn(label, sub, extraClass){
+    const b = document.createElement('button');
+    b.className = 'act-btn' + (extraClass? ' '+extraClass : '');
+    b.innerHTML = `<span>${label}</span><small>${sub}</small>`;
+    return b;
+  }
+
+  /* ============================================================
+     SHARD / CRACK EFFECT HELPERS (reusable across levels)
+  ============================================================ */
+  function shatterEffect(group, cx, cy, colorA, colorB){
+    for(let i=0;i<10;i++){
+      const angle = (Math.PI*2*i/10) + Math.random()*0.4;
+      const dist = 60 + Math.random()*90;
+      const sx = Math.cos(angle)*dist;
+      const sy = Math.sin(angle)*dist;
+      const size = 8+Math.random()*14;
+      const shard = svgEl('polygon', {
+        class:'shard',
+        points: `0,${-size} ${size*0.8},${size*0.6} ${-size*0.8},${size*0.6}`,
+        fill: i%2? colorA : colorB,
+        transform: `translate(${cx},${cy}) rotate(${Math.random()*360})`
+      });
+      shard.style.setProperty('--sx', sx+'px');
+      shard.style.setProperty('--sy', sy+'px');
+      shard.style.setProperty('--sr', (Math.random()*260-130)+'deg');
+      group.appendChild(shard);
+      requestAnimationFrame(()=> shard.classList.add('go'));
+      setTimeout(()=> shard.remove(), 950);
+    }
+  }
+  function crackOverlay(group, cx, cy){
+    for(let i=0;i<6;i++){
+      const a1 = Math.random()*Math.PI*2;
+      const len = 30+Math.random()*40;
+      const x2 = cx + Math.cos(a1)*len;
+      const y2 = cy + Math.sin(a1)*len;
+      const mx = cx + Math.cos(a1)*len*0.5 + (Math.random()*16-8);
+      const my = cy + Math.sin(a1)*len*0.5 + (Math.random()*16-8);
+      const line = svgEl('path', {
+        class:'crack-line', d:`M${cx},${cy} L${mx},${my} L${x2},${y2}`,
+        stroke:'#fff', 'stroke-width':1.4, fill:'none', opacity:0.85
+      });
+      group.appendChild(line);
+      requestAnimationFrame(()=> line.classList.add('go'));
+    }
+    setTimeout(()=>{ group.querySelectorAll('.crack-line').forEach(l=>l.remove()); }, 1600);
+  }
+
+  /* ============================================================
+     LEVEL 1 — MOLTEN RESHAPING (raw mutability)
+  ============================================================ */
+  LEVELS.push({
+    eyebrow:'Molten Reshaping',
+    title:'The Soft Glass',
+    desc:'Drag each glowing anchor to reshape the piece. Every drag edits glass.points[i] on the SAME object — nothing new is ever created. Touch all 6 anchors to finish.',
+    build(){
+      stageSvg.setAttribute('viewBox','0 0 480 480');
+      stageSvg.innerHTML = commonDefs() + `
+        <ellipse cx="240" cy="400" rx="140" ry="16" fill="#000" opacity="0.35" filter="url(#softBlur)"/>
+        <path id="l1path" fill="url(#moltenGrad)" filter="url(#softBlur)" d=""/>
+        <g id="l1handles"></g>
+      `;
+      const pathEl = document.getElementById('l1path');
+      const handleGroup = document.getElementById('l1handles');
+
+      // The single glass object — mutated directly by dragging. Note there is
+      // only ONE `glass` reference for the entire level: nothing is ever
+      // reassigned or copied, only mutated in place.
+      const originalPoints = [
+        {x:240,y:120},{x:340,y:180},{x:330,y:300},{x:240,y:360},{x:150,y:300},{x:140,y:180}
+      ];
+      const glass = { points: originalPoints.map(p=>({...p})) };
+      const touched = new Set();
+      const MOVE_THRESHOLD = 18; // px of displacement before an anchor "counts"
+      let done = false;
+
+      function render(){
+        const p = glass.points;
+        let d = `M${p[0].x},${p[0].y} `;
+        for(let i=1;i<p.length;i++){
+          const prev = p[i-1], cur = p[i];
+          const mx=(prev.x+cur.x)/2, my=(prev.y+cur.y)/2;
+          d += `Q${prev.x},${prev.y} ${mx},${my} `;
+        }
+        const first = p[0], last = p[p.length-1];
+        const mx=(last.x+first.x)/2, my=(last.y+first.y)/2;
+        d += `Q${last.x},${last.y} ${mx},${my} Z`;
+        pathEl.setAttribute('d', d);
+      }
+      render();
+
+      function renderHandles(){
+        handleGroup.innerHTML='';
+        glass.points.forEach((pt, idx)=>{
+          const isDone = touched.has(idx);
+          const c = svgEl('circle', {
+            cx:pt.x, cy:pt.y, r:12,
+            fill: isDone ? '#c9f0e0' : '#ffe8c9',
+            stroke: isDone ? '#7fc9a0' : '#ff9a52',
+            'stroke-width':2,
+            class: isDone ? '' : 'pulse-ring',
+            style:'cursor:grab; filter:url(#glowFilter);'
+          });
+          c.dataset.idx = idx;
+          handleGroup.appendChild(c);
+        });
+      }
+      renderHandles();
+
+      let dragIdx = null;
+      let dragStart = null;
+      function svgPoint(evt){
+        const rect = stageSvg.getBoundingClientRect();
+        const vb = stageSvg.viewBox.baseVal;
+        const cx = ('touches' in evt && evt.touches.length) ? evt.touches[0].clientX : evt.clientX;
+        const cy = ('touches' in evt && evt.touches.length) ? evt.touches[0].clientY : evt.clientY;
+        const x = (cx - rect.left) / rect.width * vb.width;
+        const y = (cy - rect.top) / rect.height * vb.height;
+        return {x,y};
+      }
+      function onDown(e){
+        const target = e.target;
+        if(target.tagName === 'circle'){
+          dragIdx = parseInt(target.dataset.idx,10);
+          dragStart = { ...glass.points[dragIdx] };
+          e.preventDefault();
+        }
+      }
+      function onMove(e){
+        if(dragIdx===null) return;
+        const pt = svgPoint(e);
+        // MUTATION: same object, same array — we overwrite the point in place.
+        // glass itself never changes identity; only its contents change.
+        glass.points[dragIdx].x = pt.x;
+        glass.points[dragIdx].y = pt.y;
+        render();
+        renderHandles();
+      }
+      function onUp(){
+        if(dragIdx!==null){
+          const dx = glass.points[dragIdx].x - dragStart.x;
+          const dy = glass.points[dragIdx].y - dragStart.y;
+          const moved = Math.sqrt(dx*dx+dy*dy);
+          if(moved >= MOVE_THRESHOLD && !touched.has(dragIdx)){
+            touched.add(dragIdx);
+            logLine(`glass.points[${dragIdx}] mutated — same array, same object, still called "glass".`, 'ok');
+          }
+          renderHandles();
+          updateProgressUI();
+          if(touched.size >= glass.points.length && !done){
+            done = true;
+            completeLevel();
+          }
+        }
+        dragIdx = null;
+      }
+      stageSvg.addEventListener('mousedown', onDown);
+      stageSvg.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+      stageSvg.addEventListener('touchstart', onDown, {passive:false});
+      stageSvg.addEventListener('touchmove', onMove, {passive:false});
+      stageSvg.addEventListener('touchend', onUp);
+
+      function updateProgressUI(){
+        setStageProgress(touched.size / glass.points.length * 100);
+        setCode(
+`<span class="cm">// glass is ONE object living in memory —</span>
+<span class="cm">// its identity never changes below.</span>
+<span class="kw">let</span> glass = { points: [ ...6 anchors ] };
+
+<span class="cm">// each drag mutates the SAME array in place:</span>
+glass.points[i].x = newX;
+glass.points[i].y = newY;
+
+<span class="cm">// anchors reshaped: <span class="hl">${touched.size} / ${glass.points.length}</span></span>
+<span class="cm">// glass === glass, always. No copy was made.</span>`);
+      }
+      updateProgressUI();
+
+      const btn = makeActBtn('Reset Shape', 'Restore the original molten form', '');
+      btn.addEventListener('click', ()=>{
+        glass.points = originalPoints.map(p=>({...p}));
+        touched.clear();
+        render(); renderHandles(); updateProgressUI();
+        logLine('Shape reset — still the same glass object, just reshaped back.', 'info');
+      });
+      stageControls.appendChild(btn);
+
+      return { destroy(){
+        stageSvg.removeEventListener('mousedown', onDown);
+        stageSvg.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        stageSvg.removeEventListener('touchstart', onDown);
+        stageSvg.removeEventListener('touchmove', onMove);
+        stageSvg.removeEventListener('touchend', onUp);
+      }};
+    }
+  });
+
+  /* ============================================================
+     LEVEL 2 — CONST'S ILLUSION (const allows mutation, blocks reassignment)
+  ============================================================ */
+  LEVELS.push({
+    eyebrow:"const's Illusion",
+    title:'The Locked Grip',
+    desc:'The tongs are declared with const. Try adjusting the temperature (mutating a property) versus swapping in a whole new piece (reassignment).',
+    build(){
+      stageSvg.setAttribute('viewBox','0 0 480 480');
+      stageSvg.innerHTML = commonDefs() + `
+        <ellipse cx="240" cy="400" rx="140" ry="16" fill="#000" opacity="0.35" filter="url(#softBlur)"/>
+        <g id="l2piece">
+          <circle cx="240" cy="240" r="90" fill="url(#moltenGrad)" filter="url(#softBlur)"/>
+        </g>
+        <g id="l2fx"></g>
+        <text id="l2tempLabel" x="240" y="245" text-anchor="middle" font-family="JetBrains Mono" font-size="20" fill="#3a1a08" font-weight="600">500°</text>
+      `;
+      const pieceGroup = document.getElementById('l2piece');
+      const circleEl = pieceGroup.querySelector('circle');
+      const fx = document.getElementById('l2fx');
+      const tempLabel = document.getElementById('l2tempLabel');
+
+      const glass = { temp: 500 }; // conceptually declared with const in code shown
+
+      function colorForTemp(t){
+        if(t>=900) return '#fff2df';
+        if(t>=700) return '#ffd7a8';
+        if(t>=500) return '#ffb877';
+        if(t>=300) return '#ff8a3d';
+        return '#a8481c';
+      }
+
+      let tempMutated = false;
+      let reassignAttempted = false;
+
+      function refreshCode(){
+        setCode(
+`<span class="kw">const</span> glass = { temp: ${glass.temp} };
+
+<span class="cm">// adjusting temp MUTATES the object —</span>
+<span class="cm">// const never stops this.</span>
+glass.temp = ${glass.temp + 200};  <span class="cm">// allowed</span>
+
+<span class="cm">// swapping the whole piece REASSIGNS</span>
+<span class="cm">// the variable — const forbids this.</span>
+glass = { temp: 20 };  <span class="cm">// ${reassignAttempted ? '<span class="hl">TypeError thrown</span>' : '(try it →)'}</span>`);
+      }
+      refreshCode();
+
+      const btnAdjust = makeActBtn('Adjust Temperature', 'glass.temp = glass.temp + 200  (mutate)', '');
+      btnAdjust.addEventListener('click', ()=>{
+        glass.temp += 200;
+        if(glass.temp>1100) glass.temp=1100;
+        circleEl.style.filter = 'url(#softBlur) drop-shadow(0 0 '+(glass.temp/40)+'px '+colorForTemp(glass.temp)+')';
+        circleEl.setAttribute('fill', colorForTemp(glass.temp));
+        tempLabel.textContent = glass.temp + '°';
+        tempLabel.setAttribute('fill', glass.temp>600 ? '#3a1a08':'#fff');
+        logLine(`glass.temp mutated to ${glass.temp}. Same object — const didn't stop this.`, 'ok');
+        showToast('Mutated in place — const allows this.', 'ok');
+        tempMutated = true;
+        refreshCode();
+        checkDone();
+      });
+
+      const btnReassign = makeActBtn('Swap For New Piece', 'glass = { temp: 20 }  (reassign)', 'danger');
+      btnReassign.addEventListener('click', ()=>{
+        reassignAttempted = true;
+        logLine(`Uncaught TypeError: Assignment to constant variable.`, 'err');
+        showToast('Reassignment blocked — const locks the grip, not the glass.', 'err');
+        crackOverlay(fx, 240, 240);
+        shatterEffect(fx, 240, 240, '#ff9a8f', '#ff5a4e');
+        refreshCode();
+        checkDone();
+      });
+
+      stageControls.appendChild(btnAdjust);
+      stageControls.appendChild(btnReassign);
+
+      function checkDone(){
+        if(tempMutated && reassignAttempted){
+          setTimeout(completeLevel, 600);
+        }
+      }
+
+      return { destroy(){} };
+    }
+  });
+
+  /* ============================================================
+     LEVEL 3 — THE RACK (mutating vs. copying arrays)
+  ============================================================ */
+  LEVELS.push({
+    eyebrow:'The Rack',
+    title:'Push, or Pour a New Rack',
+    desc:'The master rack must stay intact for the archive. The apprentice needs a display rack with one extra piece. Choose the correct operation for each order.',
+    build(){
+      stageSvg.setAttribute('viewBox','0 0 480 480');
+      stageSvg.innerHTML = commonDefs() + `
+        <g id="l3scene"></g>
+      `;
+      const scene = document.getElementById('l3scene');
+
+      let rack = [ {id:1,c:'url(#moltenGrad)'}, {id:2,c:'url(#coolGrad)'} ];
+      let displayRack = null;
+      let order = 0; // 0: need mutate order, 1: need spread order
+      let ordersCompleted = 0;
+
+      function drawBottle(x,y,fillId,scale){
+        scale = scale||1;
+        return `<g transform="translate(${x},${y}) scale(${scale})">
+          <rect x="-14" y="-6" width="28" height="10" rx="3" fill="#6b5240"/>
+          <path d="M-16,4 Q-20,60 -12,80 Q0,90 12,80 Q20,60 16,4 Z" fill="${fillId}" filter="url(#softBlur)"/>
+        </g>`;
+      }
+
+      function render(){
+        let html = `<text x="240" y="26" text-anchor="middle" font-family="Outfit" font-size="15" fill="${order===0?'#ffb877':'#9fd8d0'}" font-weight="700" letter-spacing="0.5">${order===0 ? 'ORDER · Extend the MASTER rack' : 'ORDER · Build a NEW display rack'}</text>`;
+        html += `<text x="120" y="66" text-anchor="middle" font-family="Outfit" font-size="14" fill="#b8a996" font-weight="600">MASTER RACK</text>`;
+        rack.forEach((piece, i)=>{
+          html += drawBottle(60+i*60, 86, piece.c);
+        });
+        if(displayRack){
+          html += `<line x1="0" y1="256" x2="480" y2="256" stroke="#3a2f26" stroke-width="1.5" stroke-dasharray="4 6"/>`;
+          html += `<text x="120" y="296" text-anchor="middle" font-family="Outfit" font-size="14" fill="#7fc9a0" font-weight="600">NEW DISPLAY RACK</text>`;
+          displayRack.forEach((piece,i)=>{
+            html += drawBottle(60+i*60, 316, piece.c);
+          });
+        }
+        scene.innerHTML = html;
+      }
+      render();
+      setStageProgress(0);
+
+      function refreshCode(){
+        const orderText = order===0
+          ? '<span class="hl">Order: add a bowl to the MASTER rack directly.</span>'
+          : '<span class="hl">Order: apprentice needs a NEW rack — master must stay untouched.</span>';
+        setCode(
+`<span class="cm">// ${orderText.replace(/<[^>]+>/g,'')}</span>
+<span class="kw">const</span> rack = [ glass1, glass2 ];
+
+<span class="cm">// push() MUTATES rack directly:</span>
+rack.push(bowl);
+
+<span class="cm">// spread COPIES into a new array:</span>
+<span class="kw">const</span> displayRack = [...rack, bowl];`);
+      }
+      refreshCode();
+      logLine('Order received: ' + (order===0 ? 'extend the MASTER rack.' : 'build a NEW display rack.'), 'info');
+
+      const btnPush = makeActBtn('rack.push(bowl)', 'Mutates the master rack directly', '');
+      const btnSpread = makeActBtn('[...rack, bowl]', 'Creates a brand new rack', '');
+
+      function newBowl(){ return {id: Date.now(), c:'url(#frozenGrad)'}; }
+
+      btnPush.addEventListener('click', ()=>{
+        if(order===0){
+          rack.push(newBowl());
+          render();
+          logLine('rack.push(bowl) → master rack mutated. Order fulfilled correctly.', 'ok');
+          showToast('Correct — master rack extended directly.', 'ok');
+          advanceOrder();
+        } else {
+          rack.push(newBowl());
+          render();
+          logLine('rack.push(bowl) → the MASTER rack was mutated — but the order needed it untouched!', 'err');
+          showToast('That mutated the master rack — it needed to stay intact.', 'err');
+        }
+      });
+
+      btnSpread.addEventListener('click', ()=>{
+        if(order===1){
+          displayRack = [...rack, newBowl()];
+          render();
+          logLine('const displayRack = [...rack, bowl] → new array created. Master rack untouched.', 'ok');
+          showToast('Correct — a new rack was poured, master stayed intact.', 'ok');
+          advanceOrder();
+        } else {
+          const preview = [...rack, newBowl()];
+          logLine('[...rack, bowl] created a new array — but the order needed the MASTER rack itself mutated.', 'err');
+          showToast('That created a copy — this order needed a direct mutation.', 'err');
+        }
+      });
+
+      stageControls.appendChild(btnPush);
+      stageControls.appendChild(btnSpread);
+
+      function advanceOrder(){
+        ordersCompleted++;
+        setStageProgress(ordersCompleted/2*100);
+        if(ordersCompleted>=2){
+          setTimeout(completeLevel, 700);
+        } else {
+          order = 1;
+          render();
+          refreshCode();
+          setTimeout(()=> logLine('New order received: build a NEW display rack — master must stay untouched.', 'info'), 400);
+        }
+      }
+
+      return { destroy(){} };
+    }
+  });
+
+  /* ============================================================
+     LEVEL 4 — THE KILN (Object.freeze)
+  ============================================================ */
+  LEVELS.push({
+    eyebrow:'The Kiln',
+    title:'Cooling to Permanence',
+    desc:'Cool the piece in the kiln with Object.freeze(). Then try to reshape it — watch what happens to a frozen object.',
+    build(){
+      stageSvg.setAttribute('viewBox','0 0 480 480');
+      stageSvg.innerHTML = commonDefs() + `
+        <ellipse cx="240" cy="400" rx="140" ry="16" fill="#000" opacity="0.35" filter="url(#softBlur)"/>
+        <path id="l4path" fill="url(#moltenGrad)" filter="url(#softBlur)" d=""/>
+        <g id="l4handles"></g>
+        <g id="l4fx"></g>
+      `;
+      const pathEl = document.getElementById('l4path');
+      const handleGroup = document.getElementById('l4handles');
+      const fx = document.getElementById('l4fx');
+
+      const glass = {
+        points: [
+          {x:240,y:150},{x:320,y:200},{x:310,y:290},{x:240,y:330},{x:170,y:290},{x:160,y:200}
+        ],
+        frozen: false
+      };
+
+      function render(){
+        const p = glass.points;
+        let d = `M${p[0].x},${p[0].y} `;
+        for(let i=1;i<p.length;i++){
+          const prev = p[i-1], cur = p[i];
+          const mx=(prev.x+cur.x)/2, my=(prev.y+cur.y)/2;
+          d += `Q${prev.x},${prev.y} ${mx},${my} `;
+        }
+        const first = p[0], last = p[p.length-1];
+        const mx=(last.x+first.x)/2, my=(last.y+first.y)/2;
+        d += `Q${last.x},${last.y} ${mx},${my} Z`;
+        pathEl.setAttribute('d', d);
+        pathEl.setAttribute('fill', glass.frozen ? 'url(#frozenGrad)' : 'url(#moltenGrad)');
+      }
+      render();
+
+      function renderHandles(){
+        handleGroup.innerHTML='';
+        glass.points.forEach((pt, idx)=>{
+          const c = svgEl('circle', {
+            cx:pt.x, cy:pt.y, r:11,
+            fill: glass.frozen ? '#dfeaf5' : '#ffe8c9',
+            stroke: glass.frozen ? '#7a97ab' : '#ff9a52',
+            'stroke-width':2,
+            class: glass.frozen ? '' : 'pulse-ring',
+            style:'cursor:grab; filter:url(#glowFilter);'
+          });
+          c.dataset.idx = idx;
+          handleGroup.appendChild(c);
+        });
+      }
+      renderHandles();
+
+      let attemptsAfterFreeze = 0;
+      let frozenAt = null;
+
+      function refreshCode(){
+        setCode(
+glass.frozen
+? `<span class="kw">const</span> heirloom = <span class="fn">Object.freeze</span>(glass);
+
+<span class="cm">// heirloom is now cooled solid.</span>
+heirloom.points[i] = { x, y };
+<span class="cm">// ${attemptsAfterFreeze>0 ? '<span class="hl">silently fails — shape never changes</span>' : '(try dragging a handle →)'}</span>
+
+<span class="cm">// "strict mode" would throw instead:</span>
+<span class="cm">// TypeError: Cannot assign to read only</span>
+<span class="cm">// property of object</span>`
+: `<span class="kw">let</span> glass = { points: [...] };
+
+<span class="cm">// still soft — freely reshapable.</span>
+<span class="cm">// cool it in the kiln to lock it forever:</span>
+<span class="fn">Object.freeze</span>(glass);`
+        );
+      }
+      refreshCode();
+
+      let dragIdx = null;
+      function svgPoint(evt){
+        const rect = stageSvg.getBoundingClientRect();
+        const vb = stageSvg.viewBox.baseVal;
+        const cx = ('touches' in evt && evt.touches.length) ? evt.touches[0].clientX : evt.clientX;
+        const cy = ('touches' in evt && evt.touches.length) ? evt.touches[0].clientY : evt.clientY;
+        const x = (cx - rect.left) / rect.width * vb.width;
+        const y = (cy - rect.top) / rect.height * vb.height;
+        return {x,y};
+      }
+      function onDown(e){
+        const target = e.target;
+        if(target.tagName === 'circle'){
+          dragIdx = parseInt(target.dataset.idx,10);
+          e.preventDefault();
+          if(glass.frozen){
+            attemptsAfterFreeze++;
+            const pt = glass.points[dragIdx];
+            crackOverlay(fx, pt.x, pt.y);
+            logLine(`heirloom.points[${dragIdx}] assignment attempted → blocked. Object is frozen.`, 'err');
+            showToast('Frozen — the reshape attempt fails. The glass does not move.', 'err');
+            dragIdx = null;
+            refreshCode();
+            checkDone();
+          }
+        }
+      }
+      function onMove(e){
+        if(dragIdx===null || glass.frozen) return;
+        const pt = svgPoint(e);
+        glass.points[dragIdx] = { x: pt.x, y: pt.y };
+        render();
+        renderHandles();
+      }
+      function onUp(){
+        if(dragIdx!==null && !glass.frozen){
+          logLine(`glass.points[${dragIdx}] mutated — still soft, not yet cooled.`, 'ok');
+        }
+        dragIdx = null;
+      }
+      stageSvg.addEventListener('mousedown', onDown);
+      stageSvg.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+      stageSvg.addEventListener('touchstart', onDown, {passive:false});
+      stageSvg.addEventListener('touchmove', onMove, {passive:false});
+      stageSvg.addEventListener('touchend', onUp);
+
+      const btnFreeze = makeActBtn('Cool in Kiln', 'Object.freeze(glass)', '');
+      btnFreeze.addEventListener('click', ()=>{
+        if(glass.frozen) return;
+        glass.frozen = true;
+        frozenAt = Date.now();
+        render(); renderHandles(); refreshCode();
+        logLine('Object.freeze(glass) executed. The piece is now immutable.', 'info');
+        showToast('Cooled solid — try to reshape it now.', 'info');
+        btnFreeze.disabled = true;
+        checkDone();
+      });
+      stageControls.appendChild(btnFreeze);
+
+      function checkDone(){
+        if(glass.frozen && attemptsAfterFreeze>=1){
+          setTimeout(completeLevel, 900);
+        }
+      }
+
+      return { destroy(){
+        stageSvg.removeEventListener('mousedown', onDown);
+        stageSvg.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        stageSvg.removeEventListener('touchstart', onDown);
+        stageSvg.removeEventListener('touchmove', onMove);
+        stageSvg.removeEventListener('touchend', onUp);
+      }};
+    }
+  });
+
+  buildPips();
+
+})();
+</script>
+</body>
+</html>

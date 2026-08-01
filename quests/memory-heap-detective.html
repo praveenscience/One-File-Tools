@@ -1,0 +1,603 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Interactive memory profiling and garbage collection diagnostic simulator for learning JavaScript memory management and leak prevention." />
+    <title>Memory Heap Detective — One File Tools Quest</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <script>
+      (() => {
+        try {
+          const saved = localStorage.getItem("heap-detective-theme");
+          document.documentElement.dataset.theme = saved || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        } catch {
+          document.documentElement.dataset.theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        }
+      })();
+    </script>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+      :root {
+        color-scheme: dark;
+        --bg: #090d16;
+        --surface: #131b2e;
+        --surface-2: #1e293b;
+        --text: #f8fafc;
+        --muted: #94a3b8;
+        --border: #1e293b;
+        --border-strong: #334155;
+        --accent: #ef4444;
+        --accent-soft: rgba(239, 68, 68, 0.15);
+        --success: #10b981;
+        --warning: #f59e0b;
+        --neon-cyan: #38bdf8;
+        --radius: 14px;
+        --radius-sm: 8px;
+        --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+      }
+      html[data-theme="light"] {
+        color-scheme: light;
+        --bg: #f8fafc;
+        --surface: #ffffff;
+        --surface-2: #f1f5f9;
+        --text: #0f172a;
+        --muted: #64748b;
+        --border: #e2e8f0;
+        --border-strong: #cbd5e1;
+        --accent: #dc2626;
+        --accent-soft: #fee2e2;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font-sans);
+        line-height: 1.5;
+        display: flex;
+        flex-direction: column;
+        user-select: none;
+      }
+      header {
+        border-bottom: 1px solid var(--border-strong);
+        background: var(--surface);
+        padding: 0.85rem 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+      .brand-icon {
+        width: 40px;
+        height: 40px;
+        background: linear-gradient(135deg, #ef4444, #f59e0b);
+        color: #fff;
+        border-radius: var(--radius-sm);
+        display: grid;
+        place-items: center;
+        font-weight: 800;
+        font-size: 1.3rem;
+        box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
+      }
+      h1 {
+        margin: 0;
+        font-size: 1.25rem;
+        font-weight: 800;
+      }
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+      button {
+        font-family: inherit;
+        font-size: 0.85rem;
+        font-weight: 600;
+        padding: 0.55rem 0.95rem;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border-strong);
+        background: var(--surface-2);
+        color: var(--text);
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+        transition: all 0.18s ease;
+      }
+      button:hover {
+        background: var(--border-strong);
+        transform: translateY(-1px);
+      }
+      button.primary {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: #ffffff;
+        border-color: #10b981;
+        box-shadow: 0 0 15px rgba(16, 185, 129, 0.35);
+      }
+
+      .app-container {
+        flex: 1;
+        max-width: 1340px;
+        width: 100%;
+        margin: 0 auto;
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+      }
+
+      /* Memory HUD Bar */
+      .hud-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 1rem;
+        background: var(--surface);
+        padding: 0.85rem 1.25rem;
+        border-radius: var(--radius);
+        border: 1px solid var(--border-strong);
+      }
+      .hud-stat {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+      }
+      .hud-label {
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .hud-value {
+        font-family: var(--font-mono);
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--accent);
+      }
+
+      .heap-bar-bg {
+        width: 100%;
+        height: 10px;
+        background: var(--bg);
+        border-radius: 5px;
+        overflow: hidden;
+        border: 1px solid var(--border-strong);
+      }
+      .heap-bar-fill {
+        height: 100%;
+        width: 75%;
+        background: linear-gradient(90deg, #10b981, #f59e0b, #ef4444);
+        transition: width 0.4s ease;
+      }
+
+      /* Game Split Layout */
+      .game-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+      }
+      @media (min-width: 900px) {
+        .game-grid {
+          grid-template-columns: 1fr 480px;
+        }
+      }
+
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius);
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      .code-box {
+        background: var(--bg);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-sm);
+        padding: 1rem;
+        font-family: var(--font-mono);
+        font-size: 0.85rem;
+        line-height: 1.6;
+        color: var(--neon-cyan);
+        white-space: pre-wrap;
+      }
+
+      .choice-option {
+        background: var(--bg);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-sm);
+        padding: 0.85rem 1rem;
+        font-family: var(--font-mono);
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: all 0.18s ease;
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+      }
+      .choice-option:hover {
+        border-color: var(--neon-cyan);
+        background: var(--surface-2);
+      }
+      .choice-option.selected {
+        border-color: var(--success);
+        background: rgba(16, 185, 129, 0.15);
+      }
+
+      /* Heap Graph Inspector */
+      .heap-graph {
+        background: var(--bg);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-sm);
+        padding: 1rem;
+        min-height: 280px;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .retainer-node {
+        background: var(--surface-2);
+        border: 1px solid var(--border-strong);
+        border-radius: 6px;
+        padding: 0.5rem 0.75rem;
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .retainer-node.gc-root {
+        border-color: #38bdf8;
+        color: #38bdf8;
+      }
+      .retainer-node.leaked {
+        border-color: #ef4444;
+        color: #ef4444;
+        background: rgba(239, 68, 68, 0.15);
+      }
+
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(9, 13, 22, 0.85);
+        backdrop-filter: blur(6px);
+        display: grid;
+        place-items: center;
+        z-index: 100;
+        padding: 1.5rem;
+      }
+      .modal-box {
+        background: var(--surface);
+        border: 2px solid var(--success);
+        border-radius: var(--radius);
+        padding: 2rem;
+        max-width: 500px;
+        width: 100%;
+        text-align: center;
+        box-shadow: 0 0 30px rgba(16, 185, 129, 0.4);
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="brand">
+        <div class="brand-icon" aria-hidden="true">🧠</div>
+        <div>
+          <h1>Memory Heap Detective</h1>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="soundToggle" aria-label="Toggle Sound Effects">🔊 Sound ON</button>
+        <button id="themeToggle" aria-label="Toggle Theme"><span id="themeIcon">☀️</span></button>
+        <a href="https://github.com/praveenscience/One-File-Tools" target="_blank" rel="noopener" style="text-decoration: none">
+          <button type="button">GitHub</button>
+        </a>
+      </div>
+    </header>
+
+    <main class="app-container">
+      <!-- City HUD Bar -->
+      <section class="hud-bar">
+        <div class="hud-stat">
+          <span class="hud-label">ALLOCATED HEAP</span>
+          <span id="heapText" class="hud-value">🧠 58.4 MB / 64.0 MB</span>
+        </div>
+        <div class="hud-stat">
+          <span class="hud-label">PRESSURE STATUS</span>
+          <span id="statusText" class="hud-value" style="color: var(--accent)">⚠️ Memory Leak Detected</span>
+        </div>
+        <div class="hud-stat">
+          <span class="hud-label">CURRENT DIAGNOSTIC</span>
+          <span id="levelText" class="hud-value" style="color: var(--neon-cyan)">LEVEL 1 / 4</span>
+        </div>
+        <button id="btnTriggerGc" class="primary">🧹 TRIGGER GC (Mark-and-Sweep)</button>
+      </section>
+
+      <div class="heap-bar-bg">
+        <div id="heapBarFill" class="heap-bar-fill"></div>
+      </div>
+
+      <!-- Main Game Grid Split -->
+      <div class="game-grid">
+        <!-- Left: Code Inspector & Patch Studio -->
+        <section class="card">
+          <h2 id="levelTitle" style="font-size: 1.1rem; font-weight: 800; margin: 0">Level 1: Dangling Event Listeners</h2>
+          <div id="levelDesc" style="font-size: 0.9rem; color: var(--muted)">The scroll event listener is never detached when component unmounts, keeping the entire DOM subtree in memory!</div>
+
+          <div class="code-box" id="codeSnippet">window.addEventListener('scroll', handleScroll); // Component unmounts without cleanup!</div>
+
+          <span style="font-size: 0.85rem; font-weight: 700; color: var(--text)">Select Code Patch to Reclaim Memory:</span>
+          <div id="choicesContainer" style="display: flex; flex-direction: column; gap: 0.6rem"></div>
+
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap">
+            <button id="btnApplyFix" class="primary">▶ APPLY PATCH & RECLAIM HEAP</button>
+            <button id="btnHint">💡 Hint</button>
+          </div>
+          <div id="feedbackText" style="font-size: 0.85rem; font-weight: 700"></div>
+        </section>
+
+        <!-- Right: Heap Retainer Tree -->
+        <section class="card">
+          <h2 style="font-size: 1.1rem; font-weight: 800; margin: 0">V8 Heap Retainer Inspector</h2>
+
+          <div id="heapGraph" class="heap-graph">
+            <div class="retainer-node gc-root">
+              <span>ROOT: Window (Global Scope)</span>
+              <span>128 B</span>
+            </div>
+            <div id="leakedNode" class="retainer-node leaked">
+              <span>↳ Detached HTMLDivElement (#heroBanner)</span>
+              <span id="nodeSizeText">18.4 MB</span>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- Victory Modal -->
+    <div id="victoryModal" class="modal-backdrop" style="display: none">
+      <div class="modal-box">
+        <h2 style="font-size: 1.5rem; font-weight: 800; margin: 0; color: var(--success)">MEMORY HEAP STABILIZED!</h2>
+        <p style="font-size: 0.95rem; color: var(--muted); margin: 0">You successfully patched all memory leaks, cleared un-retained DOM trees, and restored V8 Garbage Collector efficiency!</p>
+        <button id="btnPlayAgain" class="primary" style="font-size: 1rem; padding: 0.75rem 1.5rem">🔄 RE-PROFILE MEMORY</button>
+      </div>
+    </div>
+
+    <script>
+      const LEVELS = [
+        {
+          id: 1,
+          title: "Level 1: Dangling Event Listeners",
+          desc: "The scroll event listener is never detached when component unmounts, retaining DOM subtrees!",
+          snippet: "window.addEventListener('scroll', handleScroll);\n// Component unmounts without cleanup!",
+          nodeName: "↳ EventListener retainer (scroll ➔ handleScroll)",
+          nodeSize: "18.4 MB",
+          initialHeapPct: 85,
+          choices: [
+            { text: "window.removeEventListener('scroll', handleScroll);", correct: true },
+            { text: "window.onscroll = null;", correct: false },
+            { text: "delete window.handleScroll;", correct: false }
+          ],
+          hint: "Call removeEventListener with the exact same event type and listener reference."
+        },
+        {
+          id: 2,
+          title: "Level 2: Detached DOM Node Cache",
+          desc: "DOM elements removed from document body remain cached in global array `window.cache`!",
+          snippet: "element.remove();\nwindow.cache.push(element); // Retains detached DOM node!",
+          nodeName: "↳ Detached HTMLDivElement (#heroBanner)",
+          nodeSize: "24.1 MB",
+          initialHeapPct: 90,
+          choices: [
+            { text: "window.cache.length = 0; // Clear global retainer array", correct: true },
+            { text: "element.innerHTML = '';", correct: false },
+            { text: "delete element;", correct: false }
+          ],
+          hint: "Set global array references to null or clear array length to zero."
+        },
+        {
+          id: 3,
+          title: "Level 3: Uncleared Timers (setInterval)",
+          desc: "An active `setInterval` callback holds a closure over large data buffers!",
+          snippet: "const timer = setInterval(() => processBuffer(largeData), 1000);\n// Timer never stopped!",
+          nodeName: "↳ Active Timer (setInterval ➔ largeData Closure)",
+          nodeSize: "15.2 MB",
+          initialHeapPct: 78,
+          choices: [
+            { text: "clearInterval(timer); // Terminate timer callback", correct: true },
+            { text: "timer = null;", correct: false },
+            { text: "largeData = undefined;", correct: false }
+          ],
+          hint: "Call clearInterval(timer) to allow garbage collection of closure variables."
+        },
+        {
+          id: 4,
+          title: "Level 4: Circular Reference Traps",
+          desc: "Object A references Object B and Object B references Object A, creating a circular retainer!",
+          snippet: "nodeA.next = nodeB;\nnodeB.prev = nodeA; // Circular reference!",
+          nodeName: "↳ Circular Retainer (nodeA ⇄ nodeB)",
+          nodeSize: "12.0 MB",
+          initialHeapPct: 70,
+          choices: [
+            { text: "nodeA.next = null; nodeB.prev = null;", correct: true },
+            { text: "nodeA = null;", correct: false },
+            { text: "delete nodeB;", correct: false }
+          ],
+          hint: "Break the reference cycle by setting one of the pointers to null."
+        }
+      ];
+
+      const $ = (id) => document.getElementById(id);
+
+      let currentLevel = 0;
+      let selectedChoice = -1;
+      let soundEnabled = true;
+      let audioCtx = null;
+
+      function initAudio() {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+
+      function playSound(type) {
+        if (!soundEnabled || !audioCtx) return;
+        try {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          const now = audioCtx.currentTime;
+
+          if (type === "gc") {
+            osc.type = "sawtooth";
+            osc.frequency.setValueAtTime(600, now);
+            osc.frequency.exponentialRampToValueAtTime(150, now + 0.3);
+            gain.gain.setValueAtTime(0.2, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+            osc.start(now);
+            osc.stop(now + 0.3);
+          } else if (type === "win") {
+            osc.type = "triangle";
+            osc.frequency.setValueAtTime(523.25, now);
+            osc.frequency.setValueAtTime(659.25, now + 0.15);
+            osc.frequency.setValueAtTime(783.99, now + 0.3);
+            gain.gain.setValueAtTime(0.25, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.45);
+            osc.start(now);
+            osc.stop(now + 0.45);
+          }
+        } catch (e) {}
+      }
+
+      function init() {
+        loadLevel(currentLevel);
+
+        $("btnTriggerGc").addEventListener("click", triggerGcSweep);
+        $("btnApplyFix").addEventListener("click", applyFix);
+        $("btnHint").addEventListener("click", () => {
+          $("feedbackText").textContent = "💡 " + LEVELS[currentLevel].hint;
+        });
+
+        $("btnPlayAgain").addEventListener("click", () => {
+          currentLevel = 0;
+          $("victoryModal").style.display = "none";
+          loadLevel(currentLevel);
+        });
+
+        $("soundToggle").addEventListener("click", () => {
+          soundEnabled = !soundEnabled;
+          $("soundToggle").textContent = soundEnabled ? "🔊 Sound ON" : "🔇 Sound OFF";
+        });
+        $("themeToggle").addEventListener("click", toggleTheme);
+        $("themeIcon").textContent = document.documentElement.dataset.theme === "dark" ? "☀️" : "🌙";
+      }
+
+      function toggleTheme() {
+        const current = document.documentElement.dataset.theme;
+        const next = current === "dark" ? "light" : "dark";
+        document.documentElement.dataset.theme = next;
+        localStorage.setItem("heap-detective-theme", next);
+        $("themeIcon").textContent = next === "dark" ? "☀️" : "🌙";
+      }
+
+      function loadLevel(idx) {
+        selectedChoice = -1;
+        const l = LEVELS[idx];
+        $("levelText").textContent = `LEVEL ${l.id} / ${LEVELS.length}`;
+        $("levelTitle").textContent = l.title;
+        $("levelDesc").textContent = l.desc;
+        $("codeSnippet").textContent = l.snippet;
+        $("feedbackText").textContent = "";
+
+        $("leakedNode").className = "retainer-node leaked";
+        $("leakedNode").querySelector("span").textContent = l.nodeName;
+        $("nodeSizeText").textContent = l.nodeSize;
+
+        $("heapBarFill").style.width = l.initialHeapPct + "%";
+        $("heapText").textContent = `🧠 ${(64 * (l.initialHeapPct / 100)).toFixed(1)} MB / 64.0 MB`;
+
+        renderChoices(l.choices);
+      }
+
+      function renderChoices(choices) {
+        const container = $("choicesContainer");
+        container.innerHTML = choices
+          .map(
+            (c, i) => `
+          <div class="choice-option" onclick="selectChoice(${i})">
+            <span>[${i + 1}]</span>
+            <code>${c.text}</code>
+          </div>
+        `
+          )
+          .join("");
+      }
+
+      window.selectChoice = (idx) => {
+        selectedChoice = idx;
+        document.querySelectorAll(".choice-option").forEach((el, i) => {
+          el.className = `choice-option ${i === idx ? "selected" : ""}`;
+        });
+      };
+
+      function triggerGcSweep() {
+        initAudio();
+        playSound("gc");
+        $("feedbackText").textContent = "🧹 Mark-and-Sweep GC executed!";
+      }
+
+      function applyFix() {
+        initAudio();
+        if (selectedChoice === -1) {
+          $("feedbackText").textContent = "⚠️ Please select a code patch option first!";
+          return;
+        }
+
+        const l = LEVELS[currentLevel];
+        if (l.choices[selectedChoice].correct) {
+          playSound("gc");
+          $("heapBarFill").style.width = "25%";
+          $("heapText").textContent = "🧠 16.0 MB / 64.0 MB";
+          $("statusText").textContent = "✓ Heap Reclaimed";
+          $("statusText").style.color = "var(--success)";
+          $("leakedNode").className = "retainer-node";
+          $("feedbackText").textContent = "✓ Memory leak patched! GC sweep reclaimed memory.";
+
+          setTimeout(() => {
+            if (currentLevel + 1 < LEVELS.length) {
+              currentLevel++;
+              loadLevel(currentLevel);
+            } else {
+              playSound("win");
+              $("victoryModal").style.display = "grid";
+            }
+          }, 900);
+        } else {
+          $("feedbackText").textContent = "⚠️ Incorrect patch! The memory leak persists.";
+        }
+      }
+
+      window.addEventListener("DOMContentLoaded", init);
+    </script>
+  </body>
+</html>
