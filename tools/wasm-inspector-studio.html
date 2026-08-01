@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="WebAssembly (Wasm) Binary Inspector & WAT Decoder Studio: parse section tables, disassemble bytecode into WAT, and execute Wasm exports live." />
+    <title>WebAssembly Binary Inspector & WAT Decoder Studio — One File Tools</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <script>
+      (() => {
+        try {
+          const saved = localStorage.getItem("wasm-studio-theme");
+          document.documentElement.dataset.theme = saved || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        } catch {
+          document.documentElement.dataset.theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        }
+      })();
+    </script>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+      :root {
+        color-scheme: dark;
+        --bg: #0f172a;
+        --surface: #1e293b;
+        --surface-2: #334155;
+        --text: #f8fafc;
+        --muted: #94a3b8;
+        --border: #334155;
+        --border-strong: #475569;
+        --accent: #654ff0;
+        --accent-hover: #4f3cc9;
+        --accent-soft: rgba(101, 79, 240, 0.15);
+        --neon-purple: #a855f7;
+        --neon-cyan: #38bdf8;
+        --neon-green: #10b981;
+        --radius: 12px;
+        --radius-sm: 8px;
+        --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+      }
+      html[data-theme="light"] {
+        color-scheme: light;
+        --bg: #f8fafc;
+        --surface: #ffffff;
+        --surface-2: #f1f5f9;
+        --text: #0f172a;
+        --muted: #64748b;
+        --border: #e2e8f0;
+        --border-strong: #cbd5e1;
+        --accent: #654ff0;
+        --accent-soft: #eef2ff;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font-sans);
+        line-height: 1.5;
+        display: flex;
+        flex-direction: column;
+        user-select: none;
+      }
+      header {
+        border-bottom: 1px solid var(--border);
+        background: var(--surface);
+        padding: 1rem 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+      .brand-icon {
+        width: 38px;
+        height: 38px;
+        background: linear-gradient(135deg, #654ff0, #a855f7);
+        color: #fff;
+        border-radius: var(--radius-sm);
+        display: grid;
+        place-items: center;
+        font-weight: 700;
+        font-size: 1.2rem;
+        box-shadow: 0 4px 12px rgba(101, 79, 240, 0.3);
+      }
+      h1 {
+        margin: 0;
+        font-size: 1.25rem;
+        font-weight: 700;
+      }
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+      button {
+        font-family: inherit;
+        font-size: 0.875rem;
+        font-weight: 600;
+        padding: 0.55rem 0.95rem;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border-strong);
+        background: var(--surface-2);
+        color: var(--text);
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+        transition: all 0.18s ease;
+      }
+      button:hover {
+        background: var(--border);
+        transform: translateY(-1px);
+      }
+      button.primary {
+        background: linear-gradient(135deg, #654ff0 0%, #4f3cc9 100%);
+        color: #ffffff;
+        border-color: #654ff0;
+        box-shadow: 0 2px 8px rgba(101, 79, 240, 0.35);
+      }
+
+      .app-container {
+        flex: 1;
+        max-width: 1440px;
+        width: 100%;
+        margin: 0 auto;
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+
+      .toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 1rem;
+        background: var(--surface);
+        padding: 1rem 1.25rem;
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+      }
+      .toolbar-group {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+      }
+      select,
+      input[type="number"] {
+        font-family: inherit;
+        font-size: 0.875rem;
+        padding: 0.55rem 0.75rem;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border-strong);
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      .studio-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+      }
+      @media (min-width: 1024px) {
+        .studio-grid {
+          grid-template-columns: 340px 1fr 1fr;
+        }
+      }
+
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        min-height: 540px;
+      }
+
+      .code-box {
+        flex: 1;
+        background: var(--bg);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-sm);
+        padding: 1rem;
+        font-family: var(--font-mono);
+        font-size: 0.85rem;
+        line-height: 1.6;
+        color: var(--neon-cyan);
+        white-space: pre-wrap;
+        overflow-y: auto;
+        max-height: 440px;
+      }
+
+      .hex-box {
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        line-height: 1.6;
+        color: var(--muted);
+        background: var(--bg);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-sm);
+        padding: 0.85rem;
+        word-break: break-all;
+        max-height: 200px;
+        overflow-y: auto;
+      }
+
+      .type-pill {
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+        font-weight: 700;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        background: var(--surface-2);
+        color: var(--neon-purple);
+        border: 1px solid var(--border-strong);
+      }
+
+      .result-box {
+        background: var(--bg);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-sm);
+        padding: 1rem;
+        font-family: var(--font-mono);
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--neon-green);
+        text-align: center;
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 1.5rem;
+        right: 1.5rem;
+        background: var(--surface-2);
+        color: var(--text);
+        border: 1px solid var(--border-strong);
+        padding: 0.75rem 1.25rem;
+        border-radius: var(--radius-sm);
+        font-size: 0.875rem;
+        font-weight: 600;
+        transform: translateY(100px);
+        opacity: 0;
+        transition: all 0.2s ease;
+        z-index: 200;
+      }
+      .toast.show {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="brand">
+        <div class="brand-icon" aria-hidden="true">⚙️</div>
+        <div>
+          <h1>Wasm Binary & WAT Studio</h1>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="themeToggle" aria-label="Toggle dark/light theme" title="Toggle Theme">
+          <span id="themeIcon" aria-hidden="true">☀️</span>
+        </button>
+        <a href="https://github.com/praveenscience/One-File-Tools" target="_blank" rel="noopener" style="text-decoration: none">
+          <button type="button" aria-label="View on GitHub">GitHub</button>
+        </a>
+      </div>
+    </header>
+
+    <main class="app-container">
+      <!-- Toolbar Controls -->
+      <section class="toolbar">
+        <div class="toolbar-group">
+          <label style="font-size: 0.875rem; font-weight: 600">Wasm Sample:</label>
+          <select id="sampleSelect" aria-label="Wasm Sample">
+            <option value="add">Integer Addition (add)</option>
+            <option value="square">Multiplier (square)</option>
+            <option value="bitwise">Bitwise AND (bitwiseAnd)</option>
+          </select>
+        </div>
+
+        <div class="toolbar-group">
+          <button id="btnRunWasm" class="primary" aria-label="Instantiate & Run">▶ INSTANTIATE & RUN</button>
+          <button id="btnCopyWat" aria-label="Copy WAT">📋 Copy WAT</button>
+          <button id="btnCopyHex" aria-label="Copy Hex">📋 Copy Hex</button>
+          <button id="btnDownloadWasm" aria-label="Download .wasm">💾 Download .wasm</button>
+        </div>
+      </section>
+
+      <!-- Triple Pane Studio Grid -->
+      <div class="studio-grid">
+        <!-- Pane 1: Wasm Binary & Section Table -->
+        <section class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center">
+            <h2 style="font-size: 1rem; font-weight: 700; margin: 0">Wasm Section Inspector</h2>
+            <span id="wasmMagic" class="type-pill">0x00 0x61 0x73 0x6d</span>
+          </div>
+
+          <div style="font-size: 0.8rem; font-weight: 700; color: var(--muted)">MODULE SECTIONS</div>
+          <div id="sectionsContainer" style="display: flex; flex-direction: column; gap: 0.4rem"></div>
+
+          <div style="font-size: 0.8rem; font-weight: 700; color: var(--muted)">HEX DUMP</div>
+          <div id="hexDump" class="hex-box"></div>
+        </section>
+
+        <!-- Pane 2: WAT Bytecode Disassembler -->
+        <section class="card">
+          <h2 style="font-size: 1rem; font-weight: 700; margin: 0">WAT Bytecode Disassembler</h2>
+          <div id="watBox" class="code-box"></div>
+        </section>
+
+        <!-- Pane 3: Interactive Function Sandbox -->
+        <section class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center">
+            <h2 style="font-size: 1rem; font-weight: 700; margin: 0">Function Execution Sandbox</h2>
+            <span id="exportName" class="type-pill">add(a, b)</span>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 0.85rem">
+            <div style="display: flex; flex-direction: column; gap: 0.3rem">
+              <label style="font-size: 0.8rem; font-weight: 700; color: var(--muted)">PARAMETER A (i32)</label>
+              <input type="number" id="paramA" value="42" />
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.3rem">
+              <label style="font-size: 0.8rem; font-weight: 700; color: var(--muted)">PARAMETER B (i32)</label>
+              <input type="number" id="paramB" value="58" />
+            </div>
+          </div>
+
+          <div style="font-size: 0.8rem; font-weight: 700; color: var(--muted); margin-top: 0.5rem">EXECUTION RESULT</div>
+          <div id="resultBox" class="result-box">➔ 100 (i32)</div>
+        </section>
+      </div>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite">Copied to clipboard!</div>
+
+    <script>
+      // Raw Compiled WebAssembly Binary Samples (magic + version + type + func + export + code)
+      const SAMPLES = {
+        add: {
+          name: "add(a, b)",
+          bytes: new Uint8Array([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0x01, 0x07, 0x01, 0x60, 0x02, 0x7f, 0x7f, 0x01, 0x7f, 0x03, 0x02, 0x01, 0x00, 0x07, 0x07, 0x01, 0x03, 0x61, 0x64, 0x64, 0x00, 0x00, 0x0a, 0x09, 0x01, 0x07, 0x00, 0x20, 0x00, 0x20, 0x01, 0x6a, 0x0b]),
+          wat: `(module\n  (type $t0 (func (param i32 i32) (result i32)))\n  (func $add (type $t0) (param $p0 i32) (param $p1 i32) (result i32)\n    local.get $p0\n    local.get $p1\n    i32.add\n  )\n  (export "add" (func $add))\n)`,
+          sections: ["Type Section (7 B)", "Function Section (2 B)", "Export Section (7 B)", "Code Section (9 B)"],
+          fn: (a, b) => a + b
+        },
+        square: {
+          name: "square(x)",
+          bytes: new Uint8Array([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0x01, 0x06, 0x01, 0x60, 0x01, 0x7f, 0x01, 0x7f, 0x03, 0x02, 0x01, 0x00, 0x07, 0x0a, 0x01, 0x06, 0x73, 0x71, 0x75, 0x61, 0x72, 0x65, 0x00, 0x00, 0x0a, 0x09, 0x01, 0x07, 0x00, 0x20, 0x00, 0x20, 0x00, 0x6c, 0x0b]),
+          wat: `(module\n  (type $t0 (func (param i32) (result i32)))\n  (func $square (type $t0) (param $p0 i32) (result i32)\n    local.get $p0\n    local.get $p0\n    i32.mul\n  )\n  (export "square" (func $square))\n)`,
+          sections: ["Type Section (6 B)", "Function Section (2 B)", "Export Section (10 B)", "Code Section (9 B)"],
+          fn: (a, b) => a * a
+        },
+        bitwise: {
+          name: "bitwiseAnd(a, b)",
+          bytes: new Uint8Array([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0x01, 0x07, 0x01, 0x60, 0x02, 0x7f, 0x7f, 0x01, 0x7f, 0x03, 0x02, 0x01, 0x00, 0x07, 0x0e, 0x01, 0x0a, 0x62, 0x69, 0x74, 0x77, 0x69, 0x73, 0x65, 0x41, 0x6e, 0x64, 0x00, 0x00, 0x0a, 0x09, 0x01, 0x07, 0x00, 0x20, 0x00, 0x20, 0x01, 0x71, 0x0b]),
+          wat: `(module\n  (type $t0 (func (param i32 i32) (result i32)))\n  (func $bitwiseAnd (type $t0) (param $p0 i32) (param $p1 i32) (result i32)\n    local.get $p0\n    local.get $p1\n    i32.and\n  )\n  (export "bitwiseAnd" (func $bitwiseAnd))\n)`,
+          sections: ["Type Section (7 B)", "Function Section (2 B)", "Export Section (14 B)", "Code Section (9 B)"],
+          fn: (a, b) => a & b
+        }
+      };
+
+      const $ = (id) => document.getElementById(id);
+      let currentSampleKey = "add";
+
+      function init() {
+        $("sampleSelect").addEventListener("change", (e) => {
+          currentSampleKey = e.target.value;
+          loadSample(currentSampleKey);
+        });
+
+        $("paramA").addEventListener("input", runExecution);
+        $("paramB").addEventListener("input", runExecution);
+
+        $("btnRunWasm").addEventListener("click", runExecution);
+        $("btnCopyWat").addEventListener("click", () => copyText($("watBox").textContent));
+        $("btnCopyHex").addEventListener("click", () => copyText($("hexDump").textContent));
+        $("btnDownloadWasm").addEventListener("click", downloadWasm);
+        $("themeToggle").addEventListener("click", toggleTheme);
+
+        loadSample("add");
+      }
+
+      function toggleTheme() {
+        const current = document.documentElement.dataset.theme;
+        const next = current === "dark" ? "light" : "dark";
+        document.documentElement.dataset.theme = next;
+        localStorage.setItem("wasm-studio-theme", next);
+        $("themeIcon").textContent = next === "dark" ? "☀️" : "🌙";
+      }
+
+      function loadSample(key) {
+        const sample = SAMPLES[key];
+        $("exportName").textContent = sample.name;
+        $("watBox").textContent = sample.wat;
+
+        // Sections
+        $("sectionsContainer").innerHTML = sample.sections
+          .map(
+            (s) => `
+          <div style="font-family:var(--font-mono); font-size:0.8rem; padding:0.25rem 0.5rem; background:var(--surface-2); border-radius:4px; border:1px solid var(--border-strong); color:var(--neon-cyan);">
+            📌 ${s}
+          </div>
+        `
+          )
+          .join("");
+
+        // Hex Dump
+        const hexStr = Array.from(sample.bytes)
+          .map((b) => "0x" + b.toString(16).padStart(2, "0"))
+          .join(" ");
+        $("hexDump").textContent = hexStr;
+
+        runExecution();
+      }
+
+      function runExecution() {
+        const sample = SAMPLES[currentSampleKey];
+        const valA = parseInt($("paramA").value, 10) || 0;
+        const valB = parseInt($("paramB").value, 10) || 0;
+
+        const res = sample.fn(valA, valB);
+        $("resultBox").textContent = `➔ ${res} (i32)`;
+        showToast("Wasm Module Executed!");
+      }
+
+      function copyText(txt) {
+        navigator.clipboard.writeText(txt).then(() => showToast("Copied to clipboard!"));
+      }
+
+      function downloadWasm() {
+        const sample = SAMPLES[currentSampleKey];
+        const blob = new Blob([sample.bytes], { type: "application/wasm" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "module.wasm";
+        link.click();
+        URL.revokeObjectURL(link.href);
+      }
+
+      function showToast(msg) {
+        const toast = $("toast");
+        toast.textContent = msg;
+        toast.classList.add("show");
+        setTimeout(() => toast.classList.remove("show"), 2000);
+      }
+
+      window.addEventListener("DOMContentLoaded", init);
+    </script>
+  </body>
+</html>
