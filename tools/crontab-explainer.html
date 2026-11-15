@@ -1,0 +1,791 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Crontab Explainer & Schedule Inspector — One File Tools</title>
+    <script>
+      (function () {
+        var t = localStorage.getItem("cron_explainer_theme");
+        if (t) document.documentElement.setAttribute("data-theme", t);
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Nunito:wght@400;600;700;800&family=Oxanium:wght@600;700;800&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg-primary: #0f172a;
+        --bg-secondary: #1e293b;
+        --bg-card: #1e293b;
+        --border-color: #334155;
+        --text-primary: #f8fafc;
+        --text-secondary: #94a3b8;
+        --accent-blue: #38bdf8;
+        --accent-indigo: #6366f1;
+        --accent-emerald: #10b981;
+        --danger: #ef4444;
+        --warning: #f59e0b;
+        --font-sans: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+        --font-heading: "Oxanium", sans-serif;
+      }
+
+      [data-theme="light"] {
+        --bg-primary: #f8fafc;
+        --bg-secondary: #ffffff;
+        --bg-card: #ffffff;
+        --border-color: #cbd5e1;
+        --text-primary: #0f172a;
+        --text-secondary: #64748b;
+        --accent-blue: #0284c7;
+        --accent-indigo: #4f46e5;
+        --accent-emerald: #059669;
+        --danger: #dc2626;
+        --warning: #d97706;
+      }
+
+      @media (prefers-color-scheme: light) {
+        :root:not([data-theme="dark"]) {
+          --bg-primary: #f8fafc;
+          --bg-secondary: #ffffff;
+          --bg-card: #ffffff;
+          --border-color: #cbd5e1;
+          --text-primary: #0f172a;
+          --text-secondary: #64748b;
+          --accent-blue: #0284c7;
+          --accent-indigo: #4f46e5;
+          --accent-emerald: #059669;
+          --danger: #dc2626;
+          --warning: #d97706;
+        }
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg-primary);
+        color: var(--text-primary);
+        line-height: 1.6;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 2rem 1.5rem;
+        width: 100%;
+        flex: 1;
+      }
+
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        padding-bottom: 1.25rem;
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      .header-title h1 {
+        font-family: var(--font-heading);
+        font-size: 1.75rem;
+        font-weight: 800;
+        color: var(--accent-blue);
+        letter-spacing: -0.02em;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .header-title p {
+        color: var(--text-secondary);
+        font-size: 0.95rem;
+        margin-top: 0.25rem;
+      }
+
+      .theme-btn {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
+        padding: 0.5rem 0.85rem;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        transition: all 0.2s;
+      }
+      .theme-btn:hover {
+        border-color: var(--accent-blue);
+      }
+
+      .card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      }
+
+      .presets-row {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 1.25rem;
+        flex-wrap: wrap;
+      }
+      .presets-row label {
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: var(--text-secondary);
+      }
+      .preset-select {
+        flex: 1;
+        min-width: 240px;
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
+        padding: 0.6rem 0.85rem;
+        border-radius: 8px;
+        font-family: var(--font-sans);
+        font-size: 0.95rem;
+        outline: none;
+      }
+      .preset-select:focus {
+        border-color: var(--accent-blue);
+      }
+
+      .input-wrapper {
+        position: relative;
+        margin-bottom: 1.5rem;
+      }
+      .cron-input {
+        width: 100%;
+        font-family: var(--font-mono);
+        font-size: 1.6rem;
+        font-weight: 700;
+        text-align: center;
+        letter-spacing: 0.25em;
+        background: var(--bg-primary);
+        border: 2px solid var(--border-color);
+        color: var(--accent-blue);
+        border-radius: 10px;
+        padding: 0.85rem 1rem;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+      .cron-input:focus {
+        border-color: var(--accent-indigo);
+      }
+      .cron-input.invalid {
+        border-color: var(--danger);
+        color: var(--danger);
+      }
+
+      .fields-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 0.75rem;
+        margin-bottom: 1.5rem;
+      }
+      .field-box {
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 0.75rem 0.5rem;
+        text-align: center;
+      }
+      .field-val {
+        font-family: var(--font-mono);
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: var(--accent-blue);
+        margin-bottom: 0.25rem;
+      }
+      .field-name {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .field-range {
+        font-size: 0.7rem;
+        color: var(--text-secondary);
+      }
+
+      .explanation-banner {
+        background: rgba(56, 189, 248, 0.08);
+        border: 1px solid rgba(56, 189, 248, 0.25);
+        border-radius: 10px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+      }
+      .explanation-banner.invalid {
+        background: rgba(239, 68, 68, 0.08);
+        border-color: rgba(239, 68, 68, 0.3);
+      }
+      .exp-label {
+        font-size: 0.75rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+        letter-spacing: 0.05em;
+        margin-bottom: 0.25rem;
+      }
+      .exp-text {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--text-primary);
+      }
+      .exp-text.invalid {
+        color: var(--danger);
+        font-size: 1rem;
+      }
+
+      .section-heading {
+        font-family: var(--font-heading);
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .next-runs-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      .run-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+        font-size: 0.95rem;
+      }
+      .run-index {
+        font-family: var(--font-mono);
+        font-weight: 700;
+        color: var(--accent-blue);
+        min-width: 2rem;
+      }
+      .run-datetime {
+        font-family: var(--font-mono);
+        color: var(--text-primary);
+        font-weight: 600;
+        flex: 1;
+      }
+      .run-relative {
+        font-size: 0.85rem;
+        color: var(--accent-emerald);
+        font-weight: 600;
+      }
+
+      .actions-bar {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        margin-top: 1rem;
+      }
+      .action-btn {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
+        padding: 0.55rem 1rem;
+        border-radius: 8px;
+        cursor: pointer;
+        font-family: var(--font-sans);
+        font-size: 0.85rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        transition: all 0.2s;
+      }
+      .action-btn:hover {
+        border-color: var(--accent-blue);
+        color: var(--accent-blue);
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 2rem;
+        right: 2rem;
+        background: var(--accent-emerald);
+        color: #ffffff;
+        font-size: 0.9rem;
+        font-weight: 700;
+        padding: 0.6rem 1.25rem;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        opacity: 0;
+        transform: translateY(10px);
+        transition: all 0.25s ease;
+        pointer-events: none;
+      }
+      .toast.show {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      footer {
+        text-align: center;
+        padding: 1.5rem;
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        border-top: 1px solid var(--border-color);
+      }
+      footer a {
+        color: var(--accent-blue);
+        text-decoration: none;
+      }
+
+      @media (max-width: 640px) {
+        .fields-grid {
+          grid-template-columns: repeat(3, 1fr);
+        }
+        .cron-input {
+          font-size: 1.25rem;
+          letter-spacing: 0.15em;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <div class="header-title">
+          <h1>⏰ Crontab Explainer</h1>
+          <p>Instant human-readable English breakdown and execution schedule predictor</p>
+        </div>
+        <button class="theme-btn" id="themeBtn" aria-label="Toggle Theme"><span id="themeIcon">☀️</span> <span id="themeText">Theme</span></button>
+      </header>
+
+      <div class="card">
+        <div class="presets-row">
+          <label for="presetSelect">Quick Presets:</label>
+          <select id="presetSelect" class="preset-select">
+            <option value="custom">-- Choose or Type Expression --</option>
+            <option value="* * * * *">Every minute (* * * * *)</option>
+            <option value="*/5 * * * *">Every 5 minutes (*/5 * * * *)</option>
+            <option value="*/15 * * * *">Every 15 minutes (*/15 * * * *)</option>
+            <option value="0 * * * *">Every hour at minute 0 (0 * * * *)</option>
+            <option value="0 0 * * *">Daily at midnight (0 0 * * *)</option>
+            <option value="0 9 * * 1-5">Every weekday at 9:00 AM (0 9 * * 1-5)</option>
+            <option value="0 18 * * 1-5">Every weekday at 6:00 PM (0 18 * * 1-5)</option>
+            <option value="0 0 * * 0">Every Sunday at midnight (0 0 * * 0)</option>
+            <option value="0 0 1 * *">First day of every month at midnight (0 0 1 * *)</option>
+            <option value="0 0 1 1 *">Annually on January 1st (0 0 1 1 *)</option>
+          </select>
+        </div>
+
+        <div class="input-wrapper">
+          <input type="text" id="cronInput" class="cron-input" value="0 9 * * 1-5" spellcheck="false" autocomplete="off" placeholder="* * * * *" />
+        </div>
+
+        <div class="fields-grid" id="fieldsGrid">
+          <div class="field-box">
+            <div class="field-val" id="valMin">0</div>
+            <div class="field-name">Minute</div>
+            <div class="field-range">0 - 59</div>
+          </div>
+          <div class="field-box">
+            <div class="field-val" id="valHour">9</div>
+            <div class="field-name">Hour</div>
+            <div class="field-range">0 - 23</div>
+          </div>
+          <div class="field-box">
+            <div class="field-val" id="valDom">*</div>
+            <div class="field-name">Day of Month</div>
+            <div class="field-range">1 - 31</div>
+          </div>
+          <div class="field-box">
+            <div class="field-val" id="valMonth">*</div>
+            <div class="field-name">Month</div>
+            <div class="field-range">1 - 12</div>
+          </div>
+          <div class="field-box">
+            <div class="field-val" id="valDow">1-5</div>
+            <div class="field-name">Day of Week</div>
+            <div class="field-range">0 - 6 (Sun-Sat)</div>
+          </div>
+        </div>
+
+        <div class="explanation-banner" id="expBanner">
+          <div class="exp-label">Plain English Translation</div>
+          <div class="exp-text" id="expText">At 09:00 AM, Monday through Friday</div>
+        </div>
+
+        <div class="section-heading">📅 Next 5 Scheduled Executions (Local Time)</div>
+        <div class="next-runs-list" id="runsList"></div>
+
+        <div class="actions-bar">
+          <button class="action-btn" id="copyCronBtn">📋 Copy Cron Expression</button>
+          <button class="action-btn" id="copyTextBtn">📝 Copy Explanation</button>
+          <button class="action-btn" id="copyRunsBtn">🗓️ Copy Next 5 Runs</button>
+        </div>
+      </div>
+
+      <div class="toast" id="toast">Copied to clipboard! ✅</div>
+
+      <footer>Part of <a href="https://github.com/praveenscience/One-File-Tools" target="_blank" rel="noopener">One File Tools</a> — Open and use. Zero build steps.</footer>
+    </div>
+
+    <script>
+      function escapeHtml(str) {
+        if (!str) return "";
+        return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+      }
+
+      // Theme toggle
+      const themeBtn = document.getElementById("themeBtn");
+      const themeIcon = document.getElementById("themeIcon");
+      let currentTheme = localStorage.getItem("cron_explainer_theme") || "dark";
+
+      function applyTheme(theme) {
+        currentTheme = theme;
+        document.documentElement.setAttribute("data-theme", theme);
+        localStorage.setItem("cron_explainer_theme", theme);
+        themeIcon.textContent = theme === "dark" ? "☀️" : "🌙";
+      }
+      applyTheme(currentTheme);
+
+      themeBtn.addEventListener("click", () => {
+        applyTheme(currentTheme === "dark" ? "light" : "dark");
+      });
+
+      // Cron Parser & Evaluator
+      const cronInput = document.getElementById("cronInput");
+      const presetSelect = document.getElementById("presetSelect");
+      const expBanner = document.getElementById("expBanner");
+      const expText = document.getElementById("expText");
+      const runsList = document.getElementById("runsList");
+
+      const valMin = document.getElementById("valMin");
+      const valHour = document.getElementById("valHour");
+      const valDom = document.getElementById("valDom");
+      const valMonth = document.getElementById("valMonth");
+      const valDow = document.getElementById("valDow");
+
+      const MONTH_NAMES = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      const DOW_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+      function parseField(pattern, min, max) {
+        const values = new Set();
+        const parts = pattern.split(",");
+
+        for (const part of parts) {
+          const stepMatch = part.match(/^(\*|\d+-\d+|\d+)\/(\d+)$/);
+          if (stepMatch) {
+            const step = parseInt(stepMatch[2], 10);
+            if (step <= 0) return null;
+            let start = min;
+            let end = max;
+            if (stepMatch[1] !== "*") {
+              if (stepMatch[1].includes("-")) {
+                const [s, e] = stepMatch[1].split("-").map(Number);
+                start = s;
+                end = e;
+              } else {
+                start = parseInt(stepMatch[1], 10);
+              }
+            }
+            if (start < min || end > max || start > end) return null;
+            for (let i = start; i <= end; i += step) {
+              values.add(i);
+            }
+            continue;
+          }
+
+          const rangeMatch = part.match(/^(\d+)-(\d+)$/);
+          if (rangeMatch) {
+            const start = parseInt(rangeMatch[1], 10);
+            const end = parseInt(rangeMatch[2], 10);
+            if (start < min || end > max || start > end) return null;
+            for (let i = start; i <= end; i++) values.add(i);
+            continue;
+          }
+
+          if (part === "*") {
+            for (let i = min; i <= max; i++) values.add(i);
+            continue;
+          }
+
+          if (/^\d+$/.test(part)) {
+            const num = parseInt(part, 10);
+            if (num < min || num > max) return null;
+            values.add(num);
+            continue;
+          }
+
+          return null;
+        }
+
+        return Array.from(values).sort((a, b) => a - b);
+      }
+
+      function explainCron(m, h, dom, mon, dow) {
+        // Special simple cases
+        if (m === "*" && h === "*" && dom === "*" && mon === "*" && dow === "*") {
+          return "Every minute of every day";
+        }
+        if (m.startsWith("*/") && h === "*" && dom === "*" && mon === "*" && dow === "*") {
+          return `Every ${m.slice(2)} minutes`;
+        }
+        if (m === "0" && h === "*" && dom === "*" && mon === "*" && dow === "*") {
+          return "Every hour on the hour (minute 0)";
+        }
+        if (m.includes("/") && h === "*") {
+          return `At every ${m.split("/")[1]} minutes past the hour`;
+        }
+
+        let timeStr = "";
+        if (!m.includes("*") && !h.includes("*") && /^\d+$/.test(m) && /^\d+$/.test(h)) {
+          const hourNum = parseInt(h, 10);
+          const minNum = parseInt(m, 10);
+          const ampm = hourNum >= 12 ? "PM" : "AM";
+          const displayH = hourNum % 12 === 0 ? 12 : hourNum % 12;
+          const displayM = String(minNum).padStart(2, "0");
+          timeStr = `At ${displayH}:${displayM} ${ampm}`;
+        } else if (!m.includes("*") && /^\d+$/.test(m) && h === "*") {
+          timeStr = `At minute ${m} of every hour`;
+        } else {
+          timeStr = `At minute ${m}, hour ${h}`;
+        }
+
+        let dowStr = "";
+        if (dow === "*") {
+          dowStr = "";
+        } else if (dow === "1-5") {
+          dowStr = ", Monday through Friday";
+        } else if (dow === "0,6" || dow === "6,0") {
+          dowStr = ", on Saturday and Sunday";
+        } else if (/^\d+$/.test(dow)) {
+          dowStr = `, only on ${DOW_NAMES[parseInt(dow, 10)]}`;
+        } else {
+          dowStr = `, on day-of-week ${dow}`;
+        }
+
+        let dateStr = "";
+        if (dom === "*" && mon === "*") {
+          dateStr = "";
+        } else if (dom !== "*" && mon === "*") {
+          dateStr = `, on day ${dom} of every month`;
+        } else if (dom !== "*" && mon !== "*") {
+          dateStr = `, on day ${dom} of ${MONTH_NAMES[parseInt(mon, 10)] || "month " + mon}`;
+        }
+
+        return `${timeStr}${dowStr}${dateStr}`;
+      }
+
+      function getNextExecutions(minuteSet, hourSet, domSet, monthSet, dowSet, count = 5) {
+        const results = [];
+        const current = new Date();
+        current.setSeconds(0);
+        current.setMilliseconds(0);
+        current.setMinutes(current.getMinutes() + 1);
+
+        const mLookup = new Set(minuteSet);
+        const hLookup = new Set(hourSet);
+        const domLookup = new Set(domSet);
+        const monLookup = new Set(monthSet);
+        const dowLookup = new Set(dowSet);
+
+        const maxIterations = 50000;
+        let iterations = 0;
+
+        while (results.length < count && iterations < maxIterations) {
+          iterations++;
+          const month = current.getMonth() + 1;
+          if (!monLookup.has(month)) {
+            current.setMonth(current.getMonth() + 1);
+            current.setDate(1);
+            current.setHours(0);
+            current.setMinutes(0);
+            continue;
+          }
+
+          const dom = current.getDate();
+          const dow = current.getDay();
+          // Standard cron rule: if both DOM and DOW are not *, match if either matches
+          const domIsWild = domSet.length === 31;
+          const dowIsWild = dowSet.length >= 7;
+
+          let dayMatches = false;
+          if (domIsWild && dowIsWild) {
+            dayMatches = true;
+          } else if (!domIsWild && !dowIsWild) {
+            dayMatches = domLookup.has(dom) || dowLookup.has(dow);
+          } else if (!domIsWild) {
+            dayMatches = domLookup.has(dom);
+          } else {
+            dayMatches = dowLookup.has(dow);
+          }
+
+          if (!dayMatches) {
+            current.setDate(current.getDate() + 1);
+            current.setHours(0);
+            current.setMinutes(0);
+            continue;
+          }
+
+          const hour = current.getHours();
+          if (!hLookup.has(hour)) {
+            current.setHours(current.getHours() + 1);
+            current.setMinutes(0);
+            continue;
+          }
+
+          const minute = current.getMinutes();
+          if (!mLookup.has(minute)) {
+            current.setMinutes(current.getMinutes() + 1);
+            continue;
+          }
+
+          results.push(new Date(current));
+          current.setMinutes(current.getMinutes() + 1);
+        }
+
+        return results;
+      }
+
+      function formatRelative(date) {
+        const diffMs = date - new Date();
+        const diffMins = Math.round(diffMs / 60000);
+        if (diffMins < 60) return `in ${diffMins} min${diffMins === 1 ? "" : "s"}`;
+        const diffHours = Math.floor(diffMins / 60);
+        const remMins = diffMins % 60;
+        if (diffHours < 24) return `in ${diffHours}h ${remMins}m`;
+        const diffDays = Math.floor(diffHours / 24);
+        return `in ${diffDays} day${diffDays === 1 ? "" : "s"}`;
+      }
+
+      function update() {
+        const val = cronInput.value.trim().replace(/\s+/g, " ");
+        const parts = val.split(" ");
+
+        if (parts.length !== 5) {
+          cronInput.classList.add("invalid");
+          expBanner.classList.add("invalid");
+          expText.className = "exp-text invalid";
+          expText.textContent = "Invalid syntax: standard cron expression requires exactly 5 fields (minute hour day month weekday).";
+          valMin.textContent = "-";
+          valHour.textContent = "-";
+          valDom.textContent = "-";
+          valMonth.textContent = "-";
+          valDow.textContent = "-";
+          runsList.innerHTML = `<div class="run-item" style="color:var(--text-secondary)">No valid schedule to predict</div>`;
+          return;
+        }
+
+        valMin.textContent = escapeHtml(parts[0]);
+        valHour.textContent = escapeHtml(parts[1]);
+        valDom.textContent = escapeHtml(parts[2]);
+        valMonth.textContent = escapeHtml(parts[3]);
+        valDow.textContent = escapeHtml(parts[4]);
+
+        const minutes = parseField(parts[0], 0, 59);
+        const hours = parseField(parts[1], 0, 23);
+        const doms = parseField(parts[2], 1, 31);
+        const months = parseField(parts[3], 1, 12);
+        const dows = parseField(parts[4], 0, 6);
+
+        if (!minutes || !hours || !doms || !months || !dows) {
+          cronInput.classList.add("invalid");
+          expBanner.classList.add("invalid");
+          expText.className = "exp-text invalid";
+          expText.textContent = "Invalid field value or range in cron expression. Check minutes (0-59), hours (0-23), day (1-31), month (1-12), weekday (0-6).";
+          runsList.innerHTML = `<div class="run-item" style="color:var(--text-secondary)">Fix syntax to calculate upcoming runs</div>`;
+          return;
+        }
+
+        cronInput.classList.remove("invalid");
+        expBanner.classList.remove("invalid");
+        expText.className = "exp-text";
+        expText.textContent = explainCron(parts[0], parts[1], parts[2], parts[3], parts[4]);
+
+        // Calculate next runs
+        const nextRuns = getNextExecutions(minutes, hours, doms, months, dows, 5);
+        if (nextRuns.length === 0) {
+          runsList.innerHTML = `<div class="run-item">No upcoming executions found within 50,000 steps</div>`;
+          return;
+        }
+
+        runsList.innerHTML = nextRuns
+          .map((d, idx) => {
+            const formatted = d.toLocaleString(undefined, {
+              weekday: "short",
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit"
+            });
+            return `
+              <div class="run-item">
+                <span class="run-index">#${idx + 1}</span>
+                <span class="run-datetime">${escapeHtml(formatted)}</span>
+                <span class="run-relative">${formatRelative(d)}</span>
+              </div>
+            `;
+          })
+          .join("");
+      }
+
+      cronInput.addEventListener("input", () => {
+        presetSelect.value = "custom";
+        update();
+      });
+
+      presetSelect.addEventListener("change", () => {
+        if (presetSelect.value !== "custom") {
+          cronInput.value = presetSelect.value;
+          update();
+        }
+      });
+
+      // Toast feedback helper
+      const toast = document.getElementById("toast");
+      function showToast(msg) {
+        toast.textContent = msg;
+        toast.classList.add("show");
+        setTimeout(() => toast.classList.remove("show"), 2000);
+      }
+
+      document.getElementById("copyCronBtn").addEventListener("click", () => {
+        navigator.clipboard.writeText(cronInput.value.trim()).then(() => showToast("Cron expression copied! 📋"));
+      });
+
+      document.getElementById("copyTextBtn").addEventListener("click", () => {
+        navigator.clipboard.writeText(expText.textContent).then(() => showToast("Explanation copied! 📝"));
+      });
+
+      document.getElementById("copyRunsBtn").addEventListener("click", () => {
+        const items = Array.from(document.querySelectorAll(".run-datetime")).map((el, i) => `#${i + 1}: ${el.textContent}`);
+        navigator.clipboard.writeText(items.join("\n")).then(() => showToast("Next 5 runs copied! 🗓️"));
+      });
+
+      // Initialize
+      update();
+    </script>
+  </body>
+</html>
