@@ -7,7 +7,11 @@
     <script>
       (function () {
         var t = localStorage.getItem("eventloop_theme");
-        if (t) document.documentElement.setAttribute("data-theme", t);
+        if (t) {
+          document.documentElement.setAttribute("data-theme", t);
+        } else if (window.matchMedia("(prefers-color-scheme: light)").matches) {
+          document.documentElement.setAttribute("data-theme", "light");
+        }
       })();
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -658,6 +662,9 @@
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       function playTone(freq, type = "sine", duration = 0.15) {
         if (!audioCtx) return;
+        if (audioCtx.state === "suspended") {
+          audioCtx.resume();
+        }
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.type = type;
@@ -696,7 +703,13 @@
         });
       }
 
+      let simulationInterval = null;
+
       function loadLevel(idx) {
+        if (simulationInterval) {
+          clearInterval(simulationInterval);
+          simulationInterval = null;
+        }
         currentLevelIndex = idx;
         const lvl = levels[idx];
         levelBadgeEl.textContent = `Level ${lvl.id} of ${levels.length}`;
@@ -789,12 +802,16 @@
       }
 
       simulateBtn.addEventListener("click", () => {
+        if (simulationInterval) {
+          clearInterval(simulationInterval);
+          simulationInterval = null;
+        }
         const lvl = levels[currentLevelIndex];
         resetEngineView();
         let step = 0;
         const plan = lvl.answer;
 
-        const interval = setInterval(() => {
+        simulationInterval = setInterval(() => {
           if (step < plan.length) {
             const currentItem = plan[step];
             callStackBox.innerHTML = `<span class="item-badge badge-callstack">console.log("${currentItem}")</span>`;
@@ -802,7 +819,8 @@
             playTone(520 + step * 40);
             step++;
           } else {
-            clearInterval(interval);
+            clearInterval(simulationInterval);
+            simulationInterval = null;
             callStackBox.innerHTML = '<span style="color: var(--text-secondary); font-size: 0.75rem">Stack Cleaned</span>';
           }
         }, 600);
