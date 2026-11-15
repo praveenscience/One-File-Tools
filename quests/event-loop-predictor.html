@@ -1,0 +1,883 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Event Loop Predictor: The Microtask Maze — One File Tools</title>
+    <script>
+      (function () {
+        var t = localStorage.getItem("eventloop_theme");
+        if (t) {
+          document.documentElement.setAttribute("data-theme", t);
+        } else if (window.matchMedia("(prefers-color-scheme: light)").matches) {
+          document.documentElement.setAttribute("data-theme", "light");
+        }
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Nunito:wght@400;600;700;800&family=Oxanium:wght@600;700;800&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg-primary: #0a0f1d;
+        --bg-secondary: #131d35;
+        --bg-tertiary: #1e2c4f;
+        --border-color: #2a3d6b;
+        --text-primary: #f8fafc;
+        --text-secondary: #94a3b8;
+        --accent-amber: #f59e0b;
+        --accent-cyan: #06b6d4;
+        --accent-purple: #a855f7;
+        --accent-emerald: #10b981;
+        --accent-rose: #f43f5e;
+        --font-sans: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+        --font-heading: "Oxanium", sans-serif;
+      }
+
+      @media (prefers-color-scheme: light) {
+        :root:not([data-theme="dark"]) {
+          --bg-primary: #f8fafc;
+          --bg-secondary: #ffffff;
+          --bg-tertiary: #f1f5f9;
+          --border-color: #cbd5e1;
+          --text-primary: #0f172a;
+          --text-secondary: #475569;
+          --accent-amber: #d97706;
+          --accent-cyan: #0891b2;
+          --accent-purple: #9333ea;
+          --accent-emerald: #059669;
+          --accent-rose: #e11d48;
+        }
+      }
+
+      [data-theme="dark"] {
+        --bg-primary: #0a0f1d;
+        --bg-secondary: #131d35;
+        --bg-tertiary: #1e2c4f;
+        --border-color: #2a3d6b;
+        --text-primary: #f8fafc;
+        --text-secondary: #94a3b8;
+        --accent-amber: #f59e0b;
+        --accent-cyan: #06b6d4;
+        --accent-purple: #a855f7;
+        --accent-emerald: #10b981;
+        --accent-rose: #f43f5e;
+      }
+
+      [data-theme="light"] {
+        --bg-primary: #f8fafc;
+        --bg-secondary: #ffffff;
+        --bg-tertiary: #f1f5f9;
+        --border-color: #cbd5e1;
+        --text-primary: #0f172a;
+        --text-secondary: #475569;
+        --accent-amber: #d97706;
+        --accent-cyan: #0891b2;
+        --accent-purple: #9333ea;
+        --accent-emerald: #059669;
+        --accent-rose: #e11d48;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg-primary);
+        color: var(--text-primary);
+        line-height: 1.6;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        transition:
+          background-color 0.2s,
+          color 0.2s;
+        overflow-x: hidden;
+      }
+
+      header {
+        background-color: var(--bg-secondary);
+        border-bottom: 1px solid var(--border-color);
+        padding: 1rem 2rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+      }
+
+      .logo-group h1 {
+        font-family: var(--font-heading);
+        font-size: 1.5rem;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        letter-spacing: 0.03em;
+      }
+
+      .logo-group p {
+        color: var(--text-secondary);
+        font-size: 0.8125rem;
+      }
+
+      .stats-bar {
+        display: flex;
+        align-items: center;
+        gap: 1.25rem;
+      }
+
+      .stat-item {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-family: var(--font-heading);
+        font-size: 1.125rem;
+        font-weight: 700;
+      }
+
+      .theme-btn {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
+        padding: 0.45rem 0.85rem;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        transition: all 0.2s;
+      }
+
+      .theme-btn:hover {
+        border-color: var(--accent-cyan);
+      }
+
+      main {
+        max-width: 1250px;
+        width: 100%;
+        margin: 1.5rem auto;
+        padding: 0 1.5rem;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+
+      .level-nav {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 0.85rem 1.25rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+
+      .level-dots {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .level-dot {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--bg-tertiary);
+        border: 2px solid var(--border-color);
+        color: var(--text-secondary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-heading);
+        font-size: 0.875rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .level-dot.active {
+        background: var(--accent-cyan);
+        color: #000;
+        border-color: var(--accent-cyan);
+        transform: scale(1.1);
+      }
+
+      .level-dot.completed {
+        background: var(--accent-emerald);
+        color: #fff;
+        border-color: var(--accent-emerald);
+      }
+
+      .game-grid {
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 1.5rem;
+      }
+
+      .card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 14px;
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+      }
+
+      .card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 0.75rem;
+      }
+
+      .card-header h2 {
+        font-family: var(--font-heading);
+        font-size: 1.125rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .code-view {
+        background: #060a14;
+        color: #e2e8f0;
+        padding: 1.25rem;
+        border-radius: 10px;
+        font-family: var(--font-mono);
+        font-size: 0.875rem;
+        line-height: 1.6;
+        border: 1px solid #1a2542;
+        overflow-x: auto;
+      }
+
+      .interactive-section {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      .slots-area {
+        background: var(--bg-tertiary);
+        border: 2px dashed var(--border-color);
+        border-radius: 10px;
+        padding: 1rem;
+        min-height: 70px;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+
+      .chip-pool {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        padding: 0.5rem 0;
+      }
+
+      .log-chip {
+        background: #2563eb;
+        color: #fff;
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        font-family: var(--font-mono);
+        font-size: 0.875rem;
+        font-weight: 700;
+        cursor: pointer;
+        user-select: none;
+        transition: all 0.15s;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+      }
+
+      .log-chip:hover {
+        transform: translateY(-2px);
+        filter: brightness(1.15);
+      }
+
+      .log-chip.used {
+        opacity: 0.3;
+        pointer-events: none;
+      }
+
+      .button-group {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-top: 0.5rem;
+      }
+
+      .btn {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
+        padding: 0.65rem 1.25rem;
+        border-radius: 8px;
+        font-family: var(--font-heading);
+        font-size: 0.9375rem;
+        font-weight: 700;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        transition: all 0.2s;
+      }
+
+      .btn:hover {
+        border-color: var(--accent-cyan);
+      }
+
+      .btn.primary {
+        background: var(--accent-cyan);
+        color: #000;
+        border-color: var(--accent-cyan);
+      }
+
+      .btn.primary:hover {
+        filter: brightness(1.1);
+      }
+
+      /* Visualizer Engine Display */
+      .engine-box {
+        background: #060a14;
+        border: 1px solid #1a2542;
+        border-radius: 12px;
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      .queue-row {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+      }
+
+      .queue-title {
+        font-size: 0.75rem;
+        font-weight: 800;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+
+      .queue-items {
+        background: #0d1527;
+        border: 1px solid #1e2c4f;
+        border-radius: 6px;
+        padding: 0.5rem;
+        min-height: 42px;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        overflow-x: auto;
+      }
+
+      .item-badge {
+        padding: 0.25rem 0.65rem;
+        border-radius: 4px;
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+        font-weight: 600;
+      }
+
+      .badge-callstack {
+        background: rgba(244, 63, 94, 0.2);
+        color: var(--accent-rose);
+        border: 1px solid var(--accent-rose);
+      }
+
+      .badge-micro {
+        background: rgba(168, 85, 247, 0.2);
+        color: var(--accent-purple);
+        border: 1px solid var(--accent-purple);
+      }
+
+      .badge-macro {
+        background: rgba(245, 158, 11, 0.2);
+        color: var(--accent-amber);
+        border: 1px solid var(--accent-amber);
+      }
+
+      .badge-output {
+        background: rgba(16, 185, 129, 0.2);
+        color: var(--accent-emerald);
+        border: 1px solid var(--accent-emerald);
+      }
+
+      .verdict-banner {
+        padding: 1rem;
+        border-radius: 8px;
+        font-weight: 700;
+        display: none;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .verdict-banner.success {
+        display: flex;
+        background: rgba(16, 185, 129, 0.15);
+        color: #34d399;
+        border: 1px solid #10b981;
+      }
+
+      .verdict-banner.error {
+        display: flex;
+        background: rgba(244, 63, 94, 0.15);
+        color: #fb7185;
+        border: 1px solid #f43f5e;
+      }
+
+      #confettiCanvas {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        pointer-events: none;
+        z-index: 9999;
+      }
+
+      footer {
+        background-color: var(--bg-secondary);
+        border-top: 1px solid var(--border-color);
+        padding: 1.5rem;
+        text-align: center;
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+      }
+
+      footer a {
+        color: var(--accent-cyan);
+        text-decoration: none;
+        font-weight: 600;
+      }
+
+      footer a:hover {
+        text-decoration: underline;
+      }
+
+      @media (max-width: 860px) {
+        .game-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="confettiCanvas"></canvas>
+
+    <header>
+      <div class="logo-group">
+        <h1>⚡ Event Loop Predictor</h1>
+        <p>Interactive Quest: Crack Call Stacks, Microtasks & Macrotasks</p>
+      </div>
+      <div class="stats-bar">
+        <div class="stat-item" style="color: var(--accent-amber)">⭐ <span id="starScore">0</span></div>
+        <div class="stat-item" style="color: var(--accent-emerald)">🔥 <span id="streakCount">0</span> Streak</div>
+        <button id="themeToggle" class="theme-btn" aria-label="Toggle theme">
+          <span id="themeIcon">☀️</span>
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <!-- Level Navigator -->
+      <section class="level-nav" aria-label="Quest Level Selector">
+        <div style="display: flex; align-items: center; gap: 0.75rem">
+          <span style="font-family: var(--font-heading); font-weight: 700">Level:</span>
+          <div class="level-dots" id="levelDots">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+        <div id="levelDescription" style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 600">Loading scenario...</div>
+      </section>
+
+      <div class="game-grid">
+        <!-- Code Challenge -->
+        <section class="card" aria-labelledby="code-heading">
+          <div class="card-header">
+            <h2 id="code-heading">📜 Scenario Code</h2>
+            <span id="levelBadge" style="font-size: 0.75rem; font-weight: 800; padding: 0.2rem 0.6rem; border-radius: 999px; background: rgba(6, 182, 212, 0.15); color: var(--accent-cyan)">Level 1</span>
+          </div>
+          <pre class="code-view"><code id="codeSnippet"></code></pre>
+          <div class="interactive-section">
+            <label style="font-size: 0.8125rem; font-weight: 700; color: var(--text-secondary)">Your Predicted Output Sequence (Click in order):</label>
+            <div class="slots-area" id="slotsArea">
+              <span id="emptySlotMsg" style="color: var(--text-secondary); font-size: 0.8125rem; font-style: italic">Click the chips below to build your predicted sequence...</span>
+            </div>
+            <div class="chip-pool" id="chipPool">
+              <!-- Available chips -->
+            </div>
+            <div class="button-group">
+              <button id="submitBtn" class="btn primary">Verify Sequence 🚀</button>
+              <button id="clearBtn" class="btn">Reset Choice</button>
+              <button id="simulateBtn" class="btn">Step-by-Step Visualizer ⚙️</button>
+            </div>
+            <div id="verdictBanner" class="verdict-banner"></div>
+          </div>
+        </section>
+
+        <!-- Real-Time Event Loop Engine Simulator -->
+        <section class="card" aria-labelledby="engine-heading">
+          <div class="card-header">
+            <h2 id="engine-heading">⚙️ Event Loop State Inspector</h2>
+            <span style="font-size: 0.75rem; color: var(--text-secondary)">V8 Engine Simulation</span>
+          </div>
+          <div class="engine-box">
+            <div class="queue-row">
+              <span class="queue-title" style="color: var(--accent-rose)">1. Call Stack (LIFO)</span>
+              <div class="queue-items" id="callStackBox">
+                <span style="color: var(--text-secondary); font-size: 0.75rem">Idle</span>
+              </div>
+            </div>
+            <div class="queue-row">
+              <span class="queue-title" style="color: var(--accent-purple)">2. Microtask Queue (Promises, queueMicrotask)</span>
+              <div class="queue-items" id="microtaskBox">
+                <span style="color: var(--text-secondary); font-size: 0.75rem">Empty</span>
+              </div>
+            </div>
+            <div class="queue-row">
+              <span class="queue-title" style="color: var(--accent-amber)">3. Macrotask / Callback Queue (setTimeout, setInterval)</span>
+              <div class="queue-items" id="macrotaskBox">
+                <span style="color: var(--text-secondary); font-size: 0.75rem">Empty</span>
+              </div>
+            </div>
+            <div class="queue-row">
+              <span class="queue-title" style="color: var(--accent-emerald)">4. Actual Console Output</span>
+              <div class="queue-items" id="outputBox">
+                <span style="color: var(--text-secondary); font-size: 0.75rem">No logs executed</span>
+              </div>
+            </div>
+          </div>
+          <div style="background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; font-size: 0.8125rem; color: var(--text-secondary)">
+            <strong style="color: var(--text-primary)">Rule of Thumb:</strong>
+            The Call Stack runs synchronous code first. When clear, V8 drains <em>all</em> pending Microtasks before pulling the next Macrotask from the Task Queue.
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <footer>
+      <p>Built with ❤️ for <a href="https://github.com/praveenscience/One-File-Tools" target="_blank" rel="noopener noreferrer">One File Tools</a>. Zero build step. Zero dependencies. Open and run anywhere.</p>
+    </footer>
+
+    <script>
+      const levels = [
+        {
+          id: 1,
+          title: "Synchronous vs Macrotask",
+          desc: "Understand how setTimeout callbacks are deferred to the Macrotask queue.",
+          code: `console.log("A");\n\nsetTimeout(() => {\n  console.log("B");\n}, 0);\n\nconsole.log("C");`,
+          tokens: ["A", "B", "C"],
+          answer: ["A", "C", "B"],
+          explanation: "Synchronous logs 'A' and 'C' run immediately on the Call Stack. setTimeout callback 'B' queues in Macrotasks and runs after the stack is clear."
+        },
+        {
+          id: 2,
+          title: "Microtask Priority",
+          desc: "Promises resolve into the Microtask Queue, which executes before Macrotasks.",
+          code: `console.log("1");\n\nsetTimeout(() => {\n  console.log("2");\n}, 0);\n\nPromise.resolve().then(() => {\n  console.log("3");\n});\n\nconsole.log("4");`,
+          tokens: ["1", "2", "3", "4"],
+          answer: ["1", "4", "3", "2"],
+          explanation: "Synchronous '1' and '4' execute first. The Microtask '3' executes before the Macrotask queue drains '2'."
+        },
+        {
+          id: 3,
+          title: "Nested Microtasks",
+          desc: "Microtasks generated inside microtasks take precedence over waiting macrotasks.",
+          code: `setTimeout(() => console.log("Timeout"), 0);\n\nPromise.resolve()\n  .then(() => {\n    console.log("Promise 1");\n    return Promise.resolve("Promise 2");\n  })\n  .then((val) => {\n    console.log(val);\n  });`,
+          tokens: ["Timeout", "Promise 1", "Promise 2"],
+          answer: ["Promise 1", "Promise 2", "Timeout"],
+          explanation: "All chained microtasks must be completely drained before the event loop can proceed to the macrotask queue."
+        },
+        {
+          id: 4,
+          title: "Async / Await Deconstruction",
+          desc: "Execution up to the first await is synchronous; everything after is queued as a microtask.",
+          code: `async function run() {\n  console.log("Start");\n  await Promise.resolve();\n  console.log("After Await");\n}\n\nrun();\nconsole.log("End");`,
+          tokens: ["Start", "After Await", "End"],
+          answer: ["Start", "End", "After Await"],
+          explanation: "'Start' logs immediately inside run(). The await suspends run(), logging 'End' synchronously, then resumes as a microtask."
+        },
+        {
+          id: 5,
+          title: "The queueMicrotask API",
+          desc: "Compare explicit queueMicrotask alongside Promise resolutions.",
+          code: `queueMicrotask(() => console.log("Microtask 1"));\n\nPromise.resolve().then(() => console.log("Promise"));\n\nqueueMicrotask(() => console.log("Microtask 2"));`,
+          tokens: ["Microtask 1", "Promise", "Microtask 2"],
+          answer: ["Microtask 1", "Promise", "Microtask 2"],
+          explanation: "Microtasks execute FIFO (First-In-First-Out) in the order they were scheduled in the microtask queue."
+        },
+        {
+          id: 6,
+          title: "The Master Challenge",
+          desc: "Complex interleaving of synchronous code, promises, and timers.",
+          code: `console.log("Init");\n\nsetTimeout(() => console.log("Timer 1"), 0);\n\nPromise.resolve().then(() => {\n  console.log("P1");\n  setTimeout(() => console.log("Timer 2"), 0);\n});\n\nPromise.resolve().then(() => console.log("P2"));\n\nconsole.log("Done");`,
+          tokens: ["Init", "Done", "P1", "P2", "Timer 1", "Timer 2"],
+          answer: ["Init", "Done", "P1", "P2", "Timer 1", "Timer 2"],
+          explanation: "Sync ('Init', 'Done') -> Microtasks ('P1', 'P2') -> First timer ('Timer 1') -> Second timer scheduled inside P1 ('Timer 2')."
+        }
+      ];
+
+      let currentLevelIndex = 0;
+      let userSequence = [];
+      let score = parseInt(localStorage.getItem("quest_eventloop_score") || "0", 10);
+      let streak = parseInt(localStorage.getItem("quest_eventloop_streak") || "0", 10);
+      let completedLevels = JSON.parse(localStorage.getItem("quest_eventloop_completed") || "[]");
+
+      const starScoreEl = document.getElementById("starScore");
+      const streakCountEl = document.getElementById("streakCount");
+      const levelDotsEl = document.getElementById("levelDots");
+      const levelDescriptionEl = document.getElementById("levelDescription");
+      const codeSnippetEl = document.getElementById("codeSnippet");
+      const levelBadgeEl = document.getElementById("levelBadge");
+      const slotsAreaEl = document.getElementById("slotsArea");
+      const chipPoolEl = document.getElementById("chipPool");
+      const submitBtn = document.getElementById("submitBtn");
+      const clearBtn = document.getElementById("clearBtn");
+      const simulateBtn = document.getElementById("simulateBtn");
+      const verdictBanner = document.getElementById("verdictBanner");
+
+      const callStackBox = document.getElementById("callStackBox");
+      const microtaskBox = document.getElementById("microtaskBox");
+      const macrotaskBox = document.getElementById("macrotaskBox");
+      const outputBox = document.getElementById("outputBox");
+
+      // Audio Synthesis (Zero dependencies)
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      function playTone(freq, type = "sine", duration = 0.15) {
+        if (!audioCtx) return;
+        if (audioCtx.state === "suspended") {
+          audioCtx.resume();
+        }
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      }
+
+      // Theme toggle
+      const themeToggle = document.getElementById("themeToggle");
+      const themeIcon = document.getElementById("themeIcon");
+      let currentTheme = localStorage.getItem("eventloop_theme") || "dark";
+      function applyTheme(t) {
+        document.documentElement.setAttribute("data-theme", t);
+        themeIcon.textContent = t === "dark" ? "☀️" : "🌙";
+        localStorage.setItem("eventloop_theme", t);
+      }
+      applyTheme(currentTheme);
+      themeToggle.addEventListener("click", () => {
+        currentTheme = currentTheme === "dark" ? "light" : "dark";
+        applyTheme(currentTheme);
+      });
+
+      function renderLevelDots() {
+        levelDotsEl.innerHTML = "";
+        levels.forEach((lvl, idx) => {
+          const dot = document.createElement("div");
+          dot.className = `level-dot ${idx === currentLevelIndex ? "active" : ""} ${completedLevels.includes(lvl.id) ? "completed" : ""}`;
+          dot.textContent = lvl.id;
+          dot.addEventListener("click", () => loadLevel(idx));
+          levelDotsEl.appendChild(dot);
+        });
+      }
+
+      let simulationInterval = null;
+
+      function loadLevel(idx) {
+        if (simulationInterval) {
+          clearInterval(simulationInterval);
+          simulationInterval = null;
+        }
+        currentLevelIndex = idx;
+        const lvl = levels[idx];
+        levelBadgeEl.textContent = `Level ${lvl.id} of ${levels.length}`;
+        levelDescriptionEl.textContent = `${lvl.title}: ${lvl.desc}`;
+        codeSnippetEl.textContent = lvl.code;
+        userSequence = [];
+        verdictBanner.style.display = "none";
+        renderLevelDots();
+        renderChips();
+        resetEngineView();
+      }
+
+      function renderChips() {
+        const lvl = levels[currentLevelIndex];
+        slotsAreaEl.innerHTML = userSequence.length === 0 ? '<span style="color: var(--text-secondary); font-size: 0.8125rem; font-style: italic">Click the chips below to build your predicted sequence...</span>' : "";
+
+        userSequence.forEach((val, i) => {
+          const chip = document.createElement("div");
+          chip.className = "log-chip";
+          chip.textContent = `${i + 1}. "${val}"`;
+          chip.addEventListener("click", () => {
+            userSequence.splice(i, 1);
+            renderChips();
+          });
+          slotsAreaEl.appendChild(chip);
+        });
+
+        chipPoolEl.innerHTML = "";
+        lvl.tokens.forEach((token) => {
+          const isUsed = userSequence.includes(token);
+          const chip = document.createElement("div");
+          chip.className = `log-chip ${isUsed ? "used" : ""}`;
+          chip.textContent = `"${token}"`;
+          chip.addEventListener("click", () => {
+            if (!isUsed) {
+              userSequence.push(token);
+              playTone(440);
+              renderChips();
+            }
+          });
+          chipPoolEl.appendChild(chip);
+        });
+      }
+
+      clearBtn.addEventListener("click", () => {
+        userSequence = [];
+        renderChips();
+      });
+
+      submitBtn.addEventListener("click", () => {
+        const lvl = levels[currentLevelIndex];
+        const isMatch = userSequence.length === lvl.answer.length && userSequence.every((val, i) => val === lvl.answer[i]);
+
+        if (isMatch) {
+          playTone(660, "sine", 0.3);
+          streak++;
+          score += 50;
+          if (!completedLevels.includes(lvl.id)) completedLevels.push(lvl.id);
+          saveStats();
+          verdictBanner.className = "verdict-banner success";
+          verdictBanner.innerHTML = `<span>🎉 Correct!</span> ${lvl.explanation}`;
+          triggerConfetti();
+
+          if (currentLevelIndex < levels.length - 1) {
+            setTimeout(() => loadLevel(currentLevelIndex + 1), 2000);
+          }
+        } else {
+          playTone(220, "sawtooth", 0.4);
+          streak = 0;
+          saveStats();
+          verdictBanner.className = "verdict-banner error";
+          verdictBanner.innerHTML = `<span>❌ Incorrect Order!</span> Check which phase executes first. Expected: ${lvl.answer.map((x) => `"${x}"`).join(" → ")}`;
+        }
+      });
+
+      function saveStats() {
+        starScoreEl.textContent = score;
+        streakCountEl.textContent = streak;
+        localStorage.setItem("quest_eventloop_score", score);
+        localStorage.setItem("quest_eventloop_streak", streak);
+        localStorage.setItem("quest_eventloop_completed", JSON.stringify(completedLevels));
+        renderLevelDots();
+      }
+
+      function resetEngineView() {
+        callStackBox.innerHTML = '<span style="color: var(--text-secondary); font-size: 0.75rem">Idle</span>';
+        microtaskBox.innerHTML = '<span style="color: var(--text-secondary); font-size: 0.75rem">Empty</span>';
+        macrotaskBox.innerHTML = '<span style="color: var(--text-secondary); font-size: 0.75rem">Empty</span>';
+        outputBox.innerHTML = '<span style="color: var(--text-secondary); font-size: 0.75rem">No logs executed</span>';
+      }
+
+      simulateBtn.addEventListener("click", () => {
+        if (simulationInterval) {
+          clearInterval(simulationInterval);
+          simulationInterval = null;
+        }
+        const lvl = levels[currentLevelIndex];
+        resetEngineView();
+        let step = 0;
+        const plan = lvl.answer;
+
+        simulationInterval = setInterval(() => {
+          if (step < plan.length) {
+            const currentItem = plan[step];
+            callStackBox.innerHTML = `<span class="item-badge badge-callstack">console.log("${currentItem}")</span>`;
+            outputBox.innerHTML += `<span class="item-badge badge-output">"${currentItem}"</span> `;
+            playTone(520 + step * 40);
+            step++;
+          } else {
+            clearInterval(simulationInterval);
+            simulationInterval = null;
+            callStackBox.innerHTML = '<span style="color: var(--text-secondary); font-size: 0.75rem">Stack Cleaned</span>';
+          }
+        }, 600);
+      });
+
+      // Confetti Effect
+      const canvas = document.getElementById("confettiCanvas");
+      const ctx = canvas.getContext("2d");
+      let confetti = [];
+      function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
+      window.addEventListener("resize", resizeCanvas);
+      resizeCanvas();
+
+      function triggerConfetti() {
+        confetti = [];
+        for (let i = 0; i < 70; i++) {
+          confetti.push({
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            r: Math.random() * 6 + 4,
+            d: Math.random() * 70,
+            color: `hsl(${Math.random() * 360}, 100%, 50%)`,
+            tilt: Math.random() * 10 - 10,
+            tiltAngleInc: Math.random() * 0.07 + 0.05,
+            tiltAngle: 0,
+            vx: (Math.random() - 0.5) * 12,
+            vy: (Math.random() - 0.5) * 12 - 4
+          });
+        }
+        animateConfetti();
+      }
+
+      function animateConfetti() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        confetti.forEach((p, idx) => {
+          p.tiltAngle += p.tiltAngleInc;
+          p.y += (Math.cos(p.d) + 3 + p.r / 2) / 2 + p.vy;
+          p.x += Math.sin(p.d) * 2 + p.vx;
+          p.vy += 0.2;
+          ctx.beginPath();
+          ctx.lineWidth = p.r;
+          ctx.strokeStyle = p.color;
+          ctx.moveTo(p.x + p.tilt + p.r / 4, p.y);
+          ctx.lineTo(p.x + p.tilt, p.y + p.tilt + p.r / 4);
+          ctx.stroke();
+        });
+        confetti = confetti.filter((p) => p.y < canvas.height);
+        if (confetti.length > 0) requestAnimationFrame(animateConfetti);
+      }
+
+      // Initial stats & level load
+      starScoreEl.textContent = score;
+      streakCountEl.textContent = streak;
+      loadLevel(0);
+    </script>
+  </body>
+</html>
