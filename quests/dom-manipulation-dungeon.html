@@ -1,0 +1,1697 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DOM Manipulation Dungeon — One File Tools</title>
+  <meta name="description"
+    content="A dungeon-crawler programming game. Navigate rooms and unlock doors by writing and executing live DOM manipulation commands." />
+
+  <!-- Dark Mode FOUC Prevention -->
+  <script>
+    (function () {
+      var t = localStorage.getItem('dom_dungeon_theme');
+      if (t === 'light') document.documentElement.setAttribute('data-theme', 'light');
+      else if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+      else if (window.matchMedia('(prefers-color-scheme: light)').matches) document.documentElement.setAttribute('data-theme', 'light');
+      else document.documentElement.setAttribute('data-theme', 'dark');
+    })();
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+    rel="stylesheet" />
+
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #090d16;
+      --surface: #0f172a;
+      --surface-raised: #1e293b;
+      --border: #334155;
+      --border-focus: #38bdf8;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+
+      --accent: #38bdf8;
+      --gold: #f59e0b;
+      --gold-subtle: rgba(245, 158, 11, 0.15);
+      --success: #10b981;
+      --success-subtle: rgba(16, 185, 129, 0.15);
+      --danger: #ef4444;
+      --danger-subtle: rgba(239, 68, 68, 0.15);
+      --purple: #a855f7;
+
+      --radius-sm: 6px;
+      --radius: 12px;
+      --radius-lg: 16px;
+
+      --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+    }
+
+    :root[data-theme="light"] {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface-raised: #f1f5f9;
+      --border: #cbd5e1;
+      --border-focus: #0284c7;
+      --text: #0f172a;
+      --text-muted: #64748b;
+
+      --accent: #0284c7;
+      --gold: #d97706;
+      --gold-subtle: rgba(217, 119, 6, 0.12);
+      --success: #059669;
+      --success-subtle: rgba(5, 150, 105, 0.12);
+      --danger: #dc2626;
+      --danger-subtle: rgba(220, 38, 38, 0.12);
+      --purple: #7c3aed;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      transition: background-color 0.2s, color 0.2s;
+    }
+
+    .container {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 1.25rem 1rem 3rem;
+      width: 100%;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top Navigation Header */
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: var(--radius);
+      background: linear-gradient(135deg, #a855f7, #ec4899, #f59e0b);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      box-shadow: 0 4px 12px rgba(168, 85, 247, 0.35);
+    }
+
+    .brand-text h1 {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .quest-badge {
+      font-size: 0.68rem;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      font-weight: 700;
+      padding: 0.15rem 0.5rem;
+      border-radius: 9999px;
+      background: var(--gold-subtle);
+      color: var(--gold);
+      border: 1px solid var(--gold);
+    }
+
+    .brand-text p {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .btn-action {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: var(--radius-sm);
+      padding: 0.45rem 0.75rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: all 0.15s ease;
+    }
+
+    .btn-action:hover {
+      background: var(--surface-raised);
+      border-color: var(--text-muted);
+    }
+
+    /* Dungeon HUD Stats Bar */
+    .dungeon-hud {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .hud-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.65rem 0.9rem;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .hud-lbl {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .hud-val {
+      font-size: 1.25rem;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    /* Dungeon Map Navigation Strip */
+    .map-strip {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.75rem 1rem;
+      margin-bottom: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      overflow-x: auto;
+    }
+
+    .map-room-node {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-sm);
+      border: 1.5px solid var(--border);
+      background: var(--surface-raised);
+      color: var(--text-muted);
+      font-size: 0.72rem;
+      font-weight: 700;
+      cursor: pointer;
+      flex-shrink: 0;
+      position: relative;
+      transition: all 0.15s ease;
+    }
+
+    .map-room-node:hover {
+      border-color: var(--border-focus);
+    }
+
+    .map-room-node.active {
+      border-color: var(--accent);
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
+    }
+
+    .map-room-node.cleared {
+      border-color: var(--success);
+      color: var(--success);
+    }
+
+    .map-room-node.boss {
+      border-color: var(--purple);
+    }
+
+    .map-room-connector {
+      width: 12px;
+      height: 2px;
+      background: var(--border);
+      flex-shrink: 0;
+    }
+
+    /* Main Crawl Grid Layout */
+    .crawl-layout {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.25rem;
+      flex: 1;
+    }
+
+    @media (min-width: 900px) {
+      .crawl-layout {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    /* Left: Visual Chamber Sandbox & Room Objective */
+    .chamber-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    }
+
+    .chamber-header {
+      padding: 0.85rem 1.25rem;
+      background: var(--surface-raised);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+
+    .chamber-title h2 {
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .floor-pill {
+      font-size: 0.7rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--gold);
+    }
+
+    /* Mission Objective Clue */
+    .objective-banner {
+      padding: 0.85rem 1.25rem;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      font-size: 0.86rem;
+      line-height: 1.5;
+    }
+
+    .objective-banner strong {
+      color: var(--accent);
+    }
+
+    /* Visual Chamber Sandbox */
+    .chamber-sandbox {
+      background: #040711;
+      padding: 1.5rem;
+      min-height: 220px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      border-bottom: 1px solid var(--border);
+    }
+
+    :root[data-theme="light"] .chamber-sandbox {
+      background: #0f172a;
+      color: #f8fafc;
+    }
+
+    /* Chamber Visual Elements */
+    .dungeon-door {
+      width: 140px;
+      height: 160px;
+      border: 4px solid #475569;
+      border-radius: 70px 70px 0 0;
+      background: #1e293b;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      transition: all 0.3s ease;
+    }
+
+    .dungeon-door.locked {
+      border-color: #ef4444;
+      background: #450a0a;
+    }
+
+    .dungeon-door.locked::after {
+      content: '🔒 LOCKED';
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 800;
+      color: #fca5a5;
+    }
+
+    .dungeon-door.unlocked {
+      border-color: #10b981;
+      background: #064e3b;
+      box-shadow: 0 0 25px rgba(16, 185, 129, 0.4);
+    }
+
+    .dungeon-door.unlocked::after {
+      content: '🚪 UNLOCKED';
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 800;
+      color: #6ee7b7;
+    }
+
+    .torch {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #334155;
+      display: inline-block;
+      transition: all 0.3s ease;
+    }
+
+    .torch.lit {
+      background: #f59e0b;
+      box-shadow: 0 0 20px #f59e0b;
+    }
+
+    .bridge {
+      display: flex;
+      gap: 6px;
+      padding: 10px;
+      background: #0f172a;
+      border-radius: 4px;
+      width: 260px;
+      justify-content: center;
+    }
+
+    .plank {
+      width: 32px;
+      height: 50px;
+      background: #78350f;
+      border-radius: 3px;
+      border: 1px solid #92400e;
+    }
+
+    .gem {
+      width: 22px;
+      height: 22px;
+      background: #a855f7;
+      border-radius: 4px;
+      transform: rotate(45deg);
+      display: inline-block;
+      margin: 4px;
+    }
+
+    .gem.collected {
+      background: #38bdf8;
+      box-shadow: 0 0 12px #38bdf8;
+    }
+
+    /* Live DOM Inspector Tree Box */
+    .dom-inspector-drawer {
+      padding: 0.85rem 1.25rem;
+      background: var(--surface-raised);
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .dom-inspector-head {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.4rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .dom-tree-preview {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: #94a3b8;
+      background: #040711;
+      padding: 0.75rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      max-height: 140px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+
+    :root[data-theme="light"] .dom-tree-preview {
+      background: #0f172a;
+      color: #bae6fd;
+    }
+
+    /* Right: Terminal Console & Inventory */
+    .terminal-column {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    /* Console Terminal Card */
+    .terminal-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+      flex: 1;
+    }
+
+    .terminal-header {
+      padding: 0.65rem 1rem;
+      background: var(--surface-raised);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+
+    .terminal-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .terminal-body {
+      background: #040711;
+      padding: 1rem;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      font-family: var(--font-mono);
+      font-size: 0.86rem;
+      overflow-y: auto;
+      min-height: 220px;
+    }
+
+    :root[data-theme="light"] .terminal-body {
+      background: #0f172a;
+    }
+
+    .terminal-log-output {
+      flex: 1;
+      margin-bottom: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      overflow-y: auto;
+      max-height: 200px;
+    }
+
+    .log-line {
+      line-height: 1.5;
+    }
+
+    .log-sys {
+      color: #64748b;
+    }
+
+    .log-cmd {
+      color: #38bdf8;
+    }
+
+    .log-err {
+      color: #f87171;
+    }
+
+    .log-succ {
+      color: #34d399;
+      font-weight: 700;
+    }
+
+    .terminal-input-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0.4rem 0.75rem;
+    }
+
+    .terminal-prompt {
+      color: #38bdf8;
+      font-weight: 700;
+      user-select: none;
+    }
+
+    .terminal-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #f8fafc;
+      font-family: var(--font-mono);
+      font-size: 0.88rem;
+    }
+
+    .btn-exec {
+      background: var(--accent);
+      color: #ffffff;
+      border: none;
+      border-radius: 4px;
+      padding: 0.35rem 0.8rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn-exec:hover {
+      background: var(--border-focus);
+    }
+
+    /* Inventory Drawer Card */
+    .inventory-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1rem 1.25rem;
+    }
+
+    .inventory-head {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.6rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .inventory-slots {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .inv-item-pill {
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0.35rem 0.65rem;
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .inv-item-pill:hover {
+      border-color: var(--accent);
+      background: rgba(56, 189, 248, 0.1);
+    }
+
+    /* Debrief / Explanation Drawer */
+    .debrief-card {
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      margin-top: 1rem;
+      display: none;
+    }
+
+    .debrief-card.show {
+      display: block;
+      animation: fadeIn 0.25s ease-out;
+    }
+
+    .debrief-success {
+      background: var(--success-subtle);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+
+    .btn-enter-next {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #ffffff;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 0.65rem 1.4rem;
+      font-size: 0.92rem;
+      font-weight: 800;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+      margin-top: 0.75rem;
+      transition: all 0.15s ease;
+    }
+
+    .btn-enter-next:hover {
+      transform: translateY(-1px);
+    }
+
+    /* Modals & Dialogs */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      z-index: 50;
+    }
+
+    .modal-backdrop.show {
+      display: flex;
+      animation: fadeIn 0.2s ease-out;
+    }
+
+    .modal-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      width: 100%;
+      max-width: 600px;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+      overflow: hidden;
+    }
+
+    .modal-head {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-body {
+      padding: 1.25rem;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 1.5rem;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      border-top: 1px solid var(--border);
+      margin-top: 2rem;
+    }
+
+    footer a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(4px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="brand">
+        <div class="brand-icon">🏰</div>
+        <div class="brand-text">
+          <h1>DOM Manipulation Dungeon <span class="quest-badge">Hard Quest</span></h1>
+          <p>Navigate chambers by typing live JavaScript DOM commands &bull; Fix broken web pages to unlock doors</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="inventoryModalBtn" class="btn-action" title="View collected DOM spells & items">
+          <span>🎒</span> Spells
+        </button>
+        <button id="hintBtn" class="btn-action" title="Request a scroll of guidance (-10 pts)">
+          <span>📜</span> Hint
+        </button>
+        <button id="resetChamberBtn" class="btn-action" title="Restore chamber DOM to original broken state">
+          <span>🔄</span> Reset Room
+        </button>
+        <button id="themeToggleBtn" class="btn-action" title="Toggle theme">
+          <span id="themeIcon">☀️</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Dungeon HUD Stats Bar -->
+    <div class="dungeon-hud">
+      <div class="hud-card">
+        <span class="hud-lbl">Player HP</span>
+        <span class="hud-val" id="statHP">100 / 100 ❤️</span>
+      </div>
+      <div class="hud-card">
+        <span class="hud-lbl">Floor &amp; Chamber</span>
+        <span class="hud-val" id="statChamber">Floor 1 &bull; Room 1</span>
+      </div>
+      <div class="hud-card">
+        <span class="hud-lbl">Dungeon Score</span>
+        <span class="hud-val" id="statScore">0 pts</span>
+      </div>
+      <div class="hud-card">
+        <span class="hud-lbl">Rooms Unlocked</span>
+        <span class="hud-val" id="statUnlocked">0 / 16 🗝️</span>
+      </div>
+    </div>
+
+    <!-- Dungeon Map Strip -->
+    <div class="map-strip" id="mapStrip">
+      <!-- 16 room nodes dynamically generated -->
+    </div>
+
+    <!-- Main Crawl Grid Layout -->
+    <div class="crawl-layout">
+      <!-- Left: Visual Chamber Sandbox & DOM Inspector -->
+      <div class="chamber-card">
+        <div class="chamber-header">
+          <div class="chamber-title">
+            <h2 id="roomTitle">Chamber 1: The Sealed Gate</h2>
+          </div>
+          <span class="floor-pill" id="floorBadge">Floor 1: Catacombs</span>
+        </div>
+
+        <div class="objective-banner" id="objectiveBanner">
+          <!-- Room objective text -->
+        </div>
+
+        <!-- Live Visual Webpage Chamber Sandbox -->
+        <div class="chamber-sandbox" id="chamberSandbox">
+          <!-- Rendered broken page elements -->
+        </div>
+
+        <!-- Live DOM Tree Inspector -->
+        <div class="dom-inspector-drawer">
+          <div class="dom-inspector-head">
+            <span>Live DOM Tree Inspector</span>
+            <span id="domNodeCount">5 Elements</span>
+          </div>
+          <div class="dom-tree-preview" id="domTreePreview">
+            <!-- Formatted HTML snippet -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Terminal Console & Inventory -->
+      <div class="terminal-column">
+        <!-- Interactive Terminal Console -->
+        <div class="terminal-card">
+          <div class="terminal-header">
+            <div class="terminal-title">
+              <span>⚡ DOM Command Console</span>
+            </div>
+            <button id="clearConsoleBtn" class="btn-action" style="padding:0.2rem 0.5rem; font-size:0.7rem;">Clear Log</button>
+          </div>
+
+          <div class="terminal-body" id="terminalBody">
+            <div class="terminal-log-output" id="terminalLog">
+              <div class="log-line log-sys">// Type DOM manipulation commands to repair the chamber.</div>
+              <div class="log-line log-sys">// e.g. document.querySelector('#gate').classList.remove('locked');</div>
+            </div>
+
+            <form id="terminalForm" class="terminal-input-row">
+              <span class="terminal-prompt">dungeon:~$</span>
+              <input id="terminalInput" class="terminal-input" type="text" autocomplete="off" spellcheck="false"
+                placeholder="Enter DOM command (e.g. document.querySelector...)" />
+              <button type="submit" class="btn-exec">Run</button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Inventory DOM Powers Quick Bar -->
+        <div class="inventory-card">
+          <div class="inventory-head">
+            <span>Collected DOM Spells &amp; Artifacts</span>
+            <span id="invCount" style="color:var(--accent);">2 Spells</span>
+          </div>
+          <div class="inventory-slots" id="inventorySlots">
+            <!-- Inventory items -->
+          </div>
+        </div>
+
+        <!-- Room Victory / Debrief Box -->
+        <div class="debrief-card debrief-success" id="debriefCard">
+          <div style="font-size:1.05rem; font-weight:800; color:var(--success); display:flex; align-items:center; gap:0.5rem;">
+            <span>🗝️</span> Chamber Seal Broken! Door Unlocked
+          </div>
+          <p id="debriefWhy" style="font-size:0.85rem; margin-top:0.4rem; line-height:1.5;">
+            <!-- Debrief explanation -->
+          </p>
+          <button id="enterNextRoomBtn" class="btn-enter-next">
+            Enter Next Chamber &rarr;
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Inventory / Spellbook Modal -->
+    <div class="modal-backdrop" id="spellbookModal">
+      <div class="modal-card">
+        <div class="modal-head">
+          <h3>📖 The DOM Spellbook &amp; Inventory</h3>
+          <button id="closeModalBtn" class="btn-action">✕</button>
+        </div>
+        <div class="modal-body" id="spellbookBody">
+          <!-- Spells list -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p>Part of <a href="https://github.com/praveenscience/One-File-Tools">One File Tools</a> &bull; DOM Manipulation Dungeon &bull; Pure Single File</p>
+  </footer>
+
+  <!-- Dungeon Engine Script -->
+  <script>
+    (function () {
+      'use strict';
+
+      // --- Theme Management ---
+      var themeToggleBtn = document.getElementById('themeToggleBtn');
+      var themeIcon = document.getElementById('themeIcon');
+      function updateThemeIcon() {
+        var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+        themeIcon.textContent = isLight ? '🌙' : '☀️';
+      }
+      updateThemeIcon();
+
+      themeToggleBtn.addEventListener('click', function () {
+        var current = document.documentElement.getAttribute('data-theme');
+        var next = current === 'light' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', next);
+        localStorage.setItem('dom_dungeon_theme', next);
+        updateThemeIcon();
+      });
+
+      // --- 16 Progressive Dungeon Rooms Across 3 Floors ---
+      var DUNGEON_ROOMS = [
+        // FLOOR 1: CATACOMBS OF SELECTION (Rooms 1-5)
+        {
+          id: 1,
+          floor: 1,
+          floorName: 'Floor 1: Catacombs of Selection',
+          title: 'The Sealed Gate',
+          isBoss: false,
+          objective: 'The dungeon gate is held shut by a red seal. Remove the <strong>locked</strong> class from the <code>#gate</code> element to open it.',
+          hint: 'document.querySelector("#gate").classList.remove("locked");',
+          initialHtml: '<div id="gate" class="dungeon-door locked"></div>',
+          validate: function (sandbox) {
+            var gate = sandbox.querySelector('#gate');
+            return gate && !gate.classList.contains('locked');
+          },
+          onUnlock: function (sandbox) {
+            var gate = sandbox.querySelector('#gate');
+            if (gate) gate.classList.add('unlocked');
+          },
+          explanation: 'Using `classList.remove("locked")` dynamically updates the element\'s class attribute without overwriting other existing classes.',
+          loot: { name: '$() Query Wand', code: 'document.querySelector' }
+        },
+        {
+          id: 2,
+          floor: 1,
+          floorName: 'Floor 1: Catacombs of Selection',
+          title: 'The Ancient Epitaph',
+          isBoss: false,
+          objective: 'A stone tablet requires an invocation. Change the <strong>textContent</strong> of <code>.epitaph</code> to <strong>"Open Sesame"</strong>.',
+          hint: 'document.querySelector(".epitaph").textContent = "Open Sesame";',
+          initialHtml: '<div class="dungeon-door locked"><p class="epitaph" style="color:#f8fafc; font-family:monospace; margin-top:20px;">[Silence]</p></div>',
+          validate: function (sandbox) {
+            var ep = sandbox.querySelector('.epitaph');
+            return ep && ep.textContent.trim().toLowerCase() === 'open sesame';
+          },
+          onUnlock: function (sandbox) {
+            var door = sandbox.querySelector('.dungeon-door');
+            if (door) { door.classList.remove('locked'); door.classList.add('unlocked'); }
+          },
+          explanation: '`textContent` safely sets or retrieves the text content of a node and automatically prevents script injections.',
+          loot: null
+        },
+        {
+          id: 3,
+          floor: 1,
+          floorName: 'Floor 1: Catacombs of Selection',
+          title: 'The Unlit Torch',
+          isBoss: false,
+          objective: 'Darkness blocks the corridor. Illuminate the torch by changing <code>#torch</code>\'s style <strong>backgroundColor</strong> to <strong>"gold"</strong>.',
+          hint: 'document.querySelector("#torch").style.backgroundColor = "gold";',
+          initialHtml: '<div style="display:flex; align-items:center; gap:20px;"><div id="torch" class="torch"></div><div id="door3" class="dungeon-door locked"></div></div>',
+          validate: function (sandbox) {
+            var t = sandbox.querySelector('#torch');
+            return t && (t.style.backgroundColor === 'gold' || t.style.backgroundColor === 'yellow' || t.style.backgroundColor === 'rgb(245, 158, 11)');
+          },
+          onUnlock: function (sandbox) {
+            var t = sandbox.querySelector('#torch');
+            if (t) t.classList.add('lit');
+            var door = sandbox.querySelector('#door3');
+            if (door) { door.classList.remove('locked'); door.classList.add('unlocked'); }
+          },
+          explanation: 'Inline CSS styles are modified via the `.style` property object using camelCase property keys.',
+          loot: null
+        },
+        {
+          id: 4,
+          floor: 1,
+          floorName: 'Floor 1: Catacombs of Selection',
+          title: 'The Hidden Alcove',
+          isBoss: false,
+          objective: 'A concealed secret passage is hidden. Reveal it by setting <code>.secret-door</code>\'s <strong>hidden</strong> property to <strong>false</strong>.',
+          hint: 'document.querySelector(".secret-door").hidden = false;',
+          initialHtml: '<div style="text-align:center;"><p style="color:#64748b;">Blank stone wall...</p><div class="secret-door dungeon-door locked" hidden></div></div>',
+          validate: function (sandbox) {
+            var d = sandbox.querySelector('.secret-door');
+            return d && !d.hidden && d.style.display !== 'none';
+          },
+          onUnlock: function (sandbox) {
+            var d = sandbox.querySelector('.secret-door');
+            if (d) { d.classList.remove('locked'); d.classList.add('unlocked'); }
+          },
+          explanation: 'The boolean `hidden` property toggles standard user-agent visibility without needing manual CSS display declarations.',
+          loot: { name: 'Potion of Vitality', code: '// HP +30' }
+        },
+        {
+          id: 5,
+          floor: 1,
+          floorName: 'Floor 1: Boss Chamber',
+          title: 'Floor 1 Boss: The Gargoyle Sentinel',
+          isBoss: true,
+          objective: 'BOSS BATTLE: Disarm the guardian gargoyle! Remove its <strong>"cursed"</strong> attribute AND change its text to <strong>"Slumber"</strong>.',
+          hint: 'const g = document.querySelector("#gargoyle"); g.removeAttribute("cursed"); g.textContent = "Slumber";',
+          initialHtml: '<div style="text-align:center;"><div id="gargoyle" cursed="true" style="padding:10px; background:#450a0a; border:2px solid #ef4444; border-radius:6px; color:#fca5a5; font-family:monospace;">ROARING GARGOYLE</div><div id="bossDoor1" class="dungeon-door locked" style="margin-top:15px;"></div></div>',
+          validate: function (sandbox) {
+            var g = sandbox.querySelector('#gargoyle');
+            return g && !g.hasAttribute('cursed') && g.textContent.trim().toLowerCase() === 'slumber';
+          },
+          onUnlock: function (sandbox) {
+            var g = sandbox.querySelector('#gargoyle');
+            if (g) { g.style.background = '#064e3b'; g.style.borderColor = '#10b981'; g.style.color = '#6ee7b7'; }
+            var d = sandbox.querySelector('#bossDoor1');
+            if (d) { d.classList.remove('locked'); d.classList.add('unlocked'); }
+          },
+          explanation: 'Chaining element querying, attribute removal (`removeAttribute`), and text manipulation disarms complex DOM state guards.',
+          loot: { name: 'Scroll of Element Forging', code: 'document.createElement' }
+        },
+
+        // FLOOR 2: THE HALL OF CREATION (Rooms 6-10)
+        {
+          id: 6,
+          floor: 2,
+          floorName: 'Floor 2: Hall of Creation',
+          title: 'The Missing Bridge Plank',
+          isBoss: false,
+          objective: 'A chasm separates you from the doorway. Create a new <code>div</code> with class <strong>"plank"</strong> and <strong>appendChild</strong> it into <code>.bridge</code>.',
+          hint: 'const p = document.createElement("div"); p.className = "plank"; document.querySelector(".bridge").appendChild(p);',
+          initialHtml: '<div class="bridge"><div class="plank"></div><div class="plank"></div></div><div class="dungeon-door locked" style="margin-top:10px;"></div>',
+          validate: function (sandbox) {
+            var b = sandbox.querySelector('.bridge');
+            return b && b.querySelectorAll('.plank').length >= 3;
+          },
+          onUnlock: function (sandbox) {
+            var d = sandbox.querySelector('.dungeon-door');
+            if (d) { d.classList.remove('locked'); d.classList.add('unlocked'); }
+          },
+          explanation: '`document.createElement` generates a detached node in memory that becomes part of the live document tree once attached with `appendChild`.',
+          loot: null
+        },
+        {
+          id: 7,
+          floor: 2,
+          floorName: 'Floor 2: Hall of Creation',
+          title: 'The Cursed Altar',
+          isBoss: false,
+          objective: 'Empower the pedestal: use <strong>setAttribute</strong> to assign <strong>data-rune="activated"</strong> to <code>#altar</code>.',
+          hint: 'document.querySelector("#altar").setAttribute("data-rune", "activated");',
+          initialHtml: '<div id="altar" style="padding:15px; background:#1e293b; border:2px dashed #475569; border-radius:8px; text-align:center;"><span style="color:#94a3b8;">Ancient Altar Pedestal</span></div><div class="dungeon-door locked" style="margin-top:15px;"></div>',
+          validate: function (sandbox) {
+            var a = sandbox.querySelector('#altar');
+            return a && a.getAttribute('data-rune') === 'activated';
+          },
+          onUnlock: function (sandbox) {
+            var a = sandbox.querySelector('#altar');
+            if (a) { a.style.borderColor = '#38bdf8'; a.style.boxShadow = '0 0 15px rgba(56, 189, 248, 0.4)'; }
+            var d = sandbox.querySelector('.dungeon-door');
+            if (d) { d.classList.remove('locked'); d.classList.add('unlocked'); }
+          },
+          explanation: 'Data attributes (`data-*`) store custom private data on elements without conflicting with standard HTML attributes.',
+          loot: null
+        },
+        {
+          id: 8,
+          floor: 2,
+          floorName: 'Floor 2: Hall of Creation',
+          title: 'The Poisoned Chalice',
+          isBoss: false,
+          objective: 'Toxic sludge is blocking the fountain mechanism. Remove the element with class <strong>.poison</strong> using <strong>remove()</strong>.',
+          hint: 'document.querySelector(".poison").remove();',
+          initialHtml: '<div id="fountain" style="padding:12px; background:#1e293b; border-radius:6px;"><span class="pure-water" style="color:#38bdf8;">Pure Spring Water</span><div class="poison" style="color:#ef4444; font-weight:bold;">☠️ Deadly Venom</div></div><div class="dungeon-door locked" style="margin-top:15px;"></div>',
+          validate: function (sandbox) {
+            var p = sandbox.querySelector('.poison');
+            return !p && sandbox.querySelector('#fountain');
+          },
+          onUnlock: function (sandbox) {
+            var d = sandbox.querySelector('.dungeon-door');
+            if (d) { d.classList.remove('locked'); d.classList.add('unlocked'); }
+          },
+          explanation: 'The modern `node.remove()` API removes an element directly from its parent node cleanly.',
+          loot: { name: 'Amulet of Purging', code: 'node.remove()' }
+        },
+        {
+          id: 9,
+          floor: 2,
+          floorName: 'Floor 2: Hall of Creation',
+          title: 'The Scattered Gems',
+          isBoss: false,
+          objective: 'Gather all gems on the floor! Use <strong>querySelectorAll</strong> to iterate over every <code>.gem</code> and add the <strong>"collected"</strong> class.',
+          hint: 'document.querySelectorAll(".gem").forEach(g => g.classList.add("collected"));',
+          initialHtml: '<div style="display:flex; gap:10px;"><div class="gem"></div><div class="gem"></div><div class="gem"></div></div><div class="dungeon-door locked" style="margin-top:15px;"></div>',
+          validate: function (sandbox) {
+            var gems = sandbox.querySelectorAll('.gem');
+            if (gems.length === 0) return false;
+            for (var i = 0; i < gems.length; i++) {
+              if (!gems[i].classList.contains('collected')) return false;
+            }
+            return true;
+          },
+          onUnlock: function (sandbox) {
+            var d = sandbox.querySelector('.dungeon-door');
+            if (d) { d.classList.remove('locked'); d.classList.add('unlocked'); }
+          },
+          explanation: '`querySelectorAll` returns a static NodeList that can be iterated with `.forEach()` to apply batch DOM updates.',
+          loot: null
+        },
+        {
+          id: 10,
+          floor: 2,
+          floorName: 'Floor 2: Boss Chamber',
+          title: 'Floor 2 Boss: The Golem Constructor',
+          isBoss: true,
+          objective: 'BOSS BATTLE: Build the Golem Core! Create a <code>div</code> with id <strong>"core"</strong> and <strong>data-power="100"</strong>, then append it into <code>#golem</code>.',
+          hint: 'const c = document.createElement("div"); c.id = "core"; c.setAttribute("data-power", "100"); document.querySelector("#golem").appendChild(c);',
+          initialHtml: '<div id="golem" style="padding:15px; border:2px solid #64748b; background:#1e293b; border-radius:8px; text-align:center;"><p style="color:#94a3b8;">Dormant Stone Golem (Awaiting Core)</p></div><div id="bossDoor2" class="dungeon-door locked" style="margin-top:15px;"></div>',
+          validate: function (sandbox) {
+            var g = sandbox.querySelector('#golem');
+            if (!g) return false;
+            var core = g.querySelector('#core');
+            return core && core.getAttribute('data-power') === '100';
+          },
+          onUnlock: function (sandbox) {
+            var g = sandbox.querySelector('#golem');
+            if (g) { g.style.borderColor = '#a855f7'; g.style.boxShadow = '0 0 20px #a855f7'; }
+            var d = sandbox.querySelector('#bossDoor2');
+            if (d) { d.classList.remove('locked'); d.classList.add('unlocked'); }
+          },
+          explanation: 'Complex dynamic structures require creating elements, configuring ids/data attributes, and inserting into target containers.',
+          loot: { name: 'Great Potion of Healing', code: '// HP +50' }
+        },
+
+        // FLOOR 3: THE CRYPT OF EVENTS & DYNAMIC TREES (Rooms 11-16)
+        {
+          id: 11,
+          floor: 3,
+          floorName: 'Floor 3: Crypt of Dynamic Trees',
+          title: 'The Trapped Lever',
+          isBoss: false,
+          objective: 'A mechanical gear lever triggers the iron grate. Simulate a user pulling the lever by invoking <strong>click()</strong> on <code>#lever</code>.',
+          hint: 'document.querySelector("#lever").click();',
+          initialHtml: '<div style="text-align:center;"><button id="lever" style="padding:8px 16px; background:#475569; color:white; border:none; border-radius:4px; cursor:pointer;">PULL LEVER</button><div id="door11" class="dungeon-door locked" style="margin-top:15px;"></div></div>',
+          validate: function (sandbox) {
+            var door = sandbox.querySelector('#door11');
+            return door && door.classList.contains('unlocked');
+          },
+          onInit: function (sandbox) {
+            var lever = sandbox.querySelector('#lever');
+            var door = sandbox.querySelector('#door11');
+            if (lever && door) {
+              lever.addEventListener('click', function () {
+                door.classList.remove('locked');
+                door.classList.add('unlocked');
+              });
+            }
+          },
+          onUnlock: function (sandbox) { },
+          explanation: 'The `.click()` DOM method triggers the attached click event listener chain programmatically.',
+          loot: null
+        },
+        {
+          id: 12,
+          floor: 3,
+          floorName: 'Floor 3: Crypt of Dynamic Trees',
+          title: 'The Mirror of Duplication',
+          isBoss: false,
+          objective: 'Twin keys are needed to unlock the dual tumblers. Clone the <code>.key</code> node using <strong>cloneNode(true)</strong> and append it to <code>#keyring</code>.',
+          hint: 'const k = document.querySelector(".key").cloneNode(true); document.querySelector("#keyring").appendChild(k);',
+          initialHtml: '<div id="keyring" style="display:flex; gap:10px;"><div class="key" style="padding:6px 12px; background:#f59e0b; color:#0f172a; border-radius:4px; font-weight:bold;">🔑 Key Alpha</div></div><div class="dungeon-door locked" style="margin-top:15px;"></div>',
+          validate: function (sandbox) {
+            var kr = sandbox.querySelector('#keyring');
+            return kr && kr.querySelectorAll('.key').length >= 2;
+          },
+          onUnlock: function (sandbox) {
+            var d = sandbox.querySelector('.dungeon-door');
+            if (d) { d.classList.remove('locked'); d.classList.add('unlocked'); }
+          },
+          explanation: '`node.cloneNode(deep)` creates an exact duplicate of a node, including attributes and (if deep is true) all child nodes.',
+          loot: null
+        },
+        {
+          id: 13,
+          floor: 3,
+          floorName: 'Floor 3: Crypt of Dynamic Trees',
+          title: 'The Relic Alignment',
+          isBoss: false,
+          objective: 'Insert the <code>#crystal</code> before the <code>#relic</code> inside <code>#chamber</code> using <strong>insertBefore</strong>.',
+          hint: 'const c = document.querySelector("#crystal"); const r = document.querySelector("#relic"); document.querySelector("#chamber").insertBefore(c, r);',
+          initialHtml: '<div id="chamber" style="padding:10px; background:#1e293b; border-radius:6px;"><div id="relic" style="color:#f59e0b;">⭐ Golden Relic</div><div id="crystal" style="color:#38bdf8;">💎 Mana Crystal</div></div><div class="dungeon-door locked" style="margin-top:15px;"></div>',
+          validate: function (sandbox) {
+            var ch = sandbox.querySelector('#chamber');
+            if (!ch) return false;
+            var first = ch.firstElementChild;
+            return first && first.id === 'crystal';
+          },
+          onUnlock: function (sandbox) {
+            var d = sandbox.querySelector('.dungeon-door');
+            if (d) { d.classList.remove('locked'); d.classList.add('unlocked'); }
+          },
+          explanation: '`parent.insertBefore(newNode, referenceNode)` places a node immediately before a specified sibling child.',
+          loot: null
+        },
+        {
+          id: 14,
+          floor: 3,
+          floorName: 'Floor 3: Crypt of Dynamic Trees',
+          title: 'The Cascade of Shadows',
+          isBoss: false,
+          objective: 'A shadowy curse seals the wall. Replace the <code>.shadow-curse</code> element with a new <code>div</code> having class <strong>"light-orb"</strong> using <strong>replaceWith()</strong>.',
+          hint: 'const orb = document.createElement("div"); orb.className = "light-orb"; document.querySelector(".shadow-curse").replaceWith(orb);',
+          initialHtml: '<div id="pedestal"><div class="shadow-curse" style="color:#ef4444; font-family:monospace;">🌑 Cursed Shadow</div></div><div class="dungeon-door locked" style="margin-top:15px;"></div>',
+          validate: function (sandbox) {
+            var sc = sandbox.querySelector('.shadow-curse');
+            var orb = sandbox.querySelector('.light-orb');
+            return !sc && orb;
+          },
+          onUnlock: function (sandbox) {
+            var orb = sandbox.querySelector('.light-orb');
+            if (orb) { orb.textContent = '☀️ Radiant Orb'; orb.style.color = '#f59e0b'; }
+            var d = sandbox.querySelector('.dungeon-door');
+            if (d) { d.classList.remove('locked'); d.classList.add('unlocked'); }
+          },
+          explanation: '`node.replaceWith(newNode)` seamlessly substitutes an existing element in the DOM tree with one or more nodes.',
+          loot: null
+        },
+        {
+          id: 15,
+          floor: 3,
+          floorName: 'Floor 3: Crypt of Dynamic Trees',
+          title: 'The Glyph Matrix',
+          isBoss: false,
+          objective: 'Find all buttons inside <code>.matrix</code> with attribute <strong>data-active="true"</strong> and disable them (<strong>disabled = true</strong>).',
+          hint: 'document.querySelectorAll(".matrix button[data-active=\'true\']").forEach(b => b.disabled = true);',
+          initialHtml: '<div class="matrix" style="display:flex; gap:8px;"><button data-active="true" style="padding:6px;">Rune 1</button><button data-active="false" style="padding:6px;">Rune 2</button><button data-active="true" style="padding:6px;">Rune 3</button></div><div class="dungeon-door locked" style="margin-top:15px;"></div>',
+          validate: function (sandbox) {
+            var btns = sandbox.querySelectorAll('.matrix button[data-active="true"]');
+            if (btns.length === 0) return false;
+            for (var i = 0; i < btns.length; i++) {
+              if (!btns[i].disabled) return false;
+            }
+            return true;
+          },
+          onUnlock: function (sandbox) {
+            var d = sandbox.querySelector('.dungeon-door');
+            if (d) { d.classList.remove('locked'); d.classList.add('unlocked'); }
+          },
+          explanation: 'Combining attribute query selectors with form element properties like `disabled` gives precise control over UI interactions.',
+          loot: null
+        },
+        {
+          id: 16,
+          floor: 3,
+          floorName: 'Floor 3: Final Boss Chamber',
+          title: 'Dungeon Overlord: The Archmage of the DOM',
+          isBoss: true,
+          objective: 'FINAL BOSS: Restore the ancient tri-elemental seal! Inside <code>#master-seal</code>, append three new span elements with classes <strong>"fire"</strong>, <strong>"water"</strong>, and <strong>"earth"</strong>.',
+          hint: '["fire", "water", "earth"].forEach(c => { const s = document.createElement("span"); s.className = c; document.querySelector("#master-seal").appendChild(s); });',
+          initialHtml: '<div id="master-seal" style="padding:15px; border:2px solid #a855f7; background:#1e1b4b; border-radius:8px; min-height:60px; display:flex; gap:10px; align-items:center; justify-content:center;"><span style="color:#c084fc;">[Empty Elemental Vessel]</span></div><div id="archmageDoor" class="dungeon-door locked" style="margin-top:15px;"></div>',
+          validate: function (sandbox) {
+            var ms = sandbox.querySelector('#master-seal');
+            if (!ms) return false;
+            var f = ms.querySelector('.fire');
+            var w = ms.querySelector('.water');
+            var e = ms.querySelector('.earth');
+            return f && w && e;
+          },
+          onUnlock: function (sandbox) {
+            var ms = sandbox.querySelector('#master-seal');
+            if (ms) { ms.style.borderColor = '#10b981'; ms.style.boxShadow = '0 0 25px #10b981'; }
+            var d = sandbox.querySelector('#archmageDoor');
+            if (d) { d.classList.remove('locked'); d.classList.add('unlocked'); }
+          },
+          explanation: 'Chaining element generation in an array loop to construct compound component trees is a foundational pattern in modern frontend engineering.',
+          loot: { name: 'Crown of the DOM Archmage', code: '// Master of the Document Object Model' }
+        }
+      ];
+
+      // --- Game State Variables ---
+      var currentRoomIdx = 0;
+      var hp = 100;
+      var score = 0;
+      var unlockedRooms = new Set();
+      var inventory = [
+        { name: 'Scroll of Selection', code: 'document.querySelector' },
+        { name: 'Minor Health Potion', code: '// Restores 30 HP' }
+      ];
+      var commandHistory = [];
+      var historyCursor = -1;
+
+      // --- Web Audio SFX ---
+      function playTone(freq, type, duration) {
+        try {
+          var ctx = new (window.AudioContext || window.webkitAudioContext)();
+          var osc = ctx.createOscillator();
+          var gain = ctx.createGain();
+          osc.type = type || 'sine';
+          osc.frequency.setValueAtTime(freq, ctx.currentTime);
+          gain.gain.setValueAtTime(0.12, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + duration);
+        } catch (e) { }
+      }
+
+      function playUnlockChime() {
+        playTone(523.25, 'triangle', 0.12);
+        setTimeout(function () { playTone(659.25, 'triangle', 0.12); }, 100);
+        setTimeout(function () { playTone(783.99, 'triangle', 0.25); }, 200);
+      }
+
+      function playDamageBuzz() {
+        playTone(180, 'sawtooth', 0.2);
+        setTimeout(function () { playTone(140, 'sawtooth', 0.25); }, 120);
+      }
+
+      // --- DOM Elements ---
+      var statHP = document.getElementById('statHP');
+      var statChamber = document.getElementById('statChamber');
+      var statScore = document.getElementById('statScore');
+      var statUnlocked = document.getElementById('statUnlocked');
+      var mapStrip = document.getElementById('mapStrip');
+
+      var roomTitle = document.getElementById('roomTitle');
+      var floorBadge = document.getElementById('floorBadge');
+      var objectiveBanner = document.getElementById('objectiveBanner');
+      var chamberSandbox = document.getElementById('chamberSandbox');
+      var domTreePreview = document.getElementById('domTreePreview');
+      var domNodeCount = document.getElementById('domNodeCount');
+
+      var terminalBody = document.getElementById('terminalBody');
+      var terminalLog = document.getElementById('terminalLog');
+      var terminalForm = document.getElementById('terminalForm');
+      var terminalInput = document.getElementById('terminalInput');
+      var clearConsoleBtn = document.getElementById('clearConsoleBtn');
+
+      var inventorySlots = document.getElementById('inventorySlots');
+      var invCount = document.getElementById('invCount');
+      var debriefCard = document.getElementById('debriefCard');
+      var debriefWhy = document.getElementById('debriefWhy');
+      var enterNextRoomBtn = document.getElementById('enterNextRoomBtn');
+
+      var hintBtn = document.getElementById('hintBtn');
+      var resetChamberBtn = document.getElementById('resetChamberBtn');
+      var inventoryModalBtn = document.getElementById('inventoryModalBtn');
+      var spellbookModal = document.getElementById('spellbookModal');
+      var closeModalBtn = document.getElementById('closeModalBtn');
+      var spellbookBody = document.getElementById('spellbookBody');
+
+      // --- Local Storage Management ---
+      function saveGameState() {
+        try {
+          var state = {
+            roomIdx: currentRoomIdx,
+            hp: hp,
+            score: score,
+            unlocked: Array.from(unlockedRooms),
+            inventory: inventory
+          };
+          localStorage.setItem('dom_dungeon_save', JSON.stringify(state));
+        } catch (e) { }
+      }
+
+      function loadGameState() {
+        try {
+          var saved = localStorage.getItem('dom_dungeon_save');
+          if (saved) {
+            var s = JSON.parse(saved);
+            if (typeof s.roomIdx === 'number' && s.roomIdx < DUNGEON_ROOMS.length) {
+              currentRoomIdx = s.roomIdx;
+              hp = s.hp || 100;
+              score = s.score || 0;
+              unlockedRooms = new Set(s.unlocked || []);
+              if (s.inventory) inventory = s.inventory;
+            }
+          }
+        } catch (e) { }
+      }
+
+      // --- Render Dungeon Map Strip ---
+      function renderMapStrip() {
+        mapStrip.innerHTML = '';
+        DUNGEON_ROOMS.forEach(function (room, idx) {
+          var node = document.createElement('div');
+          node.className = 'map-room-node' +
+            (idx === currentRoomIdx ? ' active' : '') +
+            (unlockedRooms.has(room.id) ? ' cleared' : '') +
+            (room.isBoss ? ' boss' : '');
+
+          var icon = room.isBoss ? '💀' : (unlockedRooms.has(room.id) ? '✓' : room.id);
+          node.innerHTML = '<span>' + icon + '</span>';
+          node.title = 'Chamber ' + room.id + ': ' + room.title;
+
+          node.addEventListener('click', function () {
+            // Allow navigating to cleared rooms or current room
+            if (unlockedRooms.has(room.id) || idx <= unlockedRooms.size) {
+              loadRoom(idx);
+            }
+          });
+
+          mapStrip.appendChild(node);
+
+          if (idx < DUNGEON_ROOMS.length - 1) {
+            var conn = document.createElement('div');
+            conn.className = 'map-room-connector';
+            mapStrip.appendChild(conn);
+          }
+        });
+      }
+
+      // --- Render Inventory Quick Slots ---
+      function renderInventory() {
+        inventorySlots.innerHTML = '';
+        invCount.textContent = inventory.length + ' Item' + (inventory.length === 1 ? '' : 's');
+
+        inventory.forEach(function (item) {
+          var pill = document.createElement('button');
+          pill.type = 'button';
+          pill.className = 'inv-item-pill';
+          pill.innerHTML = '<span>📜</span> ' + item.name;
+          pill.title = 'Click to paste shortcut: ' + item.code;
+          pill.addEventListener('click', function () {
+            terminalInput.value = item.code;
+            terminalInput.focus();
+          });
+          inventorySlots.appendChild(pill);
+        });
+      }
+
+      // --- Update DOM Inspector Preview ---
+      function updateDOMInspector() {
+        var cleanHtml = chamberSandbox.innerHTML;
+        // Format indentation lightly
+        var formatted = cleanHtml
+          .replace(/></g, '>\n<')
+          .replace(/(<[^\/][^>]*>)/g, '  $1');
+        domTreePreview.textContent = formatted;
+        var count = chamberSandbox.querySelectorAll('*').length;
+        domNodeCount.textContent = count + ' Elements';
+      }
+
+      // --- Load Dungeon Room ---
+      function loadRoom(idx) {
+        currentRoomIdx = idx;
+        var r = DUNGEON_ROOMS[idx];
+
+        roomTitle.textContent = 'Chamber ' + r.id + ': ' + r.title;
+        floorBadge.textContent = r.floorName;
+        objectiveBanner.innerHTML = r.objective;
+
+        // Reset sandbox DOM
+        chamberSandbox.innerHTML = r.initialHtml;
+        if (typeof r.onInit === 'function') {
+          r.onInit(chamberSandbox);
+        }
+
+        debriefCard.classList.remove('show');
+        updateDOMInspector();
+
+        // Update HUD
+        statChamber.textContent = 'Floor ' + r.floor + ' • Room ' + r.id;
+        statHP.textContent = hp + ' / 100 ❤️';
+        statScore.textContent = score + ' pts';
+        statUnlocked.textContent = unlockedRooms.size + ' / ' + DUNGEON_ROOMS.length + ' 🗝️';
+
+        renderMapStrip();
+        renderInventory();
+
+        logTerminal('// Entered ' + r.title + ' (' + r.floorName + ')', 'sys');
+      }
+
+      // --- Terminal Logging Helper ---
+      function logTerminal(msg, type) {
+        var div = document.createElement('div');
+        div.className = 'log-line ' + (type === 'err' ? 'log-err' : (type === 'succ' ? 'log-succ' : (type === 'cmd' ? 'log-cmd' : 'log-sys')));
+        div.textContent = msg;
+        terminalLog.appendChild(div);
+        terminalBody.scrollTop = terminalBody.scrollHeight;
+      }
+
+      clearConsoleBtn.addEventListener('click', function () {
+        terminalLog.innerHTML = '';
+      });
+
+      // --- Execute DOM Command Safely ---
+      function executeDOMCommand(cmd) {
+        var room = DUNGEON_ROOMS[currentRoomIdx];
+        logTerminal('> ' + cmd, 'cmd');
+
+        try {
+          // Provide sandboxed proxies for document so users can write standard code
+          var sandbox = chamberSandbox;
+          var customDocument = {
+            getElementById: function (id) { return sandbox.querySelector('#' + id); },
+            querySelector: function (sel) { return sandbox.querySelector(sel); },
+            querySelectorAll: function (sel) { return sandbox.querySelectorAll(sel); },
+            createElement: function (tag) { return document.createElement(tag); },
+            createDocumentFragment: function () { return document.createDocumentFragment(); }
+          };
+
+          // Wrap command execution
+          var fn = new Function('document', 'sandbox', 'window', 'return (' + cmd + ');');
+          var result = fn(customDocument, sandbox, window);
+
+          if (result !== undefined) {
+            logTerminal('← ' + String(result), 'sys');
+          }
+
+          updateDOMInspector();
+
+          // Evaluate if Room Condition is Met
+          if (room.validate(chamberSandbox)) {
+            handleRoomCleared(room);
+          } else {
+            // Did not break the seal yet
+            logTerminal('// Command executed, but the chamber seal remains intact.', 'sys');
+          }
+
+        } catch (err) {
+          playDamageBuzz();
+          hp = Math.max(0, hp - 15);
+          statHP.textContent = hp + ' / 100 ❤️';
+          logTerminal('✕ ' + err.name + ': ' + err.message + ' (-15 HP)', 'err');
+
+          if (hp <= 0) {
+            alert('💀 You succumbed to the dungeon curse! Reviving at floor checkpoint...');
+            hp = 100;
+            statHP.textContent = hp + ' / 100 ❤️';
+            loadRoom(currentRoomIdx);
+          }
+        }
+      }
+
+      // --- Room Cleared / Victory Handler ---
+      function handleRoomCleared(room) {
+        playUnlockChime();
+        if (typeof room.onUnlock === 'function') {
+          room.onUnlock(chamberSandbox);
+        }
+
+        if (!unlockedRooms.has(room.id)) {
+          unlockedRooms.add(room.id);
+          score += 150;
+          statScore.textContent = score + ' pts';
+          statUnlocked.textContent = unlockedRooms.size + ' / ' + DUNGEON_ROOMS.length + ' 🗝️';
+
+          if (room.loot) {
+            inventory.push(room.loot);
+            logTerminal('★ Loot Discovered: ' + room.loot.name + ' added to inventory!', 'succ');
+            renderInventory();
+          }
+        }
+
+        logTerminal('✓ Chamber seal broken! Door unlocked.', 'succ');
+        debriefWhy.innerHTML = '<strong>DOM Masterclass:</strong> ' + room.explanation;
+        debriefCard.classList.add('show');
+
+        saveGameState();
+        renderMapStrip();
+      }
+
+      // --- Terminal Form Submit ---
+      terminalForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var cmd = terminalInput.value.trim();
+        if (!cmd) return;
+
+        commandHistory.push(cmd);
+        historyCursor = commandHistory.length;
+        terminalInput.value = '';
+
+        executeDOMCommand(cmd);
+      });
+
+      // --- Command History Navigation (Up/Down) ---
+      terminalInput.addEventListener('keydown', function (e) {
+        if (e.key === 'ArrowUp') {
+          if (historyCursor > 0) {
+            historyCursor--;
+            terminalInput.value = commandHistory[historyCursor] || '';
+          }
+          e.preventDefault();
+        } else if (e.key === 'ArrowDown') {
+          if (historyCursor < commandHistory.length - 1) {
+            historyCursor++;
+            terminalInput.value = commandHistory[historyCursor] || '';
+          } else {
+            historyCursor = commandHistory.length;
+            terminalInput.value = '';
+          }
+          e.preventDefault();
+        }
+      });
+
+      // --- Next Room Navigation ---
+      enterNextRoomBtn.addEventListener('click', function () {
+        var nextIdx = currentRoomIdx + 1;
+        if (nextIdx < DUNGEON_ROOMS.length) {
+          loadRoom(nextIdx);
+        } else {
+          alert('🏆 CONGRATULATIONS! You conquered all 16 chambers and mastered the Document Object Model!');
+        }
+      });
+
+      // --- Hint Button ---
+      hintBtn.addEventListener('click', function () {
+        var r = DUNGEON_ROOMS[currentRoomIdx];
+        score = Math.max(0, score - 10);
+        statScore.textContent = score + ' pts';
+        alert('📜 Ancient Scroll Clue (-10 pts):\n\n' + r.hint);
+      });
+
+      // --- Reset Chamber Button ---
+      resetChamberBtn.addEventListener('click', function () {
+        loadRoom(currentRoomIdx);
+      });
+
+      // --- Spellbook Modal ---
+      inventoryModalBtn.addEventListener('click', function () {
+        spellbookBody.innerHTML = '';
+        inventory.forEach(function (item) {
+          var row = document.createElement('div');
+          row.style.padding = '10px';
+          row.style.borderBottom = '1px solid var(--border)';
+          row.innerHTML = '<strong style="color:var(--accent);">' + item.name + '</strong>' +
+            '<p style="font-family:var(--font-mono); font-size:0.8rem; color:var(--text-muted); margin-top:4px;">' + item.code + '</p>';
+          spellbookBody.appendChild(row);
+        });
+        spellbookModal.classList.add('show');
+      });
+
+      closeModalBtn.addEventListener('click', function () {
+        spellbookModal.classList.remove('show');
+      });
+
+      spellbookModal.addEventListener('click', function (e) {
+        if (e.target === spellbookModal) {
+          spellbookModal.classList.remove('show');
+        }
+      });
+
+      // --- Initialization ---
+      loadGameState();
+      loadRoom(currentRoomIdx);
+
+    })();
+  </script>
+</body>
+
+</html>
