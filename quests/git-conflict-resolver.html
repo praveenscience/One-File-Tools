@@ -1,0 +1,2144 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Git Conflict Resolver — One File Tools</title>
+  <meta name="description"
+    content="A fast-paced Git merge conflict simulation game. Resolve realistic merge conflicts under timer pressure and master HEAD vs incoming changes." />
+
+  <!-- Dark Mode FOUC Prevention -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('git_conflict_theme');
+        if (t === 'light') document.documentElement.setAttribute('data-theme', 'light');
+        else if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+        else if (window.matchMedia('(prefers-color-scheme: light)').matches) document.documentElement.setAttribute('data-theme', 'light');
+        else document.documentElement.setAttribute('data-theme', 'dark');
+      } catch (e) { }
+    })();
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+    rel="stylesheet" />
+
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #090d16;
+      --surface: #0f172a;
+      --surface-raised: #1e293b;
+      --border: #334155;
+      --border-focus: #38bdf8;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+
+      --head-color: #38bdf8;
+      --head-bg: rgba(56, 189, 248, 0.12);
+      --head-border: rgba(56, 189, 248, 0.4);
+
+      --incoming-color: #34d399;
+      --incoming-bg: rgba(52, 211, 153, 0.12);
+      --incoming-border: rgba(52, 211, 153, 0.4);
+
+      --divider-color: #f59e0b;
+      --divider-bg: rgba(245, 158, 11, 0.12);
+
+      --gold: #f59e0b;
+      --success: #10b981;
+      --danger: #ef4444;
+
+      --radius-sm: 6px;
+      --radius: 12px;
+      --radius-lg: 16px;
+
+      --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+    }
+
+    :root[data-theme="light"] {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface-raised: #f1f5f9;
+      --border: #cbd5e1;
+      --border-focus: #0284c7;
+      --text: #0f172a;
+      --text-muted: #64748b;
+
+      --head-color: #0284c7;
+      --head-bg: rgba(2, 132, 199, 0.1);
+      --head-border: rgba(2, 132, 199, 0.35);
+
+      --incoming-color: #059669;
+      --incoming-bg: rgba(5, 150, 105, 0.1);
+      --incoming-border: rgba(5, 150, 105, 0.35);
+
+      --divider-color: #d97706;
+      --divider-bg: rgba(217, 119, 6, 0.1);
+
+      --gold: #d97706;
+      --success: #059669;
+      --danger: #dc2626;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      transition: background-color 0.2s, color 0.2s;
+    }
+
+    .container {
+      max-width: 1140px;
+      margin: 0 auto;
+      padding: 1.25rem 1rem 3rem;
+      width: 100%;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top Navigation Header */
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: var(--radius);
+      background: linear-gradient(135deg, #f97316, #ef4444, #8b5cf6);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 1.3rem;
+      box-shadow: 0 4px 12px rgba(249, 115, 22, 0.35);
+    }
+
+    .brand-text h1 {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .quest-badge {
+      font-size: 0.68rem;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      font-weight: 700;
+      padding: 0.15rem 0.5rem;
+      border-radius: 9999px;
+      background: rgba(249, 115, 22, 0.15);
+      color: #f97316;
+      border: 1px solid #f97316;
+    }
+
+    .brand-text p {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .btn-action {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: var(--radius-sm);
+      padding: 0.45rem 0.75rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: all 0.15s ease;
+    }
+
+    .btn-action:hover {
+      background: var(--surface-raised);
+      border-color: var(--text-muted);
+    }
+
+    /* Stats Bar */
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .stat-pill {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.65rem 0.9rem;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stat-lbl {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .stat-val {
+      font-size: 1.25rem;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      color: var(--text);
+    }
+
+    .timer-alert {
+      color: var(--danger) !important;
+      animation: pulseAlert 1s infinite;
+    }
+
+    /* Timer Progress Line */
+    .timer-track {
+      background: var(--border);
+      height: 6px;
+      border-radius: 3px;
+      margin-bottom: 1.25rem;
+      overflow: hidden;
+    }
+
+    .timer-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #10b981, #f59e0b, #ef4444);
+      width: 100%;
+      transition: width 0.2s linear;
+    }
+
+    /* Main Conflict Arena Card */
+    .conflict-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+      margin-bottom: 1.25rem;
+    }
+
+    /* Conflict File Header */
+    .conflict-header {
+      padding: 0.75rem 1.25rem;
+      background: var(--surface-raised);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+
+    .file-meta {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .file-name {
+      font-family: var(--font-mono);
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .branch-pill {
+      font-size: 0.72rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+
+    .conflict-counter-badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 0.2rem 0.55rem;
+      border-radius: 9999px;
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--danger);
+      border: 1px solid var(--danger);
+    }
+
+    /* Scenario Context Banner */
+    .scenario-banner {
+      padding: 0.85rem 1.25rem;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .scenario-banner strong {
+      color: var(--text);
+    }
+
+    /* Code Viewer Container */
+    .code-viewer-container {
+      background: #040711;
+      padding: 1rem;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      line-height: 1.7;
+    }
+
+    :root[data-theme="light"] .code-viewer-container {
+      background: #0f172a;
+      color: #f8fafc;
+    }
+
+    .code-line {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .line-num {
+      width: 28px;
+      text-align: right;
+      color: #64748b;
+      user-select: none;
+      flex-shrink: 0;
+      font-size: 0.75rem;
+    }
+
+    .line-content {
+      flex: 1;
+    }
+
+    /* Conflict Hunk Blocks */
+    .conflict-hunk {
+      margin: 0.6rem 0;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      background: rgba(15, 23, 42, 0.6);
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .conflict-hunk.active-hunk {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--accent);
+    }
+
+    .hunk-marker {
+      padding: 0.35rem 0.75rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      user-select: none;
+      font-size: 0.78rem;
+    }
+
+    .hunk-head {
+      background: var(--head-bg);
+      color: var(--head-color);
+      border-bottom: 1px solid var(--head-border);
+    }
+
+    .hunk-divider {
+      background: var(--divider-bg);
+      color: var(--divider-color);
+      border-top: 1px solid rgba(245, 158, 11, 0.3);
+      border-bottom: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .hunk-incoming {
+      background: var(--incoming-bg);
+      color: var(--incoming-color);
+      border-top: 1px solid var(--incoming-border);
+    }
+
+    .hunk-content-head {
+      background: rgba(56, 189, 248, 0.06);
+      padding: 0.5rem 0.75rem;
+      color: #bae6fd;
+    }
+
+    .hunk-content-incoming {
+      background: rgba(52, 211, 153, 0.06);
+      padding: 0.5rem 0.75rem;
+      color: #a7f3d0;
+    }
+
+    /* Resolution Selector Buttons on Hunk */
+    .hunk-actions-bar {
+      background: var(--surface-raised);
+      padding: 0.5rem 0.75rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.45rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .btn-resolve-opt {
+      padding: 0.3rem 0.65rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      font-family: var(--font-sans);
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: all 0.15s ease;
+    }
+
+    .btn-resolve-opt:hover {
+      background: var(--surface-raised);
+      border-color: var(--text-muted);
+    }
+
+    .btn-resolve-opt.selected-head {
+      background: var(--head-bg);
+      border-color: var(--head-color);
+      color: var(--head-color);
+      box-shadow: 0 0 0 1px var(--head-color);
+    }
+
+    .btn-resolve-opt.selected-incoming {
+      background: var(--incoming-bg);
+      border-color: var(--incoming-color);
+      color: var(--incoming-color);
+      box-shadow: 0 0 0 1px var(--incoming-color);
+    }
+
+    .btn-resolve-opt.selected-both {
+      background: rgba(168, 85, 247, 0.15);
+      border-color: #a855f7;
+      color: #c084fc;
+      box-shadow: 0 0 0 1px #a855f7;
+    }
+
+    .btn-resolve-opt.selected-manual {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: #f59e0b;
+      color: #fbbf24;
+      box-shadow: 0 0 0 1px #f59e0b;
+    }
+
+    /* Multi-File Tabs Bar */
+    .file-tabs-bar {
+      display: flex;
+      gap: 0.4rem;
+      padding: 0.6rem 1.25rem 0;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+    }
+
+    .file-tab-btn {
+      padding: 0.4rem 0.85rem;
+      border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+      font-size: 0.8rem;
+      font-weight: 700;
+      font-family: var(--font-sans);
+      cursor: pointer;
+      background: var(--surface-raised);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      border-bottom: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: all 0.15s ease;
+    }
+
+    .file-tab-btn:hover {
+      color: var(--text);
+      background: rgba(56, 189, 248, 0.1);
+    }
+
+    .file-tab-btn.active {
+      background: var(--bg);
+      color: var(--accent);
+      border-color: var(--border);
+      border-top: 2px solid var(--accent);
+    }
+
+    /* Inline Strategic Hint Banner */
+    .hint-banner {
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      border-radius: var(--radius-sm);
+      padding: 0.75rem 1.25rem;
+      margin: 0.75rem 1.25rem 0;
+      color: #fbbf24;
+      font-size: 0.85rem;
+      line-height: 1.45;
+      display: none;
+      align-items: center;
+      gap: 0.6rem;
+      animation: fadeIn 0.2s ease-out;
+    }
+
+    /* Live Resolved Preview / Editor Drawer */
+    .resolved-preview-box {
+      background: var(--surface-raised);
+      border-top: 1px solid var(--border);
+      padding: 0.75rem 1.25rem;
+    }
+
+    .resolved-preview-head {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.45rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+
+    .marker-status-badge {
+      font-size: 0.72rem;
+      padding: 0.15rem 0.55rem;
+      border-radius: 9999px;
+      font-weight: 700;
+      text-transform: none;
+      letter-spacing: normal;
+    }
+
+    .marker-status-clean {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .marker-status-warn {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .resolved-code-editor {
+      width: 100%;
+      min-height: 120px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: #38bdf8;
+      background: #040711;
+      padding: 0.65rem 0.9rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      white-space: pre;
+      resize: vertical;
+      outline: none;
+      line-height: 1.45;
+      box-sizing: border-box;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+
+    .resolved-code-editor:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-subtle);
+    }
+
+    .resolved-code-editor.has-markers {
+      border-color: #ef4444;
+      background: rgba(239, 68, 68, 0.06);
+    }
+
+    /* Bottom Action Controls */
+    .arena-action-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-top: 0.5rem;
+    }
+
+    .btn-commit {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #ffffff;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 0.65rem 1.5rem;
+      font-size: 0.92rem;
+      font-weight: 800;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+      transition: all 0.15s ease;
+    }
+
+    .btn-commit:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(16, 185, 129, 0.45);
+    }
+
+    .btn-commit:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Explanation & Debrief Box */
+    .debrief-box {
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      margin-top: 1rem;
+      display: none;
+    }
+
+    .debrief-box.show {
+      display: block;
+      animation: fadeIn 0.25s ease-out;
+    }
+
+    .debrief-success {
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+    }
+
+    .debrief-error {
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+    }
+
+    .debrief-title {
+      font-size: 1.05rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.4rem;
+    }
+
+    .debrief-why {
+      font-size: 0.86rem;
+      line-height: 1.6;
+      color: var(--text);
+      margin-top: 0.6rem;
+      padding-top: 0.6rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    :root[data-theme="light"] .debrief-why {
+      border-top-color: rgba(0, 0, 0, 0.08);
+    }
+
+    /* Leaderboard / Final Results Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      z-index: 50;
+    }
+
+    .modal-backdrop.show {
+      display: flex;
+      animation: fadeIn 0.2s ease-out;
+    }
+
+    .modal-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      width: 100%;
+      max-width: 650px;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+      overflow: hidden;
+    }
+
+    .modal-head {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-head h3 {
+      font-size: 1.1rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .modal-body {
+      padding: 1.25rem;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .score-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .summary-box {
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .summary-num {
+      font-size: 1.6rem;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      color: var(--head-color);
+    }
+
+    .summary-lbl {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 1.5rem;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      border-top: 1px solid var(--border);
+      margin-top: 2rem;
+    }
+
+    footer a {
+      color: var(--head-color);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(4px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes pulseAlert {
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.4;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="brand">
+        <div class="brand-icon">🔀</div>
+        <div class="brand-text">
+          <h1>Git Conflict Resolver <span class="quest-badge">Hard Quest</span></h1>
+          <p>Defuse realistic Git merge conflicts under timer pressure &bull; Master HEAD vs incoming</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="leaderboardBtn" class="btn-action" title="View battle scorecard & past attempts">
+          <span>🏆</span> Leaderboard
+        </button>
+        <button id="hintBtn" class="btn-action" title="Get a strategic resolution hint (-25 points)">
+          <span>💡</span> Hint
+        </button>
+        <button id="resetGameBtn" class="btn-action" title="Restart simulation from mission 1">
+          <span>🔄</span> Reset
+        </button>
+        <button id="resetConfirmBtn" class="btn-action" style="display:none; background:rgba(239, 68, 68, 0.2); border-color:var(--danger); color:#fca5a5;" title="Click again to confirm restart">
+          <span>⚠️</span> Confirm?
+        </button>
+        <button id="themeToggleBtn" class="btn-action" title="Toggle light and dark theme">
+          <span id="themeIcon">☀️</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Timer Countdown Track -->
+    <div class="timer-track">
+      <div class="timer-bar" id="timerBar"></div>
+    </div>
+
+    <!-- Live Stats Bar -->
+    <div class="stats-bar">
+      <div class="stat-pill">
+        <span class="stat-lbl">Mission</span>
+        <span class="stat-val" id="statMission">1 / 10</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-lbl">Time Left</span>
+        <span class="stat-val" id="statTime">45s</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-lbl">Score</span>
+        <span class="stat-val" id="statScore">0</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-lbl">Streak</span>
+        <span class="stat-val" id="statStreak">0x 🔥</span>
+      </div>
+    </div>
+
+    <!-- Main Conflict Arena Card -->
+    <div class="conflict-card">
+      <!-- File & Branch Meta -->
+      <div class="conflict-header">
+        <div class="file-meta">
+          <span style="font-size:1.1rem;">📄</span>
+          <span class="file-name" id="fileName">config/server.js</span>
+          <span class="branch-pill" id="branchInfo">HEAD: main &larr; feature/dev-setup</span>
+        </div>
+        <div class="conflict-counter-badge" id="conflictCounterBadge">1 Conflict Hunk</div>
+      </div>
+
+      <!-- Scenario Context -->
+      <div class="scenario-banner" id="scenarioBanner">
+        <!-- Injected dynamically -->
+      </div>
+
+      <!-- Inline Strategic Hint Banner -->
+      <div class="hint-banner" id="hintBanner"></div>
+
+      <!-- Multi-File Tabs Bar (Active on multi-file missions) -->
+      <div class="file-tabs-bar" id="fileTabsBar" style="display:none;"></div>
+
+      <!-- Code Viewer with Interactive Conflict Markers -->
+      <div class="code-viewer-container" id="codeViewer">
+        <!-- Rendered lines & hunks -->
+      </div>
+
+      <!-- Live Resolved Preview & Editor Drawer -->
+      <div class="resolved-preview-box">
+        <div class="resolved-preview-head">
+          <span>👁️ Live Resolution Editor (What Git will stage &amp; commit)</span>
+          <span id="markerStatusBadge" class="marker-status-badge marker-status-clean">✓ Markers Cleared</span>
+        </div>
+        <textarea class="resolved-code-editor" id="resolvedEditor" spellcheck="false" placeholder="// Select a resolution option or edit directly..."></textarea>
+      </div>
+    </div>
+
+    <!-- Bottom Action Controls -->
+    <div class="arena-action-row">
+      <div style="font-size:0.8rem; color:var(--text-muted);" id="keyboardHint">
+        Shortcut: Press <strong>1</strong> for HEAD, <strong>2</strong> for Incoming, <strong>3</strong> for Both, <strong>4</strong> for Manual, <strong>Enter</strong> to Commit.
+      </div>
+      <div style="display:flex; gap:0.5rem;">
+        <button id="commitBtn" class="btn-commit" disabled>
+          <span>✓</span> Commit Resolution (`git add && git commit`)
+        </button>
+        <button id="nextMissionBtn" class="btn-action" style="display:none; font-weight:800; background:var(--head-bg); color:var(--head-color);">
+          Next Conflict &rarr;
+        </button>
+      </div>
+    </div>
+
+    <!-- Debrief & Explanation Box -->
+    <div class="debrief-box" id="debriefBox">
+      <div class="debrief-title" id="debriefTitle"></div>
+      <p id="debriefSummary" style="font-size:0.9rem;"></p>
+      <div class="debrief-why" id="debriefWhy"></div>
+    </div>
+
+    <!-- Leaderboard / Results Modal -->
+    <div class="modal-backdrop" id="leaderboardModal">
+      <div class="modal-card">
+        <div class="modal-head">
+          <h3 id="modalTitle">🏆 Conflict Resolution Leaderboard</h3>
+          <button id="closeModalBtn" class="btn-action">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="score-summary-grid">
+            <div class="summary-box">
+              <div class="summary-num" id="modalFinalScore">0</div>
+              <div class="summary-lbl">Total Score</div>
+            </div>
+            <div class="summary-box">
+              <div class="summary-num" id="modalAccuracy">100%</div>
+              <div class="summary-lbl">Accuracy</div>
+            </div>
+            <div class="summary-box">
+              <div class="summary-num" id="modalMaxStreak">0x</div>
+              <div class="summary-lbl">Max Streak</div>
+            </div>
+          </div>
+          <p id="modalDebriefSummary" style="font-size:0.85rem; color:var(--text-muted); text-align:center;">
+            Practice resolving realistic Git merge conflicts under pressure.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p>Part of <a href="https://github.com/praveenscience/One-File-Tools">One File Tools</a> &bull; Git Conflict Resolver &bull; Pure Single File</p>
+  </footer>
+
+  <!-- Simulation Engine Script -->
+  <script>
+    (function () {
+      'use strict';
+
+      // --- Theme Toggle ---
+      var themeToggleBtn = document.getElementById('themeToggleBtn');
+      var themeIcon = document.getElementById('themeIcon');
+      function updateThemeIcon() {
+        var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+        themeIcon.textContent = isLight ? '🌙' : '☀️';
+      }
+      updateThemeIcon();
+
+      themeToggleBtn.addEventListener('click', function () {
+        var current = document.documentElement.getAttribute('data-theme');
+        var next = current === 'light' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', next);
+        try { localStorage.setItem('git_conflict_theme', next); } catch (e) { }
+        updateThemeIcon();
+      });
+
+      // --- 10 Progressive Merge Conflict Scenarios ---
+      var SCENARIOS = [
+        {
+          id: 1,
+          branchHead: 'main',
+          branchIncoming: 'feature/dev-setup',
+          timerSec: 40,
+          scenario: 'Two developers changed the server listen port. <strong>main</strong> hardened configuration to read from environment variables for production containers, while <strong>feature/dev-setup</strong> set port 3000.',
+          hint: 'Production cloud deployments require reading from process.env.PORT rather than hardcoding port 3000.',
+          why: 'Accepting HEAD (or manual merge with port 3000 default) preserves dynamic container port binding via process.env.PORT. Pure concatenation creates a duplicate const PORT declaration causing a runtime crash.',
+          files: [
+            {
+              fileName: 'config/server.js',
+              prefix: ['// Server configuration', 'const express = require("express");', 'const app = express();', ''],
+              hunks: [
+                {
+                  id: 'h1',
+                  name: 'Listen Port',
+                  head: 'const PORT = process.env.PORT || 8080;',
+                  incoming: 'const PORT = 3000;',
+                  both: 'const PORT = process.env.PORT || 8080;\nconst PORT = 3000;',
+                  manual: 'const PORT = process.env.PORT || 3000;',
+                  correctChoice: 'head',
+                  acceptableResolutions: [
+                    'const PORT = process.env.PORT || 8080;',
+                    'const PORT = process.env.PORT || 3000;'
+                  ]
+                }
+              ],
+              suffix: ['', 'app.listen(PORT, () => {', '  console.log(`Server listening on port ${PORT}`);', '});']
+            }
+          ]
+        },
+        {
+          id: 2,
+          branchHead: 'main',
+          branchIncoming: 'feature/jwt-auth',
+          timerSec: 45,
+          scenario: 'Parallel feature development: <strong>main</strong> added HTTP client <code>axios</code>, while <strong>feature/jwt-auth</strong> added <code>jsonwebtoken</code>. Both packages are required.',
+          hint: 'Both dependencies are introduced by different ongoing features. Neither can be dropped!',
+          why: 'Accepting Both Changes properly retains both axios (for API requests) and jsonwebtoken (for auth token signing).',
+          files: [
+            {
+              fileName: 'package.json',
+              prefix: ['{', '  "name": "enterprise-api",', '  "version": "2.4.0",', '  "dependencies": {'],
+              hunks: [
+                {
+                  id: 'h1',
+                  name: 'Dependencies',
+                  head: '    "axios": "^1.6.0",',
+                  incoming: '    "jsonwebtoken": "^9.0.2"',
+                  both: '    "axios": "^1.6.0",\n    "jsonwebtoken": "^9.0.2"',
+                  manual: '    "axios": "^1.6.0",\n    "jsonwebtoken": "^9.0.2"',
+                  correctChoice: 'both',
+                  acceptableResolutions: [
+                    '    "axios": "^1.6.0",\n    "jsonwebtoken": "^9.0.2"'
+                  ]
+                }
+              ],
+              suffix: ['  }', '}']
+            }
+          ]
+        },
+        {
+          id: 3,
+          branchHead: 'main',
+          branchIncoming: 'feature/user-tokens',
+          timerSec: 40,
+          scenario: 'Security Hotfix: The security team on <strong>main</strong> deprecated vulnerable MD5 hashing in favor of SHA-256. The incoming branch still calls the old MD5 algorithm.',
+          hint: 'MD5 is cryptographically broken and vulnerable to collisions. The security patch on main must win.',
+          why: 'Accepting HEAD preserves cryptographically secure SHA-256 hashing. MD5 is collision-vulnerable; concatenating both or choosing incoming re-introduces security vulnerabilities.',
+          files: [
+            {
+              fileName: 'utils/crypto.js',
+              prefix: ['const crypto = require("crypto");', '', 'function generateAuthToken(payload) {'],
+              hunks: [
+                {
+                  id: 'h1',
+                  name: 'Hash Algorithm',
+                  head: '  return crypto.createHash("sha256").update(payload).digest("hex");',
+                  incoming: '  return crypto.createHash("md5").update(payload).digest("hex");',
+                  both: '  return crypto.createHash("sha256").update(payload).digest("hex");\n  return crypto.createHash("md5").update(payload).digest("hex");',
+                  manual: '  return crypto.createHash("sha256").update(payload).digest("hex");',
+                  correctChoice: 'head',
+                  acceptableResolutions: [
+                    'return crypto.createHash("sha256").update(payload).digest("hex");'
+                  ]
+                }
+              ],
+              suffix: ['}', '', 'module.exports = { generateAuthToken };']
+            }
+          ]
+        },
+        {
+          id: 4,
+          branchHead: 'main',
+          branchIncoming: 'feature/analytics-score',
+          timerSec: 45,
+          scenario: 'Multi-Hunk Conflict: Two teams added distinct helper imports and startup procedures in the application bootstrap file.',
+          hint: 'Hunk 1 requires a single consolidated import to prevent duplicate identifier errors. Hunk 2 requires executing both functions.',
+          why: 'Hunk 1 requires Manual Merge to unify formatUser, validateEmail, and calculateScore under one import. Hunk 2 combines both initialization calls.',
+          files: [
+            {
+              fileName: 'src/index.js',
+              prefix: ['// Application bootstrap', ''],
+              hunks: [
+                {
+                  id: 'h1',
+                  name: 'Named Imports',
+                  head: 'import { formatUser, validateEmail } from "./helpers.js";',
+                  incoming: 'import { formatUser, calculateScore } from "./helpers.js";',
+                  both: 'import { formatUser, validateEmail } from "./helpers.js";\nimport { formatUser, calculateScore } from "./helpers.js";',
+                  manual: 'import { formatUser, validateEmail, calculateScore } from "./helpers.js";',
+                  correctChoice: 'manual',
+                  acceptableResolutions: [
+                    'import { formatUser, validateEmail, calculateScore } from "./helpers.js";',
+                    'import { formatUser, calculateScore, validateEmail } from "./helpers.js";'
+                  ]
+                },
+                {
+                  id: 'h2',
+                  name: 'App Bootstrap',
+                  preHunk: ['', 'export function initApp() {', '  console.log("Starting server services...");'],
+                  head: '  validateEmail(process.env.ADMIN_EMAIL);',
+                  incoming: '  calculateScore(0);',
+                  both: '  validateEmail(process.env.ADMIN_EMAIL);\n  calculateScore(0);',
+                  manual: '  validateEmail(process.env.ADMIN_EMAIL);\n  calculateScore(0);',
+                  correctChoice: 'both',
+                  acceptableResolutions: [
+                    'validateEmail(process.env.ADMIN_EMAIL);\n  calculateScore(0);',
+                    'calculateScore(0);\n  validateEmail(process.env.ADMIN_EMAIL);'
+                  ]
+                }
+              ],
+              suffix: ['}', '']
+            }
+          ]
+        },
+        {
+          id: 5,
+          branchHead: 'main',
+          branchIncoming: 'feature/stripe-checkout',
+          timerSec: 40,
+          scenario: 'Independent Route Registration: <strong>main</strong> added a users search endpoint, while incoming added a Stripe checkout endpoint.',
+          hint: 'Endpoints are independent route handlers. Both should be mounted on the router.',
+          why: 'Accepting Both retains both the user search GET route and the Stripe checkout POST route.',
+          files: [
+            {
+              fileName: 'routes/api.js',
+              prefix: ['const express = require("express");', 'const router = express.Router();', ''],
+              hunks: [
+                {
+                  id: 'h1',
+                  name: 'Route Handlers',
+                  head: 'router.get("/users/search", authMiddleware, searchUsers);',
+                  incoming: 'router.post("/billing/checkout", stripeLimiter, processCheckout);',
+                  both: 'router.get("/users/search", authMiddleware, searchUsers);\nrouter.post("/billing/checkout", stripeLimiter, processCheckout);',
+                  manual: 'router.get("/users/search", authMiddleware, searchUsers);\nrouter.post("/billing/checkout", stripeLimiter, processCheckout);',
+                  correctChoice: 'both',
+                  acceptableResolutions: [
+                    'router.get("/users/search", authMiddleware, searchUsers);\nrouter.post("/billing/checkout", stripeLimiter, processCheckout);',
+                    'router.post("/billing/checkout", stripeLimiter, processCheckout);\nrouter.get("/users/search", authMiddleware, searchUsers);'
+                  ]
+                }
+              ],
+              suffix: ['', 'module.exports = router;']
+            }
+          ]
+        },
+        {
+          id: 6,
+          branchHead: 'main',
+          branchIncoming: 'feature/phone-verification',
+          timerSec: 45,
+          scenario: 'Parallel Schema Migrations: Both branches add new columns to the `users` table via ALTER TABLE statements.',
+          hint: 'Both schema migrations are necessary for user identity and phone verification.',
+          why: 'Both ALTER TABLE statements are needed. Discarding either column causes runtime column-not-found SQL exceptions.',
+          files: [
+            {
+              fileName: 'db/schema.sql',
+              prefix: ['-- Database schema updates', 'BEGIN TRANSACTION;', ''],
+              hunks: [
+                {
+                  id: 'h1',
+                  name: 'Schema Columns',
+                  head: 'ALTER TABLE users ADD COLUMN phone_number VARCHAR(20);',
+                  incoming: 'ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE;',
+                  both: 'ALTER TABLE users ADD COLUMN phone_number VARCHAR(20);\nALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE;',
+                  manual: 'ALTER TABLE users ADD COLUMN phone_number VARCHAR(20);\nALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE;',
+                  correctChoice: 'both',
+                  acceptableResolutions: [
+                    'ALTER TABLE users ADD COLUMN phone_number VARCHAR(20);\nALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE;',
+                    'ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE;\nALTER TABLE users ADD COLUMN phone_number VARCHAR(20);'
+                  ]
+                }
+              ],
+              suffix: ['', 'COMMIT;']
+            }
+          ]
+        },
+        {
+          id: 7,
+          branchHead: 'main',
+          branchIncoming: 'feature/legacy-patch',
+          timerSec: 45,
+          scenario: 'Modern Async/Await vs Nested Promises: <strong>main</strong> refactored to clean async/await with typed error handling, while incoming used old .then() callbacks.',
+          hint: 'Maintain codebase consistency with async/await and throw errors for centralized middleware.',
+          why: 'Accepting HEAD preserves modern async/await execution and centralized error handling instead of legacy nested Promise callbacks.',
+          files: [
+            {
+              fileName: 'controllers/auth.js',
+              prefix: ['class AuthController {', '  async handleLogin(req, res) {'],
+              hunks: [
+                {
+                  id: 'h1',
+                  name: 'Query Handler',
+                  head: '    const user = await User.findById(req.userId);\n    if (!user) throw new NotFoundError("User not found");',
+                  incoming: '    User.findById(req.userId).then(user => {\n      if (!user) return res.status(404).send("User not found");\n    });',
+                  both: '    const user = await User.findById(req.userId);\n    if (!user) throw new NotFoundError("User not found");\n    User.findById(req.userId).then(user => {\n      if (!user) return res.status(404).send("User not found");\n    });',
+                  manual: '    const user = await User.findById(req.userId);\n    if (!user) throw new NotFoundError("User not found");',
+                  correctChoice: 'head',
+                  acceptableResolutions: [
+                    '    const user = await User.findById(req.userId);\n    if (!user) throw new NotFoundError("User not found");',
+                    'const user = await User.findById(req.userId);\nif (!user) throw new NotFoundError("User not found");'
+                  ]
+                }
+              ],
+              suffix: ['    return res.json({ status: "success", user });', '  }', '}']
+            }
+          ]
+        },
+        {
+          id: 8,
+          branchHead: 'main',
+          branchIncoming: 'feature/helmet-security',
+          timerSec: 50,
+          scenario: 'Multi-Hunk Security Middleware: <strong>main</strong> configured CORS origins, while incoming introduced Helmet HTTP security headers.',
+          hint: 'Web apps require both CORS domain filtering and Helmet HTTP security headers.',
+          why: 'Accepting Both in both hunks imports and mounts both CORS domain access rules and Helmet defensive security headers.',
+          files: [
+            {
+              fileName: 'app.js',
+              prefix: ['const express = require("express");', 'const app = express();', ''],
+              hunks: [
+                {
+                  id: 'h1',
+                  name: 'Middleware Imports',
+                  head: 'const cors = require("cors");',
+                  incoming: 'const helmet = require("helmet");',
+                  both: 'const cors = require("cors");\nconst helmet = require("helmet");',
+                  manual: 'const cors = require("cors");\nconst helmet = require("helmet");',
+                  correctChoice: 'both',
+                  acceptableResolutions: [
+                    'const cors = require("cors");\nconst helmet = require("helmet");',
+                    'const helmet = require("helmet");\nconst cors = require("cors");'
+                  ]
+                },
+                {
+                  id: 'h2',
+                  name: 'Middleware Mounting',
+                  preHunk: ['', '// Security headers and CORS configuration'],
+                  head: 'app.use(cors({ origin: process.env.ALLOWED_ORIGIN, credentials: true }));',
+                  incoming: 'app.use(helmet({ contentSecurityPolicy: false }));',
+                  both: 'app.use(cors({ origin: process.env.ALLOWED_ORIGIN, credentials: true }));\napp.use(helmet({ contentSecurityPolicy: false }));',
+                  manual: 'app.use(cors({ origin: process.env.ALLOWED_ORIGIN, credentials: true }));\napp.use(helmet({ contentSecurityPolicy: false }));',
+                  correctChoice: 'both',
+                  acceptableResolutions: [
+                    'app.use(cors({ origin: process.env.ALLOWED_ORIGIN, credentials: true }));\napp.use(helmet({ contentSecurityPolicy: false }));',
+                    'app.use(helmet({ contentSecurityPolicy: false }));\napp.use(cors({ origin: process.env.ALLOWED_ORIGIN, credentials: true }));'
+                  ]
+                }
+              ],
+              suffix: ['', 'app.use(express.json());', 'module.exports = app;']
+            }
+          ]
+        },
+        {
+          id: 9,
+          branchHead: 'main',
+          branchIncoming: 'feature/email-resilience',
+          timerSec: 50,
+          scenario: 'Retry Algorithm Collision: <strong>main</strong> implemented exponential backoff with max 3 retries. Incoming changed it to a static loop without jitter.',
+          hint: 'Exponential backoff prevents thundering herd load on mail servers during outages.',
+          why: 'HEAD utilizes standard exponential backoff (Math.pow(2, attempt)), which avoids swamping recovering mail servers during transient outages.',
+          files: [
+            {
+              fileName: 'services/notification.js',
+              prefix: ['async function sendNotificationWithRetry(payload) {'],
+              hunks: [
+                {
+                  id: 'h1',
+                  name: 'Retry Loop',
+                  head: '  for (let attempt = 1; attempt <= 3; attempt++) {\n    try { return await sendMail(payload); }\n    catch (err) { await delay(Math.pow(2, attempt) * 100); }\n  }',
+                  incoming: '  for (let i = 0; i < 5; i++) {\n    try { return await sendMail(payload); }\n    catch (e) { await delay(500); }\n  }',
+                  both: '  for (let attempt = 1; attempt <= 3; attempt++) {\n    try { return await sendMail(payload); }\n    catch (err) { await delay(Math.pow(2, attempt) * 100); }\n  }\n  for (let i = 0; i < 5; i++) {\n    try { return await sendMail(payload); }\n    catch (e) { await delay(500); }\n  }',
+                  manual: '  for (let attempt = 1; attempt <= 3; attempt++) {\n    try { return await sendMail(payload); }\n    catch (err) { await delay(Math.pow(2, attempt) * 100); }\n  }',
+                  correctChoice: 'head',
+                  acceptableResolutions: [
+                    '  for (let attempt = 1; attempt <= 3; attempt++) {\n    try { return await sendMail(payload); }\n    catch (err) { await delay(Math.pow(2, attempt) * 100); }\n  }',
+                    'for (let attempt = 1; attempt <= 3; attempt++) {\n  try { return await sendMail(payload); }\n  catch (err) { await delay(Math.pow(2, attempt) * 100); }\n}'
+                  ]
+                }
+              ],
+              suffix: ['  throw new Error("Delivery failed after maximum attempts");', '}']
+            }
+          ]
+        },
+        {
+          id: 10,
+          branchHead: 'main',
+          branchIncoming: 'feature/idempotency-keys',
+          timerSec: 60,
+          scenario: 'Grandmaster Multi-File Merge: Resolving conflicts across both the API route layer and core payment service to support webhook verification and idempotency protection.',
+          hint: 'Grandmaster Challenge: Resilient payment pipeline requires both webhook authentication and idempotency keys across routes and services.',
+          why: 'In this multi-file merge, the billing route mounts both the webhook and charge endpoints, while the payment service safely accepts options and executes both webhook event construction and idempotent payment processing.',
+          files: [
+            {
+              fileName: 'routes/billing.js',
+              prefix: ['const express = require("express");', 'const router = express.Router();', ''],
+              hunks: [
+                {
+                  id: 'h1',
+                  name: 'Billing Endpoints',
+                  head: 'router.post("/webhook", express.raw({ type: "application/json" }), handleWebhook);',
+                  incoming: 'router.post("/charge", authRequired, processPaymentRoute);',
+                  both: 'router.post("/webhook", express.raw({ type: "application/json" }), handleWebhook);\nrouter.post("/charge", authRequired, processPaymentRoute);',
+                  manual: 'router.post("/webhook", express.raw({ type: "application/json" }), handleWebhook);\nrouter.post("/charge", authRequired, processPaymentRoute);',
+                  correctChoice: 'both',
+                  acceptableResolutions: [
+                    'router.post("/webhook", express.raw({ type: "application/json" }), handleWebhook);\nrouter.post("/charge", authRequired, processPaymentRoute);',
+                    'router.post("/charge", authRequired, processPaymentRoute);\nrouter.post("/webhook", express.raw({ type: "application/json" }), handleWebhook);'
+                  ]
+                }
+              ],
+              suffix: ['', 'module.exports = router;']
+            },
+            {
+              fileName: 'services/payment.js',
+              prefix: ['// Core payment service pipeline', 'const stripe = require("stripe")(process.env.STRIPE_SECRET);', ''],
+              hunks: [
+                {
+                  id: 'h1',
+                  name: 'Handler Signature',
+                  head: 'async function processPayment(req) {',
+                  incoming: 'async function processPayment(req, options = {}) {',
+                  both: 'async function processPayment(req) {\nasync function processPayment(req, options = {}) {',
+                  manual: 'async function processPayment(req, options = {}) {',
+                  correctChoice: 'incoming',
+                  acceptableResolutions: [
+                    'async function processPayment(req, options = {}) {'
+                  ]
+                },
+                {
+                  id: 'h2',
+                  name: 'Webhook & Charge',
+                  preHunk: ['  const sig = req.headers["stripe-signature"];', '  const idempotencyKey = req.headers["idempotency-key"];', ''],
+                  head: '  const event = stripe.webhooks.constructEvent(req.rawBody, sig, WEBHOOK_SECRET);',
+                  incoming: '  const charge = await stripe.charges.create(req.body, { idempotencyKey });',
+                  both: '  const event = stripe.webhooks.constructEvent(req.rawBody, sig, WEBHOOK_SECRET);\n  const charge = await stripe.charges.create(req.body, { idempotencyKey });',
+                  manual: '  const event = stripe.webhooks.constructEvent(req.rawBody, sig, WEBHOOK_SECRET);\n  const charge = await stripe.charges.create(req.body, { idempotencyKey });',
+                  correctChoice: 'both',
+                  acceptableResolutions: [
+                    '  const event = stripe.webhooks.constructEvent(req.rawBody, sig, WEBHOOK_SECRET);\n  const charge = await stripe.charges.create(req.body, { idempotencyKey });',
+                    '  const charge = await stripe.charges.create(req.body, { idempotencyKey });\n  const event = stripe.webhooks.constructEvent(req.rawBody, sig, WEBHOOK_SECRET);'
+                  ]
+                }
+              ],
+              suffix: ['', '  return { status: "processed", event, charge };', '}']
+            }
+          ]
+        }
+      ];
+
+      // --- State Variables ---
+      var currentMissionIdx = 0;
+      var activeFileIdx = 0;
+      var activeHunkIdx = 0;
+      var score = 0;
+      var streak = 0;
+      var maxStreak = 0;
+      var timerSeconds = 45;
+      var timerTotal = 45;
+      var timerInterval = null;
+      var isMissionResolved = false;
+      var hintUsed = false;
+      var totalCorrect = 0;
+      var hunkResolutions = []; // hunkResolutions[fileIdx][hunkIdx] = choice string
+      var fileEditorTexts = []; // fileEditorTexts[fileIdx] = full resolved code
+
+      // --- Sound Synthesizer (Shared AudioContext Singleton) ---
+      var sharedAudioCtx = null;
+      function getAudioContext() {
+        if (!sharedAudioCtx) {
+          var AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtxClass) {
+            sharedAudioCtx = new AudioCtxClass();
+          }
+        }
+        if (sharedAudioCtx && sharedAudioCtx.state === 'suspended') {
+          sharedAudioCtx.resume().catch(function () {});
+        }
+        return sharedAudioCtx;
+      }
+
+      function playAudio(freq, type, duration) {
+        try {
+          var ctx = getAudioContext();
+          if (!ctx) return;
+          var osc = ctx.createOscillator();
+          var gain = ctx.createGain();
+          osc.type = type || 'sine';
+          osc.frequency.setValueAtTime(freq, ctx.currentTime);
+          gain.gain.setValueAtTime(0.12, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + duration);
+        } catch (e) { }
+      }
+
+      function playSuccessSound() {
+        playAudio(440, 'triangle', 0.12);
+        setTimeout(function () { playAudio(554.37, 'triangle', 0.12); }, 100);
+        setTimeout(function () { playAudio(659.25, 'triangle', 0.25); }, 200);
+      }
+
+      function playErrorSound() {
+        playAudio(220, 'sawtooth', 0.2);
+        setTimeout(function () { playAudio(185, 'sawtooth', 0.3); }, 150);
+      }
+
+      document.addEventListener('click', function unlockAudio() {
+        if (sharedAudioCtx && sharedAudioCtx.state === 'suspended') {
+          sharedAudioCtx.resume().catch(function () {});
+        }
+      });
+
+      // --- DOM Elements ---
+      var statMission = document.getElementById('statMission');
+      var statTime = document.getElementById('statTime');
+      var statScore = document.getElementById('statScore');
+      var statStreak = document.getElementById('statStreak');
+      var timerBar = document.getElementById('timerBar');
+
+      var fileName = document.getElementById('fileName');
+      var branchInfo = document.getElementById('branchInfo');
+      var conflictCounterBadge = document.getElementById('conflictCounterBadge');
+      var scenarioBanner = document.getElementById('scenarioBanner');
+      var hintBanner = document.getElementById('hintBanner');
+      var fileTabsBar = document.getElementById('fileTabsBar');
+      var codeViewer = document.getElementById('codeViewer');
+      var resolvedEditor = document.getElementById('resolvedEditor');
+      var markerStatusBadge = document.getElementById('markerStatusBadge');
+
+      var commitBtn = document.getElementById('commitBtn');
+      var nextMissionBtn = document.getElementById('nextMissionBtn');
+      var hintBtn = document.getElementById('hintBtn');
+      var resetGameBtn = document.getElementById('resetGameBtn');
+      var resetConfirmBtn = document.getElementById('resetConfirmBtn');
+
+      var debriefBox = document.getElementById('debriefBox');
+      var debriefTitle = document.getElementById('debriefTitle');
+      var debriefSummary = document.getElementById('debriefSummary');
+      var debriefWhy = document.getElementById('debriefWhy');
+
+      var leaderboardBtn = document.getElementById('leaderboardBtn');
+      var leaderboardModal = document.getElementById('leaderboardModal');
+      var closeModalBtn = document.getElementById('closeModalBtn');
+      var modalFinalScore = document.getElementById('modalFinalScore');
+      var modalAccuracy = document.getElementById('modalAccuracy');
+      var modalMaxStreak = document.getElementById('modalMaxStreak');
+
+      // --- Timer Control ---
+      function startCountdown(sec) {
+        clearInterval(timerInterval);
+        timerTotal = sec;
+        timerSeconds = sec;
+        updateTimerDisplay();
+
+        timerInterval = setInterval(function () {
+          timerSeconds--;
+          updateTimerDisplay();
+          if (timerSeconds <= 0) {
+            clearInterval(timerInterval);
+            timeExpired();
+          }
+        }, 1000);
+      }
+
+      function updateTimerDisplay() {
+        statTime.textContent = timerSeconds + 's';
+        var pct = Math.max(0, (timerSeconds / timerTotal) * 100);
+        timerBar.style.width = pct + '%';
+        statTime.classList.toggle('timer-alert', timerSeconds <= 10);
+      }
+
+      function stopCountdown() {
+        clearInterval(timerInterval);
+        statTime.classList.remove('timer-alert');
+      }
+
+      function timeExpired() {
+        if (isMissionResolved) return;
+        isMissionResolved = true;
+        stopCountdown();
+        playErrorSound();
+        streak = 0;
+        statStreak.textContent = '0x 🔥';
+
+        // Lock all options and editor
+        codeViewer.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
+        resolvedEditor.readOnly = true;
+
+        debriefBox.className = 'debrief-box show debrief-error';
+        debriefTitle.innerHTML = '<span>⏱️</span> Time Expired! Conflict unresolved';
+        debriefSummary.textContent = 'The merge timer ran out before this conflict was committed. Streak reset to 0.';
+        var s = SCENARIOS[currentMissionIdx];
+        debriefWhy.innerHTML = '<strong>Correct Strategy:</strong> ' + s.why;
+
+        commitBtn.disabled = true;
+        commitBtn.style.display = 'none';
+        nextMissionBtn.style.display = 'inline-flex';
+        nextMissionBtn.textContent = (currentMissionIdx < SCENARIOS.length - 1) ? 'Next Conflict →' : 'View Mission Report →';
+      }
+
+      // --- File & Hunk String Builders ---
+      function buildInitialFileText(file, s) {
+        var lines = [];
+        lines = lines.concat(file.prefix);
+        file.hunks.forEach(function (hunk, hIdx) {
+          if (hIdx > 0 && hunk.preHunk) {
+            lines = lines.concat(hunk.preHunk);
+          }
+          lines.push('<<<<<<< HEAD (' + s.branchHead + ')');
+          lines.push(hunk.head);
+          lines.push('=======');
+          lines.push(hunk.incoming);
+          lines.push('>>>>>>> ' + s.branchIncoming);
+        });
+        lines = lines.concat(file.suffix);
+        return lines.join('\n');
+      }
+
+      function recomputeFileText(fIdx) {
+        var s = SCENARIOS[currentMissionIdx];
+        var file = s.files[fIdx];
+        var lines = [];
+        lines = lines.concat(file.prefix);
+        file.hunks.forEach(function (hunk, hIdx) {
+          if (hIdx > 0 && hunk.preHunk) {
+            lines = lines.concat(hunk.preHunk);
+          }
+          var choice = hunkResolutions[fIdx] ? hunkResolutions[fIdx][hIdx] : null;
+          if (choice === 'head') {
+            lines.push(hunk.head);
+          } else if (choice === 'incoming') {
+            lines.push(hunk.incoming);
+          } else if (choice === 'both') {
+            lines.push(hunk.both);
+          } else if (choice === 'manual') {
+            lines.push(hunk.manual);
+          } else {
+            lines.push('<<<<<<< HEAD (' + s.branchHead + ')');
+            lines.push(hunk.head);
+            lines.push('=======');
+            lines.push(hunk.incoming);
+            lines.push('>>>>>>> ' + s.branchIncoming);
+          }
+        });
+        lines = lines.concat(file.suffix);
+        return lines.join('\n');
+      }
+
+      function hasConflictMarkers(text) {
+        if (!text) return false;
+        return /<{7}|={7}|>{7}/.test(text);
+      }
+
+      function updateMarkerStatus() {
+        var s = SCENARIOS[currentMissionIdx];
+        if (fileEditorTexts[activeFileIdx] !== undefined) {
+          fileEditorTexts[activeFileIdx] = resolvedEditor.value;
+        }
+
+        var anyMarkers = false;
+        for (var f = 0; f < s.files.length; f++) {
+          if (hasConflictMarkers(fileEditorTexts[f])) {
+            anyMarkers = true;
+            break;
+          }
+        }
+
+        if (anyMarkers) {
+          resolvedEditor.classList.add('has-markers');
+          markerStatusBadge.className = 'marker-status-badge marker-status-warn';
+          markerStatusBadge.textContent = '⚠️ Conflict Markers Detected';
+          commitBtn.disabled = true;
+        } else {
+          resolvedEditor.classList.remove('has-markers');
+          markerStatusBadge.className = 'marker-status-badge marker-status-clean';
+          markerStatusBadge.textContent = '✓ Markers Cleared';
+          if (!isMissionResolved) {
+            commitBtn.disabled = false;
+          }
+        }
+
+        updateConflictBadge();
+      }
+
+      function updateConflictBadge() {
+        var s = SCENARIOS[currentMissionIdx];
+        var totalHunks = 0;
+        var resolvedHunks = 0;
+        for (var f = 0; f < s.files.length; f++) {
+          totalHunks += s.files[f].hunks.length;
+          for (var h = 0; h < s.files[f].hunks.length; h++) {
+            if (hunkResolutions[f] && hunkResolutions[f][h]) {
+              resolvedHunks++;
+            }
+          }
+        }
+
+        var label = totalHunks + (totalHunks === 1 ? ' Conflict Hunk' : ' Conflict Hunks');
+        if (s.files.length > 1) {
+          label += ' (' + s.files.length + ' Files)';
+        }
+        if (resolvedHunks === totalHunks) {
+          conflictCounterBadge.textContent = label + ' • All Resolved';
+        } else {
+          conflictCounterBadge.textContent = label + ' • ' + resolvedHunks + '/' + totalHunks + ' Resolved';
+        }
+      }
+
+      // --- Load Active Conflict Scenario ---
+      function loadMission(idx) {
+        if (idx >= SCENARIOS.length) {
+          showGameOver();
+          return;
+        }
+
+        currentMissionIdx = idx;
+        activeFileIdx = 0;
+        activeHunkIdx = 0;
+        isMissionResolved = false;
+        hintUsed = false;
+
+        var s = SCENARIOS[idx];
+
+        statMission.textContent = (idx + 1) + ' / ' + SCENARIOS.length;
+        statScore.textContent = score;
+        statStreak.textContent = streak + 'x 🔥';
+
+        fileName.textContent = s.files[0].fileName;
+        branchInfo.textContent = 'HEAD: ' + s.branchHead + ' ← ' + s.branchIncoming;
+        scenarioBanner.innerHTML = s.scenario;
+        hintBanner.style.display = 'none';
+        hintBanner.innerHTML = '';
+
+        debriefBox.classList.remove('show');
+        commitBtn.disabled = true;
+        commitBtn.style.display = 'inline-flex';
+        nextMissionBtn.style.display = 'none';
+
+        hunkResolutions = [];
+        fileEditorTexts = [];
+        for (var f = 0; f < s.files.length; f++) {
+          var hunkArr = [];
+          for (var h = 0; h < s.files[f].hunks.length; h++) {
+            hunkArr.push(null);
+          }
+          hunkResolutions.push(hunkArr);
+          fileEditorTexts.push(buildInitialFileText(s.files[f], s));
+        }
+
+        renderFileTabs(s);
+        renderCodeViewer(s.files[activeFileIdx]);
+
+        resolvedEditor.value = fileEditorTexts[activeFileIdx];
+        resolvedEditor.readOnly = false;
+        updateMarkerStatus();
+
+        startCountdown(s.timerSec);
+      }
+
+      // --- Render Multi-File Navigation Tabs ---
+      function renderFileTabs(s) {
+        if (s.files.length <= 1) {
+          fileTabsBar.style.display = 'none';
+          fileTabsBar.innerHTML = '';
+          return;
+        }
+
+        fileTabsBar.style.display = 'flex';
+        fileTabsBar.innerHTML = '';
+        s.files.forEach(function (file, fIdx) {
+          var btn = document.createElement('button');
+          btn.className = 'file-tab-btn' + (fIdx === activeFileIdx ? ' active' : '');
+          btn.innerHTML = '<span>📄</span> ' + file.fileName;
+          btn.addEventListener('click', function () {
+            if (activeFileIdx === fIdx) return;
+            fileEditorTexts[activeFileIdx] = resolvedEditor.value;
+            activeFileIdx = fIdx;
+            activeHunkIdx = 0;
+            fileName.textContent = file.fileName;
+            renderFileTabs(s);
+            renderCodeViewer(file);
+            resolvedEditor.value = fileEditorTexts[activeFileIdx];
+            updateMarkerStatus();
+          });
+          fileTabsBar.appendChild(btn);
+        });
+      }
+
+      // --- Render Code Viewer with Conflict Markers ---
+      function renderCodeViewer(file) {
+        codeViewer.innerHTML = '';
+        var s = SCENARIOS[currentMissionIdx];
+        var lineNum = 1;
+
+        // Prefix lines
+        file.prefix.forEach(function (line) {
+          codeViewer.appendChild(createCodeLine(lineNum++, line));
+        });
+
+        // Hunks
+        file.hunks.forEach(function (hunk, hIdx) {
+          if (hIdx > 0 && hunk.preHunk) {
+            hunk.preHunk.forEach(function (line) {
+              codeViewer.appendChild(createCodeLine(lineNum++, line));
+            });
+          }
+
+          var hunkContainer = document.createElement('div');
+          hunkContainer.className = 'conflict-hunk' + (hIdx === activeHunkIdx ? ' active-hunk' : '');
+          hunkContainer.setAttribute('data-hunk-idx', hIdx);
+          hunkContainer.addEventListener('click', function () {
+            activeHunkIdx = hIdx;
+            highlightActiveHunk();
+          });
+
+          if (file.hunks.length > 1) {
+            var hunkTitle = document.createElement('div');
+            hunkTitle.style.cssText = 'padding:0.3rem 0.75rem; background:rgba(0,0,0,0.3); font-size:0.74rem; font-weight:700; color:var(--text-muted); border-bottom:1px solid var(--border);';
+            hunkTitle.textContent = 'Conflict Hunk ' + (hIdx + 1) + ' of ' + file.hunks.length + (hunk.name ? ': ' + hunk.name : '');
+            hunkContainer.appendChild(hunkTitle);
+          }
+
+          // HEAD Marker
+          var headMarker = document.createElement('div');
+          headMarker.className = 'hunk-marker hunk-head';
+          headMarker.innerHTML = '<span>&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD (Current Change: ' + s.branchHead + ')</span><span>[1]</span>';
+          hunkContainer.appendChild(headMarker);
+
+          // HEAD Content
+          var headContent = document.createElement('div');
+          headContent.className = 'hunk-content-head';
+          headContent.textContent = hunk.head;
+          hunkContainer.appendChild(headContent);
+
+          // Divider
+          var divMarker = document.createElement('div');
+          divMarker.className = 'hunk-marker hunk-divider';
+          divMarker.innerHTML = '<span>=======</span><span>Conflict Divider</span>';
+          hunkContainer.appendChild(divMarker);
+
+          // Incoming Content
+          var incContent = document.createElement('div');
+          incContent.className = 'hunk-content-incoming';
+          incContent.textContent = hunk.incoming;
+          hunkContainer.appendChild(incContent);
+
+          // Incoming Marker
+          var incMarker = document.createElement('div');
+          incMarker.className = 'hunk-marker hunk-incoming';
+          incMarker.innerHTML = '<span>&gt;&gt;&gt;&gt;&gt;&gt;&gt; ' + s.branchIncoming + ' (Incoming Change)</span><span>[2]</span>';
+          hunkContainer.appendChild(incMarker);
+
+          // Interactive Resolution Actions Bar
+          var actionsBar = document.createElement('div');
+          actionsBar.className = 'hunk-actions-bar';
+
+          var currentChoice = hunkResolutions[activeFileIdx] ? hunkResolutions[activeFileIdx][hIdx] : null;
+
+          var optHead = document.createElement('button');
+          optHead.className = 'btn-resolve-opt' + (currentChoice === 'head' ? ' selected-head' : '');
+          optHead.innerHTML = '<span>1</span> Accept Current (HEAD)';
+          optHead.addEventListener('click', function () { selectChoice(activeFileIdx, hIdx, 'head'); });
+
+          var optInc = document.createElement('button');
+          optInc.className = 'btn-resolve-opt' + (currentChoice === 'incoming' ? ' selected-incoming' : '');
+          optInc.innerHTML = '<span>2</span> Accept Incoming';
+          optInc.addEventListener('click', function () { selectChoice(activeFileIdx, hIdx, 'incoming'); });
+
+          var optBoth = document.createElement('button');
+          optBoth.className = 'btn-resolve-opt' + (currentChoice === 'both' ? ' selected-both' : '');
+          optBoth.innerHTML = '<span>3</span> Accept Both (Concatenate)';
+          optBoth.addEventListener('click', function () { selectChoice(activeFileIdx, hIdx, 'both'); });
+
+          var optManual = document.createElement('button');
+          optManual.className = 'btn-resolve-opt' + (currentChoice === 'manual' ? ' selected-manual' : '');
+          optManual.innerHTML = '<span>4</span> ✏️ Manual Merge';
+          optManual.addEventListener('click', function () { selectChoice(activeFileIdx, hIdx, 'manual'); });
+
+          actionsBar.appendChild(optHead);
+          actionsBar.appendChild(optInc);
+          actionsBar.appendChild(optBoth);
+          actionsBar.appendChild(optManual);
+
+          hunkContainer.appendChild(actionsBar);
+          codeViewer.appendChild(hunkContainer);
+        });
+
+        // Suffix lines
+        file.suffix.forEach(function (line) {
+          codeViewer.appendChild(createCodeLine(lineNum++, line));
+        });
+      }
+
+      function createCodeLine(num, text) {
+        var div = document.createElement('div');
+        div.className = 'code-line';
+        div.innerHTML = '<span class="line-num">' + num + '</span><span class="line-content">' + (text ? escapeHtml(text) : ' ') + '</span>';
+        return div;
+      }
+
+      function escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+      }
+
+      function highlightActiveHunk() {
+        var hunks = codeViewer.querySelectorAll('.conflict-hunk');
+        hunks.forEach(function (h, idx) {
+          h.classList.toggle('active-hunk', idx === activeHunkIdx);
+        });
+      }
+
+      // --- Resolution Choice Handler ---
+      function selectChoice(fIdx, hIdx, choice) {
+        if (isMissionResolved) return;
+        if (!hunkResolutions[fIdx]) return;
+
+        activeHunkIdx = hIdx;
+        hunkResolutions[fIdx][hIdx] = choice;
+        fileEditorTexts[fIdx] = recomputeFileText(fIdx);
+
+        if (fIdx === activeFileIdx) {
+          resolvedEditor.value = fileEditorTexts[fIdx];
+          renderCodeViewer(SCENARIOS[currentMissionIdx].files[activeFileIdx]);
+        }
+
+        updateMarkerStatus();
+      }
+
+      // --- Editor Input Handler ---
+      resolvedEditor.addEventListener('input', function () {
+        if (isMissionResolved) return;
+        fileEditorTexts[activeFileIdx] = resolvedEditor.value;
+        updateMarkerStatus();
+      });
+
+      // --- Commit / Evaluate Resolution ---
+      commitBtn.addEventListener('click', function () {
+        evaluateCommit();
+      });
+
+      function cleanCode(str) {
+        if (!str) return '';
+        return str.replace(/\r\n/g, '\n')
+          .split('\n')
+          .map(function (line) { return line.trim(); })
+          .filter(function (line) { return line.length > 0; })
+          .join('\n');
+      }
+
+      function isResolutionValid(file, userText) {
+        if (!userText) return false;
+        var userClean = cleanCode(userText);
+        if (!userClean) return false;
+
+        // 1-Hunk file
+        if (file.hunks.length === 1) {
+          var h = file.hunks[0];
+          var accList = h.acceptableResolutions || [];
+          for (var i = 0; i < accList.length; i++) {
+            var valid = cleanCode(file.prefix.concat([accList[i]]).concat(file.suffix).join('\n'));
+            if (userClean === valid) return true;
+          }
+          var pClean = cleanCode(file.prefix.join('\n'));
+          var sClean = cleanCode(file.suffix.join('\n'));
+          if (userClean.startsWith(pClean) && userClean.endsWith(sClean)) {
+            var mid = userClean.slice(pClean.length, userClean.length - sClean.length).trim();
+            for (var i = 0; i < accList.length; i++) {
+              if (cleanCode(mid) === cleanCode(accList[i])) return true;
+            }
+          }
+          return false;
+        }
+
+        // 2-Hunk file
+        if (file.hunks.length === 2) {
+          var h0 = file.hunks[0];
+          var h1 = file.hunks[1];
+          var acc0 = h0.acceptableResolutions || [];
+          var acc1 = h1.acceptableResolutions || [];
+          for (var i = 0; i < acc0.length; i++) {
+            for (var j = 0; j < acc1.length; j++) {
+              var valid = cleanCode(
+                file.prefix
+                  .concat([acc0[i]])
+                  .concat(h1.preHunk || [])
+                  .concat([acc1[j]])
+                  .concat(file.suffix)
+                  .join('\n')
+              );
+              if (userClean === valid) return true;
+            }
+          }
+          var pClean = cleanCode(file.prefix.join('\n'));
+          var mClean = cleanCode((h1.preHunk || []).join('\n'));
+          var sClean = cleanCode(file.suffix.join('\n'));
+          if (userClean.startsWith(pClean) && userClean.endsWith(sClean) && userClean.indexOf(mClean) !== -1) {
+            var mIdx = userClean.indexOf(mClean, pClean.length);
+            var mid0 = userClean.slice(pClean.length, mIdx).trim();
+            var mid1 = userClean.slice(mIdx + mClean.length, userClean.length - sClean.length).trim();
+            var match0 = acc0.some(function (a) { return cleanCode(mid0) === cleanCode(a); });
+            var match1 = acc1.some(function (a) { return cleanCode(mid1) === cleanCode(a); });
+            if (match0 && match1) return true;
+          }
+          return false;
+        }
+
+        return false;
+      }
+
+      function evaluateCommit() {
+        if (isMissionResolved) return;
+        var s = SCENARIOS[currentMissionIdx];
+
+        // Save current editor text
+        fileEditorTexts[activeFileIdx] = resolvedEditor.value;
+
+        // Check 1: Ensure no conflict markers remain in any file
+        for (var f = 0; f < s.files.length; f++) {
+          if (hasConflictMarkers(fileEditorTexts[f])) {
+            playErrorSound();
+            if (activeFileIdx !== f) {
+              switchFileTab(f);
+            }
+            markerStatusBadge.textContent = '⚠ Cannot commit: Clean conflict markers in ' + s.files[f].fileName;
+            markerStatusBadge.className = 'marker-status-badge marker-status-warn';
+            resolvedEditor.focus();
+            return;
+          }
+        }
+
+        // Only stop countdown once commit actually proceeds!
+        stopCountdown();
+
+        // Check 2: Evaluate correctness across all files using the final editor text
+        var allCorrect = true;
+        for (var f = 0; f < s.files.length; f++) {
+          var file = s.files[f];
+          var fileText = fileEditorTexts[f];
+          if (!isResolutionValid(file, fileText)) {
+            allCorrect = false;
+            break;
+          }
+        }
+
+        isMissionResolved = true;
+        codeViewer.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
+        resolvedEditor.readOnly = true;
+
+        if (allCorrect) {
+          playSuccessSound();
+          totalCorrect++;
+          streak++;
+          if (streak > maxStreak) maxStreak = streak;
+
+          var speedBonus = Math.round(timerSeconds * 3.5);
+          var streakMultiplier = streak > 1 ? (streak * 25) : 0;
+          var hintPenalty = hintUsed ? 25 : 0;
+          var pointsEarned = Math.max(50, 100 + speedBonus + streakMultiplier - hintPenalty);
+          score += pointsEarned;
+
+          debriefBox.className = 'debrief-box show debrief-success';
+          debriefTitle.innerHTML = '<span>🎉</span> Resolution Verified! Git Clean Merge';
+          debriefSummary.textContent = '+' + pointsEarned + ' points earned! (Speed: +' + speedBonus + ', Streak: ' + streak + 'x' + (hintUsed ? ', Hint: -25' : '') + ')';
+        } else {
+          playErrorSound();
+          streak = 0;
+          debriefBox.className = 'debrief-box show debrief-error';
+          debriefTitle.innerHTML = '<span>❌</span> Merge Defect Introduced!';
+          debriefSummary.textContent = 'Incorrect resolution strategy selected. Build or regression tests would fail.';
+        }
+
+        debriefWhy.innerHTML = '<strong>Why this matters:</strong> ' + s.why;
+
+        statScore.textContent = score;
+        statStreak.textContent = streak + 'x 🔥';
+
+        commitBtn.style.display = 'none';
+        nextMissionBtn.style.display = 'inline-flex';
+        nextMissionBtn.textContent = (currentMissionIdx < SCENARIOS.length - 1) ? 'Next Conflict →' : 'View Mission Report →';
+      }
+
+      // --- Next Mission Button ---
+      nextMissionBtn.addEventListener('click', function () {
+        loadMission(currentMissionIdx + 1);
+      });
+
+      // --- Hint Button (Inline Display, 25 pt penalty) ---
+      hintBtn.addEventListener('click', function () {
+        if (isMissionResolved) return;
+        var s = SCENARIOS[currentMissionIdx];
+        hintUsed = true;
+        hintBanner.style.display = 'flex';
+        hintBanner.innerHTML = '<span>💡</span><div><strong>Lead Architect Hint:</strong> ' + s.hint + ' <em style="opacity:0.85">(-25 point penalty applied on commit)</em></div>';
+      });
+
+      // --- Keyboard Shortcuts ---
+      window.addEventListener('keydown', function (e) {
+        if (isMissionResolved) {
+          if (e.key === 'Enter' && nextMissionBtn.style.display !== 'none') {
+            loadMission(currentMissionIdx + 1);
+          }
+          return;
+        }
+
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            if (!commitBtn.disabled && commitBtn.style.display !== 'none') {
+              evaluateCommit();
+            }
+          }
+          return;
+        }
+
+        var s = SCENARIOS[currentMissionIdx];
+        var file = s.files[activeFileIdx];
+        var targetHunk = activeHunkIdx;
+        if (targetHunk >= file.hunks.length) targetHunk = 0;
+
+        if (e.key === '1') selectChoice(activeFileIdx, targetHunk, 'head');
+        else if (e.key === '2') selectChoice(activeFileIdx, targetHunk, 'incoming');
+        else if (e.key === '3') selectChoice(activeFileIdx, targetHunk, 'both');
+        else if (e.key === '4') selectChoice(activeFileIdx, targetHunk, 'manual');
+
+        if (file.hunks.length > 1 && targetHunk < file.hunks.length - 1) {
+          activeHunkIdx = targetHunk + 1;
+          highlightActiveHunk();
+        }
+        else if (e.key === 'Enter') {
+          if (!commitBtn.disabled && commitBtn.style.display !== 'none') {
+            evaluateCommit();
+          } else if (nextMissionBtn.style.display !== 'none') {
+            loadMission(currentMissionIdx + 1);
+          }
+        }
+      });
+
+      // --- Game Over / Summary Scorecard ---
+      function showGameOver() {
+        stopCountdown();
+        var accuracy = Math.round((totalCorrect / SCENARIOS.length) * 100);
+
+        saveLeaderboard();
+
+        modalFinalScore.textContent = score;
+        modalAccuracy.textContent = accuracy + '%';
+        modalMaxStreak.textContent = maxStreak + 'x';
+
+        leaderboardModal.classList.add('show');
+      }
+
+      // --- Local Storage Management ---
+      function saveLeaderboard() {
+        try {
+          var saved = localStorage.getItem('git_conflict_resolver_best');
+          var bestScore = score;
+          var bestStreak = maxStreak;
+          var bestCorrect = totalCorrect;
+          if (saved) {
+            var prev = JSON.parse(saved);
+            bestScore = Math.max(score, prev.score || 0);
+            bestStreak = Math.max(maxStreak, prev.maxStreak || 0);
+            bestCorrect = Math.max(totalCorrect, prev.totalCorrect || 0);
+          }
+          var record = {
+            score: bestScore,
+            maxStreak: bestStreak,
+            totalCorrect: bestCorrect
+          };
+          localStorage.setItem('git_conflict_resolver_best', JSON.stringify(record));
+        } catch (e) { }
+      }
+
+      function loadLeaderboard() {
+        try {
+          var saved = localStorage.getItem('git_conflict_resolver_best');
+          if (saved) {
+            var rec = JSON.parse(saved);
+            modalFinalScore.textContent = rec.score || 0;
+            modalMaxStreak.textContent = (rec.maxStreak || 0) + 'x';
+          } else {
+            modalFinalScore.textContent = score;
+            modalMaxStreak.textContent = maxStreak + 'x';
+          }
+        } catch (e) { }
+      }
+
+      leaderboardBtn.addEventListener('click', function () {
+        loadLeaderboard();
+        leaderboardModal.classList.add('show');
+      });
+
+      closeModalBtn.addEventListener('click', function () {
+        leaderboardModal.classList.remove('show');
+      });
+
+      leaderboardModal.addEventListener('click', function (e) {
+        if (e.target === leaderboardModal) {
+          leaderboardModal.classList.remove('show');
+        }
+      });
+
+      var resetTimeout = null;
+
+      function cancelResetConfirm() {
+        if (resetTimeout) clearTimeout(resetTimeout);
+        resetTimeout = null;
+        if (resetConfirmBtn) resetConfirmBtn.style.display = 'none';
+        if (resetGameBtn) resetGameBtn.style.display = 'inline-flex';
+      }
+
+      resetGameBtn.addEventListener('click', function () {
+        resetGameBtn.style.display = 'none';
+        resetConfirmBtn.style.display = 'inline-flex';
+        resetTimeout = setTimeout(cancelResetConfirm, 4000);
+      });
+
+      resetConfirmBtn.addEventListener('click', function () {
+        cancelResetConfirm();
+        score = 0;
+        streak = 0;
+        maxStreak = 0;
+        totalCorrect = 0;
+        statScore.textContent = '0';
+        statStreak.textContent = '0x 🔥';
+        loadMission(0);
+      });
+
+      // --- Initialize ---
+      loadMission(0);
+
+    })();
+  </script>
+</body>
+
+</html>
