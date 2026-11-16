@@ -11,11 +11,15 @@
   <!-- Dark Mode FOUC Prevention -->
   <script>
     (function () {
-      var t = localStorage.getItem('css_selectors_quiz_theme');
-      if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
-      else if (t === 'light') document.documentElement.setAttribute('data-theme', 'light');
-      else if (window.matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.setAttribute('data-theme', 'dark');
-      else document.documentElement.setAttribute('data-theme', 'light');
+      try {
+        var t = localStorage.getItem('css_selectors_quiz_theme');
+        if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+        else if (t === 'light') document.documentElement.setAttribute('data-theme', 'light');
+        else if (window.matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.setAttribute('data-theme', 'dark');
+        else document.documentElement.setAttribute('data-theme', 'light');
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
     })();
   </script>
 
@@ -985,7 +989,7 @@
 
       function updateThemeIcon() {
         var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-        themeIcon.textContent = isDark ? '🌙' : '☀️';
+        themeIcon.textContent = isDark ? '☀️' : '🌙';
       }
       updateThemeIcon();
 
@@ -993,7 +997,9 @@
         var current = document.documentElement.getAttribute('data-theme');
         var next = current === 'dark' ? 'light' : 'dark';
         document.documentElement.setAttribute('data-theme', next);
-        localStorage.setItem('css_selectors_quiz_theme', next);
+        try {
+          localStorage.setItem('css_selectors_quiz_theme', next);
+        } catch (e) { }
         updateThemeIcon();
       });
 
@@ -1083,7 +1089,7 @@
           selector: 'h3 + p',
           specificity: '(0, 0, 2)',
           hint: 'The + combinator matches the very next sibling element if it matches the right-hand selector.',
-          explanation: '`h3 + p` targets a `<p>` only if it is the immediately preceding sibling is an `<h3>`. If a `<div>` sits between them, the adjacency is broken.',
+          explanation: '`h3 + p` targets a `<p>` only if its immediately preceding sibling is an `<h3>`. If a `<div>` sits between them, the adjacency is broken.',
           html: `<div class="content">
   <h3>Section 1</h3>
   <p>Paragraph directly following Section 1 header.</p>
@@ -1238,6 +1244,7 @@
       var score = 0;
       var streak = 0;
       var maxStreak = 0;
+      var correctCount = 0;
       var selectedNodeIds = new Set();
       var targetNodeIds = new Set();
       var isEvaluated = false;
@@ -1290,11 +1297,12 @@
           var saved = localStorage.getItem('css_selectors_quiz_data');
           if (saved) {
             var data = JSON.parse(saved);
-            if (typeof data.levelIndex === 'number' && data.levelIndex < LEVELS.length) {
+            if (typeof data.levelIndex === 'number') {
               currentLevelIndex = data.levelIndex;
               score = data.score || 0;
               streak = data.streak || 0;
               maxStreak = data.maxStreak || 0;
+              correctCount = data.correctCount || 0;
             }
           }
         } catch (e) { }
@@ -1303,10 +1311,11 @@
       function saveProgress() {
         try {
           var data = {
-            levelIndex: currentLevelIndex,
+            levelIndex: currentLevelIndex + 1,
             score: score,
             streak: streak,
-            maxStreak: maxStreak
+            maxStreak: maxStreak,
+            correctCount: correctCount
           };
           localStorage.setItem('css_selectors_quiz_data', JSON.stringify(data));
         } catch (e) { }
@@ -1631,6 +1640,7 @@
 
         // Score Calculation
         if (isPerfect) {
+          correctCount++;
           var pointsEarned = 100;
           if (isTimerEnabled && timerSeconds > 0) {
             pointsEarned += Math.round(timerSeconds * 2.5); // Speed bonus
@@ -1672,11 +1682,10 @@
         finalStreak.textContent = maxStreak;
 
         var totalQuestions = LEVELS.length;
-        var maxPossibleScore = totalQuestions * 175;
-        var accuracyPct = Math.min(100, Math.round((score / (totalQuestions * 100)) * 100));
+        var accuracyPct = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
         finalAccuracy.textContent = accuracyPct + '%';
 
-        gameOverSummary.textContent = 'You completed all ' + totalQuestions + ' CSS selector challenges! Final score: ' + score + ' points with a maximum streak of ' + maxStreak + '.';
+        gameOverSummary.textContent = 'You completed all ' + totalQuestions + ' CSS selector challenges! You answered ' + correctCount + ' of ' + totalQuestions + ' correctly (' + accuracyPct + '% accuracy). Final score: ' + score + ' points with a maximum streak of ' + maxStreak + '.';
       }
 
       // --- Reset / Restart Quiz ---
@@ -1684,8 +1693,11 @@
         score = 0;
         streak = 0;
         maxStreak = 0;
+        correctCount = 0;
         currentLevelIndex = 0;
-        localStorage.removeItem('css_selectors_quiz_data');
+        try {
+          localStorage.removeItem('css_selectors_quiz_data');
+        } catch (e) { }
         gameOverCard.classList.remove('show');
         challengeContainer.style.display = 'block';
         loadLevel(0);
