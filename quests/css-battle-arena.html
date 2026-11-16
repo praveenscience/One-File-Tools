@@ -704,13 +704,20 @@
       transition: all 0.15s ease;
     }
 
-    .btn-submit:hover {
+    .btn-submit:hover:not(:disabled) {
       transform: translateY(-1px);
       box-shadow: 0 6px 16px rgba(56, 189, 248, 0.45);
     }
 
-    .btn-submit:active {
+    .btn-submit:active:not(:disabled) {
       transform: translateY(0);
+    }
+
+    .btn-submit:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
     }
 
     .btn-next {
@@ -919,14 +926,14 @@
               <div class="viewport-box">
                 <span class="viewport-label">🎯 Target Design</span>
                 <div class="viewport-frame" id="targetFrameContainer">
-                  <iframe id="targetFrame" title="Target Design Frame"></iframe>
+                  <iframe id="targetFrame" title="Target Design Frame" sandbox="allow-same-origin"></iframe>
                 </div>
               </div>
               <!-- Player Output Viewport -->
               <div class="viewport-box">
                 <span class="viewport-label">⚡ Player Output</span>
                 <div class="viewport-frame" id="playerFrameContainer">
-                  <iframe id="playerFrame" title="Player Live Frame"></iframe>
+                  <iframe id="playerFrame" title="Player Live Frame" sandbox="allow-same-origin"></iframe>
                 </div>
               </div>
             </div>
@@ -934,10 +941,10 @@
             <!-- 2. Curtain Split Frame -->
             <div class="curtain-frame" id="curtainFrame">
               <div class="curtain-target">
-                <iframe id="curtainTargetIframe" title="Curtain Target"></iframe>
+                <iframe id="curtainTargetIframe" title="Curtain Target" sandbox="allow-same-origin"></iframe>
               </div>
               <div class="curtain-player" id="curtainPlayerCut">
-                <iframe id="curtainPlayerIframe" title="Curtain Player"></iframe>
+                <iframe id="curtainPlayerIframe" title="Curtain Player" sandbox="allow-same-origin"></iframe>
               </div>
               <div class="curtain-handle" id="curtainHandle">↔</div>
             </div>
@@ -945,10 +952,10 @@
             <!-- 3. Difference Blend Frame -->
             <div class="diff-overlay-frame" id="diffFrame">
               <div class="diff-layer-base">
-                <iframe id="diffTargetIframe" title="Diff Target"></iframe>
+                <iframe id="diffTargetIframe" title="Diff Target" sandbox="allow-same-origin"></iframe>
               </div>
               <div class="diff-layer-top">
-                <iframe id="diffPlayerIframe" title="Diff Player"></iframe>
+                <iframe id="diffPlayerIframe" title="Diff Player" sandbox="allow-same-origin"></iframe>
               </div>
             </div>
           </div>
@@ -957,7 +964,7 @@
           <div class="eval-score-bar">
             <div class="score-meters">
               <div class="meter-circle">
-                <span class="meter-val" id="evalAccuracy">100.0%</span>
+                <span class="meter-val" id="evalAccuracy">0.0%</span>
                 <span class="meter-label">Visual<br />Accuracy</span>
               </div>
               <div class="meter-circle">
@@ -965,7 +972,7 @@
                 <span class="meter-label">Characters<br />Used</span>
               </div>
               <div class="meter-circle">
-                <span class="stars-display" id="evalStars">★★★</span>
+                <span class="stars-display" id="evalStars">☆☆☆</span>
                 <span class="meter-label">Star<br />Rating</span>
               </div>
             </div>
@@ -1005,7 +1012,7 @@
             Edit CSS to see real-time updates. Click Submit when satisfied.
           </div>
           <div style="display:flex; gap:0.5rem;">
-            <button id="submitBattleBtn" class="btn-submit">
+            <button id="submitBattleBtn" class="btn-submit" disabled>
               ⚔️ Submit &amp; Score
             </button>
             <button id="nextLevelBtn" class="btn-next">
@@ -1472,6 +1479,7 @@
       var activeViewMode = 'side'; // 'side', 'curtain', 'diff'
       var userScores = {}; // levelId -> { accuracy, charCount, stars, points, code }
       var debounceTimer = null;
+      var hasEvaluated = false;
 
       // --- DOM Elements ---
       var levelsList = document.getElementById('levelsList');
@@ -1638,6 +1646,13 @@
         currentLevelIdx = idx;
         var lvl = BATTLE_LEVELS[idx];
 
+        hasEvaluated = false;
+        submitBattleBtn.disabled = true;
+        evalAccuracy.textContent = '0.0%';
+        evalAccuracy.classList.remove('perfect');
+        evalStars.textContent = '☆☆☆';
+        evalPoints.textContent = '0';
+
         levelTitle.textContent = 'Arena ' + lvl.id + ': ' + lvl.name;
         levelSubtitle.textContent = lvl.subtitle;
         hintDrawer.innerHTML = '<strong>💡 Strategy Hint:</strong> ' + lvl.hint;
@@ -1659,6 +1674,9 @@
 
       // --- Live Update Player Iframe ---
       function updatePlayerOutput() {
+        hasEvaluated = false;
+        submitBattleBtn.disabled = true;
+
         var userCode = codeEditor.value;
         var playerDoc = buildIframeDoc(userCode);
 
@@ -1713,8 +1731,16 @@
 
       function stringSimilarity(s1, s2) {
         if (!s1 || !s2) return s1 === s2 ? 1.0 : 0.0;
-        var n1 = s1.replace(/\s+/g, '').toLowerCase();
-        var n2 = s2.replace(/\s+/g, '').toLowerCase();
+        var n1 = s1.replace(/\s+/g, '').toLowerCase()
+                   .replace(/toright/g, '90deg')
+                   .replace(/tobottom/g, '180deg')
+                   .replace(/toleft/g, '270deg')
+                   .replace(/totop/g, '0deg');
+        var n2 = s2.replace(/\s+/g, '').toLowerCase()
+                   .replace(/toright/g, '90deg')
+                   .replace(/tobottom/g, '180deg')
+                   .replace(/toleft/g, '270deg')
+                   .replace(/totop/g, '0deg');
         if (n1 === n2) return 1.0;
         var matches = 0;
         var minL = Math.min(n1.length, n2.length);
@@ -1730,14 +1756,6 @@
 
         if (!userCode) {
           applyAccuracyScore(0.0);
-          return;
-        }
-
-        // Fast-path: if normalized source is identical, 100%
-        var normUser = userCode.replace(/\s+/g, ' ').toLowerCase();
-        var normTarget = lvl.targetCode.replace(/\s+/g, ' ').toLowerCase();
-        if (normUser === normTarget) {
-          applyAccuracyScore(100.0);
           return;
         }
 
@@ -1814,6 +1832,22 @@
               weights.push(0.35);
               scores.push(elemBgSim);
 
+              // Element background-image (linear/conic/radial gradients)
+              var hasTBgImg = tStyle.backgroundImage && tStyle.backgroundImage !== 'none';
+              var hasPBgImg = pStyle.backgroundImage && pStyle.backgroundImage !== 'none';
+              if (hasTBgImg || hasPBgImg) {
+                var bgImgSim = 0.0;
+                if (hasTBgImg && hasPBgImg) {
+                  bgImgSim = stringSimilarity(tStyle.backgroundImage, pStyle.backgroundImage);
+                } else if (!hasTBgImg && !hasPBgImg) {
+                  bgImgSim = 1.0;
+                } else {
+                  bgImgSim = 0.0;
+                }
+                weights.push(0.80);
+                scores.push(bgImgSim);
+              }
+
               // Border radius
               if (tStyle.borderRadius && tStyle.borderRadius !== '0px') {
                 var brSim = tStyle.borderRadius === pStyle.borderRadius ? 1.0 : (tStyle.borderTopLeftRadius === pStyle.borderTopLeftRadius ? 0.8 : 0.0);
@@ -1865,13 +1899,19 @@
               }
               var styleSim = sumWeights > 0 ? (sumScores / sumWeights) : 1.0;
 
-              var singleElemScore = (geomSim * 0.50) + (styleSim * 0.50);
+              var singleElemScore = (geomSim * 0.35) + (styleSim * 0.65);
               totalElemScore += singleElemScore;
             }
-            elementScore = totalElemScore / tElements.length;
+
+            // Normalise across max(target, player) count and penalise extra elements
+            elementScore = totalElemScore / Math.max(tElements.length, pElements.length);
+            if (pElements.length > tElements.length) {
+              var extraElems = pElements.length - tElements.length;
+              elementScore = Math.max(0, elementScore - (extraElems * 0.15));
+            }
           }
 
-          var totalAccuracy = (bodyScore * 0.25) + (elementScore * 0.75);
+          var totalAccuracy = (bodyScore * 0.20) + (elementScore * 0.80);
           var pct = Math.round(totalAccuracy * 1000) / 10;
           pct = Math.max(0.0, Math.min(100.0, pct));
           applyAccuracyScore(pct);
@@ -1881,6 +1921,8 @@
       }
 
       function applyAccuracyScore(estAccuracy) {
+        hasEvaluated = true;
+        submitBattleBtn.disabled = false;
         var userCode = codeEditor.value.trim();
         var lvl = BATTLE_LEVELS[currentLevelIdx];
 
@@ -1979,6 +2021,7 @@
 
       // --- Submit & Score Button ---
       submitBattleBtn.addEventListener('click', function () {
+        if (!hasEvaluated || submitBattleBtn.disabled) return;
         var userCode = codeEditor.value.trim();
         var lvl = BATTLE_LEVELS[currentLevelIdx];
 
