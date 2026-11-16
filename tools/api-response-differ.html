@@ -10,10 +10,14 @@
     <!-- Dark mode FOUC prevention -->
     <script>
         (function () {
-            var t = localStorage.getItem('api_differ_theme');
-            if (t === 'light') document.documentElement.classList.remove('dark');
-            else if (!t && window.matchMedia('(prefers-color-scheme: light)').matches) document.documentElement.classList.remove('dark');
-            else document.documentElement.classList.add('dark');
+            try {
+                var t = localStorage.getItem('api_differ_theme');
+                if (t === 'light') document.documentElement.classList.remove('dark');
+                else if (!t && window.matchMedia('(prefers-color-scheme: light)').matches) document.documentElement.classList.remove('dark');
+                else document.documentElement.classList.add('dark');
+            } catch (e) {
+                document.documentElement.classList.add('dark');
+            }
         })();
     </script>
     <script src="https://cdn.tailwindcss.com/3.4.17"></script>
@@ -630,13 +634,15 @@
             var themeToggleBtn = document.getElementById('themeToggleBtn');
             themeToggleBtn.addEventListener('click', function () {
                 var isDark = document.documentElement.classList.contains('dark');
-                if (isDark) {
-                    document.documentElement.classList.remove('dark');
-                    localStorage.setItem('api_differ_theme', 'light');
-                } else {
-                    document.documentElement.classList.add('dark');
-                    localStorage.setItem('api_differ_theme', 'dark');
-                }
+                try {
+                    if (isDark) {
+                        document.documentElement.classList.remove('dark');
+                        localStorage.setItem('api_differ_theme', 'light');
+                    } else {
+                        document.documentElement.classList.add('dark');
+                        localStorage.setItem('api_differ_theme', 'dark');
+                    }
+                } catch (e) { }
             });
 
             // --- Scenario Presets ---
@@ -1020,158 +1026,51 @@
 
                 // Case 1: Added in B (valA is undefined)
                 if (typeA === 'undefined') {
-                    if (typeB === 'object' || typeB === 'array') {
-                        var openRow = {
-                            id: 'row_' + rows.length,
-                            path: path,
-                            pointer: pointer,
-                            key: key,
-                            depth: depth,
-                            status: 'added',
-                            isContainer: true,
-                            containerType: typeB,
-                            bracket: 'open',
-                            typeA: 'undefined',
-                            typeB: typeB,
-                            valA: undefined,
-                            valB: valB
-                        };
-                        rows.push(openRow);
-                        changes.push({
-                            type: 'added',
-                            path: path || '(root)',
-                            pointer: pointer || '/',
-                            oldVal: undefined,
-                            newVal: valB
-                        });
-
-                        if (typeB === 'object') {
-                            var bKeys = Object.keys(valB);
-                            for (var i = 0; i < bKeys.length; i++) {
-                                var k = bKeys[i];
-                                var subPath = path ? (path + '.' + k) : k;
-                                var subPtr = pointer + '/' + k.replace(/~/g, '~0').replace(/\//g, '~1');
-                                diffValues(undefined, valB[k], k, subPath, subPtr, depth + 1, rows, changes, arrayMode);
-                            }
-                        } else {
-                            for (var j = 0; j < valB.length; j++) {
-                                var subPathArr = path + '[' + j + ']';
-                                var subPtrArr = pointer + '/' + j;
-                                diffValues(undefined, valB[j], '[' + j + ']', subPathArr, subPtrArr, depth + 1, rows, changes, arrayMode);
-                            }
-                        }
-
-                        rows.push({
-                            id: 'row_' + rows.length,
-                            path: path,
-                            pointer: pointer,
-                            key: key,
-                            depth: depth,
-                            status: 'added',
-                            isContainer: true,
-                            containerType: typeB,
-                            bracket: 'close'
-                        });
-                    } else {
-                        rows.push({
-                            id: 'row_' + rows.length,
-                            path: path,
-                            pointer: pointer,
-                            key: key,
-                            depth: depth,
-                            status: 'added',
-                            isContainer: false,
-                            typeA: 'undefined',
-                            typeB: typeB,
-                            valA: undefined,
-                            valB: valB
-                        });
-                        changes.push({
-                            type: 'added',
-                            path: path || '(root)',
-                            pointer: pointer || '/',
-                            oldVal: undefined,
-                            newVal: valB
-                        });
-                    }
+                    rows.push({
+                        id: 'row_' + rows.length,
+                        path: path,
+                        pointer: pointer,
+                        key: key,
+                        depth: depth,
+                        status: 'added',
+                        isContainer: false,
+                        typeA: 'undefined',
+                        typeB: typeB,
+                        valA: undefined,
+                        valB: valB
+                    });
+                    changes.push({
+                        type: 'added',
+                        path: path || '(root)',
+                        pointer: pointer,
+                        oldVal: undefined,
+                        newVal: valB
+                    });
                     return;
                 }
 
                 // Case 2: Removed in B (valB is undefined)
                 if (typeB === 'undefined') {
-                    if (typeA === 'object' || typeA === 'array') {
-                        rows.push({
-                            id: 'row_' + rows.length,
-                            path: path,
-                            pointer: pointer,
-                            key: key,
-                            depth: depth,
-                            status: 'removed',
-                            isContainer: true,
-                            containerType: typeA,
-                            bracket: 'open',
-                            typeA: typeA,
-                            typeB: 'undefined',
-                            valA: valA,
-                            valB: undefined
-                        });
-                        changes.push({
-                            type: 'removed',
-                            path: path || '(root)',
-                            pointer: pointer || '/',
-                            oldVal: valA,
-                            newVal: undefined
-                        });
-
-                        if (typeA === 'object') {
-                            var aKeys = Object.keys(valA);
-                            for (var i = 0; i < aKeys.length; i++) {
-                                var k = aKeys[i];
-                                var subPath = path ? (path + '.' + k) : k;
-                                var subPtr = pointer + '/' + k.replace(/~/g, '~0').replace(/\//g, '~1');
-                                diffValues(valA[k], undefined, k, subPath, subPtr, depth + 1, rows, changes, arrayMode);
-                            }
-                        } else {
-                            for (var j = 0; j < valA.length; j++) {
-                                var subPathArr = path + '[' + j + ']';
-                                var subPtrArr = pointer + '/' + j;
-                                diffValues(valA[j], undefined, '[' + j + ']', subPathArr, subPtrArr, depth + 1, rows, changes, arrayMode);
-                            }
-                        }
-
-                        rows.push({
-                            id: 'row_' + rows.length,
-                            path: path,
-                            pointer: pointer,
-                            key: key,
-                            depth: depth,
-                            status: 'removed',
-                            isContainer: true,
-                            containerType: typeA,
-                            bracket: 'close'
-                        });
-                    } else {
-                        rows.push({
-                            id: 'row_' + rows.length,
-                            path: path,
-                            pointer: pointer,
-                            key: key,
-                            depth: depth,
-                            status: 'removed',
-                            isContainer: false,
-                            typeA: typeA,
-                            typeB: 'undefined',
-                            valA: valA,
-                            valB: undefined
-                        });
-                        changes.push({
-                            type: 'removed',
-                            path: path || '(root)',
-                            pointer: pointer || '/',
-                            oldVal: valA,
-                            newVal: undefined
-                        });
-                    }
+                    rows.push({
+                        id: 'row_' + rows.length,
+                        path: path,
+                        pointer: pointer,
+                        key: key,
+                        depth: depth,
+                        status: 'removed',
+                        isContainer: false,
+                        typeA: typeA,
+                        typeB: 'undefined',
+                        valA: valA,
+                        valB: undefined
+                    });
+                    changes.push({
+                        type: 'removed',
+                        path: path || '(root)',
+                        pointer: pointer,
+                        oldVal: valA,
+                        newVal: undefined
+                    });
                     return;
                 }
 
@@ -1194,7 +1093,7 @@
                     changes.push({
                         type: 'changed',
                         path: path || '(root)',
-                        pointer: pointer || '/',
+                        pointer: pointer,
                         oldVal: valA,
                         newVal: valB,
                         note: 'Type changed: ' + typeA + ' -> ' + typeB
@@ -1204,7 +1103,7 @@
 
                 // Case 4: Both are plain Objects
                 if (typeA === 'object') {
-                    var keysSet = {};
+                    var keysSet = Object.create(null);
                     var keysA = Object.keys(valA);
                     var keysB = Object.keys(valB);
                     for (var i = 0; i < keysA.length; i++) keysSet[keysA[i]] = true;
@@ -1234,7 +1133,9 @@
                         var prop = allKeys[k];
                         var subPath = path ? (path + '.' + prop) : prop;
                         var subPtr = pointer + '/' + prop.replace(/~/g, '~0').replace(/\//g, '~1');
-                        diffValues(valA[prop], valB[prop], prop, subPath, subPtr, depth + 1, rows, changes, arrayMode);
+                        var itemA = Object.prototype.hasOwnProperty.call(valA, prop) ? valA[prop] : undefined;
+                        var itemB = Object.prototype.hasOwnProperty.call(valB, prop) ? valB[prop] : undefined;
+                        diffValues(itemA, itemB, prop, subPath, subPtr, depth + 1, rows, changes, arrayMode);
                     }
 
                     if (changes.length > initialChangesLen) {
@@ -1287,52 +1188,127 @@
                             var aHas = valA.every(function (item) { return item && typeof item === 'object' && cand in item; });
                             var bHas = valB.every(function (item) { return item && typeof item === 'object' && cand in item; });
                             if (aHas && bHas) {
-                                idField = cand;
-                                break;
+                                var setA = new Set();
+                                var uniqueA = true;
+                                for (var ia = 0; ia < valA.length; ia++) {
+                                    var v = valA[ia][cand];
+                                    if (setA.has(v)) { uniqueA = false; break; }
+                                    setA.add(v);
+                                }
+                                var setB = new Set();
+                                var uniqueB = true;
+                                for (var ib = 0; ib < valB.length; ib++) {
+                                    var vb = valB[ib][cand];
+                                    if (setB.has(vb)) { uniqueB = false; break; }
+                                    setB.add(vb);
+                                }
+                                if (uniqueA && uniqueB) {
+                                    idField = cand;
+                                    break;
+                                }
                             }
                         }
                     }
 
                     if (idField) {
-                        var mapA = {};
-                        valA.forEach(function (item, idx) { mapA[item[idField]] = { item: item, idx: idx }; });
-                        var mapB = {};
-                        valB.forEach(function (item, idx) { mapB[item[idField]] = { item: item, idx: idx }; });
+                        var mapA = new Map();
+                        valA.forEach(function (item, idx) { mapA.set(item[idField], { item: item, idx: idx }); });
+                        var mapB = new Map();
+                        valB.forEach(function (item, idx) { mapB.set(item[idField], { item: item, idx: idx }); });
+                        var handledIds = new Set();
 
-                        var handledIds = {};
-
-                        // Process items in B
-                        valB.forEach(function (bItem, bIdx) {
-                            var idVal = bItem[idField];
-                            handledIds[idVal] = true;
-                            var label = '[' + idField + '=' + idVal + ']';
-                            var subPath = path + label;
-                            var subPtr = pointer + '/' + bIdx;
-
-                            if (idVal in mapA) {
-                                diffValues(mapA[idVal].item, bItem, label, subPath, subPtr, depth + 1, rows, changes, arrayMode);
-                            } else {
-                                diffValues(undefined, bItem, label, subPath, subPtr, depth + 1, rows, changes, arrayMode);
+                        var isReordered = valA.length !== valB.length;
+                        if (!isReordered) {
+                            for (var idx = 0; idx < valA.length; idx++) {
+                                if (valA[idx][idField] !== valB[idx][idField]) {
+                                    isReordered = true;
+                                    break;
+                                }
                             }
-                        });
+                        }
 
-                        // Process items in A removed from B
-                        valA.forEach(function (aItem, aIdx) {
-                            var idVal = aItem[idField];
-                            if (!handledIds[idVal]) {
+                        if (isReordered) {
+                            // Entire array replacement op for valid RFC 6902 patch execution
+                            changes.push({
+                                type: 'changed',
+                                path: path || '(root)',
+                                pointer: pointer,
+                                oldVal: valA,
+                                newVal: valB,
+                                note: 'Array reordered / elements modified'
+                            });
+                            // Build visual tree rows with a dummy changes list so visual matching is shown in UI
+                            var dummyChanges = [];
+                            valB.forEach(function (bItem, bIdx) {
+                                var idVal = bItem[idField];
+                                handledIds.add(idVal);
                                 var label = '[' + idField + '=' + idVal + ']';
                                 var subPath = path + label;
-                                var subPtr = pointer + '/' + aIdx;
-                                diffValues(aItem, undefined, label, subPath, subPtr, depth + 1, rows, changes, arrayMode);
-                            }
-                        });
+                                var subPtr = pointer + '/' + bIdx;
+                                if (mapA.has(idVal)) {
+                                    diffValues(mapA.get(idVal).item, bItem, label, subPath, subPtr, depth + 1, rows, dummyChanges, arrayMode);
+                                } else {
+                                    diffValues(undefined, bItem, label, subPath, subPtr, depth + 1, rows, dummyChanges, arrayMode);
+                                }
+                            });
+                            valA.forEach(function (aItem, aIdx) {
+                                var idVal = aItem[idField];
+                                if (!handledIds.has(idVal)) {
+                                    var label = '[' + idField + '=' + idVal + ']';
+                                    var subPath = path + label;
+                                    var subPtr = pointer + '/' + aIdx;
+                                    diffValues(aItem, undefined, label, subPath, subPtr, depth + 1, rows, dummyChanges, arrayMode);
+                                }
+                            });
+                        } else {
+                            // Same order: 1-to-1 matching at identical indices
+                            valB.forEach(function (bItem, bIdx) {
+                                var idVal = bItem[idField];
+                                handledIds.add(idVal);
+                                var label = '[' + idField + '=' + idVal + ']';
+                                var subPath = path + label;
+                                var subPtr = pointer + '/' + bIdx;
+                                if (mapA.has(idVal)) {
+                                    diffValues(mapA.get(idVal).item, bItem, label, subPath, subPtr, depth + 1, rows, changes, arrayMode);
+                                } else {
+                                    diffValues(undefined, bItem, label, subPath, subPtr, depth + 1, rows, changes, arrayMode);
+                                }
+                            });
+                            valA.forEach(function (aItem, aIdx) {
+                                var idVal = aItem[idField];
+                                if (!handledIds.has(idVal)) {
+                                    var label = '[' + idField + '=' + idVal + ']';
+                                    var subPath = path + label;
+                                    var subPtr = pointer + '/' + aIdx;
+                                    diffValues(aItem, undefined, label, subPath, subPtr, depth + 1, rows, changes, arrayMode);
+                                }
+                            });
+                        }
                     } else {
                         // Standard Index-based Diff
-                        var maxLen = Math.max(valA.length, valB.length);
-                        for (var i = 0; i < maxLen; i++) {
-                            var subPath = path + '[' + i + ']';
-                            var subPtr = pointer + '/' + i;
-                            diffValues(valA[i], valB[i], '[' + i + ']', subPath, subPtr, depth + 1, rows, changes, arrayMode);
+                        if (valA.length !== valB.length) {
+                            changes.push({
+                                type: 'changed',
+                                path: path || '(root)',
+                                pointer: pointer,
+                                oldVal: valA,
+                                newVal: valB,
+                                note: 'Array length changed'
+                            });
+                            var dummyChanges = [];
+                            var maxLen = Math.max(valA.length, valB.length);
+                            for (var i = 0; i < maxLen; i++) {
+                                var subPath = path + '[' + i + ']';
+                                var subPtr = pointer + '/' + i;
+                                diffValues(valA[i], valB[i], '[' + i + ']', subPath, subPtr, depth + 1, rows, dummyChanges, arrayMode);
+                            }
+                        } else {
+                            var maxLen = valA.length;
+                            for (var i = 0; i < maxLen; i++) {
+                                var subPath = path + '[' + i + ']';
+                                var subPtr = pointer + '/' + i;
+                                diffValues(valA[i], valB[i], '[' + i + ']', subPath, subPtr, depth + 1, rows, changes, arrayMode);
+                            }
                         }
                     }
 
@@ -1386,7 +1362,7 @@
                     changes.push({
                         type: 'changed',
                         path: path || '(root)',
-                        pointer: pointer || '/',
+                        pointer: pointer,
                         oldVal: valA,
                         newVal: valB
                     });
@@ -1458,7 +1434,19 @@
                 activeChangesList = [];
                 var arrayMode = arrayDiffMode.value;
 
-                diffValues(parsedObjA, parsedObjB, '', '', '', 0, activeDiffRows, activeChangesList, arrayMode);
+                try {
+                    diffValues(parsedObjA, parsedObjB, '', '', '', 0, activeDiffRows, activeChangesList, arrayMode);
+                } catch (e) {
+                    treeRowsWrapper.innerHTML = '';
+                    emptyDiffState.classList.remove('hidden');
+                    emptyStateTitle.textContent = 'Diff Computation Error';
+                    emptyStateDesc.textContent = e.name === 'RangeError'
+                        ? 'Maximum call stack size exceeded (JSON structure is too deep to diff).'
+                        : ('Diff error: ' + e.message);
+                    updateSummaryCounters(0, 0, 0, 0, 0, 0);
+                    renderChangeListDrawer([]);
+                    return;
+                }
 
                 // Compute Counters
                 var adds = 0;
@@ -1519,7 +1507,7 @@
 
                     // Determine if hidden by a collapsed parent
                     if (r.bracket === 'close') {
-                        if (collapsedAncestors.length > 0 && collapsedAncestors[collapsedAncestors.length - 1] === r.path) {
+                        if (collapsedAncestors.length > 0 && collapsedAncestors[collapsedAncestors.length - 1] === r.pointer) {
                             collapsedAncestors.pop();
                             continue; // hide close bracket when parent is collapsed
                         }
@@ -1530,8 +1518,8 @@
                         continue;
                     }
 
-                    if (r.isContainer && r.bracket === 'open' && collapsedNodePaths.has(r.path)) {
-                        collapsedAncestors.push(r.path);
+                    if (r.isContainer && r.bracket === 'open' && collapsedNodePaths.has(r.pointer)) {
+                        collapsedAncestors.push(r.pointer);
                     }
 
                     // Filtering by status
@@ -1562,12 +1550,12 @@
                     else if (r.status === 'changed') rowBgClass = 'diff-row-changed';
 
                     var indentPx = r.depth * 18 + 8;
-                    var isNodeCollapsed = collapsedNodePaths.has(r.path);
+                    var isNodeCollapsed = collapsedNodePaths.has(r.pointer);
 
                     // Chevron Icon for Containers
                     var chevronHtml = '';
                     if (r.isContainer && r.bracket === 'open') {
-                        chevronHtml = '<button type="button" data-collapse-path="' + escapeHtml(r.path) + '" class="toggle-node-btn inline-flex items-center justify-center w-4 h-4 mr-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-transform ' + (isNodeCollapsed ? '-rotate-90' : '') + '">' +
+                        chevronHtml = '<button type="button" data-collapse-path="' + escapeHtml(r.pointer) + '" class="toggle-node-btn inline-flex items-center justify-center w-4 h-4 mr-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-transform ' + (isNodeCollapsed ? '-rotate-90' : '') + '">' +
                             '<svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>' +
                             '</button>';
                     } else if (r.depth > 0) {
@@ -1685,7 +1673,7 @@
                             '</div>';
                     }
 
-                    html += '<div data-jump-path="' + escapeHtml(c.path) + '" class="change-list-item p-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer transition">' +
+                    html += '<div data-jump-path="' + escapeHtml(c.pointer) + '" class="change-list-item p-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer transition">' +
                         '<div class="flex items-center justify-between gap-2">' +
                         '<span class="font-mono text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">' + escapeHtml(c.path) + '</span>' +
                         typeBadge +
@@ -1702,7 +1690,7 @@
                     el.addEventListener('click', function () {
                         var jumpPath = this.getAttribute('data-jump-path');
                         // Expand parents if collapsed
-                        var matchingRow = activeDiffRows.find(function (r) { return r.path === jumpPath; });
+                        var matchingRow = activeDiffRows.find(function (r) { return r.pointer === jumpPath; });
                         if (matchingRow) {
                             // Clear any parent collapses so it's visible
                             collapsedNodePaths.clear();
@@ -1767,8 +1755,8 @@
 
             collapseAllBtn.addEventListener('click', function () {
                 activeDiffRows.forEach(function (r) {
-                    if (r.isContainer && r.bracket === 'open' && r.path) {
-                        collapsedNodePaths.add(r.path);
+                    if (r.isContainer && r.bracket === 'open' && r.pointer) {
+                        collapsedNodePaths.add(r.pointer);
                     }
                 });
                 renderTreeRows();
@@ -1778,8 +1766,8 @@
             collapseUnchangedBtn.addEventListener('click', function () {
                 collapsedNodePaths.clear();
                 activeDiffRows.forEach(function (r) {
-                    if (r.isContainer && r.bracket === 'open' && r.status === 'unchanged' && r.path) {
-                        collapsedNodePaths.add(r.path);
+                    if (r.isContainer && r.bracket === 'open' && r.status === 'unchanged' && r.pointer) {
+                        collapsedNodePaths.add(r.pointer);
                     }
                 });
                 renderTreeRows();
@@ -1850,8 +1838,13 @@
             function generateJsonPatch() {
                 var patch = [];
                 activeChangesList.forEach(function (c) {
-                    var ptr = c.pointer || ('/' + c.path.replace(/\./g, '/'));
-                    if (!ptr.startsWith('/')) ptr = '/' + ptr;
+                    var ptr = c.pointer;
+                    if (ptr === undefined || ptr === null) {
+                        ptr = '/' + (c.path || '').replace(/\./g, '/');
+                    }
+                    if (ptr !== '' && !ptr.startsWith('/')) {
+                        ptr = '/' + ptr;
+                    }
 
                     if (c.type === 'added') {
                         patch.push({ op: 'add', path: ptr, value: c.newVal });
