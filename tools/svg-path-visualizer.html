@@ -1,1626 +1,1548 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en" class="dark">
-
-<head>
+  <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SVG Path Visualizer &amp; Optimizer</title>
     <script>
-      (function() {
-        var t = localStorage.getItem('svg_viz_theme');
-        if (t === 'light') document.documentElement.classList.remove('dark');
-        else if (!t && window.matchMedia('(prefers-color-scheme: light)').matches) document.documentElement.classList.remove('dark');
+      (function () {
+        var t = localStorage.getItem("svg_viz_theme");
+        if (t === "light") document.documentElement.classList.remove("dark");
+        else if (!t && window.matchMedia("(prefers-color-scheme: light)").matches) document.documentElement.classList.remove("dark");
       })();
     </script>
     <script src="https://cdn.tailwindcss.com/3.4.17"></script>
     <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-                        mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace']
-                    }
-                }
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ["Inter", "system-ui", "-apple-system", "sans-serif"],
+              mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"]
             }
-        };
+          }
+        }
+      };
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
-        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
     <style>
-        * {
-            box-sizing: border-box;
-        }
+      * {
+        box-sizing: border-box;
+      }
 
-        html,
-        body {
-            height: 100%;
-            margin: 0;
-        }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
 
-        .canvas-grid-dark {
-            background-color: #0b1120;
-            background-image: radial-gradient(rgba(148, 163, 184, 0.14) 1px, transparent 1px);
-            background-size: 20px 20px;
-        }
+      .canvas-grid-dark {
+        background-color: #0b1120;
+        background-image: radial-gradient(rgba(148, 163, 184, 0.14) 1px, transparent 1px);
+        background-size: 20px 20px;
+      }
 
-        .canvas-grid-light {
-            background-color: #f8fafc;
-            background-image: radial-gradient(rgba(15, 23, 42, 0.12) 1px, transparent 1px);
-            background-size: 20px 20px;
-        }
+      .canvas-grid-light {
+        background-color: #f8fafc;
+        background-image: radial-gradient(rgba(15, 23, 42, 0.12) 1px, transparent 1px);
+        background-size: 20px 20px;
+      }
 
-        .custom-scroll::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
+      .custom-scroll::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
 
-        .custom-scroll::-webkit-scrollbar-track {
-            background: transparent;
-        }
+      .custom-scroll::-webkit-scrollbar-track {
+        background: transparent;
+      }
 
-        .custom-scroll::-webkit-scrollbar-thumb {
-            background: rgba(148, 163, 184, 0.35);
-            border-radius: 9999px;
-        }
+      .custom-scroll::-webkit-scrollbar-thumb {
+        background: rgba(148, 163, 184, 0.35);
+        border-radius: 9999px;
+      }
 
-        .custom-scroll::-webkit-scrollbar-thumb:hover {
-            background: rgba(148, 163, 184, 0.55);
-        }
+      .custom-scroll::-webkit-scrollbar-thumb:hover {
+        background: rgba(148, 163, 184, 0.55);
+      }
 
-        .handle-point {
-            cursor: grab;
-            transition: r 0.12s ease;
-        }
+      .handle-point {
+        cursor: grab;
+        transition: r 0.12s ease;
+      }
 
-        .handle-point:active {
-            cursor: grabbing;
-        }
+      .handle-point:active {
+        cursor: grabbing;
+      }
 
-        input[type="number"]::-webkit-inner-spin-button,
-        input[type="number"]::-webkit-outer-spin-button {
-            -webkit-appearance: none;
-            margin: 0;
-        }
+      input[type="number"]::-webkit-inner-spin-button,
+      input[type="number"]::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
 
-        input[type="number"] {
-            -moz-appearance: textfield;
-        }
+      input[type="number"] {
+        -moz-appearance: textfield;
+      }
     </style>
-</head>
+  </head>
 
-<body
-    class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans antialiased flex flex-col min-h-screen lg:h-screen lg:overflow-hidden">
-
+  <body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans antialiased flex flex-col min-h-screen lg:h-screen lg:overflow-hidden">
     <!-- Top Header -->
-    <header
-        class="border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0 z-20">
-        <div class="flex items-center gap-2.5">
-            <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-sm">
-                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                    stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M4 19c4-8 6-14 16-14" />
-                    <circle cx="4" cy="19" r="2" fill="currentColor" />
-                    <circle cx="20" cy="5" r="2" fill="currentColor" />
-                    <circle cx="10" cy="5" r="1.5" />
-                    <line x1="4" y1="19" x2="10" y2="5" stroke-dasharray="2 2" />
-                </svg>
-            </div>
-            <div>
-                <h1 class="text-sm sm:text-base font-semibold tracking-tight leading-none">SVG Path Visualizer &amp;
-                    Optimizer</h1>
-                <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Optimize, transform, minify, and inspect SVG paths</p>
-            </div>
+    <header class="border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0 z-20">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-sm">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 19c4-8 6-14 16-14" />
+            <circle cx="4" cy="19" r="2" fill="currentColor" />
+            <circle cx="20" cy="5" r="2" fill="currentColor" />
+            <circle cx="10" cy="5" r="1.5" />
+            <line x1="4" y1="19" x2="10" y2="5" stroke-dasharray="2 2" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-sm sm:text-base font-semibold tracking-tight leading-none">SVG Path Visualizer &amp; Optimizer</h1>
+          <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Optimize, transform, minify, and inspect SVG paths</p>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <div class="flex items-center gap-1.5">
+          <label for="presetSelect" class="text-xs font-medium text-slate-500 dark:text-slate-400 hidden sm:inline">Preset:</label>
+          <select id="presetSelect" class="text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="heart">Heart (Bezier)</option>
+            <option value="rocket">Paper Plane</option>
+            <option value="bolt">Lightning Bolt</option>
+            <option value="star">5-Point Star</option>
+            <option value="cloud">Cloud (Arcs &amp; Curves)</option>
+            <option value="wave">Cubic Wave</option>
+            <option value="badge">Shield Badge</option>
+          </select>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2">
-            <div class="flex items-center gap-1.5">
-                <label for="presetSelect"
-                    class="text-xs font-medium text-slate-500 dark:text-slate-400 hidden sm:inline">Preset:</label>
-                <select id="presetSelect"
-                    class="text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    <option value="heart">Heart (Bezier)</option>
-                    <option value="rocket">Paper Plane</option>
-                    <option value="bolt">Lightning Bolt</option>
-                    <option value="star">5-Point Star</option>
-                    <option value="cloud">Cloud (Arcs &amp; Curves)</option>
-                    <option value="wave">Cubic Wave</option>
-                    <option value="badge">Shield Badge</option>
-                </select>
-            </div>
+        <label class="cursor-pointer inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+          <span>Import SVG</span>
+          <input id="svgFileInput" type="file" accept=".svg,image/svg+xml" class="hidden" />
+        </label>
 
-            <label
-                class="cursor-pointer inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition">
-                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="17 8 12 3 7 8" />
-                    <line x1="12" y1="3" x2="12" y2="15" />
-                </svg>
-                <span>Import SVG</span>
-                <input id="svgFileInput" type="file" accept=".svg,image/svg+xml" class="hidden" />
-            </label>
-
-            <button id="themeToggleBtn" type="button" title="Toggle Dark/Light Theme"
-                class="p-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition">
-                <svg id="sunIcon" class="w-4 h-4 hidden dark:block text-amber-400" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="5" />
-                    <line x1="12" y1="1" x2="12" y2="3" />
-                    <line x1="12" y1="21" x2="12" y2="23" />
-                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                    <line x1="1" y1="12" x2="3" y2="12" />
-                    <line x1="21" y1="12" x2="23" y2="12" />
-                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-                </svg>
-                <svg id="moonIcon" class="w-4 h-4 block dark:hidden text-slate-700" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2">
-                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                </svg>
-            </button>
-        </div>
+        <button id="themeToggleBtn" type="button" title="Toggle Dark/Light Theme" class="p-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition">
+          <svg id="sunIcon" class="w-4 h-4 hidden dark:block text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5" />
+            <line x1="12" y1="1" x2="12" y2="3" />
+            <line x1="12" y1="21" x2="12" y2="23" />
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+            <line x1="1" y1="12" x2="3" y2="12" />
+            <line x1="21" y1="12" x2="23" y2="12" />
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+          </svg>
+          <svg id="moonIcon" class="w-4 h-4 block dark:hidden text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+          </svg>
+        </button>
+      </div>
     </header>
 
     <!-- Main Workspace -->
     <main class="flex-1 flex flex-col lg:flex-row min-h-0 overflow-y-auto lg:overflow-hidden">
+      <!-- Left Panel: Input, Tabs (Inspector / Optimizer / Transform) -->
+      <aside class="w-full lg:w-[440px] xl:w-[480px] border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shrink-0 lg:h-full min-h-0">
+        <!-- Path Input Box -->
+        <div class="p-3.5 border-b border-slate-200 dark:border-slate-800 space-y-2 shrink-0">
+          <div class="flex items-center justify-between">
+            <label for="pathInput" class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Path <code class="font-mono text-indigo-500">d</code> Attribute</label>
+            <div class="flex items-center gap-1.5">
+              <button id="formatReadableBtn" type="button" class="text-[11px] font-medium px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition">Format</button>
+              <button id="copyRawBtn" type="button" class="text-[11px] font-medium px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition">Copy d</button>
+              <button id="clearPathBtn" type="button" class="text-[11px] font-medium px-2 py-0.5 rounded bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 transition">Clear</button>
+            </div>
+          </div>
+          <textarea id="pathInput" rows="3" spellcheck="false" placeholder="Paste SVG path 'd' data or a full <svg> / <path> tag..." class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-3 py-2 font-mono text-xs leading-relaxed focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y custom-scroll"></textarea>
+          <div id="parseErrorBox" class="hidden text-xs text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded-md px-2.5 py-1.5"></div>
+        </div>
 
-        <!-- Left Panel: Input, Tabs (Inspector / Optimizer / Transform) -->
-        <aside
-            class="w-full lg:w-[440px] xl:w-[480px] border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shrink-0 lg:h-full min-h-0">
+        <!-- Panel Tabs -->
+        <div class="grid grid-cols-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 shrink-0 text-xs font-medium">
+          <button type="button" data-tab="optimize" class="tab-btn py-2.5 text-center border-b-2 border-indigo-500 text-indigo-600 dark:text-indigo-400 bg-white dark:bg-slate-900">Optimize</button>
+          <button type="button" data-tab="inspector" class="tab-btn py-2.5 text-center border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200">Commands (<span id="cmdCountBadge">0</span>)</button>
+          <button type="button" data-tab="transform" class="tab-btn py-2.5 text-center border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200">Transform</button>
+        </div>
 
-            <!-- Path Input Box -->
-            <div class="p-3.5 border-b border-slate-200 dark:border-slate-800 space-y-2 shrink-0">
-                <div class="flex items-center justify-between">
-                    <label for="pathInput"
-                        class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Path
-                        <code class="font-mono text-indigo-500">d</code> Attribute</label>
-                    <div class="flex items-center gap-1.5">
-                        <button id="formatReadableBtn" type="button"
-                            class="text-[11px] font-medium px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition">Format</button>
-                        <button id="copyRawBtn" type="button"
-                            class="text-[11px] font-medium px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition">Copy
-                            d</button>
-                        <button id="clearPathBtn" type="button"
-                            class="text-[11px] font-medium px-2 py-0.5 rounded bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 transition">Clear</button>
-                    </div>
+        <!-- Tab Content Area -->
+        <div class="flex-1 overflow-y-auto custom-scroll p-3.5 min-h-[280px]">
+          <!-- TAB 1: OPTIMIZE -->
+          <section id="tab-optimize" class="tab-panel space-y-4">
+            <!-- Savings Summary Card -->
+            <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-3 space-y-2.5">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">Optimized Output</span>
+                <span id="savingsBadge" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400">0% saved</span>
+              </div>
+              <div class="grid grid-cols-3 gap-2 text-center">
+                <div class="rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2">
+                  <div class="text-[10px] uppercase text-slate-400">Original</div>
+                  <div id="origBytesStat" class="font-mono text-xs font-semibold mt-0.5">0 B</div>
                 </div>
-                <textarea id="pathInput" rows="3" spellcheck="false"
-                    placeholder="Paste SVG path 'd' data or a full <svg> / <path> tag..."
-                    class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-3 py-2 font-mono text-xs leading-relaxed focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y custom-scroll"></textarea>
-                <div id="parseErrorBox"
-                    class="hidden text-xs text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded-md px-2.5 py-1.5">
+                <div class="rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2">
+                  <div class="text-[10px] uppercase text-slate-400">Optimized</div>
+                  <div id="optBytesStat" class="font-mono text-xs font-semibold text-indigo-600 dark:text-indigo-400 mt-0.5">0 B</div>
                 </div>
+                <div class="rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2">
+                  <div class="text-[10px] uppercase text-slate-400">Length</div>
+                  <div id="pathLengthStat" class="font-mono text-xs font-semibold mt-0.5">0</div>
+                </div>
+              </div>
+              <textarea id="optimizedOutput" rows="3" readonly spellcheck="false" class="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 py-2 font-mono text-[11px] leading-relaxed text-slate-700 dark:text-slate-300 focus:outline-none custom-scroll"></textarea>
+              <div class="flex flex-wrap gap-2">
+                <button id="applyOptBtn" type="button" class="flex-1 text-xs font-medium px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition">Apply to Editor</button>
+                <button id="copyOptBtn" type="button" class="text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition">Copy Minified</button>
+              </div>
             </div>
 
-            <!-- Panel Tabs -->
-            <div
-                class="grid grid-cols-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 shrink-0 text-xs font-medium">
-                <button type="button" data-tab="optimize"
-                    class="tab-btn py-2.5 text-center border-b-2 border-indigo-500 text-indigo-600 dark:text-indigo-400 bg-white dark:bg-slate-900">Optimize</button>
-                <button type="button" data-tab="inspector"
-                    class="tab-btn py-2.5 text-center border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200">Commands
-                    (<span id="cmdCountBadge">0</span>)</button>
-                <button type="button" data-tab="transform"
-                    class="tab-btn py-2.5 text-center border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200">Transform</button>
+            <!-- Optimization Controls -->
+            <div class="space-y-3">
+              <div>
+                <div class="flex items-center justify-between text-xs mb-1">
+                  <label for="precisionRange" class="font-medium text-slate-700 dark:text-slate-300">Coordinate Precision (Decimals)</label>
+                  <span id="precisionVal" class="font-mono font-semibold text-indigo-600 dark:text-indigo-400">2</span>
+                </div>
+                <input id="precisionRange" type="range" min="0" max="5" step="1" value="2" class="w-full accent-indigo-600" />
+              </div>
+
+              <div class="space-y-1.5">
+                <span class="text-xs font-medium text-slate-700 dark:text-slate-300 block">Command Coordinate Mode</span>
+                <div class="grid grid-cols-3 gap-1.5 text-xs">
+                  <button type="button" data-mode="auto" class="coord-mode-btn py-1.5 px-2 rounded-lg border border-indigo-500 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-medium">Auto Shortest</button>
+                  <button type="button" data-mode="relative" class="coord-mode-btn py-1.5 px-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800">Relative (m,l)</button>
+                  <button type="button" data-mode="absolute" class="coord-mode-btn py-1.5 px-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800">Absolute (M,L)</button>
+                </div>
+              </div>
+
+              <div class="space-y-2 pt-1">
+                <label class="flex items-center justify-between gap-2 text-xs cursor-pointer">
+                  <span class="text-slate-700 dark:text-slate-300">Convert straight <code class="font-mono">L</code> to <code class="font-mono">H</code> / <code class="font-mono">V</code></span>
+                  <input id="optHV" type="checkbox" checked class="rounded accent-indigo-600 w-4 h-4" />
+                </label>
+                <label class="flex items-center justify-between gap-2 text-xs cursor-pointer">
+                  <span class="text-slate-700 dark:text-slate-300">Remove redundant zero-length moves</span>
+                  <input id="optRedundant" type="checkbox" checked class="rounded accent-indigo-600 w-4 h-4" />
+                </label>
+                <label class="flex items-center justify-between gap-2 text-xs cursor-pointer">
+                  <span class="text-slate-700 dark:text-slate-300">Strip leading zeros (<code class="font-mono">0.5</code> → <code class="font-mono">.5</code>) &amp; tight spacing</span>
+                  <input id="optMinify" type="checkbox" checked class="rounded accent-indigo-600 w-4 h-4" />
+                </label>
+                <label class="flex items-center justify-between gap-2 text-xs cursor-pointer">
+                  <span class="text-slate-700 dark:text-slate-300">Collapse repeated commands (<code class="font-mono">L1 2 L3 4</code> → <code class="font-mono">L1 2 3 4</code>)</span>
+                  <input id="optCollapse" type="checkbox" checked class="rounded accent-indigo-600 w-4 h-4" />
+                </label>
+              </div>
             </div>
 
-            <!-- Tab Content Area -->
-            <div class="flex-1 overflow-y-auto custom-scroll p-3.5 min-h-[280px]">
-
-                <!-- TAB 1: OPTIMIZE -->
-                <section id="tab-optimize" class="tab-panel space-y-4">
-                    <!-- Savings Summary Card -->
-                    <div
-                        class="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-3 space-y-2.5">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">Optimized
-                                Output</span>
-                            <span id="savingsBadge"
-                                class="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400">0%
-                                saved</span>
-                        </div>
-                        <div class="grid grid-cols-3 gap-2 text-center">
-                            <div
-                                class="rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2">
-                                <div class="text-[10px] uppercase text-slate-400">Original</div>
-                                <div id="origBytesStat" class="font-mono text-xs font-semibold mt-0.5">0 B</div>
-                            </div>
-                            <div
-                                class="rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2">
-                                <div class="text-[10px] uppercase text-slate-400">Optimized</div>
-                                <div id="optBytesStat"
-                                    class="font-mono text-xs font-semibold text-indigo-600 dark:text-indigo-400 mt-0.5">
-                                    0 B</div>
-                            </div>
-                            <div
-                                class="rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2">
-                                <div class="text-[10px] uppercase text-slate-400">Length</div>
-                                <div id="pathLengthStat" class="font-mono text-xs font-semibold mt-0.5">0</div>
-                            </div>
-                        </div>
-                        <textarea id="optimizedOutput" rows="3" readonly spellcheck="false"
-                            class="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 py-2 font-mono text-[11px] leading-relaxed text-slate-700 dark:text-slate-300 focus:outline-none custom-scroll"></textarea>
-                        <div class="flex flex-wrap gap-2">
-                            <button id="applyOptBtn" type="button"
-                                class="flex-1 text-xs font-medium px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition">Apply
-                                to Editor</button>
-                            <button id="copyOptBtn" type="button"
-                                class="text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition">Copy
-                                Minified</button>
-                        </div>
-                    </div>
-
-                    <!-- Optimization Controls -->
-                    <div class="space-y-3">
-                        <div>
-                            <div class="flex items-center justify-between text-xs mb-1">
-                                <label for="precisionRange"
-                                    class="font-medium text-slate-700 dark:text-slate-300">Coordinate Precision
-                                    (Decimals)</label>
-                                <span id="precisionVal"
-                                    class="font-mono font-semibold text-indigo-600 dark:text-indigo-400">2</span>
-                            </div>
-                            <input id="precisionRange" type="range" min="0" max="5" step="1" value="2"
-                                class="w-full accent-indigo-600" />
-                        </div>
-
-                        <div class="space-y-1.5">
-                            <span class="text-xs font-medium text-slate-700 dark:text-slate-300 block">Command
-                                Coordinate Mode</span>
-                            <div class="grid grid-cols-3 gap-1.5 text-xs">
-                                <button type="button" data-mode="auto"
-                                    class="coord-mode-btn py-1.5 px-2 rounded-lg border border-indigo-500 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-medium">Auto
-                                    Shortest</button>
-                                <button type="button" data-mode="relative"
-                                    class="coord-mode-btn py-1.5 px-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800">Relative
-                                    (m,l)</button>
-                                <button type="button" data-mode="absolute"
-                                    class="coord-mode-btn py-1.5 px-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800">Absolute
-                                    (M,L)</button>
-                            </div>
-                        </div>
-
-                        <div class="space-y-2 pt-1">
-                            <label class="flex items-center justify-between gap-2 text-xs cursor-pointer">
-                                <span class="text-slate-700 dark:text-slate-300">Convert straight <code
-                                        class="font-mono">L</code> to <code class="font-mono">H</code> / <code
-                                        class="font-mono">V</code></span>
-                                <input id="optHV" type="checkbox" checked class="rounded accent-indigo-600 w-4 h-4" />
-                            </label>
-                            <label class="flex items-center justify-between gap-2 text-xs cursor-pointer">
-                                <span class="text-slate-700 dark:text-slate-300">Remove redundant zero-length
-                                    moves</span>
-                                <input id="optRedundant" type="checkbox" checked
-                                    class="rounded accent-indigo-600 w-4 h-4" />
-                            </label>
-                            <label class="flex items-center justify-between gap-2 text-xs cursor-pointer">
-                                <span class="text-slate-700 dark:text-slate-300">Strip leading zeros (<code
-                                        class="font-mono">0.5</code> → <code class="font-mono">.5</code>) &amp; tight
-                                    spacing</span>
-                                <input id="optMinify" type="checkbox" checked
-                                    class="rounded accent-indigo-600 w-4 h-4" />
-                            </label>
-                            <label class="flex items-center justify-between gap-2 text-xs cursor-pointer">
-                                <span class="text-slate-700 dark:text-slate-300">Collapse repeated commands (<code
-                                        class="font-mono">L1 2 L3 4</code> → <code
-                                        class="font-mono">L1 2 3 4</code>)</span>
-                                <input id="optCollapse" type="checkbox" checked
-                                    class="rounded accent-indigo-600 w-4 h-4" />
-                            </label>
-                        </div>
-                    </div>
-
-                    <!-- Export Full SVG -->
-                    <div class="pt-2 border-t border-slate-200 dark:border-slate-800 flex gap-2">
-                        <button id="copySvgBtn" type="button"
-                            class="flex-1 text-xs font-medium px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition">Copy
-                            &lt;svg&gt; Tag</button>
-                        <button id="downloadSvgBtn" type="button"
-                            class="flex-1 text-xs font-medium px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition">Download
-                            .svg</button>
-                    </div>
-                </section>
-
-                <!-- TAB 2: COMMAND INSPECTOR -->
-                <section id="tab-inspector" class="tab-panel hidden space-y-2">
-                    <div class="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pb-1">
-                        <span>Click a command to highlight on canvas; edit values directly.</span>
-                        <button id="convertAllAbsBtn" type="button"
-                            class="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">All Abs</button>
-                    </div>
-                    <div id="commandList" class="space-y-1.5"></div>
-                </section>
-
-                <!-- TAB 3: TRANSFORM -->
-                <section id="tab-transform" class="tab-panel hidden space-y-4">
-                    <div class="rounded-xl border border-slate-200 dark:border-slate-800 p-3 space-y-3">
-                        <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                            Translate (Move)</h3>
-                        <div class="grid grid-cols-2 gap-2">
-                            <div>
-                                <label class="text-[11px] text-slate-500">Delta X</label>
-                                <input id="txInput" type="number" step="1" value="0"
-                                    class="w-full mt-0.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-2.5 py-1.5 font-mono text-xs" />
-                            </div>
-                            <div>
-                                <label class="text-[11px] text-slate-500">Delta Y</label>
-                                <input id="tyInput" type="number" step="1" value="0"
-                                    class="w-full mt-0.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-2.5 py-1.5 font-mono text-xs" />
-                            </div>
-                        </div>
-                        <button id="applyTranslateBtn" type="button"
-                            class="w-full text-xs font-medium py-1.5 rounded-lg bg-slate-800 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 text-white transition">Apply
-                            Translation</button>
-                    </div>
-
-                    <div class="rounded-xl border border-slate-200 dark:border-slate-800 p-3 space-y-3">
-                        <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                            Scale</h3>
-                        <div class="grid grid-cols-2 gap-2">
-                            <div>
-                                <label class="text-[11px] text-slate-500">Scale X</label>
-                                <input id="sxInput" type="number" step="0.1" value="1"
-                                    class="w-full mt-0.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-2.5 py-1.5 font-mono text-xs" />
-                            </div>
-                            <div>
-                                <label class="text-[11px] text-slate-500">Scale Y</label>
-                                <input id="syInput" type="number" step="0.1" value="1"
-                                    class="w-full mt-0.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-2.5 py-1.5 font-mono text-xs" />
-                            </div>
-                        </div>
-                        <button id="applyScaleBtn" type="button"
-                            class="w-full text-xs font-medium py-1.5 rounded-lg bg-slate-800 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 text-white transition">Apply
-                            Scale</button>
-                    </div>
-
-                    <div class="rounded-xl border border-slate-200 dark:border-slate-800 p-3 space-y-2">
-                        <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                            Quick Actions</h3>
-                        <div class="grid grid-cols-2 gap-2">
-                            <button id="flipHBtn" type="button"
-                                class="text-xs font-medium py-1.5 px-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition">Flip
-                                Horizontal</button>
-                            <button id="flipVBtn" type="button"
-                                class="text-xs font-medium py-1.5 px-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition">Flip
-                                Vertical</button>
-                            <button id="normalizeOriginBtn" type="button"
-                                class="text-xs font-medium py-1.5 px-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition">Move
-                                to (0, 0)</button>
-                            <button id="roundIntsBtn" type="button"
-                                class="text-xs font-medium py-1.5 px-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition">Round
-                                Integers</button>
-                        </div>
-                    </div>
-                </section>
+            <!-- Export Full SVG -->
+            <div class="pt-2 border-t border-slate-200 dark:border-slate-800 flex gap-2">
+              <button id="copySvgBtn" type="button" class="flex-1 text-xs font-medium px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition">Copy &lt;svg&gt; Tag</button>
+              <button id="downloadSvgBtn" type="button" class="flex-1 text-xs font-medium px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition">Download .svg</button>
             </div>
-        </aside>
+          </section>
 
-        <!-- Right Panel: Interactive Canvas & Overlays -->
-        <section class="flex-1 flex flex-col min-w-0 min-h-[420px] lg:h-full relative">
+          <!-- TAB 2: COMMAND INSPECTOR -->
+          <section id="tab-inspector" class="tab-panel hidden space-y-2">
+            <div class="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pb-1">
+              <span>Click a command to highlight on canvas; edit values directly.</span>
+              <button id="convertAllAbsBtn" type="button" class="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">All Abs</button>
+            </div>
+            <div id="commandList" class="space-y-1.5"></div>
+          </section>
 
-            <!-- Canvas Toolbar -->
-            <div
-                class="border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 px-3.5 py-2 flex flex-wrap items-center justify-between gap-2 shrink-0">
-                <div class="flex flex-wrap items-center gap-3 text-xs">
-                    <label class="inline-flex items-center gap-1.5 cursor-pointer">
-                        <input id="toggleGrid" type="checkbox" checked class="rounded accent-indigo-600" />
-                        <span>Grid</span>
-                    </label>
-                    <label class="inline-flex items-center gap-1.5 cursor-pointer">
-                        <input id="togglePoints" type="checkbox" checked class="rounded accent-indigo-600" />
-                        <span>Points &amp; Handles</span>
-                    </label>
-                    <label class="inline-flex items-center gap-1.5 cursor-pointer">
-                        <input id="toggleBBox" type="checkbox" checked class="rounded accent-indigo-600" />
-                        <span>BBox</span>
-                    </label>
-                    <label class="inline-flex items-center gap-1.5 cursor-pointer">
-                        <input id="toggleFill" type="checkbox" class="rounded accent-indigo-600" />
-                        <span>Fill</span>
-                    </label>
-                    <div class="flex items-center gap-1.5 border-l border-slate-200 dark:border-slate-700 pl-3">
-                        <span class="text-slate-500">Stroke:</span>
-                        <input id="strokeColor" type="color" value="#6366f1"
-                            class="w-5 h-5 rounded cursor-pointer border-0 bg-transparent p-0" />
-                        <input id="strokeWidth" type="number" min="0.1" max="20" step="0.25" value="1.5"
-                            title="Stroke Width"
-                            class="w-12 rounded border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-1.5 py-0.5 font-mono text-xs text-center" />
-                    </div>
+          <!-- TAB 3: TRANSFORM -->
+          <section id="tab-transform" class="tab-panel hidden space-y-4">
+            <div class="rounded-xl border border-slate-200 dark:border-slate-800 p-3 space-y-3">
+              <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Translate (Move)</h3>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-[11px] text-slate-500">Delta X</label>
+                  <input id="txInput" type="number" step="1" value="0" class="w-full mt-0.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-2.5 py-1.5 font-mono text-xs" />
                 </div>
-
-                <div class="flex items-center gap-1.5 text-xs">
-                    <button id="zoomOutBtn" type="button" title="Zoom Out"
-                        class="px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 font-mono">-</button>
-                    <span id="zoomLabel" class="font-mono text-[11px] w-12 text-center">100%</span>
-                    <button id="zoomInBtn" type="button" title="Zoom In"
-                        class="px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 font-mono">+</button>
-                    <button id="fitViewBtn" type="button"
-                        class="px-2.5 py-1 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 font-medium transition">Fit
-                        View</button>
+                <div>
+                  <label class="text-[11px] text-slate-500">Delta Y</label>
+                  <input id="tyInput" type="number" step="1" value="0" class="w-full mt-0.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-2.5 py-1.5 font-mono text-xs" />
                 </div>
+              </div>
+              <button id="applyTranslateBtn" type="button" class="w-full text-xs font-medium py-1.5 rounded-lg bg-slate-800 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 text-white transition">Apply Translation</button>
             </div>
 
-            <!-- Interactive SVG Viewport -->
-            <div id="canvasContainer" class="flex-1 relative overflow-hidden canvas-grid-dark select-none">
-                <svg id="mainSvg" class="w-full h-full block cursor-grab active:cursor-grabbing"
-                    xmlns="http://www.w3.org/2000/svg">
-                    <g id="viewportGroup">
-                        <!-- Coordinate Grid & Axes -->
-                        <g id="gridLayer"></g>
-                        <!-- Bounding Box -->
-                        <g id="bboxLayer"></g>
-                        <!-- Main Rendered Path -->
-                        <path id="renderedPath" d="" fill="none" stroke="#6366f1" stroke-width="1.5"
-                            stroke-linecap="round" stroke-linejoin="round" />
-                        <!-- Highlighted Segment Overlay -->
-                        <path id="highlightSegment" d="" fill="none" stroke="#f59e0b" stroke-width="3"
-                            stroke-linecap="round" stroke-linejoin="round" opacity="0.9" />
-                        <!-- Control Lines & Draggable Handles -->
-                        <g id="handlesLayer"></g>
-                    </g>
-                </svg>
-
-                <!-- Bottom-Left Live Cursor & BBox HUD -->
-                <div class="absolute bottom-3 left-3 flex flex-wrap items-center gap-2 pointer-events-none">
-                    <div
-                        class="px-2.5 py-1 rounded-md bg-white/85 dark:bg-slate-900/85 backdrop-blur border border-slate-200 dark:border-slate-800 text-[11px] font-mono text-slate-600 dark:text-slate-300 shadow-sm">
-                        Cursor: <span id="cursorCoords">0, 0</span>
-                    </div>
-                    <div
-                        class="px-2.5 py-1 rounded-md bg-white/85 dark:bg-slate-900/85 backdrop-blur border border-slate-200 dark:border-slate-800 text-[11px] font-mono text-slate-600 dark:text-slate-300 shadow-sm">
-                        BBox: <span id="bboxCoords">0 × 0</span>
-                    </div>
+            <div class="rounded-xl border border-slate-200 dark:border-slate-800 p-3 space-y-3">
+              <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Scale</h3>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-[11px] text-slate-500">Scale X</label>
+                  <input id="sxInput" type="number" step="0.1" value="1" class="w-full mt-0.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-2.5 py-1.5 font-mono text-xs" />
                 </div>
-
-                <!-- Bottom-Right Legend -->
-                <div
-                    class="absolute bottom-3 right-3 hidden sm:flex items-center gap-3 px-2.5 py-1 rounded-md bg-white/85 dark:bg-slate-900/85 backdrop-blur border border-slate-200 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-300 shadow-sm pointer-events-none">
-                    <span class="inline-flex items-center gap-1"><span
-                            class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>Move (M)</span>
-                    <span class="inline-flex items-center gap-1"><span
-                            class="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block"></span>Anchor</span>
-                    <span class="inline-flex items-center gap-1"><span
-                            class="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block"></span>Control Pt</span>
+                <div>
+                  <label class="text-[11px] text-slate-500">Scale Y</label>
+                  <input id="syInput" type="number" step="0.1" value="1" class="w-full mt-0.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-2.5 py-1.5 font-mono text-xs" />
                 </div>
+              </div>
+              <button id="applyScaleBtn" type="button" class="w-full text-xs font-medium py-1.5 rounded-lg bg-slate-800 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 text-white transition">Apply Scale</button>
             </div>
-        </section>
+
+            <div class="rounded-xl border border-slate-200 dark:border-slate-800 p-3 space-y-2">
+              <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Quick Actions</h3>
+              <div class="grid grid-cols-2 gap-2">
+                <button id="flipHBtn" type="button" class="text-xs font-medium py-1.5 px-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition">Flip Horizontal</button>
+                <button id="flipVBtn" type="button" class="text-xs font-medium py-1.5 px-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition">Flip Vertical</button>
+                <button id="normalizeOriginBtn" type="button" class="text-xs font-medium py-1.5 px-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition">Move to (0, 0)</button>
+                <button id="roundIntsBtn" type="button" class="text-xs font-medium py-1.5 px-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition">Round Integers</button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </aside>
+
+      <!-- Right Panel: Interactive Canvas & Overlays -->
+      <section class="flex-1 flex flex-col min-w-0 min-h-[420px] lg:h-full relative">
+        <!-- Canvas Toolbar -->
+        <div class="border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 px-3.5 py-2 flex flex-wrap items-center justify-between gap-2 shrink-0">
+          <div class="flex flex-wrap items-center gap-3 text-xs">
+            <label class="inline-flex items-center gap-1.5 cursor-pointer">
+              <input id="toggleGrid" type="checkbox" checked class="rounded accent-indigo-600" />
+              <span>Grid</span>
+            </label>
+            <label class="inline-flex items-center gap-1.5 cursor-pointer">
+              <input id="togglePoints" type="checkbox" checked class="rounded accent-indigo-600" />
+              <span>Points &amp; Handles</span>
+            </label>
+            <label class="inline-flex items-center gap-1.5 cursor-pointer">
+              <input id="toggleBBox" type="checkbox" checked class="rounded accent-indigo-600" />
+              <span>BBox</span>
+            </label>
+            <label class="inline-flex items-center gap-1.5 cursor-pointer">
+              <input id="toggleFill" type="checkbox" class="rounded accent-indigo-600" />
+              <span>Fill</span>
+            </label>
+            <div class="flex items-center gap-1.5 border-l border-slate-200 dark:border-slate-700 pl-3">
+              <span class="text-slate-500">Stroke:</span>
+              <input id="strokeColor" type="color" value="#6366f1" class="w-5 h-5 rounded cursor-pointer border-0 bg-transparent p-0" />
+              <input id="strokeWidth" type="number" min="0.1" max="20" step="0.25" value="1.5" title="Stroke Width" class="w-12 rounded border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-1.5 py-0.5 font-mono text-xs text-center" />
+            </div>
+          </div>
+
+          <div class="flex items-center gap-1.5 text-xs">
+            <button id="zoomOutBtn" type="button" title="Zoom Out" class="px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 font-mono">-</button>
+            <span id="zoomLabel" class="font-mono text-[11px] w-12 text-center">100%</span>
+            <button id="zoomInBtn" type="button" title="Zoom In" class="px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 font-mono">+</button>
+            <button id="fitViewBtn" type="button" class="px-2.5 py-1 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 font-medium transition">Fit View</button>
+          </div>
+        </div>
+
+        <!-- Interactive SVG Viewport -->
+        <div id="canvasContainer" class="flex-1 relative overflow-hidden canvas-grid-dark select-none">
+          <svg id="mainSvg" class="w-full h-full block cursor-grab active:cursor-grabbing" xmlns="http://www.w3.org/2000/svg">
+            <g id="viewportGroup">
+              <!-- Coordinate Grid & Axes -->
+              <g id="gridLayer"></g>
+              <!-- Bounding Box -->
+              <g id="bboxLayer"></g>
+              <!-- Main Rendered Path -->
+              <path id="renderedPath" d="" fill="none" stroke="#6366f1" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+              <!-- Highlighted Segment Overlay -->
+              <path id="highlightSegment" d="" fill="none" stroke="#f59e0b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9" />
+              <!-- Control Lines & Draggable Handles -->
+              <g id="handlesLayer"></g>
+            </g>
+          </svg>
+
+          <!-- Bottom-Left Live Cursor & BBox HUD -->
+          <div class="absolute bottom-3 left-3 flex flex-wrap items-center gap-2 pointer-events-none">
+            <div class="px-2.5 py-1 rounded-md bg-white/85 dark:bg-slate-900/85 backdrop-blur border border-slate-200 dark:border-slate-800 text-[11px] font-mono text-slate-600 dark:text-slate-300 shadow-sm">Cursor: <span id="cursorCoords">0, 0</span></div>
+            <div class="px-2.5 py-1 rounded-md bg-white/85 dark:bg-slate-900/85 backdrop-blur border border-slate-200 dark:border-slate-800 text-[11px] font-mono text-slate-600 dark:text-slate-300 shadow-sm">BBox: <span id="bboxCoords">0 × 0</span></div>
+          </div>
+
+          <!-- Bottom-Right Legend -->
+          <div class="absolute bottom-3 right-3 hidden sm:flex items-center gap-3 px-2.5 py-1 rounded-md bg-white/85 dark:bg-slate-900/85 backdrop-blur border border-slate-200 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-300 shadow-sm pointer-events-none">
+            <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>Move (M)</span>
+            <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block"></span>Anchor</span>
+            <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block"></span>Control Pt</span>
+          </div>
+        </div>
+      </section>
     </main>
 
     <!-- Toast Notification -->
-    <div id="toast"
-        class="fixed bottom-4 right-4 z-50 px-3.5 py-2 rounded-lg bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-xs font-medium shadow-lg opacity-0 pointer-events-none transition-opacity duration-200">
-    </div>
+    <div id="toast" class="fixed bottom-4 right-4 z-50 px-3.5 py-2 rounded-lg bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-xs font-medium shadow-lg opacity-0 pointer-events-none transition-opacity duration-200"></div>
 
     <script>
-        (function () {
-            'use strict';
+      (function () {
+        "use strict";
 
-            // =========================================================================
-            // PRESETS
-            // =========================================================================
-            const PRESETS = {
-                heart: 'M 12 21.35 l -1.45 -1.32 C 5.4 15.36 2 12.28 2 8.5 C 2 5.42 4.42 3 7.5 3 c 1.74 0 3.41 0.81 4.5 2.09 C 13.09 3.81 14.76 3 16.5 3 C 19.58 3 22 5.42 22 8.5 c 0 3.78 -3.4 6.86 -8.55 11.54 L 12 21.35 z',
-                rocket: 'M 22 2 L 11 13 M 22 2 L 15 22 L 11 13 L 2 9 L 22 2 Z',
-                bolt: 'M 13 2 L 3 14 H 12 L 11 22 L 21 10 H 12 L 13 2 Z',
-                star: 'M 12 2 L 15.09 8.26 L 22 9.27 L 17 14.14 L 18.18 21.02 L 12 17.77 L 5.82 21.02 L 7 14.14 L 2 9.27 L 8.91 8.26 Z',
-                cloud: 'M 18 10 h -1.26 A 8 8 0 1 0 9 20 h 9 a 5 5 0 0 0 0 -10 z',
-                wave: 'M 2 12 C 6 4, 10 4, 14 12 C 18 20, 22 20, 26 12 S 34 4, 38 12',
-                badge: 'M 12 2 L 4 5 V 11 C 4 16.55 7.41 21.74 12 23 C 16.59 21.74 20 16.55 20 11 V 5 L 12 2 Z'
+        // =========================================================================
+        // PRESETS
+        // =========================================================================
+        const PRESETS = {
+          heart: "M 12 21.35 l -1.45 -1.32 C 5.4 15.36 2 12.28 2 8.5 C 2 5.42 4.42 3 7.5 3 c 1.74 0 3.41 0.81 4.5 2.09 C 13.09 3.81 14.76 3 16.5 3 C 19.58 3 22 5.42 22 8.5 c 0 3.78 -3.4 6.86 -8.55 11.54 L 12 21.35 z",
+          rocket: "M 22 2 L 11 13 M 22 2 L 15 22 L 11 13 L 2 9 L 22 2 Z",
+          bolt: "M 13 2 L 3 14 H 12 L 11 22 L 21 10 H 12 L 13 2 Z",
+          star: "M 12 2 L 15.09 8.26 L 22 9.27 L 17 14.14 L 18.18 21.02 L 12 17.77 L 5.82 21.02 L 7 14.14 L 2 9.27 L 8.91 8.26 Z",
+          cloud: "M 18 10 h -1.26 A 8 8 0 1 0 9 20 h 9 a 5 5 0 0 0 0 -10 z",
+          wave: "M 2 12 C 6 4, 10 4, 14 12 C 18 20, 22 20, 26 12 S 34 4, 38 12",
+          badge: "M 12 2 L 4 5 V 11 C 4 16.55 7.41 21.74 12 23 C 16.59 21.74 20 16.55 20 11 V 5 L 12 2 Z"
+        };
+
+        // =========================================================================
+        // STATE
+        // =========================================================================
+        const state = {
+          rawPath: PRESETS.heart,
+          commands: [],
+          selectedCmdIndex: -1,
+          coordMode: "auto", // 'auto' | 'relative' | 'absolute'
+          precision: 2,
+          optHV: true,
+          optRedundant: true,
+          optMinify: true,
+          optCollapse: true,
+          view: { panX: 0, panY: 0, zoom: 12 },
+          showGrid: true,
+          showPoints: true,
+          showBBox: true,
+          showFill: false,
+          strokeColor: "#6366f1",
+          strokeWidth: 1.5,
+          drag: null
+        };
+
+        // =========================================================================
+        // DOM REFERENCES
+        // =========================================================================
+        const el = {
+          pathInput: document.getElementById("pathInput"),
+          parseErrorBox: document.getElementById("parseErrorBox"),
+          presetSelect: document.getElementById("presetSelect"),
+          svgFileInput: document.getElementById("svgFileInput"),
+          themeToggleBtn: document.getElementById("themeToggleBtn"),
+          formatReadableBtn: document.getElementById("formatReadableBtn"),
+          copyRawBtn: document.getElementById("copyRawBtn"),
+          clearPathBtn: document.getElementById("clearPathBtn"),
+          cmdCountBadge: document.getElementById("cmdCountBadge"),
+          commandList: document.getElementById("commandList"),
+          convertAllAbsBtn: document.getElementById("convertAllAbsBtn"),
+          optimizedOutput: document.getElementById("optimizedOutput"),
+          origBytesStat: document.getElementById("origBytesStat"),
+          optBytesStat: document.getElementById("optBytesStat"),
+          pathLengthStat: document.getElementById("pathLengthStat"),
+          savingsBadge: document.getElementById("savingsBadge"),
+          applyOptBtn: document.getElementById("applyOptBtn"),
+          copyOptBtn: document.getElementById("copyOptBtn"),
+          copySvgBtn: document.getElementById("copySvgBtn"),
+          downloadSvgBtn: document.getElementById("downloadSvgBtn"),
+          precisionRange: document.getElementById("precisionRange"),
+          precisionVal: document.getElementById("precisionVal"),
+          optHV: document.getElementById("optHV"),
+          optRedundant: document.getElementById("optRedundant"),
+          optMinify: document.getElementById("optMinify"),
+          optCollapse: document.getElementById("optCollapse"),
+          txInput: document.getElementById("txInput"),
+          tyInput: document.getElementById("tyInput"),
+          applyTranslateBtn: document.getElementById("applyTranslateBtn"),
+          sxInput: document.getElementById("sxInput"),
+          syInput: document.getElementById("syInput"),
+          applyScaleBtn: document.getElementById("applyScaleBtn"),
+          flipHBtn: document.getElementById("flipHBtn"),
+          flipVBtn: document.getElementById("flipVBtn"),
+          normalizeOriginBtn: document.getElementById("normalizeOriginBtn"),
+          roundIntsBtn: document.getElementById("roundIntsBtn"),
+          toggleGrid: document.getElementById("toggleGrid"),
+          togglePoints: document.getElementById("togglePoints"),
+          toggleBBox: document.getElementById("toggleBBox"),
+          toggleFill: document.getElementById("toggleFill"),
+          strokeColor: document.getElementById("strokeColor"),
+          strokeWidth: document.getElementById("strokeWidth"),
+          zoomOutBtn: document.getElementById("zoomOutBtn"),
+          zoomInBtn: document.getElementById("zoomInBtn"),
+          zoomLabel: document.getElementById("zoomLabel"),
+          fitViewBtn: document.getElementById("fitViewBtn"),
+          canvasContainer: document.getElementById("canvasContainer"),
+          mainSvg: document.getElementById("mainSvg"),
+          viewportGroup: document.getElementById("viewportGroup"),
+          gridLayer: document.getElementById("gridLayer"),
+          bboxLayer: document.getElementById("bboxLayer"),
+          renderedPath: document.getElementById("renderedPath"),
+          highlightSegment: document.getElementById("highlightSegment"),
+          handlesLayer: document.getElementById("handlesLayer"),
+          cursorCoords: document.getElementById("cursorCoords"),
+          bboxCoords: document.getElementById("bboxCoords"),
+          toast: document.getElementById("toast")
+        };
+
+        // =========================================================================
+        // UTILITIES
+        // =========================================================================
+        let toastTimer = null;
+        function showToast(msg) {
+          el.toast.textContent = msg;
+          el.toast.classList.remove("opacity-0");
+          el.toast.classList.add("opacity-100");
+          clearTimeout(toastTimer);
+          toastTimer = setTimeout(() => {
+            el.toast.classList.remove("opacity-100");
+            el.toast.classList.add("opacity-0");
+          }, 2000);
+        }
+
+        function copyText(text, label) {
+          if (!text) return;
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard
+              .writeText(text)
+              .then(() => showToast(label + " copied"))
+              .catch(() => fallbackCopy(text, label));
+          } else {
+            fallbackCopy(text, label);
+          }
+        }
+
+        function fallbackCopy(text, label) {
+          const ta = document.createElement("textarea");
+          ta.value = text;
+          ta.style.position = "fixed";
+          ta.style.opacity = "0";
+          document.body.appendChild(ta);
+          ta.select();
+          try {
+            document.execCommand("copy");
+            showToast(label + " copied");
+          } catch (_) {
+            showToast("Copy failed");
+          }
+          document.body.removeChild(ta);
+        }
+
+        function extractPathFromSvgText(input) {
+          const trimmed = input.trim();
+          if (trimmed.includes("<path") || trimmed.includes("<svg")) {
+            const match = trimmed.match(/\bd\s*=\s*["']([^"']+)["']/i);
+            if (match && match[1]) return match[1].trim();
+          }
+          return input;
+        }
+
+        function roundNum(val, precision) {
+          const factor = Math.pow(10, precision);
+          const r = Math.round((val + Number.EPSILON) * factor) / factor;
+          return Object.is(r, -0) ? 0 : r;
+        }
+
+        function formatNumber(val, precision, stripLeadingZero) {
+          let num = roundNum(val, precision);
+          let str = Number.isInteger(num) ? String(num) : String(num);
+          if (stripLeadingZero) {
+            if (str.startsWith("0.")) str = str.slice(1);
+            else if (str.startsWith("-0.")) str = "-" + str.slice(2);
+          }
+          return str;
+        }
+
+        // =========================================================================
+        // SVG PATH PARSER (FULL SPEC: IMPLICIT PARAMS, ARC FLAGS, NEGATIVES)
+        // =========================================================================
+        const PARAM_COUNTS = {
+          M: 2,
+          m: 2,
+          L: 2,
+          l: 2,
+          H: 1,
+          h: 1,
+          V: 1,
+          v: 1,
+          C: 6,
+          c: 6,
+          S: 4,
+          s: 4,
+          Q: 4,
+          q: 4,
+          T: 2,
+          t: 2,
+          A: 7,
+          a: 7,
+          Z: 0,
+          z: 0
+        };
+
+        function parseSvgPath(d) {
+          const commands = [];
+          const len = d.length;
+          let i = 0;
+
+          function skipSpacesAndCommas() {
+            while (i < len && /[\s,]/.test(d[i])) i++;
+          }
+
+          function readNumber() {
+            skipSpacesAndCommas();
+            const match = d.slice(i).match(/^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/);
+            if (!match) return null;
+            i += match[0].length;
+            return parseFloat(match[0]);
+          }
+
+          function readFlag() {
+            skipSpacesAndCommas();
+            if (i < len && (d[i] === "0" || d[i] === "1")) {
+              return parseInt(d[i++], 10);
+            }
+            return null;
+          }
+
+          let currentCmd = null;
+          while (i < len) {
+            skipSpacesAndCommas();
+            if (i >= len) break;
+
+            const ch = d[i];
+            if (/[a-zA-Z]/.test(ch)) {
+              if (!(ch in PARAM_COUNTS)) {
+                throw new Error('Unsupported SVG command "' + ch + '" at index ' + i);
+              }
+              currentCmd = ch;
+              i++;
+              if (PARAM_COUNTS[currentCmd] === 0) {
+                commands.push({ type: currentCmd, params: [] });
+                currentCmd = null;
+                continue;
+              }
+            } else if (currentCmd === null) {
+              throw new Error("Expected command letter at index " + i + ' ("' + ch + '")');
+            }
+
+            // Read one parameter tuple for currentCmd
+            const expected = PARAM_COUNTS[currentCmd];
+            const params = [];
+            for (let p = 0; p < expected; p++) {
+              let val;
+              if ((currentCmd === "A" || currentCmd === "a") && (p === 3 || p === 4)) {
+                val = readFlag();
+              } else {
+                val = readNumber();
+              }
+              if (val === null || Number.isNaN(val)) {
+                throw new Error('Missing parameter for command "' + currentCmd + '" at index ' + i);
+              }
+              params.push(val);
+            }
+
+            commands.push({ type: currentCmd, params });
+
+            // Subsequent implicit tuples after M/m are treated as L/l
+            if (currentCmd === "M") currentCmd = "L";
+            else if (currentCmd === "m") currentCmd = "l";
+          }
+
+          return commands;
+        }
+
+        // Compute absolute start & end positions + absolute control points for every command
+        function computeAbsoluteGeometry(commands) {
+          let cx = 0,
+            cy = 0;
+          let sx = 0,
+            sy = 0;
+          let lastCpX = null,
+            lastCpY = null;
+          let lastCmdType = "";
+
+          return commands.map((cmd, idx) => {
+            const t = cmd.type;
+            const upper = t.toUpperCase();
+            const isRel = t !== upper;
+            const p = cmd.params;
+            const startX = cx,
+              startY = cy;
+            let absParams = [];
+            const points = []; // { role: 'anchor'|'cp1'|'cp2', x, y, paramIdxX, paramIdxY }
+
+            if (upper === "M") {
+              const x = isRel ? cx + p[0] : p[0];
+              const y = isRel ? cy + p[1] : p[1];
+              absParams = [x, y];
+              cx = x;
+              cy = y;
+              sx = x;
+              sy = y;
+              points.push({ role: "move", x, y, px: 0, py: 1 });
+            } else if (upper === "L") {
+              const x = isRel ? cx + p[0] : p[0];
+              const y = isRel ? cy + p[1] : p[1];
+              absParams = [x, y];
+              cx = x;
+              cy = y;
+              points.push({ role: "anchor", x, y, px: 0, py: 1 });
+            } else if (upper === "H") {
+              const x = isRel ? cx + p[0] : p[0];
+              absParams = [x];
+              cx = x;
+              points.push({ role: "anchor", x, y: cy, px: 0, py: null });
+            } else if (upper === "V") {
+              const y = isRel ? cy + p[0] : p[0];
+              absParams = [y];
+              cy = y;
+              points.push({ role: "anchor", x: cx, y, px: null, py: 0 });
+            } else if (upper === "C") {
+              const x1 = isRel ? cx + p[0] : p[0];
+              const y1 = isRel ? cy + p[1] : p[1];
+              const x2 = isRel ? cx + p[2] : p[2];
+              const y2 = isRel ? cy + p[3] : p[3];
+              const x = isRel ? cx + p[4] : p[4];
+              const y = isRel ? cy + p[5] : p[5];
+              absParams = [x1, y1, x2, y2, x, y];
+              points.push({ role: "cp1", x: x1, y: y1, px: 0, py: 1, linkX: startX, linkY: startY });
+              points.push({ role: "cp2", x: x2, y: y2, px: 2, py: 3, linkX: x, linkY: y });
+              points.push({ role: "anchor", x, y, px: 4, py: 5 });
+              lastCpX = x2;
+              lastCpY = y2;
+              cx = x;
+              cy = y;
+            } else if (upper === "S") {
+              const rx1 = (lastCmdType === "C" || lastCmdType === "S") && lastCpX !== null ? 2 * cx - lastCpX : cx;
+              const ry1 = (lastCmdType === "C" || lastCmdType === "S") && lastCpY !== null ? 2 * cy - lastCpY : cy;
+              const x2 = isRel ? cx + p[0] : p[0];
+              const y2 = isRel ? cy + p[1] : p[1];
+              const x = isRel ? cx + p[2] : p[2];
+              const y = isRel ? cy + p[3] : p[3];
+              absParams = [x2, y2, x, y];
+              points.push({ role: "cp2", x: x2, y: y2, px: 0, py: 1, linkX: x, linkY: y, reflected: { x: rx1, y: ry1 } });
+              points.push({ role: "anchor", x, y, px: 2, py: 3 });
+              lastCpX = x2;
+              lastCpY = y2;
+              cx = x;
+              cy = y;
+            } else if (upper === "Q") {
+              const x1 = isRel ? cx + p[0] : p[0];
+              const y1 = isRel ? cy + p[1] : p[1];
+              const x = isRel ? cx + p[2] : p[2];
+              const y = isRel ? cy + p[3] : p[3];
+              absParams = [x1, y1, x, y];
+              points.push({ role: "cp1", x: x1, y: y1, px: 0, py: 1, linkX: startX, linkY: startY, link2X: x, link2Y: y });
+              points.push({ role: "anchor", x, y, px: 2, py: 3 });
+              lastCpX = x1;
+              lastCpY = y1;
+              cx = x;
+              cy = y;
+            } else if (upper === "T") {
+              const rx1 = (lastCmdType === "Q" || lastCmdType === "T") && lastCpX !== null ? 2 * cx - lastCpX : cx;
+              const ry1 = (lastCmdType === "Q" || lastCmdType === "T") && lastCpY !== null ? 2 * cy - lastCpY : cy;
+              const x = isRel ? cx + p[0] : p[0];
+              const y = isRel ? cy + p[1] : p[1];
+              absParams = [x, y];
+              points.push({ role: "anchor", x, y, px: 0, py: 1, reflected: { x: rx1, y: ry1 } });
+              lastCpX = rx1;
+              lastCpY = ry1;
+              cx = x;
+              cy = y;
+            } else if (upper === "A") {
+              const x = isRel ? cx + p[5] : p[5];
+              const y = isRel ? cy + p[6] : p[6];
+              absParams = [p[0], p[1], p[2], p[3], p[4], x, y];
+              points.push({ role: "anchor", x, y, px: 5, py: 6 });
+              cx = x;
+              cy = y;
+            } else if (upper === "Z") {
+              cx = sx;
+              cy = sy;
+            }
+
+            if (upper !== "C" && upper !== "S" && upper !== "Q" && upper !== "T") {
+              lastCpX = null;
+              lastCpY = null;
+            }
+            lastCmdType = upper;
+
+            return {
+              index: idx,
+              type: t,
+              upper,
+              isRel,
+              params: p,
+              absParams,
+              startX,
+              startY,
+              endX: cx,
+              endY: cy,
+              points
             };
+          });
+        }
 
-            // =========================================================================
-            // STATE
-            // =========================================================================
-            const state = {
-                rawPath: PRESETS.heart,
-                commands: [],
-                selectedCmdIndex: -1,
-                coordMode: 'auto', // 'auto' | 'relative' | 'absolute'
-                precision: 2,
-                optHV: true,
-                optRedundant: true,
-                optMinify: true,
-                optCollapse: true,
-                view: { panX: 0, panY: 0, zoom: 12 },
-                showGrid: true,
-                showPoints: true,
-                showBBox: true,
-                showFill: false,
-                strokeColor: '#6366f1',
-                strokeWidth: 1.5,
-                drag: null
-            };
+        // =========================================================================
+        // SERIALIZER & OPTIMIZER
+        // =========================================================================
+        function serializeReadable(commands) {
+          return commands.map((c) => (c.params.length ? c.type + " " + c.params.join(" ") : c.type)).join("\n");
+        }
 
-            // =========================================================================
-            // DOM REFERENCES
-            // =========================================================================
-            const el = {
-                pathInput: document.getElementById('pathInput'),
-                parseErrorBox: document.getElementById('parseErrorBox'),
-                presetSelect: document.getElementById('presetSelect'),
-                svgFileInput: document.getElementById('svgFileInput'),
-                themeToggleBtn: document.getElementById('themeToggleBtn'),
-                formatReadableBtn: document.getElementById('formatReadableBtn'),
-                copyRawBtn: document.getElementById('copyRawBtn'),
-                clearPathBtn: document.getElementById('clearPathBtn'),
-                cmdCountBadge: document.getElementById('cmdCountBadge'),
-                commandList: document.getElementById('commandList'),
-                convertAllAbsBtn: document.getElementById('convertAllAbsBtn'),
-                optimizedOutput: document.getElementById('optimizedOutput'),
-                origBytesStat: document.getElementById('origBytesStat'),
-                optBytesStat: document.getElementById('optBytesStat'),
-                pathLengthStat: document.getElementById('pathLengthStat'),
-                savingsBadge: document.getElementById('savingsBadge'),
-                applyOptBtn: document.getElementById('applyOptBtn'),
-                copyOptBtn: document.getElementById('copyOptBtn'),
-                copySvgBtn: document.getElementById('copySvgBtn'),
-                downloadSvgBtn: document.getElementById('downloadSvgBtn'),
-                precisionRange: document.getElementById('precisionRange'),
-                precisionVal: document.getElementById('precisionVal'),
-                optHV: document.getElementById('optHV'),
-                optRedundant: document.getElementById('optRedundant'),
-                optMinify: document.getElementById('optMinify'),
-                optCollapse: document.getElementById('optCollapse'),
-                txInput: document.getElementById('txInput'),
-                tyInput: document.getElementById('tyInput'),
-                applyTranslateBtn: document.getElementById('applyTranslateBtn'),
-                sxInput: document.getElementById('sxInput'),
-                syInput: document.getElementById('syInput'),
-                applyScaleBtn: document.getElementById('applyScaleBtn'),
-                flipHBtn: document.getElementById('flipHBtn'),
-                flipVBtn: document.getElementById('flipVBtn'),
-                normalizeOriginBtn: document.getElementById('normalizeOriginBtn'),
-                roundIntsBtn: document.getElementById('roundIntsBtn'),
-                toggleGrid: document.getElementById('toggleGrid'),
-                togglePoints: document.getElementById('togglePoints'),
-                toggleBBox: document.getElementById('toggleBBox'),
-                toggleFill: document.getElementById('toggleFill'),
-                strokeColor: document.getElementById('strokeColor'),
-                strokeWidth: document.getElementById('strokeWidth'),
-                zoomOutBtn: document.getElementById('zoomOutBtn'),
-                zoomInBtn: document.getElementById('zoomInBtn'),
-                zoomLabel: document.getElementById('zoomLabel'),
-                fitViewBtn: document.getElementById('fitViewBtn'),
-                canvasContainer: document.getElementById('canvasContainer'),
-                mainSvg: document.getElementById('mainSvg'),
-                viewportGroup: document.getElementById('viewportGroup'),
-                gridLayer: document.getElementById('gridLayer'),
-                bboxLayer: document.getElementById('bboxLayer'),
-                renderedPath: document.getElementById('renderedPath'),
-                highlightSegment: document.getElementById('highlightSegment'),
-                handlesLayer: document.getElementById('handlesLayer'),
-                cursorCoords: document.getElementById('cursorCoords'),
-                bboxCoords: document.getElementById('bboxCoords'),
-                toast: document.getElementById('toast')
-            };
+        function serializeParamsTight(params, precision, stripLeadingZero, isArc) {
+          let out = "";
+          for (let i = 0; i < params.length; i++) {
+            let token;
+            if (isArc && (i === 3 || i === 4)) {
+              token = String(params[i] ? 1 : 0);
+            } else {
+              token = formatNumber(params[i], precision, stripLeadingZero);
+            }
+            if (i === 0) {
+              out += token;
+            } else {
+              // Can omit space if token starts with '-' or if (token starts with '.' and prev token already has '.')
+              const prev = out[out.length - 1];
+              const prevHasDot = /\d*\.\d*$/.test(out);
+              const canOmitSpace = token.startsWith("-") || (token.startsWith(".") && prevHasDot) || (isArc && (i === 4 || i === 5) && (out.endsWith("0") || out.endsWith("1")) && i === 4);
+              if (canOmitSpace && !isArc) {
+                out += token;
+              } else if (token.startsWith("-")) {
+                out += token;
+              } else {
+                out += " " + token;
+              }
+            }
+          }
+          return out;
+        }
 
-            // =========================================================================
-            // UTILITIES
-            // =========================================================================
-            let toastTimer = null;
-            function showToast(msg) {
-                el.toast.textContent = msg;
-                el.toast.classList.remove('opacity-0');
-                el.toast.classList.add('opacity-100');
-                clearTimeout(toastTimer);
-                toastTimer = setTimeout(() => {
-                    el.toast.classList.remove('opacity-100');
-                    el.toast.classList.add('opacity-0');
-                }, 2000);
+        function optimizeCommands(rawCommands) {
+          if (!rawCommands.length) return "";
+          const geo = computeAbsoluteGeometry(rawCommands);
+          const prec = state.precision;
+          const minify = state.optMinify;
+
+          const outCmds = [];
+          for (let i = 0; i < geo.length; i++) {
+            const g = geo[i];
+            let upper = g.upper;
+            let absP = g.absParams.slice();
+
+            // 1. Remove redundant zero-length L / H / V moves
+            if (state.optRedundant && (upper === "L" || upper === "H" || upper === "V")) {
+              const dx = roundNum(g.endX - g.startX, prec);
+              const dy = roundNum(g.endY - g.startY, prec);
+              if (dx === 0 && dy === 0) continue;
             }
 
-            function copyText(text, label) {
-                if (!text) return;
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(text).then(() => showToast(label + ' copied')).catch(() => fallbackCopy(text, label));
-                } else {
-                    fallbackCopy(text, label);
-                }
+            // 2. Convert L to H or V if axis-aligned
+            if (state.optHV && upper === "L") {
+              const dx = roundNum(g.endX - g.startX, prec);
+              const dy = roundNum(g.endY - g.startY, prec);
+              if (dy === 0 && dx !== 0) {
+                upper = "H";
+                absP = [g.endX];
+              } else if (dx === 0 && dy !== 0) {
+                upper = "V";
+                absP = [g.endY];
+              }
             }
 
-            function fallbackCopy(text, label) {
-                const ta = document.createElement('textarea');
-                ta.value = text;
-                ta.style.position = 'fixed';
-                ta.style.opacity = '0';
-                document.body.appendChild(ta);
-                ta.select();
-                try {
-                    document.execCommand('copy');
-                    showToast(label + ' copied');
-                } catch (_) {
-                    showToast('Copy failed');
-                }
-                document.body.removeChild(ta);
+            // Compute relative params from absP
+            let relP = null;
+            if (upper === "Z") {
+              outCmds.push({ type: "Z", params: [] });
+              continue;
+            } else if (upper === "M" || upper === "L" || upper === "T") {
+              relP = [absP[0] - g.startX, absP[1] - g.startY];
+            } else if (upper === "H") {
+              relP = [absP[0] - g.startX];
+            } else if (upper === "V") {
+              relP = [absP[0] - g.startY];
+            } else if (upper === "C") {
+              relP = [absP[0] - g.startX, absP[1] - g.startY, absP[2] - g.startX, absP[3] - g.startY, absP[4] - g.startX, absP[5] - g.startY];
+            } else if (upper === "S" || upper === "Q") {
+              relP = [absP[0] - g.startX, absP[1] - g.startY, absP[2] - g.startX, absP[3] - g.startY];
+            } else if (upper === "A") {
+              relP = [absP[0], absP[1], absP[2], absP[3], absP[4], absP[5] - g.startX, absP[6] - g.startY];
             }
 
-            function extractPathFromSvgText(input) {
-                const trimmed = input.trim();
-                if (trimmed.includes('<path') || trimmed.includes('<svg')) {
-                    const match = trimmed.match(/\bd\s*=\s*["']([^"']+)["']/i);
-                    if (match && match[1]) return match[1].trim();
-                }
-                return input;
+            const isArc = upper === "A";
+            const absStr = serializeParamsTight(absP, prec, minify, isArc);
+            const relStr = serializeParamsTight(relP, prec, minify, isArc);
+
+            let chosenType = upper;
+            let chosenParams = absP;
+            if (i === 0 && upper === "M") {
+              chosenType = "M";
+              chosenParams = absP;
+            } else if (state.coordMode === "relative") {
+              chosenType = upper.toLowerCase();
+              chosenParams = relP;
+            } else if (state.coordMode === "absolute") {
+              chosenType = upper;
+              chosenParams = absP;
+            } else {
+              // Auto shortest
+              if (relStr.length < absStr.length) {
+                chosenType = upper.toLowerCase();
+                chosenParams = relP;
+              }
             }
 
-            function roundNum(val, precision) {
-                const factor = Math.pow(10, precision);
-                const r = Math.round((val + Number.EPSILON) * factor) / factor;
-                return Object.is(r, -0) ? 0 : r;
+            outCmds.push({ type: chosenType, params: chosenParams, str: serializeParamsTight(chosenParams, prec, minify, isArc) });
+          }
+
+          // Build final string, collapsing repeated command letters if enabled
+          let result = "";
+          let prevType = "";
+          for (let i = 0; i < outCmds.length; i++) {
+            const c = outCmds[i];
+            if (c.type === "Z" || c.type === "z") {
+              result += c.type;
+              prevType = c.type;
+              continue;
             }
-
-            function formatNumber(val, precision, stripLeadingZero) {
-                let num = roundNum(val, precision);
-                let str = Number.isInteger(num) ? String(num) : String(num);
-                if (stripLeadingZero) {
-                    if (str.startsWith('0.')) str = str.slice(1);
-                    else if (str.startsWith('-0.')) str = '-' + str.slice(2);
-                }
-                return str;
+            const canCollapse = state.optCollapse && prevType === c.type && c.type !== "M" && c.type !== "m";
+            if (canCollapse) {
+              result += (c.str.startsWith("-") ? "" : " ") + c.str;
+            } else {
+              result += c.type + c.str;
             }
+            prevType = c.type;
+          }
+          return result;
+        }
 
-            // =========================================================================
-            // SVG PATH PARSER (FULL SPEC: IMPLICIT PARAMS, ARC FLAGS, NEGATIVES)
-            // =========================================================================
-            const PARAM_COUNTS = {
-                M: 2, m: 2,
-                L: 2, l: 2,
-                H: 1, h: 1,
-                V: 1, v: 1,
-                C: 6, c: 6,
-                S: 4, s: 4,
-                Q: 4, q: 4,
-                T: 2, t: 2,
-                A: 7, a: 7,
-                Z: 0, z: 0
-            };
+        // =========================================================================
+        // RENDERING & UI SYNC
+        // =========================================================================
+        function updateAll(skipTextareaUpdate) {
+          if (!skipTextareaUpdate) {
+            el.pathInput.value = state.rawPath;
+          }
 
-            function parseSvgPath(d) {
-                const commands = [];
-                const len = d.length;
-                let i = 0;
+          const extracted = extractPathFromSvgText(state.rawPath);
+          let parsed = [];
+          try {
+            parsed = parseSvgPath(extracted);
+            state.commands = parsed;
+            el.parseErrorBox.classList.add("hidden");
+            el.parseErrorBox.textContent = "";
+          } catch (err) {
+            el.parseErrorBox.textContent = err.message;
+            el.parseErrorBox.classList.remove("hidden");
+            return;
+          }
 
-                function skipSpacesAndCommas() {
-                    while (i < len && /[\s,]/.test(d[i])) i++;
-                }
+          el.cmdCountBadge.textContent = parsed.length;
 
-                function readNumber() {
-                    skipSpacesAndCommas();
-                    const match = d.slice(i).match(/^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/);
-                    if (!match) return null;
-                    i += match[0].length;
-                    return parseFloat(match[0]);
-                }
+          // Render SVG Path
+          const dStr = parsed.map((c) => c.type + (c.params.length ? " " + c.params.join(" ") : "")).join(" ");
+          el.renderedPath.setAttribute("d", dStr);
+          el.renderedPath.setAttribute("stroke", state.strokeColor);
+          el.renderedPath.setAttribute("stroke-width", String(state.strokeWidth));
+          el.renderedPath.setAttribute("fill", state.showFill ? state.strokeColor + "33" : "none");
 
-                function readFlag() {
-                    skipSpacesAndCommas();
-                    if (i < len && (d[i] === '0' || d[i] === '1')) {
-                        return parseInt(d[i++], 10);
-                    }
-                    return null;
-                }
+          // Highlighted Segment
+          const geo = computeAbsoluteGeometry(parsed);
+          if (state.selectedCmdIndex >= 0 && state.selectedCmdIndex < geo.length) {
+            const sel = geo[state.selectedCmdIndex];
+            const segD = sel.upper === "Z" ? `M ${sel.startX} ${sel.startY} L ${sel.endX} ${sel.endY}` : `M ${sel.startX} ${sel.startY} ${sel.type} ${sel.params.join(" ")}`;
+            el.highlightSegment.setAttribute("d", segD);
+            el.highlightSegment.setAttribute("stroke-width", String(Math.max(state.strokeWidth * 1.8, 2 / state.view.zoom)));
+          } else {
+            el.highlightSegment.setAttribute("d", "");
+          }
 
-                let currentCmd = null;
-                while (i < len) {
-                    skipSpacesAndCommas();
-                    if (i >= len) break;
+          // Stats & Optimizer
+          const optimized = optimizeCommands(parsed);
+          el.optimizedOutput.value = optimized;
+          const origLen = new Blob([state.rawPath.trim()]).size;
+          const optLen = new Blob([optimized]).size;
+          el.origBytesStat.textContent = origLen + " B";
+          el.optBytesStat.textContent = optLen + " B";
+          const savedPct = origLen > 0 ? Math.round(((origLen - optLen) / origLen) * 100) : 0;
+          el.savingsBadge.textContent = (savedPct >= 0 ? savedPct : 0) + "% saved";
 
-                    const ch = d[i];
-                    if (/[a-zA-Z]/.test(ch)) {
-                        if (!(ch in PARAM_COUNTS)) {
-                            throw new Error('Unsupported SVG command "' + ch + '" at index ' + i);
-                        }
-                        currentCmd = ch;
-                        i++;
-                        if (PARAM_COUNTS[currentCmd] === 0) {
-                            commands.push({ type: currentCmd, params: [] });
-                            currentCmd = null;
-                            continue;
-                        }
-                    } else if (currentCmd === null) {
-                        throw new Error('Expected command letter at index ' + i + ' ("' + ch + '")');
-                    }
+          try {
+            const totalLen = el.renderedPath.getTotalLength();
+            el.pathLengthStat.textContent = totalLen.toFixed(1);
+          } catch (_) {
+            el.pathLengthStat.textContent = "0";
+          }
 
-                    // Read one parameter tuple for currentCmd
-                    const expected = PARAM_COUNTS[currentCmd];
-                    const params = [];
-                    for (let p = 0; p < expected; p++) {
-                        let val;
-                        if ((currentCmd === 'A' || currentCmd === 'a') && (p === 3 || p === 4)) {
-                            val = readFlag();
-                        } else {
-                            val = readNumber();
-                        }
-                        if (val === null || Number.isNaN(val)) {
-                            throw new Error('Missing parameter for command "' + currentCmd + '" at index ' + i);
-                        }
-                        params.push(val);
-                    }
+          renderInspector(geo);
+          renderCanvasOverlays(geo);
+        }
 
-                    commands.push({ type: currentCmd, params });
+        function renderInspector(geo) {
+          const frag = document.createDocumentFragment();
+          geo.forEach((g) => {
+            const isSel = g.index === state.selectedCmdIndex;
+            const card = document.createElement("div");
+            card.className = `rounded-lg border p-2 transition cursor-pointer ${isSel ? "border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/40" : "border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 hover:border-slate-300 dark:hover:border-slate-700"}`;
 
-                    // Subsequent implicit tuples after M/m are treated as L/l
-                    if (currentCmd === 'M') currentCmd = 'L';
-                    else if (currentCmd === 'm') currentCmd = 'l';
-                }
+            const header = document.createElement("div");
+            header.className = "flex items-center justify-between gap-2";
 
-                return commands;
-            }
+            const left = document.createElement("div");
+            left.className = "flex items-center gap-2";
+            const idxSpan = document.createElement("span");
+            idxSpan.className = "text-[10px] font-mono text-slate-400 w-4";
+            idxSpan.textContent = g.index;
 
-            // Compute absolute start & end positions + absolute control points for every command
-            function computeAbsoluteGeometry(commands) {
-                let cx = 0, cy = 0;
-                let sx = 0, sy = 0;
-                let lastCpX = null, lastCpY = null;
-                let lastCmdType = '';
+            const badge = document.createElement("span");
+            const badgeColor = g.upper === "M" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400" : g.upper === "C" || g.upper === "S" || g.upper === "Q" || g.upper === "T" ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400" : "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400";
+            badge.className = `font-mono text-xs font-semibold px-1.5 py-0.5 rounded ${badgeColor}`;
+            badge.textContent = g.type;
 
-                return commands.map((cmd, idx) => {
-                    const t = cmd.type;
-                    const upper = t.toUpperCase();
-                    const isRel = t !== upper;
-                    const p = cmd.params;
-                    const startX = cx, startY = cy;
-                    let absParams = [];
-                    const points = []; // { role: 'anchor'|'cp1'|'cp2', x, y, paramIdxX, paramIdxY }
+            const endInfo = document.createElement("span");
+            endInfo.className = "text-[11px] font-mono text-slate-500 dark:text-slate-400";
+            endInfo.textContent = `→ (${roundNum(g.endX, 2)}, ${roundNum(g.endY, 2)})`;
 
-                    if (upper === 'M') {
-                        const x = isRel ? cx + p[0] : p[0];
-                        const y = isRel ? cy + p[1] : p[1];
-                        absParams = [x, y];
-                        cx = x; cy = y; sx = x; sy = y;
-                        points.push({ role: 'move', x, y, px: 0, py: 1 });
-                    } else if (upper === 'L') {
-                        const x = isRel ? cx + p[0] : p[0];
-                        const y = isRel ? cy + p[1] : p[1];
-                        absParams = [x, y];
-                        cx = x; cy = y;
-                        points.push({ role: 'anchor', x, y, px: 0, py: 1 });
-                    } else if (upper === 'H') {
-                        const x = isRel ? cx + p[0] : p[0];
-                        absParams = [x];
-                        cx = x;
-                        points.push({ role: 'anchor', x, y: cy, px: 0, py: null });
-                    } else if (upper === 'V') {
-                        const y = isRel ? cy + p[0] : p[0];
-                        absParams = [y];
-                        cy = y;
-                        points.push({ role: 'anchor', x: cx, y, px: null, py: 0 });
-                    } else if (upper === 'C') {
-                        const x1 = isRel ? cx + p[0] : p[0];
-                        const y1 = isRel ? cy + p[1] : p[1];
-                        const x2 = isRel ? cx + p[2] : p[2];
-                        const y2 = isRel ? cy + p[3] : p[3];
-                        const x = isRel ? cx + p[4] : p[4];
-                        const y = isRel ? cy + p[5] : p[5];
-                        absParams = [x1, y1, x2, y2, x, y];
-                        points.push({ role: 'cp1', x: x1, y: y1, px: 0, py: 1, linkX: startX, linkY: startY });
-                        points.push({ role: 'cp2', x: x2, y: y2, px: 2, py: 3, linkX: x, linkY: y });
-                        points.push({ role: 'anchor', x, y, px: 4, py: 5 });
-                        lastCpX = x2; lastCpY = y2;
-                        cx = x; cy = y;
-                    } else if (upper === 'S') {
-                        const rx1 = (lastCmdType === 'C' || lastCmdType === 'S') && lastCpX !== null ? 2 * cx - lastCpX : cx;
-                        const ry1 = (lastCmdType === 'C' || lastCmdType === 'S') && lastCpY !== null ? 2 * cy - lastCpY : cy;
-                        const x2 = isRel ? cx + p[0] : p[0];
-                        const y2 = isRel ? cy + p[1] : p[1];
-                        const x = isRel ? cx + p[2] : p[2];
-                        const y = isRel ? cy + p[3] : p[3];
-                        absParams = [x2, y2, x, y];
-                        points.push({ role: 'cp2', x: x2, y: y2, px: 0, py: 1, linkX: x, linkY: y, reflected: { x: rx1, y: ry1 } });
-                        points.push({ role: 'anchor', x, y, px: 2, py: 3 });
-                        lastCpX = x2; lastCpY = y2;
-                        cx = x; cy = y;
-                    } else if (upper === 'Q') {
-                        const x1 = isRel ? cx + p[0] : p[0];
-                        const y1 = isRel ? cy + p[1] : p[1];
-                        const x = isRel ? cx + p[2] : p[2];
-                        const y = isRel ? cy + p[3] : p[3];
-                        absParams = [x1, y1, x, y];
-                        points.push({ role: 'cp1', x: x1, y: y1, px: 0, py: 1, linkX: startX, linkY: startY, link2X: x, link2Y: y });
-                        points.push({ role: 'anchor', x, y, px: 2, py: 3 });
-                        lastCpX = x1; lastCpY = y1;
-                        cx = x; cy = y;
-                    } else if (upper === 'T') {
-                        const rx1 = (lastCmdType === 'Q' || lastCmdType === 'T') && lastCpX !== null ? 2 * cx - lastCpX : cx;
-                        const ry1 = (lastCmdType === 'Q' || lastCmdType === 'T') && lastCpY !== null ? 2 * cy - lastCpY : cy;
-                        const x = isRel ? cx + p[0] : p[0];
-                        const y = isRel ? cy + p[1] : p[1];
-                        absParams = [x, y];
-                        points.push({ role: 'anchor', x, y, px: 0, py: 1, reflected: { x: rx1, y: ry1 } });
-                        lastCpX = rx1; lastCpY = ry1;
-                        cx = x; cy = y;
-                    } else if (upper === 'A') {
-                        const x = isRel ? cx + p[5] : p[5];
-                        const y = isRel ? cy + p[6] : p[6];
-                        absParams = [p[0], p[1], p[2], p[3], p[4], x, y];
-                        points.push({ role: 'anchor', x, y, px: 5, py: 6 });
-                        cx = x; cy = y;
-                    } else if (upper === 'Z') {
-                        cx = sx; cy = sy;
-                    }
+            left.appendChild(idxSpan);
+            left.appendChild(badge);
+            left.appendChild(endInfo);
 
-                    if (upper !== 'C' && upper !== 'S' && upper !== 'Q' && upper !== 'T') {
-                        lastCpX = null; lastCpY = null;
-                    }
-                    lastCmdType = upper;
-
-                    return {
-                        index: idx,
-                        type: t,
-                        upper,
-                        isRel,
-                        params: p,
-                        absParams,
-                        startX,
-                        startY,
-                        endX: cx,
-                        endY: cy,
-                        points
-                    };
-                });
-            }
-
-            // =========================================================================
-            // SERIALIZER & OPTIMIZER
-            // =========================================================================
-            function serializeReadable(commands) {
-                return commands.map(c => c.params.length ? c.type + ' ' + c.params.join(' ') : c.type).join('\n');
-            }
-
-            function serializeParamsTight(params, precision, stripLeadingZero, isArc) {
-                let out = '';
-                for (let i = 0; i < params.length; i++) {
-                    let token;
-                    if (isArc && (i === 3 || i === 4)) {
-                        token = String(params[i] ? 1 : 0);
-                    } else {
-                        token = formatNumber(params[i], precision, stripLeadingZero);
-                    }
-                    if (i === 0) {
-                        out += token;
-                    } else {
-                        // Can omit space if token starts with '-' or if (token starts with '.' and prev token already has '.')
-                        const prev = out[out.length - 1];
-                        const prevHasDot = /\d*\.\d*$/.test(out);
-                        const canOmitSpace = token.startsWith('-') || (token.startsWith('.') && prevHasDot) || (isArc && (i === 4 || i === 5) && (out.endsWith('0') || out.endsWith('1')) && (i === 4));
-                        if (canOmitSpace && !isArc) {
-                            out += token;
-                        } else if (token.startsWith('-')) {
-                            out += token;
-                        } else {
-                            out += ' ' + token;
-                        }
-                    }
-                }
-                return out;
-            }
-
-            function optimizeCommands(rawCommands) {
-                if (!rawCommands.length) return '';
-                const geo = computeAbsoluteGeometry(rawCommands);
-                const prec = state.precision;
-                const minify = state.optMinify;
-
-                const outCmds = [];
-                for (let i = 0; i < geo.length; i++) {
-                    const g = geo[i];
-                    let upper = g.upper;
-                    let absP = g.absParams.slice();
-
-                    // 1. Remove redundant zero-length L / H / V moves
-                    if (state.optRedundant && (upper === 'L' || upper === 'H' || upper === 'V')) {
-                        const dx = roundNum(g.endX - g.startX, prec);
-                        const dy = roundNum(g.endY - g.startY, prec);
-                        if (dx === 0 && dy === 0) continue;
-                    }
-
-                    // 2. Convert L to H or V if axis-aligned
-                    if (state.optHV && upper === 'L') {
-                        const dx = roundNum(g.endX - g.startX, prec);
-                        const dy = roundNum(g.endY - g.startY, prec);
-                        if (dy === 0 && dx !== 0) {
-                            upper = 'H';
-                            absP = [g.endX];
-                        } else if (dx === 0 && dy !== 0) {
-                            upper = 'V';
-                            absP = [g.endY];
-                        }
-                    }
-
-                    // Compute relative params from absP
-                    let relP = null;
-                    if (upper === 'Z') {
-                        outCmds.push({ type: 'Z', params: [] });
-                        continue;
-                    } else if (upper === 'M' || upper === 'L' || upper === 'T') {
-                        relP = [absP[0] - g.startX, absP[1] - g.startY];
-                    } else if (upper === 'H') {
-                        relP = [absP[0] - g.startX];
-                    } else if (upper === 'V') {
-                        relP = [absP[0] - g.startY];
-                    } else if (upper === 'C') {
-                        relP = [
-                            absP[0] - g.startX, absP[1] - g.startY,
-                            absP[2] - g.startX, absP[3] - g.startY,
-                            absP[4] - g.startX, absP[5] - g.startY
-                        ];
-                    } else if (upper === 'S' || upper === 'Q') {
-                        relP = [
-                            absP[0] - g.startX, absP[1] - g.startY,
-                            absP[2] - g.startX, absP[3] - g.startY
-                        ];
-                    } else if (upper === 'A') {
-                        relP = [absP[0], absP[1], absP[2], absP[3], absP[4], absP[5] - g.startX, absP[6] - g.startY];
-                    }
-
-                    const isArc = upper === 'A';
-                    const absStr = serializeParamsTight(absP, prec, minify, isArc);
-                    const relStr = serializeParamsTight(relP, prec, minify, isArc);
-
-                    let chosenType = upper;
-                    let chosenParams = absP;
-                    if (i === 0 && upper === 'M') {
-                        chosenType = 'M';
-                        chosenParams = absP;
-                    } else if (state.coordMode === 'relative') {
-                        chosenType = upper.toLowerCase();
-                        chosenParams = relP;
-                    } else if (state.coordMode === 'absolute') {
-                        chosenType = upper;
-                        chosenParams = absP;
-                    } else {
-                        // Auto shortest
-                        if (relStr.length < absStr.length) {
-                            chosenType = upper.toLowerCase();
-                            chosenParams = relP;
-                        }
-                    }
-
-                    outCmds.push({ type: chosenType, params: chosenParams, str: serializeParamsTight(chosenParams, prec, minify, isArc) });
-                }
-
-                // Build final string, collapsing repeated command letters if enabled
-                let result = '';
-                let prevType = '';
-                for (let i = 0; i < outCmds.length; i++) {
-                    const c = outCmds[i];
-                    if (c.type === 'Z' || c.type === 'z') {
-                        result += c.type;
-                        prevType = c.type;
-                        continue;
-                    }
-                    const canCollapse = state.optCollapse && prevType === c.type && c.type !== 'M' && c.type !== 'm';
-                    if (canCollapse) {
-                        result += (c.str.startsWith('-') ? '' : ' ') + c.str;
-                    } else {
-                        result += c.type + c.str;
-                    }
-                    prevType = c.type;
-                }
-                return result;
-            }
-
-            // =========================================================================
-            // RENDERING & UI SYNC
-            // =========================================================================
-            function updateAll(skipTextareaUpdate) {
-                if (!skipTextareaUpdate) {
-                    el.pathInput.value = state.rawPath;
-                }
-
-                const extracted = extractPathFromSvgText(state.rawPath);
-                let parsed = [];
-                try {
-                    parsed = parseSvgPath(extracted);
-                    state.commands = parsed;
-                    el.parseErrorBox.classList.add('hidden');
-                    el.parseErrorBox.textContent = '';
-                } catch (err) {
-                    el.parseErrorBox.textContent = err.message;
-                    el.parseErrorBox.classList.remove('hidden');
-                    return;
-                }
-
-                el.cmdCountBadge.textContent = parsed.length;
-
-                // Render SVG Path
-                const dStr = parsed.map(c => c.type + (c.params.length ? ' ' + c.params.join(' ') : '')).join(' ');
-                el.renderedPath.setAttribute('d', dStr);
-                el.renderedPath.setAttribute('stroke', state.strokeColor);
-                el.renderedPath.setAttribute('stroke-width', String(state.strokeWidth));
-                el.renderedPath.setAttribute('fill', state.showFill ? state.strokeColor + '33' : 'none');
-
-                // Highlighted Segment
-                const geo = computeAbsoluteGeometry(parsed);
-                if (state.selectedCmdIndex >= 0 && state.selectedCmdIndex < geo.length) {
-                    const sel = geo[state.selectedCmdIndex];
-                    const segD = sel.upper === 'Z'
-                        ? `M ${sel.startX} ${sel.startY} L ${sel.endX} ${sel.endY}`
-                        : `M ${sel.startX} ${sel.startY} ${sel.type} ${sel.params.join(' ')}`;
-                    el.highlightSegment.setAttribute('d', segD);
-                    el.highlightSegment.setAttribute('stroke-width', String(Math.max(state.strokeWidth * 1.8, 2 / state.view.zoom)));
-                } else {
-                    el.highlightSegment.setAttribute('d', '');
-                }
-
-                // Stats & Optimizer
-                const optimized = optimizeCommands(parsed);
-                el.optimizedOutput.value = optimized;
-                const origLen = new Blob([state.rawPath.trim()]).size;
-                const optLen = new Blob([optimized]).size;
-                el.origBytesStat.textContent = origLen + ' B';
-                el.optBytesStat.textContent = optLen + ' B';
-                const savedPct = origLen > 0 ? Math.round(((origLen - optLen) / origLen) * 100) : 0;
-                el.savingsBadge.textContent = (savedPct >= 0 ? savedPct : 0) + '% saved';
-
-                try {
-                    const totalLen = el.renderedPath.getTotalLength();
-                    el.pathLengthStat.textContent = totalLen.toFixed(1);
-                } catch (_) {
-                    el.pathLengthStat.textContent = '0';
-                }
-
-                renderInspector(geo);
-                renderCanvasOverlays(geo);
-            }
-
-            function renderInspector(geo) {
-                const frag = document.createDocumentFragment();
-                geo.forEach((g) => {
-                    const isSel = g.index === state.selectedCmdIndex;
-                    const card = document.createElement('div');
-                    card.className = `rounded-lg border p-2 transition cursor-pointer ${isSel
-                        ? 'border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/40'
-                        : 'border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 hover:border-slate-300 dark:hover:border-slate-700'
-                        }`;
-
-                    const header = document.createElement('div');
-                    header.className = 'flex items-center justify-between gap-2';
-
-                    const left = document.createElement('div');
-                    left.className = 'flex items-center gap-2';
-                    const idxSpan = document.createElement('span');
-                    idxSpan.className = 'text-[10px] font-mono text-slate-400 w-4';
-                    idxSpan.textContent = g.index;
-
-                    const badge = document.createElement('span');
-                    const badgeColor = g.upper === 'M'
-                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
-                        : (g.upper === 'C' || g.upper === 'S' || g.upper === 'Q' || g.upper === 'T')
-                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400'
-                            : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400';
-                    badge.className = `font-mono text-xs font-semibold px-1.5 py-0.5 rounded ${badgeColor}`;
-                    badge.textContent = g.type;
-
-                    const endInfo = document.createElement('span');
-                    endInfo.className = 'text-[11px] font-mono text-slate-500 dark:text-slate-400';
-                    endInfo.textContent = `→ (${roundNum(g.endX, 2)}, ${roundNum(g.endY, 2)})`;
-
-                    left.appendChild(idxSpan);
-                    left.appendChild(badge);
-                    left.appendChild(endInfo);
-
-                    const delBtn = document.createElement('button');
-                    delBtn.type = 'button';
-                    delBtn.title = 'Delete command';
-                    delBtn.className = 'text-slate-400 hover:text-rose-500 text-xs px-1';
-                    delBtn.textContent = '✕';
-                    delBtn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        state.commands.splice(g.index, 1);
-                        if (state.selectedCmdIndex === g.index) state.selectedCmdIndex = -1;
-                        state.rawPath = serializeReadable(state.commands);
-                        updateAll(false);
-                    });
-
-                    header.appendChild(left);
-                    header.appendChild(delBtn);
-                    card.appendChild(header);
-
-                    if (g.params.length > 0) {
-                        const paramsRow = document.createElement('div');
-                        paramsRow.className = 'flex flex-wrap gap-1.5 mt-2';
-                        g.params.forEach((val, pIdx) => {
-                            const inp = document.createElement('input');
-                            inp.type = 'number';
-                            inp.step = 'any';
-                            inp.value = roundNum(val, 3);
-                            inp.className = 'w-14 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 py-0.5 font-mono text-[11px] text-center focus:outline-none focus:ring-1 focus:ring-indigo-500';
-                            inp.addEventListener('click', (e) => e.stopPropagation());
-                            inp.addEventListener('change', (e) => {
-                                const n = parseFloat(e.target.value);
-                                if (!Number.isNaN(n)) {
-                                    state.commands[g.index].params[pIdx] = n;
-                                    state.rawPath = serializeReadable(state.commands);
-                                    updateAll(false);
-                                }
-                            });
-                            paramsRow.appendChild(inp);
-                        });
-                        card.appendChild(paramsRow);
-                    }
-
-                    card.addEventListener('click', () => {
-                        state.selectedCmdIndex = state.selectedCmdIndex === g.index ? -1 : g.index;
-                        updateAll(true);
-                    });
-
-                    frag.appendChild(card);
-                });
-                el.commandList.innerHTML = '';
-                el.commandList.appendChild(frag);
-            }
-
-            function applyViewportTransform() {
-                const { panX, panY, zoom } = state.view;
-                el.viewportGroup.setAttribute('transform', `translate(${panX}, ${panY}) scale(${zoom})`);
-                el.zoomLabel.textContent = Math.round(zoom * 100) + '%';
-            }
-
-            function renderCanvasOverlays(geo) {
-                applyViewportTransform();
-                const invZoom = 1 / state.view.zoom;
-
-                // Grid & Origin Axes
-                el.gridLayer.innerHTML = '';
-                if (state.showGrid) {
-                    const axisX = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                    axisX.setAttribute('x1', '-5000'); axisX.setAttribute('y1', '0');
-                    axisX.setAttribute('x2', '5000'); axisX.setAttribute('y2', '0');
-                    axisX.setAttribute('stroke', 'rgba(148,163,184,0.35)');
-                    axisX.setAttribute('stroke-width', String(1 * invZoom));
-
-                    const axisY = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                    axisY.setAttribute('x1', '0'); axisY.setAttribute('y1', '-5000');
-                    axisY.setAttribute('x2', '0'); axisY.setAttribute('y2', '5000');
-                    axisY.setAttribute('stroke', 'rgba(148,163,184,0.35)');
-                    axisY.setAttribute('stroke-width', String(1 * invZoom));
-
-                    el.gridLayer.appendChild(axisX);
-                    el.gridLayer.appendChild(axisY);
-                }
-
-                // Bounding Box
-                el.bboxLayer.innerHTML = '';
-                try {
-                    const bbox = el.renderedPath.getBBox();
-                    el.bboxCoords.textContent = `${roundNum(bbox.width, 1)} × ${roundNum(bbox.height, 1)} @ (${roundNum(bbox.x, 1)}, ${roundNum(bbox.y, 1)})`;
-                    if (state.showBBox && (bbox.width > 0 || bbox.height > 0)) {
-                        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-                        rect.setAttribute('x', bbox.x);
-                        rect.setAttribute('y', bbox.y);
-                        rect.setAttribute('width', bbox.width);
-                        rect.setAttribute('height', bbox.height);
-                        rect.setAttribute('fill', 'none');
-                        rect.setAttribute('stroke', '#38bdf8');
-                        rect.setAttribute('stroke-width', String(1 * invZoom));
-                        rect.setAttribute('stroke-dasharray', `${4 * invZoom} ${3 * invZoom}`);
-                        el.bboxLayer.appendChild(rect);
-                    }
-                } catch (_) {
-                    el.bboxCoords.textContent = '0 × 0';
-                }
-
-                // Control Points & Handles
-                el.handlesLayer.innerHTML = '';
-                if (!state.showPoints) return;
-
-                geo.forEach((g) => {
-                    g.points.forEach((pt) => {
-                        if (pt.linkX !== undefined) {
-                            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                            line.setAttribute('x1', pt.x);
-                            line.setAttribute('y1', pt.y);
-                            line.setAttribute('x2', pt.linkX);
-                            line.setAttribute('y2', pt.linkY);
-                            line.setAttribute('stroke', '#fbbf24');
-                            line.setAttribute('stroke-width', String(1 * invZoom));
-                            line.setAttribute('stroke-dasharray', `${3 * invZoom} ${2 * invZoom}`);
-                            line.setAttribute('opacity', '0.75');
-                            el.handlesLayer.appendChild(line);
-                        }
-                        if (pt.link2X !== undefined) {
-                            const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                            line2.setAttribute('x1', pt.x);
-                            line2.setAttribute('y1', pt.y);
-                            line2.setAttribute('x2', pt.link2X);
-                            line2.setAttribute('y2', pt.link2Y);
-                            line2.setAttribute('stroke', '#fbbf24');
-                            line2.setAttribute('stroke-width', String(1 * invZoom));
-                            line2.setAttribute('stroke-dasharray', `${3 * invZoom} ${2 * invZoom}`);
-                            line2.setAttribute('opacity', '0.75');
-                            el.handlesLayer.appendChild(line2);
-                        }
-
-                        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                        circle.setAttribute('cx', pt.x);
-                        circle.setAttribute('cy', pt.y);
-                        const isCp = pt.role === 'cp1' || pt.role === 'cp2';
-                        const radius = (isCp ? 4 : 5) * invZoom;
-                        circle.setAttribute('r', String(radius));
-                        circle.setAttribute('fill', pt.role === 'move' ? '#10b981' : isCp ? '#fbbf24' : '#6366f1');
-                        circle.setAttribute('stroke', '#ffffff');
-                        circle.setAttribute('stroke-width', String(1.5 * invZoom));
-                        circle.classList.add('handle-point');
-
-                        circle.addEventListener('mousedown', (e) => {
-                            e.stopPropagation();
-                            state.selectedCmdIndex = g.index;
-                            state.drag = {
-                                type: 'point',
-                                cmdIndex: g.index,
-                                isRel: g.isRel,
-                                startX: g.startX,
-                                startY: g.startY,
-                                px: pt.px,
-                                py: pt.py
-                            };
-                        });
-
-                        el.handlesLayer.appendChild(circle);
-                    });
-                });
-            }
-
-            function fitViewToPath() {
-                try {
-                    const bbox = el.renderedPath.getBBox();
-                    const rect = el.mainSvg.getBoundingClientRect();
-                    if (!rect.width || !rect.height) return;
-                    if (bbox.width === 0 && bbox.height === 0) {
-                        state.view = { panX: rect.width / 2, panY: rect.height / 2, zoom: 10 };
-                    } else {
-                        const padding = 0.72;
-                        const scaleX = (rect.width * padding) / Math.max(bbox.width, 1);
-                        const scaleY = (rect.height * padding) / Math.max(bbox.height, 1);
-                        const zoom = Math.min(Math.max(Math.min(scaleX, scaleY), 0.2), 60);
-                        const cx = bbox.x + bbox.width / 2;
-                        const cy = bbox.y + bbox.height / 2;
-                        state.view.zoom = zoom;
-                        state.view.panX = rect.width / 2 - cx * zoom;
-                        state.view.panY = rect.height / 2 - cy * zoom;
-                    }
-                    renderCanvasOverlays(computeAbsoluteGeometry(state.commands));
-                } catch (_) { }
-            }
-
-            // =========================================================================
-            // TRANSFORMS
-            // =========================================================================
-            function transformAllCommands(fn) {
-                const geo = computeAbsoluteGeometry(state.commands);
-                const newCmds = geo.map((g) => {
-                    const t = g.upper;
-                    if (t === 'Z') return { type: 'Z', params: [] };
-                    const p = g.absParams.slice();
-                    if (t === 'M' || t === 'L' || t === 'T') {
-                        const pt = fn(p[0], p[1]);
-                        return { type: t, params: [pt.x, pt.y] };
-                    }
-                    if (t === 'H') {
-                        const pt = fn(p[0], g.startY);
-                        return { type: 'H', params: [pt.x] };
-                    }
-                    if (t === 'V') {
-                        const pt = fn(g.startX, p[0]);
-                        return { type: 'V', params: [pt.y] };
-                    }
-                    if (t === 'C') {
-                        const p1 = fn(p[0], p[1]);
-                        const p2 = fn(p[2], p[3]);
-                        const p3 = fn(p[4], p[5]);
-                        return { type: 'C', params: [p1.x, p1.y, p2.x, p2.y, p3.x, p3.y] };
-                    }
-                    if (t === 'S' || t === 'Q') {
-                        const p1 = fn(p[0], p[1]);
-                        const p2 = fn(p[2], p[3]);
-                        return { type: t, params: [p1.x, p1.y, p2.x, p2.y] };
-                    }
-                    if (t === 'A') {
-                        const end = fn(p[5], p[6]);
-                        return { type: 'A', params: [p[0], p[1], p[2], p[3], p[4], end.x, end.y] };
-                    }
-                    return { type: g.type, params: g.params };
-                });
-                state.commands = newCmds;
-                state.rawPath = serializeReadable(newCmds);
-                updateAll(false);
-                fitViewToPath();
-            }
-
-            // =========================================================================
-            // EVENT LISTENERS
-            // =========================================================================
-            el.pathInput.addEventListener('input', (e) => {
-                state.rawPath = e.target.value;
-                updateAll(true);
+            const delBtn = document.createElement("button");
+            delBtn.type = "button";
+            delBtn.title = "Delete command";
+            delBtn.className = "text-slate-400 hover:text-rose-500 text-xs px-1";
+            delBtn.textContent = "✕";
+            delBtn.addEventListener("click", (e) => {
+              e.stopPropagation();
+              state.commands.splice(g.index, 1);
+              if (state.selectedCmdIndex === g.index) state.selectedCmdIndex = -1;
+              state.rawPath = serializeReadable(state.commands);
+              updateAll(false);
             });
 
-            el.presetSelect.addEventListener('change', (e) => {
-                const key = e.target.value;
-                if (PRESETS[key]) {
-                    state.rawPath = PRESETS[key];
-                    state.selectedCmdIndex = -1;
-                    updateAll(false);
-                    fitViewToPath();
-                }
-            });
+            header.appendChild(left);
+            header.appendChild(delBtn);
+            card.appendChild(header);
 
-            el.svgFileInput.addEventListener('change', (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = () => {
-                    const text = String(reader.result || '');
-                    const extracted = extractPathFromSvgText(text);
-                    state.rawPath = extracted;
-                    updateAll(false);
-                    fitViewToPath();
-                    showToast('SVG path imported');
-                };
-                reader.readAsText(file);
-                e.target.value = '';
-            });
-
-            el.themeToggleBtn.addEventListener('click', () => {
-                const html = document.documentElement;
-                const isDark = html.classList.toggle('dark');
-                el.canvasContainer.classList.toggle('canvas-grid-dark', isDark);
-                el.canvasContainer.classList.toggle('canvas-grid-light', !isDark);
-                try { localStorage.setItem('svg_viz_theme', isDark ? 'dark' : 'light'); } catch (_) { }
-            });
-
-            el.formatReadableBtn.addEventListener('click', () => {
-                state.rawPath = serializeReadable(state.commands);
-                updateAll(false);
-                showToast('Formatted path');
-            });
-
-            el.copyRawBtn.addEventListener('click', () => copyText(el.pathInput.value.trim(), 'Path d'));
-            el.clearPathBtn.addEventListener('click', () => {
-                state.rawPath = '';
-                state.commands = [];
-                state.selectedCmdIndex = -1;
-                updateAll(false);
-            });
-
-            // Tabs
-            document.querySelectorAll('.tab-btn').forEach((btn) => {
-                btn.addEventListener('click', () => {
-                    const target = btn.dataset.tab;
-                    document.querySelectorAll('.tab-btn').forEach((b) => {
-                        const active = b.dataset.tab === target;
-                        b.classList.toggle('border-indigo-500', active);
-                        b.classList.toggle('text-indigo-600', active);
-                        b.classList.toggle('dark:text-indigo-400', active);
-                        b.classList.toggle('bg-white', active);
-                        b.classList.toggle('dark:bg-slate-900', active);
-                        b.classList.toggle('border-transparent', !active);
-                        b.classList.toggle('text-slate-500', !active);
-                    });
-                    document.querySelectorAll('.tab-panel').forEach((p) => {
-                        p.classList.toggle('hidden', p.id !== 'tab-' + target);
-                    });
-                });
-            });
-
-            // Optimizer controls
-            el.precisionRange.addEventListener('input', (e) => {
-                state.precision = parseInt(e.target.value, 10);
-                el.precisionVal.textContent = state.precision;
-                updateAll(true);
-            });
-
-            document.querySelectorAll('.coord-mode-btn').forEach((btn) => {
-                btn.addEventListener('click', () => {
-                    state.coordMode = btn.dataset.mode;
-                    document.querySelectorAll('.coord-mode-btn').forEach((b) => {
-                        const active = b.dataset.mode === state.coordMode;
-                        b.className = active
-                            ? 'coord-mode-btn py-1.5 px-2 rounded-lg border border-indigo-500 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-medium'
-                            : 'coord-mode-btn py-1.5 px-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800';
-                    });
-                    updateAll(true);
-                });
-            });
-
-            [
-                [el.optHV, 'optHV'],
-                [el.optRedundant, 'optRedundant'],
-                [el.optMinify, 'optMinify'],
-                [el.optCollapse, 'optCollapse']
-            ].forEach(([checkbox, key]) => {
-                checkbox.addEventListener('change', (e) => {
-                    state[key] = e.target.checked;
-                    updateAll(true);
-                });
-            });
-
-            el.applyOptBtn.addEventListener('click', () => {
-                if (!el.optimizedOutput.value) return;
-                state.rawPath = el.optimizedOutput.value;
-                updateAll(false);
-                showToast('Applied optimized path');
-            });
-
-            el.copyOptBtn.addEventListener('click', () => copyText(el.optimizedOutput.value, 'Optimized d'));
-
-            function buildFullSvgString() {
-                let vb = '0 0 24 24';
-                try {
-                    const b = el.renderedPath.getBBox();
-                    if (b.width > 0 || b.height > 0) {
-                        const pad = Math.max(b.width, b.height) * 0.1;
-                        vb = `${roundNum(b.x - pad, 2)} ${roundNum(b.y - pad, 2)} ${roundNum(b.width + pad * 2, 2)} ${roundNum(b.height + pad * 2, 2)}`;
-                    }
-                } catch (_) { }
-                const d = el.optimizedOutput.value || el.pathInput.value.trim();
-                const fill = state.showFill ? state.strokeColor : 'none';
-                return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}" fill="${fill}" stroke="${state.strokeColor}" stroke-width="${state.strokeWidth}" stroke-linecap="round" stroke-linejoin="round">\n  <path d="${d}" />\n</svg>`;
-            }
-
-            el.copySvgBtn.addEventListener('click', () => copyText(buildFullSvgString(), '<svg> markup'));
-            el.downloadSvgBtn.addEventListener('click', () => {
-                const blob = new Blob([buildFullSvgString()], { type: 'image/svg+xml' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'optimized-path.svg';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                showToast('Downloaded optimized-path.svg');
-            });
-
-            el.convertAllAbsBtn.addEventListener('click', () => transformAllCommands((x, y) => ({ x, y })));
-
-            // Transform actions
-            el.applyTranslateBtn.addEventListener('click', () => {
-                const dx = parseFloat(el.txInput.value) || 0;
-                const dy = parseFloat(el.tyInput.value) || 0;
-                transformAllCommands((x, y) => ({ x: roundNum(x + dx, 3), y: roundNum(y + dy, 3) }));
-                showToast('Translated path');
-            });
-
-            el.applyScaleBtn.addEventListener('click', () => {
-                const sx = parseFloat(el.sxInput.value) || 1;
-                const sy = parseFloat(el.syInput.value) || 1;
-                transformAllCommands((x, y) => ({ x: roundNum(x * sx, 3), y: roundNum(y * sy, 3) }));
-                showToast('Scaled path');
-            });
-
-            el.flipHBtn.addEventListener('click', () => {
-                const b = el.renderedPath.getBBox();
-                const midX = b.x + b.width / 2;
-                transformAllCommands((x, y) => ({ x: roundNum(2 * midX - x, 3), y }));
-                showToast('Flipped horizontally');
-            });
-
-            el.flipVBtn.addEventListener('click', () => {
-                const b = el.renderedPath.getBBox();
-                const midY = b.y + b.height / 2;
-                transformAllCommands((x, y) => ({ x, y: roundNum(2 * midY - y, 3) }));
-                showToast('Flipped vertically');
-            });
-
-            el.normalizeOriginBtn.addEventListener('click', () => {
-                const b = el.renderedPath.getBBox();
-                transformAllCommands((x, y) => ({ x: roundNum(x - b.x, 3), y: roundNum(y - b.y, 3) }));
-                showToast('Moved to (0, 0)');
-            });
-
-            el.roundIntsBtn.addEventListener('click', () => {
-                transformAllCommands((x, y) => ({ x: Math.round(x), y: Math.round(y) }));
-                showToast('Rounded to integers');
-            });
-
-            // Canvas Visual Toggles
-            el.toggleGrid.addEventListener('change', (e) => { state.showGrid = e.target.checked; updateAll(true); });
-            el.togglePoints.addEventListener('change', (e) => { state.showPoints = e.target.checked; updateAll(true); });
-            el.toggleBBox.addEventListener('change', (e) => { state.showBBox = e.target.checked; updateAll(true); });
-            el.toggleFill.addEventListener('change', (e) => { state.showFill = e.target.checked; updateAll(true); });
-            el.strokeColor.addEventListener('input', (e) => { state.strokeColor = e.target.value; updateAll(true); });
-            el.strokeWidth.addEventListener('input', (e) => {
-                const w = parseFloat(e.target.value);
-                if (!Number.isNaN(w) && w > 0) {
-                    state.strokeWidth = w;
-                    updateAll(true);
-                }
-            });
-
-            el.zoomInBtn.addEventListener('click', () => {
-                const rect = el.mainSvg.getBoundingClientRect();
-                zoomAt(rect.width / 2, rect.height / 2, 1.25);
-            });
-            el.zoomOutBtn.addEventListener('click', () => {
-                const rect = el.mainSvg.getBoundingClientRect();
-                zoomAt(rect.width / 2, rect.height / 2, 0.8);
-            });
-            el.fitViewBtn.addEventListener('click', fitViewToPath);
-
-            function zoomAt(clientX, clientY, factor) {
-                const oldZoom = state.view.zoom;
-                const newZoom = Math.min(Math.max(oldZoom * factor, 0.2), 80);
-                const worldX = (clientX - state.view.panX) / oldZoom;
-                const worldY = (clientY - state.view.panY) / oldZoom;
-                state.view.zoom = newZoom;
-                state.view.panX = clientX - worldX * newZoom;
-                state.view.panY = clientY - worldY * newZoom;
-                renderCanvasOverlays(computeAbsoluteGeometry(state.commands));
-            }
-
-            el.mainSvg.addEventListener('wheel', (e) => {
-                e.preventDefault();
-                const rect = el.mainSvg.getBoundingClientRect();
-                const factor = e.deltaY < 0 ? 1.12 : 0.89;
-                zoomAt(e.clientX - rect.left, e.clientY - rect.top, factor);
-            }, { passive: false });
-
-            el.mainSvg.addEventListener('mousedown', (e) => {
-                state.drag = {
-                    type: 'pan',
-                    startClientX: e.clientX,
-                    startClientY: e.clientY,
-                    origPanX: state.view.panX,
-                    origPanY: state.view.panY
-                };
-            });
-
-            window.addEventListener('mousemove', (e) => {
-                const rect = el.mainSvg.getBoundingClientRect();
-                const wx = (e.clientX - rect.left - state.view.panX) / state.view.zoom;
-                const wy = (e.clientY - rect.top - state.view.panY) / state.view.zoom;
-                el.cursorCoords.textContent = `${roundNum(wx, 1)}, ${roundNum(wy, 1)}`;
-
-                if (!state.drag) return;
-                if (state.drag.type === 'pan') {
-                    state.view.panX = state.drag.origPanX + (e.clientX - state.drag.startClientX);
-                    state.view.panY = state.drag.origPanY + (e.clientY - state.drag.startClientY);
-                    applyViewportTransform();
-                } else if (state.drag.type === 'point') {
-                    const d = state.drag;
-                    const cmd = state.commands[d.cmdIndex];
-                    if (!cmd) return;
-                    const nx = roundNum(wx, 2);
-                    const ny = roundNum(wy, 2);
-                    if (d.px !== null) {
-                        cmd.params[d.px] = d.isRel ? roundNum(nx - d.startX, 2) : nx;
-                    }
-                    if (d.py !== null) {
-                        cmd.params[d.py] = d.isRel ? roundNum(ny - d.startY, 2) : ny;
-                    }
+            if (g.params.length > 0) {
+              const paramsRow = document.createElement("div");
+              paramsRow.className = "flex flex-wrap gap-1.5 mt-2";
+              g.params.forEach((val, pIdx) => {
+                const inp = document.createElement("input");
+                inp.type = "number";
+                inp.step = "any";
+                inp.value = roundNum(val, 3);
+                inp.className = "w-14 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 py-0.5 font-mono text-[11px] text-center focus:outline-none focus:ring-1 focus:ring-indigo-500";
+                inp.addEventListener("click", (e) => e.stopPropagation());
+                inp.addEventListener("change", (e) => {
+                  const n = parseFloat(e.target.value);
+                  if (!Number.isNaN(n)) {
+                    state.commands[g.index].params[pIdx] = n;
                     state.rawPath = serializeReadable(state.commands);
                     updateAll(false);
-                }
+                  }
+                });
+                paramsRow.appendChild(inp);
+              });
+              card.appendChild(paramsRow);
+            }
+
+            card.addEventListener("click", () => {
+              state.selectedCmdIndex = state.selectedCmdIndex === g.index ? -1 : g.index;
+              updateAll(true);
             });
 
-            window.addEventListener('mouseup', () => {
-                state.drag = null;
+            frag.appendChild(card);
+          });
+          el.commandList.innerHTML = "";
+          el.commandList.appendChild(frag);
+        }
+
+        function applyViewportTransform() {
+          const { panX, panY, zoom } = state.view;
+          el.viewportGroup.setAttribute("transform", `translate(${panX}, ${panY}) scale(${zoom})`);
+          el.zoomLabel.textContent = Math.round(zoom * 100) + "%";
+        }
+
+        function renderCanvasOverlays(geo) {
+          applyViewportTransform();
+          const invZoom = 1 / state.view.zoom;
+
+          // Grid & Origin Axes
+          el.gridLayer.innerHTML = "";
+          if (state.showGrid) {
+            const axisX = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            axisX.setAttribute("x1", "-5000");
+            axisX.setAttribute("y1", "0");
+            axisX.setAttribute("x2", "5000");
+            axisX.setAttribute("y2", "0");
+            axisX.setAttribute("stroke", "rgba(148,163,184,0.35)");
+            axisX.setAttribute("stroke-width", String(1 * invZoom));
+
+            const axisY = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            axisY.setAttribute("x1", "0");
+            axisY.setAttribute("y1", "-5000");
+            axisY.setAttribute("x2", "0");
+            axisY.setAttribute("y2", "5000");
+            axisY.setAttribute("stroke", "rgba(148,163,184,0.35)");
+            axisY.setAttribute("stroke-width", String(1 * invZoom));
+
+            el.gridLayer.appendChild(axisX);
+            el.gridLayer.appendChild(axisY);
+          }
+
+          // Bounding Box
+          el.bboxLayer.innerHTML = "";
+          try {
+            const bbox = el.renderedPath.getBBox();
+            el.bboxCoords.textContent = `${roundNum(bbox.width, 1)} × ${roundNum(bbox.height, 1)} @ (${roundNum(bbox.x, 1)}, ${roundNum(bbox.y, 1)})`;
+            if (state.showBBox && (bbox.width > 0 || bbox.height > 0)) {
+              const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+              rect.setAttribute("x", bbox.x);
+              rect.setAttribute("y", bbox.y);
+              rect.setAttribute("width", bbox.width);
+              rect.setAttribute("height", bbox.height);
+              rect.setAttribute("fill", "none");
+              rect.setAttribute("stroke", "#38bdf8");
+              rect.setAttribute("stroke-width", String(1 * invZoom));
+              rect.setAttribute("stroke-dasharray", `${4 * invZoom} ${3 * invZoom}`);
+              el.bboxLayer.appendChild(rect);
+            }
+          } catch (_) {
+            el.bboxCoords.textContent = "0 × 0";
+          }
+
+          // Control Points & Handles
+          el.handlesLayer.innerHTML = "";
+          if (!state.showPoints) return;
+
+          geo.forEach((g) => {
+            g.points.forEach((pt) => {
+              if (pt.linkX !== undefined) {
+                const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                line.setAttribute("x1", pt.x);
+                line.setAttribute("y1", pt.y);
+                line.setAttribute("x2", pt.linkX);
+                line.setAttribute("y2", pt.linkY);
+                line.setAttribute("stroke", "#fbbf24");
+                line.setAttribute("stroke-width", String(1 * invZoom));
+                line.setAttribute("stroke-dasharray", `${3 * invZoom} ${2 * invZoom}`);
+                line.setAttribute("opacity", "0.75");
+                el.handlesLayer.appendChild(line);
+              }
+              if (pt.link2X !== undefined) {
+                const line2 = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                line2.setAttribute("x1", pt.x);
+                line2.setAttribute("y1", pt.y);
+                line2.setAttribute("x2", pt.link2X);
+                line2.setAttribute("y2", pt.link2Y);
+                line2.setAttribute("stroke", "#fbbf24");
+                line2.setAttribute("stroke-width", String(1 * invZoom));
+                line2.setAttribute("stroke-dasharray", `${3 * invZoom} ${2 * invZoom}`);
+                line2.setAttribute("opacity", "0.75");
+                el.handlesLayer.appendChild(line2);
+              }
+
+              const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+              circle.setAttribute("cx", pt.x);
+              circle.setAttribute("cy", pt.y);
+              const isCp = pt.role === "cp1" || pt.role === "cp2";
+              const radius = (isCp ? 4 : 5) * invZoom;
+              circle.setAttribute("r", String(radius));
+              circle.setAttribute("fill", pt.role === "move" ? "#10b981" : isCp ? "#fbbf24" : "#6366f1");
+              circle.setAttribute("stroke", "#ffffff");
+              circle.setAttribute("stroke-width", String(1.5 * invZoom));
+              circle.classList.add("handle-point");
+
+              circle.addEventListener("mousedown", (e) => {
+                e.stopPropagation();
+                state.selectedCmdIndex = g.index;
+                state.drag = {
+                  type: "point",
+                  cmdIndex: g.index,
+                  isRel: g.isRel,
+                  startX: g.startX,
+                  startY: g.startY,
+                  px: pt.px,
+                  py: pt.py
+                };
+              });
+
+              el.handlesLayer.appendChild(circle);
             });
+          });
+        }
 
-            window.addEventListener('resize', () => {
-                renderCanvasOverlays(computeAbsoluteGeometry(state.commands));
-            });
+        function fitViewToPath() {
+          try {
+            const bbox = el.renderedPath.getBBox();
+            const rect = el.mainSvg.getBoundingClientRect();
+            if (!rect.width || !rect.height) return;
+            if (bbox.width === 0 && bbox.height === 0) {
+              state.view = { panX: rect.width / 2, panY: rect.height / 2, zoom: 10 };
+            } else {
+              const padding = 0.72;
+              const scaleX = (rect.width * padding) / Math.max(bbox.width, 1);
+              const scaleY = (rect.height * padding) / Math.max(bbox.height, 1);
+              const zoom = Math.min(Math.max(Math.min(scaleX, scaleY), 0.2), 60);
+              const cx = bbox.x + bbox.width / 2;
+              const cy = bbox.y + bbox.height / 2;
+              state.view.zoom = zoom;
+              state.view.panX = rect.width / 2 - cx * zoom;
+              state.view.panY = rect.height / 2 - cy * zoom;
+            }
+            renderCanvasOverlays(computeAbsoluteGeometry(state.commands));
+          } catch (_) {}
+        }
 
-            // =========================================================================
-            // INIT
-            // =========================================================================
-            try {
-                const isDark = document.documentElement.classList.contains('dark');
-                el.canvasContainer.classList.toggle('canvas-grid-dark', isDark);
-                el.canvasContainer.classList.toggle('canvas-grid-light', !isDark);
-            } catch (_) { }
+        // =========================================================================
+        // TRANSFORMS
+        // =========================================================================
+        function transformAllCommands(fn) {
+          const geo = computeAbsoluteGeometry(state.commands);
+          const newCmds = geo.map((g) => {
+            const t = g.upper;
+            if (t === "Z") return { type: "Z", params: [] };
+            const p = g.absParams.slice();
+            if (t === "M" || t === "L" || t === "T") {
+              const pt = fn(p[0], p[1]);
+              return { type: t, params: [pt.x, pt.y] };
+            }
+            if (t === "H") {
+              const pt = fn(p[0], g.startY);
+              return { type: "H", params: [pt.x] };
+            }
+            if (t === "V") {
+              const pt = fn(g.startX, p[0]);
+              return { type: "V", params: [pt.y] };
+            }
+            if (t === "C") {
+              const p1 = fn(p[0], p[1]);
+              const p2 = fn(p[2], p[3]);
+              const p3 = fn(p[4], p[5]);
+              return { type: "C", params: [p1.x, p1.y, p2.x, p2.y, p3.x, p3.y] };
+            }
+            if (t === "S" || t === "Q") {
+              const p1 = fn(p[0], p[1]);
+              const p2 = fn(p[2], p[3]);
+              return { type: t, params: [p1.x, p1.y, p2.x, p2.y] };
+            }
+            if (t === "A") {
+              const end = fn(p[5], p[6]);
+              return { type: "A", params: [p[0], p[1], p[2], p[3], p[4], end.x, end.y] };
+            }
+            return { type: g.type, params: g.params };
+          });
+          state.commands = newCmds;
+          state.rawPath = serializeReadable(newCmds);
+          updateAll(false);
+          fitViewToPath();
+        }
 
+        // =========================================================================
+        // EVENT LISTENERS
+        // =========================================================================
+        el.pathInput.addEventListener("input", (e) => {
+          state.rawPath = e.target.value;
+          updateAll(true);
+        });
+
+        el.presetSelect.addEventListener("change", (e) => {
+          const key = e.target.value;
+          if (PRESETS[key]) {
+            state.rawPath = PRESETS[key];
+            state.selectedCmdIndex = -1;
             updateAll(false);
-            setTimeout(fitViewToPath, 30);
-        })();
-    </script>
-</body>
+            fitViewToPath();
+          }
+        });
 
+        el.svgFileInput.addEventListener("change", (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            const text = String(reader.result || "");
+            const extracted = extractPathFromSvgText(text);
+            state.rawPath = extracted;
+            updateAll(false);
+            fitViewToPath();
+            showToast("SVG path imported");
+          };
+          reader.readAsText(file);
+          e.target.value = "";
+        });
+
+        el.themeToggleBtn.addEventListener("click", () => {
+          const html = document.documentElement;
+          const isDark = html.classList.toggle("dark");
+          el.canvasContainer.classList.toggle("canvas-grid-dark", isDark);
+          el.canvasContainer.classList.toggle("canvas-grid-light", !isDark);
+          try {
+            localStorage.setItem("svg_viz_theme", isDark ? "dark" : "light");
+          } catch (_) {}
+        });
+
+        el.formatReadableBtn.addEventListener("click", () => {
+          state.rawPath = serializeReadable(state.commands);
+          updateAll(false);
+          showToast("Formatted path");
+        });
+
+        el.copyRawBtn.addEventListener("click", () => copyText(el.pathInput.value.trim(), "Path d"));
+        el.clearPathBtn.addEventListener("click", () => {
+          state.rawPath = "";
+          state.commands = [];
+          state.selectedCmdIndex = -1;
+          updateAll(false);
+        });
+
+        // Tabs
+        document.querySelectorAll(".tab-btn").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const target = btn.dataset.tab;
+            document.querySelectorAll(".tab-btn").forEach((b) => {
+              const active = b.dataset.tab === target;
+              b.classList.toggle("border-indigo-500", active);
+              b.classList.toggle("text-indigo-600", active);
+              b.classList.toggle("dark:text-indigo-400", active);
+              b.classList.toggle("bg-white", active);
+              b.classList.toggle("dark:bg-slate-900", active);
+              b.classList.toggle("border-transparent", !active);
+              b.classList.toggle("text-slate-500", !active);
+            });
+            document.querySelectorAll(".tab-panel").forEach((p) => {
+              p.classList.toggle("hidden", p.id !== "tab-" + target);
+            });
+          });
+        });
+
+        // Optimizer controls
+        el.precisionRange.addEventListener("input", (e) => {
+          state.precision = parseInt(e.target.value, 10);
+          el.precisionVal.textContent = state.precision;
+          updateAll(true);
+        });
+
+        document.querySelectorAll(".coord-mode-btn").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            state.coordMode = btn.dataset.mode;
+            document.querySelectorAll(".coord-mode-btn").forEach((b) => {
+              const active = b.dataset.mode === state.coordMode;
+              b.className = active ? "coord-mode-btn py-1.5 px-2 rounded-lg border border-indigo-500 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-medium" : "coord-mode-btn py-1.5 px-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800";
+            });
+            updateAll(true);
+          });
+        });
+
+        [
+          [el.optHV, "optHV"],
+          [el.optRedundant, "optRedundant"],
+          [el.optMinify, "optMinify"],
+          [el.optCollapse, "optCollapse"]
+        ].forEach(([checkbox, key]) => {
+          checkbox.addEventListener("change", (e) => {
+            state[key] = e.target.checked;
+            updateAll(true);
+          });
+        });
+
+        el.applyOptBtn.addEventListener("click", () => {
+          if (!el.optimizedOutput.value) return;
+          state.rawPath = el.optimizedOutput.value;
+          updateAll(false);
+          showToast("Applied optimized path");
+        });
+
+        el.copyOptBtn.addEventListener("click", () => copyText(el.optimizedOutput.value, "Optimized d"));
+
+        function buildFullSvgString() {
+          let vb = "0 0 24 24";
+          try {
+            const b = el.renderedPath.getBBox();
+            if (b.width > 0 || b.height > 0) {
+              const pad = Math.max(b.width, b.height) * 0.1;
+              vb = `${roundNum(b.x - pad, 2)} ${roundNum(b.y - pad, 2)} ${roundNum(b.width + pad * 2, 2)} ${roundNum(b.height + pad * 2, 2)}`;
+            }
+          } catch (_) {}
+          const d = el.optimizedOutput.value || el.pathInput.value.trim();
+          const fill = state.showFill ? state.strokeColor : "none";
+          return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}" fill="${fill}" stroke="${state.strokeColor}" stroke-width="${state.strokeWidth}" stroke-linecap="round" stroke-linejoin="round">\n  <path d="${d}" />\n</svg>`;
+        }
+
+        el.copySvgBtn.addEventListener("click", () => copyText(buildFullSvgString(), "<svg> markup"));
+        el.downloadSvgBtn.addEventListener("click", () => {
+          const blob = new Blob([buildFullSvgString()], { type: "image/svg+xml" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "optimized-path.svg";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          showToast("Downloaded optimized-path.svg");
+        });
+
+        el.convertAllAbsBtn.addEventListener("click", () => transformAllCommands((x, y) => ({ x, y })));
+
+        // Transform actions
+        el.applyTranslateBtn.addEventListener("click", () => {
+          const dx = parseFloat(el.txInput.value) || 0;
+          const dy = parseFloat(el.tyInput.value) || 0;
+          transformAllCommands((x, y) => ({ x: roundNum(x + dx, 3), y: roundNum(y + dy, 3) }));
+          showToast("Translated path");
+        });
+
+        el.applyScaleBtn.addEventListener("click", () => {
+          const sx = parseFloat(el.sxInput.value) || 1;
+          const sy = parseFloat(el.syInput.value) || 1;
+          transformAllCommands((x, y) => ({ x: roundNum(x * sx, 3), y: roundNum(y * sy, 3) }));
+          showToast("Scaled path");
+        });
+
+        el.flipHBtn.addEventListener("click", () => {
+          const b = el.renderedPath.getBBox();
+          const midX = b.x + b.width / 2;
+          transformAllCommands((x, y) => ({ x: roundNum(2 * midX - x, 3), y }));
+          showToast("Flipped horizontally");
+        });
+
+        el.flipVBtn.addEventListener("click", () => {
+          const b = el.renderedPath.getBBox();
+          const midY = b.y + b.height / 2;
+          transformAllCommands((x, y) => ({ x, y: roundNum(2 * midY - y, 3) }));
+          showToast("Flipped vertically");
+        });
+
+        el.normalizeOriginBtn.addEventListener("click", () => {
+          const b = el.renderedPath.getBBox();
+          transformAllCommands((x, y) => ({ x: roundNum(x - b.x, 3), y: roundNum(y - b.y, 3) }));
+          showToast("Moved to (0, 0)");
+        });
+
+        el.roundIntsBtn.addEventListener("click", () => {
+          transformAllCommands((x, y) => ({ x: Math.round(x), y: Math.round(y) }));
+          showToast("Rounded to integers");
+        });
+
+        // Canvas Visual Toggles
+        el.toggleGrid.addEventListener("change", (e) => {
+          state.showGrid = e.target.checked;
+          updateAll(true);
+        });
+        el.togglePoints.addEventListener("change", (e) => {
+          state.showPoints = e.target.checked;
+          updateAll(true);
+        });
+        el.toggleBBox.addEventListener("change", (e) => {
+          state.showBBox = e.target.checked;
+          updateAll(true);
+        });
+        el.toggleFill.addEventListener("change", (e) => {
+          state.showFill = e.target.checked;
+          updateAll(true);
+        });
+        el.strokeColor.addEventListener("input", (e) => {
+          state.strokeColor = e.target.value;
+          updateAll(true);
+        });
+        el.strokeWidth.addEventListener("input", (e) => {
+          const w = parseFloat(e.target.value);
+          if (!Number.isNaN(w) && w > 0) {
+            state.strokeWidth = w;
+            updateAll(true);
+          }
+        });
+
+        el.zoomInBtn.addEventListener("click", () => {
+          const rect = el.mainSvg.getBoundingClientRect();
+          zoomAt(rect.width / 2, rect.height / 2, 1.25);
+        });
+        el.zoomOutBtn.addEventListener("click", () => {
+          const rect = el.mainSvg.getBoundingClientRect();
+          zoomAt(rect.width / 2, rect.height / 2, 0.8);
+        });
+        el.fitViewBtn.addEventListener("click", fitViewToPath);
+
+        function zoomAt(clientX, clientY, factor) {
+          const oldZoom = state.view.zoom;
+          const newZoom = Math.min(Math.max(oldZoom * factor, 0.2), 80);
+          const worldX = (clientX - state.view.panX) / oldZoom;
+          const worldY = (clientY - state.view.panY) / oldZoom;
+          state.view.zoom = newZoom;
+          state.view.panX = clientX - worldX * newZoom;
+          state.view.panY = clientY - worldY * newZoom;
+          renderCanvasOverlays(computeAbsoluteGeometry(state.commands));
+        }
+
+        el.mainSvg.addEventListener(
+          "wheel",
+          (e) => {
+            e.preventDefault();
+            const rect = el.mainSvg.getBoundingClientRect();
+            const factor = e.deltaY < 0 ? 1.12 : 0.89;
+            zoomAt(e.clientX - rect.left, e.clientY - rect.top, factor);
+          },
+          { passive: false }
+        );
+
+        el.mainSvg.addEventListener("mousedown", (e) => {
+          state.drag = {
+            type: "pan",
+            startClientX: e.clientX,
+            startClientY: e.clientY,
+            origPanX: state.view.panX,
+            origPanY: state.view.panY
+          };
+        });
+
+        window.addEventListener("mousemove", (e) => {
+          const rect = el.mainSvg.getBoundingClientRect();
+          const wx = (e.clientX - rect.left - state.view.panX) / state.view.zoom;
+          const wy = (e.clientY - rect.top - state.view.panY) / state.view.zoom;
+          el.cursorCoords.textContent = `${roundNum(wx, 1)}, ${roundNum(wy, 1)}`;
+
+          if (!state.drag) return;
+          if (state.drag.type === "pan") {
+            state.view.panX = state.drag.origPanX + (e.clientX - state.drag.startClientX);
+            state.view.panY = state.drag.origPanY + (e.clientY - state.drag.startClientY);
+            applyViewportTransform();
+          } else if (state.drag.type === "point") {
+            const d = state.drag;
+            const cmd = state.commands[d.cmdIndex];
+            if (!cmd) return;
+            const nx = roundNum(wx, 2);
+            const ny = roundNum(wy, 2);
+            if (d.px !== null) {
+              cmd.params[d.px] = d.isRel ? roundNum(nx - d.startX, 2) : nx;
+            }
+            if (d.py !== null) {
+              cmd.params[d.py] = d.isRel ? roundNum(ny - d.startY, 2) : ny;
+            }
+            state.rawPath = serializeReadable(state.commands);
+            updateAll(false);
+          }
+        });
+
+        window.addEventListener("mouseup", () => {
+          state.drag = null;
+        });
+
+        window.addEventListener("resize", () => {
+          renderCanvasOverlays(computeAbsoluteGeometry(state.commands));
+        });
+
+        // =========================================================================
+        // INIT
+        // =========================================================================
+        try {
+          const isDark = document.documentElement.classList.contains("dark");
+          el.canvasContainer.classList.toggle("canvas-grid-dark", isDark);
+          el.canvasContainer.classList.toggle("canvas-grid-light", !isDark);
+        } catch (_) {}
+
+        updateAll(false);
+        setTimeout(fitViewToPath, 30);
+      })();
+    </script>
+  </body>
 </html>

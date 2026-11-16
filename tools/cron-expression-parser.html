@@ -1,949 +1,874 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en" class="dark">
-
-<head>
+  <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cron Expression Parser &amp; Next-Run Simulator</title>
     <script>
-      (function() {
-        var t = localStorage.getItem('cron_sim_theme');
-        if (t === 'light') document.documentElement.classList.remove('dark');
-        else if (!t && window.matchMedia('(prefers-color-scheme: light)').matches) document.documentElement.classList.remove('dark');
+      (function () {
+        var t = localStorage.getItem("cron_sim_theme");
+        if (t === "light") document.documentElement.classList.remove("dark");
+        else if (!t && window.matchMedia("(prefers-color-scheme: light)").matches) document.documentElement.classList.remove("dark");
       })();
     </script>
     <script src="https://cdn.tailwindcss.com/3.4.17"></script>
     <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-                        mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace']
-                    }
-                }
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ["Inter", "system-ui", "-apple-system", "sans-serif"],
+              mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"]
             }
-        };
+          }
+        }
+      };
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
-        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <style>
-        * {
-            box-sizing: border-box;
-        }
+      * {
+        box-sizing: border-box;
+      }
 
-        .custom-scroll::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
+      .custom-scroll::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
 
-        .custom-scroll::-webkit-scrollbar-track {
-            background: transparent;
-        }
+      .custom-scroll::-webkit-scrollbar-track {
+        background: transparent;
+      }
 
-        .custom-scroll::-webkit-scrollbar-thumb {
-            background: rgba(148, 163, 184, 0.35);
-            border-radius: 9999px;
-        }
+      .custom-scroll::-webkit-scrollbar-thumb {
+        background: rgba(148, 163, 184, 0.35);
+        border-radius: 9999px;
+      }
 
-        .custom-scroll::-webkit-scrollbar-thumb:hover {
-            background: rgba(148, 163, 184, 0.55);
-        }
+      .custom-scroll::-webkit-scrollbar-thumb:hover {
+        background: rgba(148, 163, 184, 0.55);
+      }
     </style>
-</head>
+  </head>
 
-<body
-    class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans antialiased min-h-screen flex flex-col">
-
+  <body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans antialiased min-h-screen flex flex-col">
     <!-- Header -->
-    <header
-        class="border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur px-4 py-3 flex flex-wrap items-center justify-between gap-3 sticky top-0 z-20">
-        <div class="flex items-center gap-2.5">
-            <div class="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow-sm">
-                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                    stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="9" />
-                    <polyline points="12 7 12 12 15.5 14" />
-                </svg>
-            </div>
-            <div>
-                <h1 class="text-sm sm:text-base font-semibold tracking-tight leading-none">Cron Expression Parser &amp;
-                    Next-Run Simulator</h1>
-                <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Parse, visually build, and simulate
-                    upcoming cron execution schedules</p>
-            </div>
+    <header class="border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur px-4 py-3 flex flex-wrap items-center justify-between gap-3 sticky top-0 z-20">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow-sm">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9" />
+            <polyline points="12 7 12 12 15.5 14" />
+          </svg>
         </div>
-
-        <div class="flex flex-wrap items-center gap-2">
-            <select id="presetSelect"
-                class="text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                <option value="0 9 * * 1-5">Weekdays at 9:00 AM (0 9 * * 1-5)</option>
-                <option value="* * * * *">Every Minute (* * * * *)</option>
-                <option value="*/5 * * * *">Every 5 Minutes (*/5 * * * *)</option>
-                <option value="0 * * * *">Hourly at :00 (0 * * * *)</option>
-                <option value="0 0 * * *">Daily at Midnight (0 0 * * *)</option>
-                <option value="30 3 * * 0">Sundays at 3:30 AM (30 3 * * 0)</option>
-                <option value="0 0 1 * *">Monthly on 1st (0 0 1 * *)</option>
-                <option value="0 0 1 1,4,7,10 *">Quarterly (0 0 1 1,4,7,10 *)</option>
-            </select>
-
-            <button id="themeToggleBtn" type="button" title="Toggle Dark/Light Theme"
-                class="p-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition">
-                <svg class="w-4 h-4 hidden dark:block text-amber-400" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="5" />
-                    <line x1="12" y1="1" x2="12" y2="3" />
-                    <line x1="12" y1="21" x2="12" y2="23" />
-                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                    <line x1="1" y1="12" x2="3" y2="12" />
-                    <line x1="21" y1="12" x2="23" y2="12" />
-                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-                </svg>
-                <svg class="w-4 h-4 block dark:hidden text-slate-700" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2">
-                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                </svg>
-            </button>
+        <div>
+          <h1 class="text-sm sm:text-base font-semibold tracking-tight leading-none">Cron Expression Parser &amp; Next-Run Simulator</h1>
+          <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Parse, visually build, and simulate upcoming cron execution schedules</p>
         </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <select id="presetSelect" class="text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500">
+          <option value="0 9 * * 1-5">Weekdays at 9:00 AM (0 9 * * 1-5)</option>
+          <option value="* * * * *">Every Minute (* * * * *)</option>
+          <option value="*/5 * * * *">Every 5 Minutes (*/5 * * * *)</option>
+          <option value="0 * * * *">Hourly at :00 (0 * * * *)</option>
+          <option value="0 0 * * *">Daily at Midnight (0 0 * * *)</option>
+          <option value="30 3 * * 0">Sundays at 3:30 AM (30 3 * * 0)</option>
+          <option value="0 0 1 * *">Monthly on 1st (0 0 1 * *)</option>
+          <option value="0 0 1 1,4,7,10 *">Quarterly (0 0 1 1,4,7,10 *)</option>
+        </select>
+
+        <button id="themeToggleBtn" type="button" title="Toggle Dark/Light Theme" class="p-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition">
+          <svg class="w-4 h-4 hidden dark:block text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5" />
+            <line x1="12" y1="1" x2="12" y2="3" />
+            <line x1="12" y1="21" x2="12" y2="23" />
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+            <line x1="1" y1="12" x2="3" y2="12" />
+            <line x1="21" y1="12" x2="23" y2="12" />
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+          </svg>
+          <svg class="w-4 h-4 block dark:hidden text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+          </svg>
+        </button>
+      </div>
     </header>
 
     <!-- Main Content -->
     <main class="flex-1 max-w-7xl w-full mx-auto p-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
+      <!-- Left Column: Expression Input, Human Summary, Visual Field Builder -->
+      <section class="lg:col-span-7 space-y-4">
+        <!-- Cron Input Card -->
+        <div class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <label for="cronInput" class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Cron Expression (5-Field Standard or @Macro)</label>
+            <div class="flex items-center gap-1.5">
+              <button id="copyCronBtn" type="button" class="text-xs font-medium px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition">Copy Expression</button>
+              <button id="resetCronBtn" type="button" class="text-xs font-medium px-2.5 py-1 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition">Reset</button>
+            </div>
+          </div>
 
-        <!-- Left Column: Expression Input, Human Summary, Visual Field Builder -->
-        <section class="lg:col-span-7 space-y-4">
+          <input id="cronInput" type="text" spellcheck="false" autocomplete="off" value="0 9 * * 1-5" class="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-4 py-3 font-mono text-xl sm:text-2xl font-bold tracking-widest text-center text-emerald-600 dark:text-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
 
-            <!-- Cron Input Card -->
-            <div
-                class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm space-y-3">
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                    <label for="cronInput"
-                        class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Cron
-                        Expression (5-Field Standard or @Macro)</label>
-                    <div class="flex items-center gap-1.5">
-                        <button id="copyCronBtn" type="button"
-                            class="text-xs font-medium px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition">Copy
-                            Expression</button>
-                        <button id="resetCronBtn" type="button"
-                            class="text-xs font-medium px-2.5 py-1 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition">Reset</button>
-                    </div>
+          <!-- 5 Field Labels -->
+          <div id="fieldBadgesRow" class="grid grid-cols-5 gap-1.5 text-center"></div>
+
+          <!-- Human-Readable Summary -->
+          <div id="humanSummaryBox" class="rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/60 px-3.5 py-2.5 text-sm font-medium text-emerald-900 dark:text-emerald-200 text-center"></div>
+
+          <!-- Error Box -->
+          <div id="errorBox" class="hidden rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 px-3.5 py-2 text-xs text-rose-700 dark:text-rose-300"></div>
+
+          <!-- Quick Macros -->
+          <div class="flex flex-wrap items-center gap-1.5 pt-1 text-[11px]">
+            <span class="text-slate-500 dark:text-slate-400 mr-1">Macros:</span>
+            <button type="button" data-macro="@hourly" class="macro-btn px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 font-mono">@hourly</button>
+            <button type="button" data-macro="@daily" class="macro-btn px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 font-mono">@daily</button>
+            <button type="button" data-macro="@weekly" class="macro-btn px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 font-mono">@weekly</button>
+            <button type="button" data-macro="@monthly" class="macro-btn px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 font-mono">@monthly</button>
+            <button type="button" data-macro="@yearly" class="macro-btn px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 font-mono">@yearly</button>
+          </div>
+        </div>
+
+        <!-- Visual Field Builder -->
+        <div class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
+          <div class="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 grid grid-cols-5 text-xs font-medium">
+            <button type="button" data-field="0" class="builder-tab py-2.5 text-center border-b-2 border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-white dark:bg-slate-900">Minute</button>
+            <button type="button" data-field="1" class="builder-tab py-2.5 text-center border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">Hour</button>
+            <button type="button" data-field="2" class="builder-tab py-2.5 text-center border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">Day (Mo)</button>
+            <button type="button" data-field="3" class="builder-tab py-2.5 text-center border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">Month</button>
+            <button type="button" data-field="4" class="builder-tab py-2.5 text-center border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">Weekday</button>
+          </div>
+
+          <div class="p-4 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="flex flex-wrap items-center gap-1.5 text-xs">
+                <button id="modeEveryBtn" type="button" class="px-2.5 py-1 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium">Every (*)</button>
+                <div class="inline-flex items-center gap-1 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-0.5">
+                  <span class="text-slate-500">Every</span>
+                  <input id="stepInput" type="number" min="1" max="59" value="5" class="w-10 bg-transparent font-mono text-center focus:outline-none" />
+                  <button id="applyStepBtn" type="button" class="text-emerald-600 dark:text-emerald-400 font-semibold hover:underline">Apply</button>
                 </div>
-
-                <input id="cronInput" type="text" spellcheck="false" autocomplete="off" value="0 9 * * 1-5"
-                    class="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-4 py-3 font-mono text-xl sm:text-2xl font-bold tracking-widest text-center text-emerald-600 dark:text-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-
-                <!-- 5 Field Labels -->
-                <div id="fieldBadgesRow" class="grid grid-cols-5 gap-1.5 text-center"></div>
-
-                <!-- Human-Readable Summary -->
-                <div id="humanSummaryBox"
-                    class="rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/60 px-3.5 py-2.5 text-sm font-medium text-emerald-900 dark:text-emerald-200 text-center">
+                <div class="inline-flex items-center gap-1 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-0.5">
+                  <input id="rangeStartInput" type="number" value="1" class="w-9 bg-transparent font-mono text-center focus:outline-none" />
+                  <span class="text-slate-400">to</span>
+                  <input id="rangeEndInput" type="number" value="5" class="w-9 bg-transparent font-mono text-center focus:outline-none" />
+                  <button id="applyRangeBtn" type="button" class="text-emerald-600 dark:text-emerald-400 font-semibold hover:underline">Range</button>
                 </div>
-
-                <!-- Error Box -->
-                <div id="errorBox"
-                    class="hidden rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 px-3.5 py-2 text-xs text-rose-700 dark:text-rose-300">
-                </div>
-
-                <!-- Quick Macros -->
-                <div class="flex flex-wrap items-center gap-1.5 pt-1 text-[11px]">
-                    <span class="text-slate-500 dark:text-slate-400 mr-1">Macros:</span>
-                    <button type="button" data-macro="@hourly"
-                        class="macro-btn px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 font-mono">@hourly</button>
-                    <button type="button" data-macro="@daily"
-                        class="macro-btn px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 font-mono">@daily</button>
-                    <button type="button" data-macro="@weekly"
-                        class="macro-btn px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 font-mono">@weekly</button>
-                    <button type="button" data-macro="@monthly"
-                        class="macro-btn px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 font-mono">@monthly</button>
-                    <button type="button" data-macro="@yearly"
-                        class="macro-btn px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 font-mono">@yearly</button>
-                </div>
+              </div>
+              <span id="builderFieldHint" class="text-[11px] font-mono text-slate-400">Range: 0–59</span>
             </div>
 
-            <!-- Visual Field Builder -->
-            <div
-                class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
-                <div
-                    class="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 grid grid-cols-5 text-xs font-medium">
-                    <button type="button" data-field="0"
-                        class="builder-tab py-2.5 text-center border-b-2 border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-white dark:bg-slate-900">Minute</button>
-                    <button type="button" data-field="1"
-                        class="builder-tab py-2.5 text-center border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">Hour</button>
-                    <button type="button" data-field="2"
-                        class="builder-tab py-2.5 text-center border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">Day
-                        (Mo)</button>
-                    <button type="button" data-field="3"
-                        class="builder-tab py-2.5 text-center border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">Month</button>
-                    <button type="button" data-field="4"
-                        class="builder-tab py-2.5 text-center border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">Weekday</button>
-                </div>
+            <!-- Clickable Value Grid -->
+            <div id="valuePillGrid" class="grid grid-cols-6 sm:grid-cols-10 gap-1.5"></div>
+          </div>
+        </div>
 
-                <div class="p-4 space-y-3">
-                    <div class="flex flex-wrap items-center justify-between gap-2">
-                        <div class="flex flex-wrap items-center gap-1.5 text-xs">
-                            <button id="modeEveryBtn" type="button"
-                                class="px-2.5 py-1 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium">Every
-                                (*)</button>
-                            <div
-                                class="inline-flex items-center gap-1 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-0.5">
-                                <span class="text-slate-500">Every</span>
-                                <input id="stepInput" type="number" min="1" max="59" value="5"
-                                    class="w-10 bg-transparent font-mono text-center focus:outline-none" />
-                                <button id="applyStepBtn" type="button"
-                                    class="text-emerald-600 dark:text-emerald-400 font-semibold hover:underline">Apply</button>
-                            </div>
-                            <div
-                                class="inline-flex items-center gap-1 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-0.5">
-                                <input id="rangeStartInput" type="number" value="1"
-                                    class="w-9 bg-transparent font-mono text-center focus:outline-none" />
-                                <span class="text-slate-400">to</span>
-                                <input id="rangeEndInput" type="number" value="5"
-                                    class="w-9 bg-transparent font-mono text-center focus:outline-none" />
-                                <button id="applyRangeBtn" type="button"
-                                    class="text-emerald-600 dark:text-emerald-400 font-semibold hover:underline">Range</button>
-                            </div>
-                        </div>
-                        <span id="builderFieldHint" class="text-[11px] font-mono text-slate-400">Range: 0–59</span>
-                    </div>
+        <!-- 24-Hour Execution Density Bar -->
+        <div class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm space-y-2">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Daily 24-Hour Firing Window</span>
+            <span id="dailyCountLabel" class="font-mono text-slate-500 dark:text-slate-400">0 runs/day</span>
+          </div>
+          <div id="hourHeatmap" class="grid grid-cols-12 sm:grid-cols-24 gap-1"></div>
+        </div>
+      </section>
 
-                    <!-- Clickable Value Grid -->
-                    <div id="valuePillGrid" class="grid grid-cols-6 sm:grid-cols-10 gap-1.5"></div>
-                </div>
+      <!-- Right Column: Next-Run Simulator -->
+      <section class="lg:col-span-5 space-y-4">
+        <div class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm flex flex-col h-full space-y-3.5">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Next-Run Simulator</h2>
+            <button id="copyRunsBtn" type="button" class="text-[11px] font-medium px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition">Copy Schedule</button>
+          </div>
+
+          <!-- Simulator Controls -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+            <div>
+              <label for="tzSelect" class="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">Timezone</label>
+              <select id="tzSelect" class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                <option value="local">Local Browser Time</option>
+                <option value="UTC">UTC</option>
+                <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
+                <option value="America/New_York">America/New_York (ET)</option>
+                <option value="America/Los_Angeles">America/Los_Angeles (PT)</option>
+                <option value="Europe/London">Europe/London (UK)</option>
+                <option value="Asia/Tokyo">Asia/Tokyo (JST)</option>
+              </select>
             </div>
-
-            <!-- 24-Hour Execution Density Bar -->
-            <div
-                class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm space-y-2">
-                <div class="flex items-center justify-between text-xs">
-                    <span class="font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Daily
-                        24-Hour Firing Window</span>
-                    <span id="dailyCountLabel" class="font-mono text-slate-500 dark:text-slate-400">0 runs/day</span>
-                </div>
-                <div id="hourHeatmap" class="grid grid-cols-12 sm:grid-cols-24 gap-1"></div>
+            <div>
+              <label for="runCountSelect" class="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">Simulated Runs</label>
+              <select id="runCountSelect" class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                <option value="5">Next 5 runs</option>
+                <option value="10" selected>Next 10 runs</option>
+                <option value="20">Next 20 runs</option>
+                <option value="50">Next 50 runs</option>
+              </select>
             </div>
-        </section>
-
-        <!-- Right Column: Next-Run Simulator -->
-        <section class="lg:col-span-5 space-y-4">
-            <div
-                class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm flex flex-col h-full space-y-3.5">
-                <div class="flex items-center justify-between">
-                    <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                        Next-Run Simulator</h2>
-                    <button id="copyRunsBtn" type="button"
-                        class="text-[11px] font-medium px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition">Copy
-                        Schedule</button>
-                </div>
-
-                <!-- Simulator Controls -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-                    <div>
-                        <label for="tzSelect"
-                            class="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">Timezone</label>
-                        <select id="tzSelect"
-                            class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                            <option value="local">Local Browser Time</option>
-                            <option value="UTC">UTC</option>
-                            <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
-                            <option value="America/New_York">America/New_York (ET)</option>
-                            <option value="America/Los_Angeles">America/Los_Angeles (PT)</option>
-                            <option value="Europe/London">Europe/London (UK)</option>
-                            <option value="Asia/Tokyo">Asia/Tokyo (JST)</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label for="runCountSelect"
-                            class="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">Simulated Runs</label>
-                        <select id="runCountSelect"
-                            class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                            <option value="5">Next 5 runs</option>
-                            <option value="10" selected>Next 10 runs</option>
-                            <option value="20">Next 20 runs</option>
-                            <option value="50">Next 50 runs</option>
-                        </select>
-                    </div>
-                    <div class="sm:col-span-2">
-                        <div class="flex items-center justify-between mb-1">
-                            <label for="startTimeInput" class="text-[11px] text-slate-500 dark:text-slate-400">Simulate
-                                Starting From</label>
-                            <button id="nowBtn" type="button"
-                                class="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 hover:underline">Use
-                                Current Time</button>
-                        </div>
-                        <input id="startTimeInput" type="datetime-local"
-                            class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-2.5 py-1.5 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-                    </div>
-                </div>
-
-                <!-- Upcoming Runs List -->
-                <div id="runsList" class="flex-1 overflow-y-auto custom-scroll space-y-1.5 max-h-[460px] pr-1"></div>
+            <div class="sm:col-span-2">
+              <div class="flex items-center justify-between mb-1">
+                <label for="startTimeInput" class="text-[11px] text-slate-500 dark:text-slate-400">Simulate Starting From</label>
+                <button id="nowBtn" type="button" class="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 hover:underline">Use Current Time</button>
+              </div>
+              <input id="startTimeInput" type="datetime-local" class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-2.5 py-1.5 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500" />
             </div>
-        </section>
+          </div>
+
+          <!-- Upcoming Runs List -->
+          <div id="runsList" class="flex-1 overflow-y-auto custom-scroll space-y-1.5 max-h-[460px] pr-1"></div>
+        </div>
+      </section>
     </main>
 
     <!-- Toast -->
-    <div id="toast"
-        class="fixed bottom-4 right-4 z-50 px-3.5 py-2 rounded-lg bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-xs font-medium shadow-lg opacity-0 pointer-events-none transition-opacity duration-200">
-    </div>
+    <div id="toast" class="fixed bottom-4 right-4 z-50 px-3.5 py-2 rounded-lg bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-xs font-medium shadow-lg opacity-0 pointer-events-none transition-opacity duration-200"></div>
 
     <script>
-        (function () {
-            'use strict';
+      (function () {
+        "use strict";
 
-            const MACROS = {
-                '@yearly': '0 0 1 1 *',
-                '@annually': '0 0 1 1 *',
-                '@monthly': '0 0 1 * *',
-                '@weekly': '0 0 * * 0',
-                '@daily': '0 0 * * *',
-                '@midnight': '0 0 * * *',
-                '@hourly': '0 * * * *'
+        const MACROS = {
+          "@yearly": "0 0 1 1 *",
+          "@annually": "0 0 1 1 *",
+          "@monthly": "0 0 1 * *",
+          "@weekly": "0 0 * * 0",
+          "@daily": "0 0 * * *",
+          "@midnight": "0 0 * * *",
+          "@hourly": "0 * * * *"
+        };
+
+        const MONTH_NAMES = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+        const MONTH_FULL = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        const DOW_NAMES = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+        const DOW_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+        const FIELD_META = [
+          { name: "Minute", min: 0, max: 59, labels: null },
+          { name: "Hour", min: 0, max: 23, labels: null },
+          { name: "Day (Month)", min: 1, max: 31, labels: null },
+          { name: "Month", min: 1, max: 12, labels: MONTH_NAMES },
+          { name: "Weekday", min: 0, max: 6, labels: DOW_NAMES }
+        ];
+
+        const state = {
+          expression: "0 9 * * 1-5",
+          activeBuilderField: 0,
+          timezone: "local",
+          runCount: 10,
+          startDate: new Date(),
+          parsedFields: null,
+          simulatedRuns: []
+        };
+
+        const el = {
+          cronInput: document.getElementById("cronInput"),
+          presetSelect: document.getElementById("presetSelect"),
+          themeToggleBtn: document.getElementById("themeToggleBtn"),
+          copyCronBtn: document.getElementById("copyCronBtn"),
+          resetCronBtn: document.getElementById("resetCronBtn"),
+          fieldBadgesRow: document.getElementById("fieldBadgesRow"),
+          humanSummaryBox: document.getElementById("humanSummaryBox"),
+          errorBox: document.getElementById("errorBox"),
+          modeEveryBtn: document.getElementById("modeEveryBtn"),
+          stepInput: document.getElementById("stepInput"),
+          applyStepBtn: document.getElementById("applyStepBtn"),
+          rangeStartInput: document.getElementById("rangeStartInput"),
+          rangeEndInput: document.getElementById("rangeEndInput"),
+          applyRangeBtn: document.getElementById("applyRangeBtn"),
+          builderFieldHint: document.getElementById("builderFieldHint"),
+          valuePillGrid: document.getElementById("valuePillGrid"),
+          hourHeatmap: document.getElementById("hourHeatmap"),
+          dailyCountLabel: document.getElementById("dailyCountLabel"),
+          tzSelect: document.getElementById("tzSelect"),
+          runCountSelect: document.getElementById("runCountSelect"),
+          startTimeInput: document.getElementById("startTimeInput"),
+          nowBtn: document.getElementById("nowBtn"),
+          runsList: document.getElementById("runsList"),
+          copyRunsBtn: document.getElementById("copyRunsBtn"),
+          toast: document.getElementById("toast")
+        };
+
+        let toastTimer = null;
+        function showToast(msg) {
+          el.toast.textContent = msg;
+          el.toast.classList.remove("opacity-0");
+          el.toast.classList.add("opacity-100");
+          clearTimeout(toastTimer);
+          toastTimer = setTimeout(() => {
+            el.toast.classList.remove("opacity-100");
+            el.toast.classList.add("opacity-0");
+          }, 2000);
+        }
+
+        function copyText(text, label) {
+          if (!text) return;
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard
+              .writeText(text)
+              .then(() => showToast(label + " copied"))
+              .catch(() => fallbackCopy(text, label));
+          } else {
+            fallbackCopy(text, label);
+          }
+        }
+
+        function fallbackCopy(text, label) {
+          const ta = document.createElement("textarea");
+          ta.value = text;
+          ta.style.position = "fixed";
+          ta.style.opacity = "0";
+          document.body.appendChild(ta);
+          ta.select();
+          try {
+            document.execCommand("copy");
+            showToast(label + " copied");
+          } catch (_) {
+            showToast("Copy failed");
+          }
+          document.body.removeChild(ta);
+        }
+
+        function escapeHtml(str) {
+          return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+        }
+
+        // =========================================================================
+        // CRON PARSER
+        // =========================================================================
+        function normalizeToken(token, fieldIdx) {
+          let t = token.toUpperCase();
+          if (fieldIdx === 3) {
+            MONTH_NAMES.forEach((name, idx) => {
+              t = t.replace(new RegExp("\\b" + name + "\\b", "g"), String(idx + 1));
+            });
+          } else if (fieldIdx === 4) {
+            DOW_NAMES.forEach((name, idx) => {
+              t = t.replace(new RegExp("\\b" + name + "\\b", "g"), String(idx));
+            });
+          }
+          return t;
+        }
+
+        function parseField(raw, fieldIdx) {
+          const meta = FIELD_META[fieldIdx];
+          const min = meta.min;
+          const max = meta.max;
+          const normalized = normalizeToken(raw.trim(), fieldIdx);
+          if (!normalized) throw new Error(`${meta.name} field cannot be empty`);
+
+          const values = new Set();
+          const parts = normalized.split(",");
+
+          for (const part of parts) {
+            if (!part) throw new Error(`Invalid comma in ${meta.name}: "${raw}"`);
+            const stepSplit = part.split("/");
+            if (stepSplit.length > 2) throw new Error(`Invalid step syntax in ${meta.name}: "${part}"`);
+
+            const base = stepSplit[0];
+            const step = stepSplit.length === 2 ? parseInt(stepSplit[1], 10) : 1;
+            if (stepSplit.length === 2 && (Number.isNaN(step) || step < 1 || !/^\d+$/.test(stepSplit[1]))) {
+              throw new Error(`Invalid step value in ${meta.name}: "${stepSplit[1]}"`);
+            }
+
+            let start, end;
+            if (base === "*") {
+              start = min;
+              end = max;
+            } else if (base.includes("-")) {
+              const rangeParts = base.split("-");
+              if (rangeParts.length !== 2 || !/^\d+$/.test(rangeParts[0]) || !/^\d+$/.test(rangeParts[1])) {
+                throw new Error(`Invalid range in ${meta.name}: "${base}"`);
+              }
+              start = parseInt(rangeParts[0], 10);
+              end = parseInt(rangeParts[1], 10);
+              if (fieldIdx === 4 && start === 7) start = 0;
+              if (fieldIdx === 4 && end === 7) end = 0;
+              if (start < min || start > max || end < min || end > max || start > end) {
+                throw new Error(`Range out of bounds (${min}-${max}) in ${meta.name}: "${base}"`);
+              }
+            } else {
+              if (!/^\d+$/.test(base)) throw new Error(`Invalid token in ${meta.name}: "${base}"`);
+              let single = parseInt(base, 10);
+              if (fieldIdx === 4 && single === 7) single = 0;
+              if (single < min || single > max) {
+                throw new Error(`Value ${single} out of bounds (${min}-${max}) in ${meta.name}`);
+              }
+              if (stepSplit.length === 2) {
+                start = single;
+                end = max;
+              } else {
+                values.add(single);
+                continue;
+              }
+            }
+
+            for (let v = start; v <= end; v += step) {
+              values.add(v);
+            }
+          }
+
+          if (values.size === 0) throw new Error(`No valid values in ${meta.name}`);
+          return {
+            raw,
+            values,
+            isWildcard: raw.trim() === "*"
+          };
+        }
+
+        function parseCronExpression(expr) {
+          const trimmed = expr.trim();
+          if (!trimmed) throw new Error("Enter a 5-field cron expression or macro");
+          const expanded = MACROS[trimmed.toLowerCase()] || trimmed;
+          const parts = expanded.split(/\s+/);
+          if (parts.length !== 5) {
+            throw new Error(`Expected 5 space-separated fields (found ${parts.length})`);
+          }
+          return {
+            parts,
+            fields: parts.map((p, idx) => parseField(p, idx))
+          };
+        }
+
+        // =========================================================================
+        // HUMAN-READABLE DESCRIPTION
+        // =========================================================================
+        function formatList(arr, formatter) {
+          const items = arr.map(formatter);
+          if (items.length === 1) return items[0];
+          if (items.length === 2) return items[0] + " and " + items[1];
+          return items.slice(0, -1).join(", ") + ", and " + items[items.length - 1];
+        }
+
+        function describeCron(parsed) {
+          const [minF, hrF, domF, monF, dowF] = parsed.fields;
+          const mins = Array.from(minF.values).sort((a, b) => a - b);
+          const hrs = Array.from(hrF.values).sort((a, b) => a - b);
+
+          let timeDesc = "";
+          if (minF.isWildcard && hrF.isWildcard) {
+            timeDesc = "Every minute";
+          } else if (!minF.isWildcard && hrF.isWildcard && minF.raw.startsWith("*/")) {
+            timeDesc = `Every ${minF.raw.slice(2)} minutes`;
+          } else if (mins.length === 1 && hrs.length === 1) {
+            const h = hrs[0];
+            const m = String(mins[0]).padStart(2, "0");
+            const ampm = h >= 12 ? "PM" : "AM";
+            const h12 = h % 12 === 0 ? 12 : h % 12;
+            timeDesc = `At ${h12}:${m} ${ampm}`;
+          } else if (mins.length === 1 && hrF.isWildcard) {
+            timeDesc = `At minute :${String(mins[0]).padStart(2, "0")} past every hour`;
+          } else {
+            const minStr = minF.isWildcard ? "every minute" : "minute " + formatList(mins, (v) => String(v));
+            const hrStr = hrF.isWildcard ? "every hour" : "hour " + formatList(hrs, (v) => String(v));
+            timeDesc = `At ${minStr} past ${hrStr}`;
+          }
+
+          const clauses = [timeDesc];
+          if (!domF.isWildcard) {
+            const doms = Array.from(domF.values).sort((a, b) => a - b);
+            clauses.push("on day " + formatList(doms, (v) => String(v)) + " of the month");
+          }
+          if (!monF.isWildcard) {
+            const mons = Array.from(monF.values).sort((a, b) => a - b);
+            clauses.push("in " + formatList(mons, (v) => MONTH_FULL[v - 1]));
+          }
+          if (!dowF.isWildcard) {
+            const dows = Array.from(dowF.values).sort((a, b) => a - b);
+            if (dowF.raw === "1-5") {
+              clauses.push("Monday through Friday");
+            } else if (dowF.raw === "0,6" || dowF.raw === "6,0") {
+              clauses.push("on weekends");
+            } else {
+              clauses.push("on " + formatList(dows, (v) => DOW_FULL[v]));
+            }
+          }
+          return clauses.join(", ");
+        }
+
+        // =========================================================================
+        // TIMEZONE-AWARE NEXT-RUN SIMULATOR
+        // =========================================================================
+        function getZonedComponents(date, tz) {
+          if (tz === "local") {
+            return {
+              year: date.getFullYear(),
+              month: date.getMonth() + 1,
+              day: date.getDate(),
+              hour: date.getHours(),
+              minute: date.getMinutes(),
+              dow: date.getDay()
             };
+          }
+          const fmt = new Intl.DateTimeFormat("en-US", {
+            timeZone: tz,
+            year: "numeric",
+            month: "numeric",
+            day: "numeric",
+            hour: "numeric",
+            minute: "numeric",
+            weekday: "short",
+            hour12: false
+          });
+          const parts = fmt.formatToParts(date);
+          const map = {};
+          for (const p of parts) map[p.type] = p.value;
+          const dowMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+          let hr = parseInt(map.hour, 10);
+          if (hr === 24) hr = 0;
+          return {
+            year: parseInt(map.year, 10),
+            month: parseInt(map.month, 10),
+            day: parseInt(map.day, 10),
+            hour: hr,
+            minute: parseInt(map.minute, 10),
+            dow: dowMap[map.weekday]
+          };
+        }
 
-            const MONTH_NAMES = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-            const MONTH_FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-            const DOW_NAMES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-            const DOW_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        function matchesCron(c, parsed) {
+          const [minF, hrF, domF, monF, dowF] = parsed.fields;
+          if (!minF.values.has(c.minute)) return false;
+          if (!hrF.values.has(c.hour)) return false;
+          if (!monF.values.has(c.month)) return false;
 
-            const FIELD_META = [
-                { name: 'Minute', min: 0, max: 59, labels: null },
-                { name: 'Hour', min: 0, max: 23, labels: null },
-                { name: 'Day (Month)', min: 1, max: 31, labels: null },
-                { name: 'Month', min: 1, max: 12, labels: MONTH_NAMES },
-                { name: 'Weekday', min: 0, max: 6, labels: DOW_NAMES }
-            ];
+          // Standard Vixie cron: if both DOM and DOW are restricted, either can match (OR); otherwise AND
+          if (!domF.isWildcard && !dowF.isWildcard) {
+            return domF.values.has(c.day) || dowF.values.has(c.dow);
+          }
+          return domF.values.has(c.day) && dowF.values.has(c.dow);
+        }
 
-            const state = {
-                expression: '0 9 * * 1-5',
-                activeBuilderField: 0,
-                timezone: 'local',
-                runCount: 10,
-                startDate: new Date(),
-                parsedFields: null,
-                simulatedRuns: []
-            };
+        function simulateNextRuns(parsed, startDate, tz, count) {
+          const runs = [];
+          // Align to next whole minute
+          let cursorMs = Math.floor(startDate.getTime() / 60000) * 60000 + 60000;
+          const maxSteps = 525600 * 2; // up to 2 years of minutes
 
-            const el = {
-                cronInput: document.getElementById('cronInput'),
-                presetSelect: document.getElementById('presetSelect'),
-                themeToggleBtn: document.getElementById('themeToggleBtn'),
-                copyCronBtn: document.getElementById('copyCronBtn'),
-                resetCronBtn: document.getElementById('resetCronBtn'),
-                fieldBadgesRow: document.getElementById('fieldBadgesRow'),
-                humanSummaryBox: document.getElementById('humanSummaryBox'),
-                errorBox: document.getElementById('errorBox'),
-                modeEveryBtn: document.getElementById('modeEveryBtn'),
-                stepInput: document.getElementById('stepInput'),
-                applyStepBtn: document.getElementById('applyStepBtn'),
-                rangeStartInput: document.getElementById('rangeStartInput'),
-                rangeEndInput: document.getElementById('rangeEndInput'),
-                applyRangeBtn: document.getElementById('applyRangeBtn'),
-                builderFieldHint: document.getElementById('builderFieldHint'),
-                valuePillGrid: document.getElementById('valuePillGrid'),
-                hourHeatmap: document.getElementById('hourHeatmap'),
-                dailyCountLabel: document.getElementById('dailyCountLabel'),
-                tzSelect: document.getElementById('tzSelect'),
-                runCountSelect: document.getElementById('runCountSelect'),
-                startTimeInput: document.getElementById('startTimeInput'),
-                nowBtn: document.getElementById('nowBtn'),
-                runsList: document.getElementById('runsList'),
-                copyRunsBtn: document.getElementById('copyRunsBtn'),
-                toast: document.getElementById('toast')
-            };
+          for (let step = 0; step < maxSteps && runs.length < count; step++) {
+            const d = new Date(cursorMs);
+            const comp = getZonedComponents(d, tz);
 
-            let toastTimer = null;
-            function showToast(msg) {
-                el.toast.textContent = msg;
-                el.toast.classList.remove('opacity-0');
-                el.toast.classList.add('opacity-100');
-                clearTimeout(toastTimer);
-                toastTimer = setTimeout(() => {
-                    el.toast.classList.remove('opacity-100');
-                    el.toast.classList.add('opacity-0');
-                }, 2000);
+            // Fast-skip month if not matching
+            if (!parsed.fields[3].values.has(comp.month)) {
+              cursorMs += 24 * 60 * 60000;
+              continue;
+            }
+            // Fast-skip day if neither DOM nor DOW matches
+            const domMatch = parsed.fields[2].values.has(comp.day);
+            const dowMatch = parsed.fields[4].values.has(comp.dow);
+            const dayOk = !parsed.fields[2].isWildcard && !parsed.fields[4].isWildcard ? domMatch || dowMatch : domMatch && dowMatch;
+            if (!dayOk) {
+              // Jump to next day's 00:00 roughly (advance by remaining hours in day)
+              const minsLeft = (23 - comp.hour) * 60 + (60 - comp.minute);
+              cursorMs += Math.max(1, minsLeft) * 60000;
+              continue;
+            }
+            // Fast-skip hour if not matching
+            if (!parsed.fields[1].values.has(comp.hour)) {
+              const minsLeft = 60 - comp.minute;
+              cursorMs += Math.max(1, minsLeft) * 60000;
+              continue;
             }
 
-            function copyText(text, label) {
-                if (!text) return;
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(text).then(() => showToast(label + ' copied')).catch(() => fallbackCopy(text, label));
-                } else {
-                    fallbackCopy(text, label);
-                }
+            if (matchesCron(comp, parsed)) {
+              runs.push(d);
             }
+            cursorMs += 60000;
+          }
+          return runs;
+        }
 
-            function fallbackCopy(text, label) {
-                const ta = document.createElement('textarea');
-                ta.value = text;
-                ta.style.position = 'fixed';
-                ta.style.opacity = '0';
-                document.body.appendChild(ta);
-                ta.select();
-                try {
-                    document.execCommand('copy');
-                    showToast(label + ' copied');
-                } catch (_) {
-                    showToast('Copy failed');
-                }
-                document.body.removeChild(ta);
+        function formatRunDate(date, tz) {
+          const opts = {
+            weekday: "short",
+            year: "numeric",
+            month: "short",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false
+          };
+          if (tz !== "local") opts.timeZone = tz;
+          return new Intl.DateTimeFormat("en-US", opts).format(date);
+        }
+
+        function formatRelativeDelta(msDiff) {
+          const mins = Math.round(msDiff / 60000);
+          if (mins < 60) return `in ${mins}m`;
+          const hrs = Math.floor(mins / 60);
+          const remM = mins % 60;
+          if (hrs < 24) return remM ? `in ${hrs}h ${remM}m` : `in ${hrs}h`;
+          const days = Math.floor(hrs / 24);
+          const remH = hrs % 24;
+          return remH ? `in ${days}d ${remH}h` : `in ${days}d`;
+        }
+
+        // =========================================================================
+        // VISUAL BUILDER HELPERS
+        // =========================================================================
+        function compressSetToCronPart(set, min, max) {
+          if (set.size === max - min + 1) return "*";
+          const sorted = Array.from(set).sort((a, b) => a - b);
+          if (sorted.length === 0) return "*";
+          const ranges = [];
+          let start = sorted[0],
+            prev = sorted[0];
+          for (let i = 1; i < sorted.length; i++) {
+            if (sorted[i] === prev + 1) {
+              prev = sorted[i];
+            } else {
+              ranges.push(start === prev ? String(start) : `${start}-${prev}`);
+              start = prev = sorted[i];
             }
+          }
+          ranges.push(start === prev ? String(start) : `${start}-${prev}`);
+          return ranges.join(",");
+        }
 
-            function escapeHtml(str) {
-                return String(str)
-                    .replace(/&/g, '&amp;')
-                    .replace(/</g, '&lt;')
-                    .replace(/>/g, '&gt;')
-                    .replace(/"/g, '&quot;')
-                    .replace(/'/g, '&#39;');
-            }
+        function updateFieldRaw(fieldIdx, newPart) {
+          if (!state.parsedFields) return;
+          const parts = state.parsedFields.parts.slice();
+          parts[fieldIdx] = newPart;
+          state.expression = parts.join(" ");
+          el.cronInput.value = state.expression;
+          renderAll();
+        }
 
-            // =========================================================================
-            // CRON PARSER
-            // =========================================================================
-            function normalizeToken(token, fieldIdx) {
-                let t = token.toUpperCase();
-                if (fieldIdx === 3) {
-                    MONTH_NAMES.forEach((name, idx) => {
-                        t = t.replace(new RegExp('\\b' + name + '\\b', 'g'), String(idx + 1));
-                    });
-                } else if (fieldIdx === 4) {
-                    DOW_NAMES.forEach((name, idx) => {
-                        t = t.replace(new RegExp('\\b' + name + '\\b', 'g'), String(idx));
-                    });
-                }
-                return t;
-            }
+        // =========================================================================
+        // RENDERING
+        // =========================================================================
+        function renderAll() {
+          try {
+            const parsed = parseCronExpression(state.expression);
+            state.parsedFields = parsed;
+            el.errorBox.classList.add("hidden");
+            el.humanSummaryBox.textContent = describeCron(parsed);
+            el.humanSummaryBox.classList.remove("hidden");
 
-            function parseField(raw, fieldIdx) {
-                const meta = FIELD_META[fieldIdx];
-                const min = meta.min;
-                const max = meta.max;
-                const normalized = normalizeToken(raw.trim(), fieldIdx);
-                if (!normalized) throw new Error(`${meta.name} field cannot be empty`);
-
-                const values = new Set();
-                const parts = normalized.split(',');
-
-                for (const part of parts) {
-                    if (!part) throw new Error(`Invalid comma in ${meta.name}: "${raw}"`);
-                    const stepSplit = part.split('/');
-                    if (stepSplit.length > 2) throw new Error(`Invalid step syntax in ${meta.name}: "${part}"`);
-
-                    const base = stepSplit[0];
-                    const step = stepSplit.length === 2 ? parseInt(stepSplit[1], 10) : 1;
-                    if (stepSplit.length === 2 && (Number.isNaN(step) || step < 1 || !/^\d+$/.test(stepSplit[1]))) {
-                        throw new Error(`Invalid step value in ${meta.name}: "${stepSplit[1]}"`);
-                    }
-
-                    let start, end;
-                    if (base === '*') {
-                        start = min;
-                        end = max;
-                    } else if (base.includes('-')) {
-                        const rangeParts = base.split('-');
-                        if (rangeParts.length !== 2 || !/^\d+$/.test(rangeParts[0]) || !/^\d+$/.test(rangeParts[1])) {
-                            throw new Error(`Invalid range in ${meta.name}: "${base}"`);
-                        }
-                        start = parseInt(rangeParts[0], 10);
-                        end = parseInt(rangeParts[1], 10);
-                        if (fieldIdx === 4 && start === 7) start = 0;
-                        if (fieldIdx === 4 && end === 7) end = 0;
-                        if (start < min || start > max || end < min || end > max || start > end) {
-                            throw new Error(`Range out of bounds (${min}-${max}) in ${meta.name}: "${base}"`);
-                        }
-                    } else {
-                        if (!/^\d+$/.test(base)) throw new Error(`Invalid token in ${meta.name}: "${base}"`);
-                        let single = parseInt(base, 10);
-                        if (fieldIdx === 4 && single === 7) single = 0;
-                        if (single < min || single > max) {
-                            throw new Error(`Value ${single} out of bounds (${min}-${max}) in ${meta.name}`);
-                        }
-                        if (stepSplit.length === 2) {
-                            start = single;
-                            end = max;
-                        } else {
-                            values.add(single);
-                            continue;
-                        }
-                    }
-
-                    for (let v = start; v <= end; v += step) {
-                        values.add(v);
-                    }
-                }
-
-                if (values.size === 0) throw new Error(`No valid values in ${meta.name}`);
-                return {
-                    raw,
-                    values,
-                    isWildcard: raw.trim() === '*'
-                };
-            }
-
-            function parseCronExpression(expr) {
-                const trimmed = expr.trim();
-                if (!trimmed) throw new Error('Enter a 5-field cron expression or macro');
-                const expanded = MACROS[trimmed.toLowerCase()] || trimmed;
-                const parts = expanded.split(/\s+/);
-                if (parts.length !== 5) {
-                    throw new Error(`Expected 5 space-separated fields (found ${parts.length})`);
-                }
-                return {
-                    parts,
-                    fields: parts.map((p, idx) => parseField(p, idx))
-                };
-            }
-
-            // =========================================================================
-            // HUMAN-READABLE DESCRIPTION
-            // =========================================================================
-            function formatList(arr, formatter) {
-                const items = arr.map(formatter);
-                if (items.length === 1) return items[0];
-                if (items.length === 2) return items[0] + ' and ' + items[1];
-                return items.slice(0, -1).join(', ') + ', and ' + items[items.length - 1];
-            }
-
-            function describeCron(parsed) {
-                const [minF, hrF, domF, monF, dowF] = parsed.fields;
-                const mins = Array.from(minF.values).sort((a, b) => a - b);
-                const hrs = Array.from(hrF.values).sort((a, b) => a - b);
-
-                let timeDesc = '';
-                if (minF.isWildcard && hrF.isWildcard) {
-                    timeDesc = 'Every minute';
-                } else if (!minF.isWildcard && hrF.isWildcard && minF.raw.startsWith('*/')) {
-                    timeDesc = `Every ${minF.raw.slice(2)} minutes`;
-                } else if (mins.length === 1 && hrs.length === 1) {
-                    const h = hrs[0];
-                    const m = String(mins[0]).padStart(2, '0');
-                    const ampm = h >= 12 ? 'PM' : 'AM';
-                    const h12 = h % 12 === 0 ? 12 : h % 12;
-                    timeDesc = `At ${h12}:${m} ${ampm}`;
-                } else if (mins.length === 1 && hrF.isWildcard) {
-                    timeDesc = `At minute :${String(mins[0]).padStart(2, '0')} past every hour`;
-                } else {
-                    const minStr = minF.isWildcard ? 'every minute' : 'minute ' + formatList(mins, v => String(v));
-                    const hrStr = hrF.isWildcard ? 'every hour' : 'hour ' + formatList(hrs, v => String(v));
-                    timeDesc = `At ${minStr} past ${hrStr}`;
-                }
-
-                const clauses = [timeDesc];
-                if (!domF.isWildcard) {
-                    const doms = Array.from(domF.values).sort((a, b) => a - b);
-                    clauses.push('on day ' + formatList(doms, v => String(v)) + ' of the month');
-                }
-                if (!monF.isWildcard) {
-                    const mons = Array.from(monF.values).sort((a, b) => a - b);
-                    clauses.push('in ' + formatList(mons, v => MONTH_FULL[v - 1]));
-                }
-                if (!dowF.isWildcard) {
-                    const dows = Array.from(dowF.values).sort((a, b) => a - b);
-                    if (dowF.raw === '1-5') {
-                        clauses.push('Monday through Friday');
-                    } else if (dowF.raw === '0,6' || dowF.raw === '6,0') {
-                        clauses.push('on weekends');
-                    } else {
-                        clauses.push('on ' + formatList(dows, v => DOW_FULL[v]));
-                    }
-                }
-                return clauses.join(', ');
-            }
-
-            // =========================================================================
-            // TIMEZONE-AWARE NEXT-RUN SIMULATOR
-            // =========================================================================
-            function getZonedComponents(date, tz) {
-                if (tz === 'local') {
-                    return {
-                        year: date.getFullYear(),
-                        month: date.getMonth() + 1,
-                        day: date.getDate(),
-                        hour: date.getHours(),
-                        minute: date.getMinutes(),
-                        dow: date.getDay()
-                    };
-                }
-                const fmt = new Intl.DateTimeFormat('en-US', {
-                    timeZone: tz,
-                    year: 'numeric',
-                    month: 'numeric',
-                    day: 'numeric',
-                    hour: 'numeric',
-                    minute: 'numeric',
-                    weekday: 'short',
-                    hour12: false
-                });
-                const parts = fmt.formatToParts(date);
-                const map = {};
-                for (const p of parts) map[p.type] = p.value;
-                const dowMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-                let hr = parseInt(map.hour, 10);
-                if (hr === 24) hr = 0;
-                return {
-                    year: parseInt(map.year, 10),
-                    month: parseInt(map.month, 10),
-                    day: parseInt(map.day, 10),
-                    hour: hr,
-                    minute: parseInt(map.minute, 10),
-                    dow: dowMap[map.weekday]
-                };
-            }
-
-            function matchesCron(c, parsed) {
-                const [minF, hrF, domF, monF, dowF] = parsed.fields;
-                if (!minF.values.has(c.minute)) return false;
-                if (!hrF.values.has(c.hour)) return false;
-                if (!monF.values.has(c.month)) return false;
-
-                // Standard Vixie cron: if both DOM and DOW are restricted, either can match (OR); otherwise AND
-                if (!domF.isWildcard && !dowF.isWildcard) {
-                    return domF.values.has(c.day) || dowF.values.has(c.dow);
-                }
-                return domF.values.has(c.day) && dowF.values.has(c.dow);
-            }
-
-            function simulateNextRuns(parsed, startDate, tz, count) {
-                const runs = [];
-                // Align to next whole minute
-                let cursorMs = Math.floor(startDate.getTime() / 60000) * 60000 + 60000;
-                const maxSteps = 525600 * 2; // up to 2 years of minutes
-
-                for (let step = 0; step < maxSteps && runs.length < count; step++) {
-                    const d = new Date(cursorMs);
-                    const comp = getZonedComponents(d, tz);
-
-                    // Fast-skip month if not matching
-                    if (!parsed.fields[3].values.has(comp.month)) {
-                        cursorMs += 24 * 60 * 60000;
-                        continue;
-                    }
-                    // Fast-skip day if neither DOM nor DOW matches
-                    const domMatch = parsed.fields[2].values.has(comp.day);
-                    const dowMatch = parsed.fields[4].values.has(comp.dow);
-                    const dayOk = (!parsed.fields[2].isWildcard && !parsed.fields[4].isWildcard)
-                        ? (domMatch || dowMatch)
-                        : (domMatch && dowMatch);
-                    if (!dayOk) {
-                        // Jump to next day's 00:00 roughly (advance by remaining hours in day)
-                        const minsLeft = (23 - comp.hour) * 60 + (60 - comp.minute);
-                        cursorMs += Math.max(1, minsLeft) * 60000;
-                        continue;
-                    }
-                    // Fast-skip hour if not matching
-                    if (!parsed.fields[1].values.has(comp.hour)) {
-                        const minsLeft = 60 - comp.minute;
-                        cursorMs += Math.max(1, minsLeft) * 60000;
-                        continue;
-                    }
-
-                    if (matchesCron(comp, parsed)) {
-                        runs.push(d);
-                    }
-                    cursorMs += 60000;
-                }
-                return runs;
-            }
-
-            function formatRunDate(date, tz) {
-                const opts = {
-                    weekday: 'short',
-                    year: 'numeric',
-                    month: 'short',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: false
-                };
-                if (tz !== 'local') opts.timeZone = tz;
-                return new Intl.DateTimeFormat('en-US', opts).format(date);
-            }
-
-            function formatRelativeDelta(msDiff) {
-                const mins = Math.round(msDiff / 60000);
-                if (mins < 60) return `in ${mins}m`;
-                const hrs = Math.floor(mins / 60);
-                const remM = mins % 60;
-                if (hrs < 24) return remM ? `in ${hrs}h ${remM}m` : `in ${hrs}h`;
-                const days = Math.floor(hrs / 24);
-                const remH = hrs % 24;
-                return remH ? `in ${days}d ${remH}h` : `in ${days}d`;
-            }
-
-            // =========================================================================
-            // VISUAL BUILDER HELPERS
-            // =========================================================================
-            function compressSetToCronPart(set, min, max) {
-                if (set.size === max - min + 1) return '*';
-                const sorted = Array.from(set).sort((a, b) => a - b);
-                if (sorted.length === 0) return '*';
-                const ranges = [];
-                let start = sorted[0], prev = sorted[0];
-                for (let i = 1; i < sorted.length; i++) {
-                    if (sorted[i] === prev + 1) {
-                        prev = sorted[i];
-                    } else {
-                        ranges.push(start === prev ? String(start) : `${start}-${prev}`);
-                        start = prev = sorted[i];
-                    }
-                }
-                ranges.push(start === prev ? String(start) : `${start}-${prev}`);
-                return ranges.join(',');
-            }
-
-            function updateFieldRaw(fieldIdx, newPart) {
-                if (!state.parsedFields) return;
-                const parts = state.parsedFields.parts.slice();
-                parts[fieldIdx] = newPart;
-                state.expression = parts.join(' ');
-                el.cronInput.value = state.expression;
+            // Field Badges
+            el.fieldBadgesRow.innerHTML = "";
+            parsed.parts.forEach((p, idx) => {
+              const btn = document.createElement("button");
+              btn.type = "button";
+              const isActive = idx === state.activeBuilderField;
+              btn.className = `rounded-lg border px-2 py-1.5 transition ${isActive ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40" : "border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 hover:border-slate-300 dark:hover:border-slate-700"}`;
+              btn.innerHTML = `<div class="font-mono text-xs font-bold">${escapeHtml(p)}</div><div class="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">${escapeHtml(FIELD_META[idx].name)}</div>`;
+              btn.addEventListener("click", () => {
+                state.activeBuilderField = idx;
                 renderAll();
-            }
+              });
+              el.fieldBadgesRow.appendChild(btn);
+            });
 
-            // =========================================================================
-            // RENDERING
-            // =========================================================================
-            function renderAll() {
-                try {
-                    const parsed = parseCronExpression(state.expression);
-                    state.parsedFields = parsed;
-                    el.errorBox.classList.add('hidden');
-                    el.humanSummaryBox.textContent = describeCron(parsed);
-                    el.humanSummaryBox.classList.remove('hidden');
+            renderBuilder();
+            renderHeatmap(parsed);
+            renderSimulations(parsed);
+          } catch (err) {
+            state.parsedFields = null;
+            el.errorBox.textContent = err.message;
+            el.errorBox.classList.remove("hidden");
+            el.humanSummaryBox.classList.add("hidden");
+            el.runsList.innerHTML = '<div class="text-xs text-slate-400 py-8 text-center">Fix the cron expression to simulate upcoming runs.</div>';
+          }
+        }
 
-                    // Field Badges
-                    el.fieldBadgesRow.innerHTML = '';
-                    parsed.parts.forEach((p, idx) => {
-                        const btn = document.createElement('button');
-                        btn.type = 'button';
-                        const isActive = idx === state.activeBuilderField;
-                        btn.className = `rounded-lg border px-2 py-1.5 transition ${isActive
-                                ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40'
-                                : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 hover:border-slate-300 dark:hover:border-slate-700'
-                            }`;
-                        btn.innerHTML = `<div class="font-mono text-xs font-bold">${escapeHtml(p)}</div><div class="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">${escapeHtml(FIELD_META[idx].name)}</div>`;
-                        btn.addEventListener('click', () => {
-                            state.activeBuilderField = idx;
-                            renderAll();
-                        });
-                        el.fieldBadgesRow.appendChild(btn);
-                    });
+        function renderBuilder() {
+          const idx = state.activeBuilderField;
+          const meta = FIELD_META[idx];
+          const field = state.parsedFields.fields[idx];
 
-                    renderBuilder();
-                    renderHeatmap(parsed);
-                    renderSimulations(parsed);
-                } catch (err) {
-                    state.parsedFields = null;
-                    el.errorBox.textContent = err.message;
-                    el.errorBox.classList.remove('hidden');
-                    el.humanSummaryBox.classList.add('hidden');
-                    el.runsList.innerHTML = '<div class="text-xs text-slate-400 py-8 text-center">Fix the cron expression to simulate upcoming runs.</div>';
-                }
-            }
+          document.querySelectorAll(".builder-tab").forEach((tab) => {
+            const active = parseInt(tab.dataset.field, 10) === idx;
+            tab.classList.toggle("border-emerald-500", active);
+            tab.classList.toggle("text-emerald-600", active);
+            tab.classList.toggle("dark:text-emerald-400", active);
+            tab.classList.toggle("bg-white", active);
+            tab.classList.toggle("dark:bg-slate-900", active);
+            tab.classList.toggle("border-transparent", !active);
+            tab.classList.toggle("text-slate-500", !active);
+          });
 
-            function renderBuilder() {
-                const idx = state.activeBuilderField;
-                const meta = FIELD_META[idx];
-                const field = state.parsedFields.fields[idx];
+          el.builderFieldHint.textContent = `Range: ${meta.min}–${meta.max}`;
+          el.stepInput.max = meta.max;
+          el.rangeStartInput.min = meta.min;
+          el.rangeStartInput.max = meta.max;
+          el.rangeEndInput.min = meta.min;
+          el.rangeEndInput.max = meta.max;
 
-                document.querySelectorAll('.builder-tab').forEach((tab) => {
-                    const active = parseInt(tab.dataset.field, 10) === idx;
-                    tab.classList.toggle('border-emerald-500', active);
-                    tab.classList.toggle('text-emerald-600', active);
-                    tab.classList.toggle('dark:text-emerald-400', active);
-                    tab.classList.toggle('bg-white', active);
-                    tab.classList.toggle('dark:bg-slate-900', active);
-                    tab.classList.toggle('border-transparent', !active);
-                    tab.classList.toggle('text-slate-500', !active);
-                });
+          el.valuePillGrid.innerHTML = "";
+          for (let v = meta.min; v <= meta.max; v++) {
+            const selected = field.values.has(v);
+            const pill = document.createElement("button");
+            pill.type = "button";
+            pill.textContent = meta.labels ? meta.labels[v - meta.min] : String(v).padStart(2, "0");
+            pill.className = `py-1.5 rounded-md font-mono text-xs font-medium border transition ${selected ? "bg-emerald-600 text-white border-emerald-600 shadow-sm" : "bg-slate-50 dark:bg-slate-950 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:border-emerald-400"}`;
+            pill.addEventListener("click", () => {
+              const nextSet = new Set(field.values);
+              if (field.isWildcard) {
+                // Clicking a single value from wildcard isolates that value
+                nextSet.clear();
+                nextSet.add(v);
+              } else if (nextSet.has(v)) {
+                if (nextSet.size > 1) nextSet.delete(v);
+              } else {
+                nextSet.add(v);
+              }
+              updateFieldRaw(idx, compressSetToCronPart(nextSet, meta.min, meta.max));
+            });
+            el.valuePillGrid.appendChild(pill);
+          }
+        }
 
-                el.builderFieldHint.textContent = `Range: ${meta.min}–${meta.max}`;
-                el.stepInput.max = meta.max;
-                el.rangeStartInput.min = meta.min;
-                el.rangeStartInput.max = meta.max;
-                el.rangeEndInput.min = meta.min;
-                el.rangeEndInput.max = meta.max;
+        function renderHeatmap(parsed) {
+          const minsPerHour = parsed.fields[0].values.size;
+          const activeHours = parsed.fields[1].values;
+          el.dailyCountLabel.textContent = `${minsPerHour * activeHours.size} runs/matching day`;
 
-                el.valuePillGrid.innerHTML = '';
-                for (let v = meta.min; v <= meta.max; v++) {
-                    const selected = field.values.has(v);
-                    const pill = document.createElement('button');
-                    pill.type = 'button';
-                    pill.textContent = meta.labels ? meta.labels[v - meta.min] : String(v).padStart(2, '0');
-                    pill.className = `py-1.5 rounded-md font-mono text-xs font-medium border transition ${selected
-                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-                            : 'bg-slate-50 dark:bg-slate-950 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:border-emerald-400'
-                        }`;
-                    pill.addEventListener('click', () => {
-                        const nextSet = new Set(field.values);
-                        if (field.isWildcard) {
-                            // Clicking a single value from wildcard isolates that value
-                            nextSet.clear();
-                            nextSet.add(v);
-                        } else if (nextSet.has(v)) {
-                            if (nextSet.size > 1) nextSet.delete(v);
-                        } else {
-                            nextSet.add(v);
-                        }
-                        updateFieldRaw(idx, compressSetToCronPart(nextSet, meta.min, meta.max));
-                    });
-                    el.valuePillGrid.appendChild(pill);
-                }
-            }
+          el.hourHeatmap.innerHTML = "";
+          for (let h = 0; h < 24; h++) {
+            const isActive = activeHours.has(h);
+            const cell = document.createElement("div");
+            cell.title = `${String(h).padStart(2, "0")}:00 — ${isActive ? minsPerHour + " run(s)" : "0 runs"}`;
+            cell.className = `h-7 rounded flex items-center justify-center font-mono text-[10px] border ${isActive ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-700 dark:text-emerald-300 font-semibold" : "bg-slate-100 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-400"}`;
+            cell.textContent = String(h).padStart(2, "0");
+            el.hourHeatmap.appendChild(cell);
+          }
+        }
 
-            function renderHeatmap(parsed) {
-                const minsPerHour = parsed.fields[0].values.size;
-                const activeHours = parsed.fields[1].values;
-                el.dailyCountLabel.textContent = `${minsPerHour * activeHours.size} runs/matching day`;
+        function renderSimulations(parsed) {
+          const runs = simulateNextRuns(parsed, state.startDate, state.timezone, state.runCount);
+          state.simulatedRuns = runs;
+          el.runsList.innerHTML = "";
 
-                el.hourHeatmap.innerHTML = '';
-                for (let h = 0; h < 24; h++) {
-                    const isActive = activeHours.has(h);
-                    const cell = document.createElement('div');
-                    cell.title = `${String(h).padStart(2, '0')}:00 — ${isActive ? minsPerHour + ' run(s)' : '0 runs'}`;
-                    cell.className = `h-7 rounded flex items-center justify-center font-mono text-[10px] border ${isActive
-                            ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-700 dark:text-emerald-300 font-semibold'
-                            : 'bg-slate-100 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-400'
-                        }`;
-                    cell.textContent = String(h).padStart(2, '0');
-                    el.hourHeatmap.appendChild(cell);
-                }
-            }
+          if (runs.length === 0) {
+            el.runsList.innerHTML = '<div class="text-xs text-amber-600 dark:text-amber-400 py-8 text-center">No matching runs found within the next 2 years (check Day of Month vs Month).</div>';
+            return;
+          }
 
-            function renderSimulations(parsed) {
-                const runs = simulateNextRuns(parsed, state.startDate, state.timezone, state.runCount);
-                state.simulatedRuns = runs;
-                el.runsList.innerHTML = '';
+          const baseMs = state.startDate.getTime();
+          runs.forEach((d, idx) => {
+            const row = document.createElement("div");
+            row.className = "flex items-center justify-between gap-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/70 px-3 py-2 text-xs";
 
-                if (runs.length === 0) {
-                    el.runsList.innerHTML = '<div class="text-xs text-amber-600 dark:text-amber-400 py-8 text-center">No matching runs found within the next 2 years (check Day of Month vs Month).</div>';
-                    return;
-                }
-
-                const baseMs = state.startDate.getTime();
-                runs.forEach((d, idx) => {
-                    const row = document.createElement('div');
-                    row.className = 'flex items-center justify-between gap-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/70 px-3 py-2 text-xs';
-
-                    const left = document.createElement('div');
-                    left.className = 'flex items-center gap-2.5';
-                    left.innerHTML = `<span class="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 font-mono text-[10px] font-bold flex items-center justify-center">${idx + 1}</span>
+            const left = document.createElement("div");
+            left.className = "flex items-center gap-2.5";
+            left.innerHTML = `<span class="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 font-mono text-[10px] font-bold flex items-center justify-center">${idx + 1}</span>
             <span class="font-mono font-medium">${escapeHtml(formatRunDate(d, state.timezone))}</span>`;
 
-                    const right = document.createElement('span');
-                    right.className = 'font-mono text-[11px] text-slate-500 dark:text-slate-400';
-                    right.textContent = formatRelativeDelta(d.getTime() - baseMs);
+            const right = document.createElement("span");
+            right.className = "font-mono text-[11px] text-slate-500 dark:text-slate-400";
+            right.textContent = formatRelativeDelta(d.getTime() - baseMs);
 
-                    row.appendChild(left);
-                    row.appendChild(right);
-                    el.runsList.appendChild(row);
-                });
-            }
+            row.appendChild(left);
+            row.appendChild(right);
+            el.runsList.appendChild(row);
+          });
+        }
 
-            function syncStartInputFromDate(date) {
-                const pad = n => String(n).padStart(2, '0');
-                const val = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-                el.startTimeInput.value = val;
-            }
+        function syncStartInputFromDate(date) {
+          const pad = (n) => String(n).padStart(2, "0");
+          const val = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+          el.startTimeInput.value = val;
+        }
 
-            // =========================================================================
-            // EVENT LISTENERS
-            // =========================================================================
-            el.cronInput.addEventListener('input', (e) => {
-                state.expression = e.target.value;
-                renderAll();
-            });
+        // =========================================================================
+        // EVENT LISTENERS
+        // =========================================================================
+        el.cronInput.addEventListener("input", (e) => {
+          state.expression = e.target.value;
+          renderAll();
+        });
 
-            el.presetSelect.addEventListener('change', (e) => {
-                state.expression = e.target.value;
-                el.cronInput.value = state.expression;
-                renderAll();
-            });
+        el.presetSelect.addEventListener("change", (e) => {
+          state.expression = e.target.value;
+          el.cronInput.value = state.expression;
+          renderAll();
+        });
 
-            document.querySelectorAll('.macro-btn').forEach((btn) => {
-                btn.addEventListener('click', () => {
-                    state.expression = btn.dataset.macro;
-                    el.cronInput.value = state.expression;
-                    renderAll();
-                });
-            });
-
-            el.copyCronBtn.addEventListener('click', () => copyText(el.cronInput.value.trim(), 'Cron expression'));
-            el.resetCronBtn.addEventListener('click', () => {
-                state.expression = '0 9 * * 1-5';
-                el.cronInput.value = state.expression;
-                el.presetSelect.value = state.expression;
-                renderAll();
-            });
-
-            document.querySelectorAll('.builder-tab').forEach((tab) => {
-                tab.addEventListener('click', () => {
-                    state.activeBuilderField = parseInt(tab.dataset.field, 10);
-                    renderAll();
-                });
-            });
-
-            el.modeEveryBtn.addEventListener('click', () => updateFieldRaw(state.activeBuilderField, '*'));
-            el.applyStepBtn.addEventListener('click', () => {
-                const s = parseInt(el.stepInput.value, 10);
-                if (!Number.isNaN(s) && s >= 1) updateFieldRaw(state.activeBuilderField, `*/${s}`);
-            });
-            el.applyRangeBtn.addEventListener('click', () => {
-                const a = parseInt(el.rangeStartInput.value, 10);
-                const b = parseInt(el.rangeEndInput.value, 10);
-                if (!Number.isNaN(a) && !Number.isNaN(b) && a <= b) {
-                    updateFieldRaw(state.activeBuilderField, `${a}-${b}`);
-                }
-            });
-
-            el.tzSelect.addEventListener('change', (e) => {
-                state.timezone = e.target.value;
-                renderAll();
-            });
-
-            el.runCountSelect.addEventListener('change', (e) => {
-                state.runCount = parseInt(e.target.value, 10);
-                renderAll();
-            });
-
-            el.startTimeInput.addEventListener('change', (e) => {
-                if (e.target.value) {
-                    const d = new Date(e.target.value);
-                    if (!Number.isNaN(d.getTime())) {
-                        state.startDate = d;
-                        renderAll();
-                    }
-                }
-            });
-
-            el.nowBtn.addEventListener('click', () => {
-                state.startDate = new Date();
-                syncStartInputFromDate(state.startDate);
-                renderAll();
-            });
-
-            el.copyRunsBtn.addEventListener('click', () => {
-                const lines = state.simulatedRuns.map((d, i) => `${i + 1}. ${formatRunDate(d, state.timezone)}`);
-                copyText(lines.join('\n'), 'Simulated schedule');
-            });
-
-            el.themeToggleBtn.addEventListener('click', () => {
-                const isDark = document.documentElement.classList.toggle('dark');
-                try { localStorage.setItem('cron_sim_theme', isDark ? 'dark' : 'light'); } catch (_) { }
-            });
-
-            // INIT
-            syncStartInputFromDate(state.startDate);
+        document.querySelectorAll(".macro-btn").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            state.expression = btn.dataset.macro;
+            el.cronInput.value = state.expression;
             renderAll();
-        })();
-    </script>
-</body>
+          });
+        });
 
+        el.copyCronBtn.addEventListener("click", () => copyText(el.cronInput.value.trim(), "Cron expression"));
+        el.resetCronBtn.addEventListener("click", () => {
+          state.expression = "0 9 * * 1-5";
+          el.cronInput.value = state.expression;
+          el.presetSelect.value = state.expression;
+          renderAll();
+        });
+
+        document.querySelectorAll(".builder-tab").forEach((tab) => {
+          tab.addEventListener("click", () => {
+            state.activeBuilderField = parseInt(tab.dataset.field, 10);
+            renderAll();
+          });
+        });
+
+        el.modeEveryBtn.addEventListener("click", () => updateFieldRaw(state.activeBuilderField, "*"));
+        el.applyStepBtn.addEventListener("click", () => {
+          const s = parseInt(el.stepInput.value, 10);
+          if (!Number.isNaN(s) && s >= 1) updateFieldRaw(state.activeBuilderField, `*/${s}`);
+        });
+        el.applyRangeBtn.addEventListener("click", () => {
+          const a = parseInt(el.rangeStartInput.value, 10);
+          const b = parseInt(el.rangeEndInput.value, 10);
+          if (!Number.isNaN(a) && !Number.isNaN(b) && a <= b) {
+            updateFieldRaw(state.activeBuilderField, `${a}-${b}`);
+          }
+        });
+
+        el.tzSelect.addEventListener("change", (e) => {
+          state.timezone = e.target.value;
+          renderAll();
+        });
+
+        el.runCountSelect.addEventListener("change", (e) => {
+          state.runCount = parseInt(e.target.value, 10);
+          renderAll();
+        });
+
+        el.startTimeInput.addEventListener("change", (e) => {
+          if (e.target.value) {
+            const d = new Date(e.target.value);
+            if (!Number.isNaN(d.getTime())) {
+              state.startDate = d;
+              renderAll();
+            }
+          }
+        });
+
+        el.nowBtn.addEventListener("click", () => {
+          state.startDate = new Date();
+          syncStartInputFromDate(state.startDate);
+          renderAll();
+        });
+
+        el.copyRunsBtn.addEventListener("click", () => {
+          const lines = state.simulatedRuns.map((d, i) => `${i + 1}. ${formatRunDate(d, state.timezone)}`);
+          copyText(lines.join("\n"), "Simulated schedule");
+        });
+
+        el.themeToggleBtn.addEventListener("click", () => {
+          const isDark = document.documentElement.classList.toggle("dark");
+          try {
+            localStorage.setItem("cron_sim_theme", isDark ? "dark" : "light");
+          } catch (_) {}
+        });
+
+        // INIT
+        syncStartInputFromDate(state.startDate);
+        renderAll();
+      })();
+    </script>
+  </body>
 </html>

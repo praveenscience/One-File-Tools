@@ -1,1955 +1,1864 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en" class="dark">
-
-<head>
+  <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>API Response Differ &amp; Inspector — One File Tools</title>
-    <meta name="description"
-        content="Interactive side-by-side JSON API response differ with collapsible tree views, color-coded additions/removals/modifications, change summary metrics, and RFC 6902 JSON patch export." />
+    <meta name="description" content="Interactive side-by-side JSON API response differ with collapsible tree views, color-coded additions/removals/modifications, change summary metrics, and RFC 6902 JSON patch export." />
     <!-- Dark mode FOUC prevention -->
     <script>
-        (function () {
-            try {
-                var t = localStorage.getItem('api_differ_theme');
-                if (t === 'light') document.documentElement.classList.remove('dark');
-                else if (!t && window.matchMedia('(prefers-color-scheme: light)').matches) document.documentElement.classList.remove('dark');
-                else document.documentElement.classList.add('dark');
-            } catch (e) {
-                document.documentElement.classList.add('dark');
-            }
-        })();
+      (function () {
+        try {
+          var t = localStorage.getItem("api_differ_theme");
+          if (t === "light") document.documentElement.classList.remove("dark");
+          else if (!t && window.matchMedia("(prefers-color-scheme: light)").matches) document.documentElement.classList.remove("dark");
+          else document.documentElement.classList.add("dark");
+        } catch (e) {
+          document.documentElement.classList.add("dark");
+        }
+      })();
     </script>
     <script src="https://cdn.tailwindcss.com/3.4.17"></script>
     <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
-                        mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace']
-                    },
-                    colors: {
-                        diffAdd: {
-                            bg: 'rgba(16, 185, 129, 0.12)',
-                            bgDark: 'rgba(16, 185, 129, 0.18)',
-                            border: 'rgba(16, 185, 129, 0.4)',
-                            text: '#059669',
-                            textDark: '#34d399'
-                        },
-                        diffRem: {
-                            bg: 'rgba(239, 68, 68, 0.12)',
-                            bgDark: 'rgba(239, 68, 68, 0.18)',
-                            border: 'rgba(239, 68, 68, 0.4)',
-                            text: '#dc2626',
-                            textDark: '#f87171'
-                        },
-                        diffChg: {
-                            bg: 'rgba(245, 158, 11, 0.12)',
-                            bgDark: 'rgba(245, 158, 11, 0.18)',
-                            border: 'rgba(245, 158, 11, 0.4)',
-                            text: '#d97706',
-                            textDark: '#fbbf24'
-                        }
-                    }
-                }
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ["Inter", "system-ui", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "sans-serif"],
+              mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "Menlo", "Monaco", "Consolas", "monospace"]
+            },
+            colors: {
+              diffAdd: {
+                bg: "rgba(16, 185, 129, 0.12)",
+                bgDark: "rgba(16, 185, 129, 0.18)",
+                border: "rgba(16, 185, 129, 0.4)",
+                text: "#059669",
+                textDark: "#34d399"
+              },
+              diffRem: {
+                bg: "rgba(239, 68, 68, 0.12)",
+                bgDark: "rgba(239, 68, 68, 0.18)",
+                border: "rgba(239, 68, 68, 0.4)",
+                text: "#dc2626",
+                textDark: "#f87171"
+              },
+              diffChg: {
+                bg: "rgba(245, 158, 11, 0.12)",
+                bgDark: "rgba(245, 158, 11, 0.18)",
+                border: "rgba(245, 158, 11, 0.4)",
+                text: "#d97706",
+                textDark: "#fbbf24"
+              }
             }
-        };
+          }
+        }
+      };
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
-        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <style>
-        * {
-            box-sizing: border-box;
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+
+      .custom-scroll::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+
+      .custom-scroll::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .custom-scroll::-webkit-scrollbar-thumb {
+        background: rgba(148, 163, 184, 0.3);
+        border-radius: 9999px;
+      }
+
+      .custom-scroll::-webkit-scrollbar-thumb:hover {
+        background: rgba(148, 163, 184, 0.5);
+      }
+
+      /* Diff highlight classes */
+      .diff-row-added {
+        background-color: rgba(16, 185, 129, 0.1);
+      }
+
+      .dark .diff-row-added {
+        background-color: rgba(16, 185, 129, 0.15);
+      }
+
+      .diff-row-removed {
+        background-color: rgba(239, 68, 68, 0.1);
+      }
+
+      .dark .diff-row-removed {
+        background-color: rgba(239, 68, 68, 0.15);
+      }
+
+      .diff-row-changed {
+        background-color: rgba(245, 158, 11, 0.1);
+      }
+
+      .dark .diff-row-changed {
+        background-color: rgba(245, 158, 11, 0.15);
+      }
+
+      .pulse-highlight {
+        animation: pulseBg 1.6s ease-out;
+      }
+
+      @keyframes pulseBg {
+        0% {
+          background-color: rgba(168, 85, 247, 0.45);
         }
 
-        html,
-        body {
-            height: 100%;
-            margin: 0;
+        100% {
+          background-color: transparent;
         }
-
-        .custom-scroll::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-
-        .custom-scroll::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        .custom-scroll::-webkit-scrollbar-thumb {
-            background: rgba(148, 163, 184, 0.3);
-            border-radius: 9999px;
-        }
-
-        .custom-scroll::-webkit-scrollbar-thumb:hover {
-            background: rgba(148, 163, 184, 0.5);
-        }
-
-        /* Diff highlight classes */
-        .diff-row-added {
-            background-color: rgba(16, 185, 129, 0.10);
-        }
-
-        .dark .diff-row-added {
-            background-color: rgba(16, 185, 129, 0.15);
-        }
-
-        .diff-row-removed {
-            background-color: rgba(239, 68, 68, 0.10);
-        }
-
-        .dark .diff-row-removed {
-            background-color: rgba(239, 68, 68, 0.15);
-        }
-
-        .diff-row-changed {
-            background-color: rgba(245, 158, 11, 0.10);
-        }
-
-        .dark .diff-row-changed {
-            background-color: rgba(245, 158, 11, 0.15);
-        }
-
-        .pulse-highlight {
-            animation: pulseBg 1.6s ease-out;
-        }
-
-        @keyframes pulseBg {
-            0% {
-                background-color: rgba(168, 85, 247, 0.45);
-            }
-
-            100% {
-                background-color: transparent;
-            }
-        }
+      }
     </style>
-</head>
+  </head>
 
-<body
-    class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans antialiased flex flex-col min-h-screen lg:h-screen lg:overflow-hidden">
-
+  <body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans antialiased flex flex-col min-h-screen lg:h-screen lg:overflow-hidden">
     <!-- Top Navigation Header -->
-    <header
-        class="border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0 z-20">
-        <div class="flex items-center gap-3">
-            <div
-                class="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 via-teal-600 to-cyan-500 text-white flex items-center justify-center shadow-md shadow-emerald-500/20 font-mono font-bold text-xs">
-                DIFF
-            </div>
-            <div>
-                <h1
-                    class="text-sm sm:text-base font-bold tracking-tight leading-none text-slate-900 dark:text-white flex items-center gap-2">
-                    API Response Differ &amp; Inspector
-                    <span
-                        class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">API
-                        Workbench</span>
-                </h1>
-                <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Side-by-side JSON tree diff, semantic
-                    change detection, collapsible nodes, and RFC 6902 patch exporter</p>
-            </div>
+    <header class="border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0 z-20">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 via-teal-600 to-cyan-500 text-white flex items-center justify-center shadow-md shadow-emerald-500/20 font-mono font-bold text-xs">DIFF</div>
+        <div>
+          <h1 class="text-sm sm:text-base font-bold tracking-tight leading-none text-slate-900 dark:text-white flex items-center gap-2">
+            API Response Differ &amp; Inspector
+            <span class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">API Workbench</span>
+          </h1>
+          <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Side-by-side JSON tree diff, semantic change detection, collapsible nodes, and RFC 6902 patch exporter</p>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <!-- Presets Selector -->
+        <div class="flex items-center gap-1.5">
+          <label for="presetSelect" class="text-xs font-medium text-slate-500 dark:text-slate-400 hidden sm:inline">Scenario:</label>
+          <select id="presetSelect" class="text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800 dark:text-slate-200">
+            <option value="profile_evolution">REST API v1 vs v2 (Profile Schema Evolution)</option>
+            <option value="ecom_catalog">E-Commerce Catalog (Price &amp; Stock Updates)</option>
+            <option value="orders_pagination">Orders Pagination (Item Mutation &amp; Deletion)</option>
+            <option value="success_vs_error">Success (200 OK) vs API Error (403 Forbidden)</option>
+            <option value="graphql_microservice">GraphQL Microservice Data Drift</option>
+          </select>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2">
-            <!-- Presets Selector -->
-            <div class="flex items-center gap-1.5">
-                <label for="presetSelect"
-                    class="text-xs font-medium text-slate-500 dark:text-slate-400 hidden sm:inline">Scenario:</label>
-                <select id="presetSelect"
-                    class="text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800 dark:text-slate-200">
-                    <option value="profile_evolution">REST API v1 vs v2 (Profile Schema Evolution)</option>
-                    <option value="ecom_catalog">E-Commerce Catalog (Price &amp; Stock Updates)</option>
-                    <option value="orders_pagination">Orders Pagination (Item Mutation &amp; Deletion)</option>
-                    <option value="success_vs_error">Success (200 OK) vs API Error (403 Forbidden)</option>
-                    <option value="graphql_microservice">GraphQL Microservice Data Drift</option>
-                </select>
-            </div>
+        <!-- Swap Responses Button -->
+        <button id="swapBtn" type="button" title="Swap Left and Right Responses" class="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition text-slate-700 dark:text-slate-200">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M8 3 4 7l4 4"></path>
+            <path d="M4 7h16"></path>
+            <path d="m16 21 4-4-4-4"></path>
+            <path d="M20 17H4"></path>
+          </svg>
+          <span class="hidden sm:inline">Swap</span>
+        </button>
 
-            <!-- Swap Responses Button -->
-            <button id="swapBtn" type="button" title="Swap Left and Right Responses"
-                class="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition text-slate-700 dark:text-slate-200">
-                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M8 3 4 7l4 4"></path>
-                    <path d="M4 7h16"></path>
-                    <path d="m16 21 4-4-4-4"></path>
-                    <path d="M20 17H4"></path>
-                </svg>
-                <span class="hidden sm:inline">Swap</span>
-            </button>
+        <!-- Reset Button -->
+        <button id="resetBtn" type="button" title="Reset to default scenario" class="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition text-slate-700 dark:text-slate-200">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="1 4 1 10 7 10"></polyline>
+            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+          </svg>
+          <span class="hidden sm:inline">Reset</span>
+        </button>
 
-            <!-- Reset Button -->
-            <button id="resetBtn" type="button" title="Reset to default scenario"
-                class="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition text-slate-700 dark:text-slate-200">
-                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="1 4 1 10 7 10"></polyline>
-                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-                </svg>
-                <span class="hidden sm:inline">Reset</span>
-            </button>
-
-            <!-- Theme Toggle Button -->
-            <button id="themeToggleBtn" type="button" title="Toggle Dark/Light Mode"
-                class="p-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition">
-                <svg id="sunIcon" class="w-4 h-4 hidden dark:block text-amber-400" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="5"></circle>
-                    <line x1="12" y1="1" x2="12" y2="3"></line>
-                    <line x1="12" y1="21" x2="12" y2="23"></line>
-                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-                    <line x1="1" y1="12" x2="3" y2="12"></line>
-                    <line x1="21" y1="12" x2="23" y2="12"></line>
-                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-                </svg>
-                <svg id="moonIcon" class="w-4 h-4 block dark:hidden text-slate-700" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2">
-                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-                </svg>
-            </button>
-        </div>
+        <!-- Theme Toggle Button -->
+        <button id="themeToggleBtn" type="button" title="Toggle Dark/Light Mode" class="p-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition">
+          <svg id="sunIcon" class="w-4 h-4 hidden dark:block text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+          <svg id="moonIcon" class="w-4 h-4 block dark:hidden text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
+      </div>
     </header>
 
     <!-- Main Workspace Container -->
     <main class="flex-1 flex flex-col min-h-0 overflow-hidden">
-
-        <!-- Top Raw Editors Drawer (Collapsible) -->
-        <section id="rawInputsSection"
-            class="border-b border-slate-200 dark:border-slate-800 bg-slate-100/70 dark:bg-slate-900/50 transition-all duration-300">
-            <!-- Header Bar with Toggle Collapse -->
-            <div class="px-4 py-2 flex items-center justify-between border-b border-slate-200/60 dark:border-slate-800/60">
-                <div class="flex items-center gap-2">
-                    <button id="toggleRawInputsBtn" type="button"
-                        class="text-xs font-semibold flex items-center gap-1.5 text-slate-700 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400">
-                        <svg id="rawInputsChevron" class="w-4 h-4 transition-transform duration-200" viewBox="0 0 24 24"
-                            fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="6 9 12 15 18 9"></polyline>
-                        </svg>
-                        <span>Raw JSON Response Payloads</span>
-                        <span id="rawInputSummaryBadge"
-                            class="text-[10px] px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-normal">2
-                            Payloads Active</span>
-                    </button>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button id="formatBothBtn" type="button"
-                        class="text-xs px-2.5 py-1 rounded bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 flex items-center gap-1 transition">
-                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="4 7 4 4 20 4 20 7"></polyline>
-                            <line x1="9" y1="20" x2="15" y2="20"></line>
-                            <line x1="12" y1="4" x2="12" y2="20"></line>
-                        </svg>
-                        Prettify Both
-                    </button>
-                    <button id="clearBothBtn" type="button"
-                        class="text-xs px-2.5 py-1 rounded bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition">
-                        Clear
-                    </button>
-                </div>
-            </div>
-
-            <!-- Side by Side Raw JSON Inputs (Collapsible content) -->
-            <div id="rawInputsContent" class="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200 dark:divide-slate-800 p-3 gap-3">
-                
-                <!-- Left Input: Response A (Base / Expected) -->
-                <div class="flex flex-col gap-1.5">
-                    <div class="flex items-center justify-between text-xs font-medium">
-                        <div class="flex items-center gap-2">
-                            <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
-                            <span class="font-bold text-slate-800 dark:text-slate-200">Response A</span>
-                            <span class="text-[11px] text-slate-500 dark:text-slate-400">(Base / Expected)</span>
-                        </div>
-                        <div class="flex items-center gap-1.5">
-                            <input id="metaStatusA" type="text" value="200 OK" placeholder="Status"
-                                class="text-[11px] font-mono w-20 px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-center" />
-                            <input id="metaTimeA" type="text" value="124ms" placeholder="Time"
-                                class="text-[11px] font-mono w-16 px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-center" />
-                            <label class="cursor-pointer text-[11px] px-2 py-0.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300">
-                                Upload
-                                <input type="file" id="fileInputA" accept=".json,application/json" class="hidden" />
-                            </label>
-                        </div>
-                    </div>
-                    <div class="relative">
-                        <textarea id="jsonInputA" spellcheck="false"
-                            class="w-full h-32 md:h-36 font-mono text-xs p-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 custom-scroll resize-y"
-                            placeholder="Paste JSON API Response A here..."></textarea>
-                        <div id="jsonErrorA"
-                            class="hidden absolute bottom-2 left-2 right-2 text-[11px] bg-red-100 dark:bg-red-950/90 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 rounded px-2 py-1 font-mono">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Right Input: Response B (Target / Actual) -->
-                <div class="flex flex-col gap-1.5">
-                    <div class="flex items-center justify-between text-xs font-medium">
-                        <div class="flex items-center gap-2">
-                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                            <span class="font-bold text-slate-800 dark:text-slate-200">Response B</span>
-                            <span class="text-[11px] text-slate-500 dark:text-slate-400">(Target / Actual)</span>
-                        </div>
-                        <div class="flex items-center gap-1.5">
-                            <input id="metaStatusB" type="text" value="200 OK" placeholder="Status"
-                                class="text-[11px] font-mono w-20 px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-center" />
-                            <input id="metaTimeB" type="text" value="89ms" placeholder="Time"
-                                class="text-[11px] font-mono w-16 px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-center" />
-                            <label class="cursor-pointer text-[11px] px-2 py-0.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300">
-                                Upload
-                                <input type="file" id="fileInputB" accept=".json,application/json" class="hidden" />
-                            </label>
-                        </div>
-                    </div>
-                    <div class="relative">
-                        <textarea id="jsonInputB" spellcheck="false"
-                            class="w-full h-32 md:h-36 font-mono text-xs p-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 custom-scroll resize-y"
-                            placeholder="Paste JSON API Response B here..."></textarea>
-                        <div id="jsonErrorB"
-                            class="hidden absolute bottom-2 left-2 right-2 text-[11px] bg-red-100 dark:bg-red-950/90 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 rounded px-2 py-1 font-mono">
-                        </div>
-                    </div>
-                </div>
-
-            </div>
-        </section>
-
-        <!-- Diff Summary & Metrics Banner -->
-        <section
-            class="px-4 py-2.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 shrink-0">
-            <!-- Left: Stat Badges -->
-            <div class="flex flex-wrap items-center gap-2">
-                <!-- Total Differences Badge -->
-                <div
-                    class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200">
-                    <span id="badgeTotalDiffs">0</span>
-                    <span class="text-slate-500 font-normal">Diffs</span>
-                </div>
-
-                <!-- Additions Card -->
-                <button id="filterAddBtn" type="button" title="Filter Added Fields"
-                    class="filter-pill flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800 text-xs font-medium text-emerald-800 dark:text-emerald-300 transition">
-                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    <span class="font-bold font-mono" id="statAdded">+0</span>
-                    <span class="text-emerald-700 dark:text-emerald-400">Added</span>
-                </button>
-
-                <!-- Deletions Card -->
-                <button id="filterRemBtn" type="button" title="Filter Removed Fields"
-                    class="filter-pill flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-950/50 dark:hover:bg-red-900/50 border border-red-200 dark:border-red-800 text-xs font-medium text-red-800 dark:text-red-300 transition">
-                    <span class="w-2 h-2 rounded-full bg-red-500"></span>
-                    <span class="font-bold font-mono" id="statRemoved">-0</span>
-                    <span class="text-red-700 dark:text-red-400">Removed</span>
-                </button>
-
-                <!-- Modifications Card -->
-                <button id="filterChgBtn" type="button" title="Filter Modified Fields"
-                    class="filter-pill flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/50 dark:hover:bg-amber-900/50 border border-amber-200 dark:border-amber-800 text-xs font-medium text-amber-800 dark:text-amber-300 transition">
-                    <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-                    <span class="font-bold font-mono" id="statChanged">~0</span>
-                    <span class="text-amber-700 dark:text-amber-400">Changed</span>
-                </button>
-
-                <!-- Unchanged Count Badge -->
-                <div
-                    class="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800/60 text-xs text-slate-500 dark:text-slate-400 hidden sm:flex">
-                    <span class="font-mono font-medium" id="statUnchanged">0</span>
-                    <span>Unchanged</span>
-                </div>
-
-                <!-- Similarity Score -->
-                <div class="flex items-center gap-1 text-xs font-medium text-slate-600 dark:text-slate-400 pl-1">
-                    <span>Similarity:</span>
-                    <span id="statSimilarity" class="font-bold font-mono text-emerald-600 dark:text-emerald-400">100%</span>
-                </div>
-            </div>
-
-            <!-- Right: Export & Change List Buttons -->
-            <div class="flex items-center gap-2">
-                <button id="toggleChangeListBtn" type="button"
-                    class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 flex items-center gap-1.5 transition">
-                    <svg class="w-3.5 h-3.5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="2">
-                        <line x1="8" y1="6" x2="21" y2="6"></line>
-                        <line x1="8" y1="12" x2="21" y2="12"></line>
-                        <line x1="8" y1="18" x2="21" y2="18"></line>
-                        <line x1="3" y1="6" x2="3.01" y2="6"></line>
-                        <line x1="3" y1="12" x2="3.01" y2="12"></line>
-                        <line x1="3" y1="18" x2="3.01" y2="18"></line>
-                    </svg>
-                    <span>Change List</span>
-                    <span id="changeListBadge"
-                        class="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200 dark:bg-slate-700">0</span>
-                </button>
-
-                <button id="copyReportBtn" type="button"
-                    class="text-xs px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium flex items-center gap-1.5 shadow-sm transition">
-                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                    </svg>
-                    <span>Copy Report</span>
-                </button>
-
-                <button id="copyPatchBtn" type="button" title="Export RFC 6902 JSON Patch"
-                    class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 flex items-center gap-1 transition">
-                    <svg class="w-3.5 h-3.5 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="2">
-                        <polyline points="16 18 22 12 16 6"></polyline>
-                        <polyline points="8 6 2 12 8 18"></polyline>
-                    </svg>
-                    <span class="hidden sm:inline">JSON Patch</span>
-                </button>
-            </div>
-        </section>
-
-        <!-- Secondary Toolbar: Search, Filters, Collapse Controls -->
-        <section
-            class="px-4 py-2 bg-slate-50 dark:bg-slate-950/80 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2.5 shrink-0 text-xs">
-            <!-- Search & Path Filter -->
-            <div class="flex items-center gap-2 flex-1 max-w-md">
-                <div class="relative w-full">
-                    <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400">
-                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <circle cx="11" cy="11" r="8"></circle>
-                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                        </svg>
-                    </span>
-                    <input id="diffSearchInput" type="text"
-                        placeholder="Search keys, values, or JSON paths (e.g. user.profile)..."
-                        class="w-full pl-8 pr-7 py-1 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono" />
-                    <button id="clearSearchBtn" type="button"
-                        class="hidden absolute inset-y-0 right-0 pr-2 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                            <line x1="6" y1="6" x2="18" y2="18"></line>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-
-            <!-- View Options & Controls -->
-            <div class="flex flex-wrap items-center gap-2">
-                <!-- Differences Only Checkbox -->
-                <label
-                    class="flex items-center gap-1.5 cursor-pointer text-slate-700 dark:text-slate-300 font-medium select-none">
-                    <input id="diffOnlyCheckbox" type="checkbox"
-                        class="rounded border-slate-300 dark:border-slate-700 text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5" />
-                    <span>Differences Only</span>
-                </label>
-
-                <!-- Array Matching Mode -->
-                <div class="flex items-center gap-1 border-l border-slate-200 dark:border-slate-800 pl-2">
-                    <label for="arrayDiffMode" class="text-slate-500 dark:text-slate-400 text-[11px] hidden md:inline">Array
-                        Match:</label>
-                    <select id="arrayDiffMode"
-                        class="text-[11px] rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-0.5 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-500">
-                        <option value="id">Smart ID (id, _id, key)</option>
-                        <option value="index">Index Order</option>
-                    </select>
-                </div>
-
-                <!-- Tree Expand / Collapse Buttons -->
-                <div class="flex items-center gap-1 border-l border-slate-200 dark:border-slate-800 pl-2">
-                    <button id="expandAllBtn" type="button" title="Expand All Nodes"
-                        class="px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300">
-                        Expand All
-                    </button>
-                    <button id="collapseAllBtn" type="button" title="Collapse All Nodes"
-                        class="px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300">
-                        Collapse All
-                    </button>
-                    <button id="collapseUnchangedBtn" type="button" title="Collapse Identical Objects"
-                        class="px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 hidden sm:inline">
-                        Collapse Unchanged
-                    </button>
-                </div>
-            </div>
-        </section>
-
-        <!-- Main Tree Diff Pane Area -->
-        <div class="flex-1 flex min-h-0 relative">
-
-            <!-- Side-by-Side Tree View Container -->
-            <div id="treeContainer" class="flex-1 flex flex-col min-h-0 overflow-hidden bg-white dark:bg-slate-900">
-                
-                <!-- Tree Pane Column Header Bar -->
-                <div
-                    class="grid grid-cols-2 divide-x divide-slate-200 dark:divide-slate-800 border-b border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950 text-xs font-semibold shrink-0">
-                    <div class="px-4 py-1.5 flex items-center justify-between text-slate-700 dark:text-slate-300">
-                        <div class="flex items-center gap-2">
-                            <span class="w-2 h-2 rounded-full bg-rose-500"></span>
-                            <span>Response A (Base)</span>
-                        </div>
-                        <span id="colStatusA" class="font-mono text-[11px] text-slate-500">200 OK &bull; 124ms</span>
-                    </div>
-                    <div class="px-4 py-1.5 flex items-center justify-between text-slate-700 dark:text-slate-300">
-                        <div class="flex items-center gap-2">
-                            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                            <span>Response B (Target)</span>
-                        </div>
-                        <span id="colStatusB" class="font-mono text-[11px] text-slate-500">200 OK &bull; 89ms</span>
-                    </div>
-                </div>
-
-                <!-- Synchronized Tree Scroll Area -->
-                <div id="treeScrollArea" class="flex-1 overflow-auto custom-scroll font-mono text-xs select-text">
-                    <div id="treeRowsWrapper" class="min-w-full inline-block">
-                        <!-- Diff rows rendered dynamically here -->
-                    </div>
-                </div>
-
-                <!-- Empty or Error State -->
-                <div id="emptyDiffState"
-                    class="hidden absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-white/90 dark:bg-slate-900/90 z-10">
-                    <div class="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 mb-3">
-                        <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <line x1="12" y1="8" x2="12" y2="12"></line>
-                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                        </svg>
-                    </div>
-                    <h3 id="emptyStateTitle" class="text-sm font-bold text-slate-800 dark:text-slate-200">No Valid Responses</h3>
-                    <p id="emptyStateDesc" class="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">Paste valid JSON payloads into both inputs above to view their side-by-side semantic tree diff.</p>
-                </div>
-
-            </div>
-
-            <!-- Slide-over Change List Drawer -->
-            <aside id="changeListDrawer"
-                class="hidden w-80 md:w-96 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shrink-0 z-10 shadow-lg">
-                <div
-                    class="p-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-950">
-                    <div class="flex items-center gap-2">
-                        <span class="font-bold text-xs text-slate-800 dark:text-slate-200">Differences Change Log</span>
-                        <span id="drawerDiffCount"
-                            class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">0</span>
-                    </div>
-                    <button id="closeDrawerBtn" type="button"
-                        class="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                            <line x1="6" y1="6" x2="18" y2="18"></line>
-                        </svg>
-                    </button>
-                </div>
-                <div class="p-2 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
-                    <p class="text-[11px] text-slate-500 dark:text-slate-400">Click any change to scroll and highlight the field in the tree.</p>
-                </div>
-                <div id="changeListItems" class="flex-1 overflow-y-auto custom-scroll divide-y divide-slate-100 dark:divide-slate-800/80">
-                    <!-- Dynamic change list items -->
-                </div>
-            </aside>
-
+      <!-- Top Raw Editors Drawer (Collapsible) -->
+      <section id="rawInputsSection" class="border-b border-slate-200 dark:border-slate-800 bg-slate-100/70 dark:bg-slate-900/50 transition-all duration-300">
+        <!-- Header Bar with Toggle Collapse -->
+        <div class="px-4 py-2 flex items-center justify-between border-b border-slate-200/60 dark:border-slate-800/60">
+          <div class="flex items-center gap-2">
+            <button id="toggleRawInputsBtn" type="button" class="text-xs font-semibold flex items-center gap-1.5 text-slate-700 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400">
+              <svg id="rawInputsChevron" class="w-4 h-4 transition-transform duration-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+              <span>Raw JSON Response Payloads</span>
+              <span id="rawInputSummaryBadge" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-normal">2 Payloads Active</span>
+            </button>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="formatBothBtn" type="button" class="text-xs px-2.5 py-1 rounded bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 flex items-center gap-1 transition">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="4 7 4 4 20 4 20 7"></polyline>
+                <line x1="9" y1="20" x2="15" y2="20"></line>
+                <line x1="12" y1="4" x2="12" y2="20"></line>
+              </svg>
+              Prettify Both
+            </button>
+            <button id="clearBothBtn" type="button" class="text-xs px-2.5 py-1 rounded bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition">Clear</button>
+          </div>
         </div>
 
+        <!-- Side by Side Raw JSON Inputs (Collapsible content) -->
+        <div id="rawInputsContent" class="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200 dark:divide-slate-800 p-3 gap-3">
+          <!-- Left Input: Response A (Base / Expected) -->
+          <div class="flex flex-col gap-1.5">
+            <div class="flex items-center justify-between text-xs font-medium">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+                <span class="font-bold text-slate-800 dark:text-slate-200">Response A</span>
+                <span class="text-[11px] text-slate-500 dark:text-slate-400">(Base / Expected)</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <input id="metaStatusA" type="text" value="200 OK" placeholder="Status" class="text-[11px] font-mono w-20 px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-center" />
+                <input id="metaTimeA" type="text" value="124ms" placeholder="Time" class="text-[11px] font-mono w-16 px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-center" />
+                <label class="cursor-pointer text-[11px] px-2 py-0.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300">
+                  Upload
+                  <input type="file" id="fileInputA" accept=".json,application/json" class="hidden" />
+                </label>
+              </div>
+            </div>
+            <div class="relative">
+              <textarea id="jsonInputA" spellcheck="false" class="w-full h-32 md:h-36 font-mono text-xs p-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 custom-scroll resize-y" placeholder="Paste JSON API Response A here..."></textarea>
+              <div id="jsonErrorA" class="hidden absolute bottom-2 left-2 right-2 text-[11px] bg-red-100 dark:bg-red-950/90 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 rounded px-2 py-1 font-mono"></div>
+            </div>
+          </div>
+
+          <!-- Right Input: Response B (Target / Actual) -->
+          <div class="flex flex-col gap-1.5">
+            <div class="flex items-center justify-between text-xs font-medium">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                <span class="font-bold text-slate-800 dark:text-slate-200">Response B</span>
+                <span class="text-[11px] text-slate-500 dark:text-slate-400">(Target / Actual)</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <input id="metaStatusB" type="text" value="200 OK" placeholder="Status" class="text-[11px] font-mono w-20 px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-center" />
+                <input id="metaTimeB" type="text" value="89ms" placeholder="Time" class="text-[11px] font-mono w-16 px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-center" />
+                <label class="cursor-pointer text-[11px] px-2 py-0.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300">
+                  Upload
+                  <input type="file" id="fileInputB" accept=".json,application/json" class="hidden" />
+                </label>
+              </div>
+            </div>
+            <div class="relative">
+              <textarea id="jsonInputB" spellcheck="false" class="w-full h-32 md:h-36 font-mono text-xs p-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 custom-scroll resize-y" placeholder="Paste JSON API Response B here..."></textarea>
+              <div id="jsonErrorB" class="hidden absolute bottom-2 left-2 right-2 text-[11px] bg-red-100 dark:bg-red-950/90 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 rounded px-2 py-1 font-mono"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Diff Summary & Metrics Banner -->
+      <section class="px-4 py-2.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 shrink-0">
+        <!-- Left: Stat Badges -->
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- Total Differences Badge -->
+          <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200">
+            <span id="badgeTotalDiffs">0</span>
+            <span class="text-slate-500 font-normal">Diffs</span>
+          </div>
+
+          <!-- Additions Card -->
+          <button id="filterAddBtn" type="button" title="Filter Added Fields" class="filter-pill flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800 text-xs font-medium text-emerald-800 dark:text-emerald-300 transition">
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span class="font-bold font-mono" id="statAdded">+0</span>
+            <span class="text-emerald-700 dark:text-emerald-400">Added</span>
+          </button>
+
+          <!-- Deletions Card -->
+          <button id="filterRemBtn" type="button" title="Filter Removed Fields" class="filter-pill flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-950/50 dark:hover:bg-red-900/50 border border-red-200 dark:border-red-800 text-xs font-medium text-red-800 dark:text-red-300 transition">
+            <span class="w-2 h-2 rounded-full bg-red-500"></span>
+            <span class="font-bold font-mono" id="statRemoved">-0</span>
+            <span class="text-red-700 dark:text-red-400">Removed</span>
+          </button>
+
+          <!-- Modifications Card -->
+          <button id="filterChgBtn" type="button" title="Filter Modified Fields" class="filter-pill flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/50 dark:hover:bg-amber-900/50 border border-amber-200 dark:border-amber-800 text-xs font-medium text-amber-800 dark:text-amber-300 transition">
+            <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+            <span class="font-bold font-mono" id="statChanged">~0</span>
+            <span class="text-amber-700 dark:text-amber-400">Changed</span>
+          </button>
+
+          <!-- Unchanged Count Badge -->
+          <div class="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800/60 text-xs text-slate-500 dark:text-slate-400 hidden sm:flex">
+            <span class="font-mono font-medium" id="statUnchanged">0</span>
+            <span>Unchanged</span>
+          </div>
+
+          <!-- Similarity Score -->
+          <div class="flex items-center gap-1 text-xs font-medium text-slate-600 dark:text-slate-400 pl-1">
+            <span>Similarity:</span>
+            <span id="statSimilarity" class="font-bold font-mono text-emerald-600 dark:text-emerald-400">100%</span>
+          </div>
+        </div>
+
+        <!-- Right: Export & Change List Buttons -->
+        <div class="flex items-center gap-2">
+          <button id="toggleChangeListBtn" type="button" class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 flex items-center gap-1.5 transition">
+            <svg class="w-3.5 h-3.5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="8" y1="6" x2="21" y2="6"></line>
+              <line x1="8" y1="12" x2="21" y2="12"></line>
+              <line x1="8" y1="18" x2="21" y2="18"></line>
+              <line x1="3" y1="6" x2="3.01" y2="6"></line>
+              <line x1="3" y1="12" x2="3.01" y2="12"></line>
+              <line x1="3" y1="18" x2="3.01" y2="18"></line>
+            </svg>
+            <span>Change List</span>
+            <span id="changeListBadge" class="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200 dark:bg-slate-700">0</span>
+          </button>
+
+          <button id="copyReportBtn" type="button" class="text-xs px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium flex items-center gap-1.5 shadow-sm transition">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <span>Copy Report</span>
+          </button>
+
+          <button id="copyPatchBtn" type="button" title="Export RFC 6902 JSON Patch" class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 flex items-center gap-1 transition">
+            <svg class="w-3.5 h-3.5 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="16 18 22 12 16 6"></polyline>
+              <polyline points="8 6 2 12 8 18"></polyline>
+            </svg>
+            <span class="hidden sm:inline">JSON Patch</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Secondary Toolbar: Search, Filters, Collapse Controls -->
+      <section class="px-4 py-2 bg-slate-50 dark:bg-slate-950/80 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2.5 shrink-0 text-xs">
+        <!-- Search & Path Filter -->
+        <div class="flex items-center gap-2 flex-1 max-w-md">
+          <div class="relative w-full">
+            <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </span>
+            <input id="diffSearchInput" type="text" placeholder="Search keys, values, or JSON paths (e.g. user.profile)..." class="w-full pl-8 pr-7 py-1 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono" />
+            <button id="clearSearchBtn" type="button" class="hidden absolute inset-y-0 right-0 pr-2 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- View Options & Controls -->
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- Differences Only Checkbox -->
+          <label class="flex items-center gap-1.5 cursor-pointer text-slate-700 dark:text-slate-300 font-medium select-none">
+            <input id="diffOnlyCheckbox" type="checkbox" class="rounded border-slate-300 dark:border-slate-700 text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5" />
+            <span>Differences Only</span>
+          </label>
+
+          <!-- Array Matching Mode -->
+          <div class="flex items-center gap-1 border-l border-slate-200 dark:border-slate-800 pl-2">
+            <label for="arrayDiffMode" class="text-slate-500 dark:text-slate-400 text-[11px] hidden md:inline">Array Match:</label>
+            <select id="arrayDiffMode" class="text-[11px] rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-0.5 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-500">
+              <option value="id">Smart ID (id, _id, key)</option>
+              <option value="index">Index Order</option>
+            </select>
+          </div>
+
+          <!-- Tree Expand / Collapse Buttons -->
+          <div class="flex items-center gap-1 border-l border-slate-200 dark:border-slate-800 pl-2">
+            <button id="expandAllBtn" type="button" title="Expand All Nodes" class="px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300">Expand All</button>
+            <button id="collapseAllBtn" type="button" title="Collapse All Nodes" class="px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300">Collapse All</button>
+            <button id="collapseUnchangedBtn" type="button" title="Collapse Identical Objects" class="px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 hidden sm:inline">Collapse Unchanged</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Main Tree Diff Pane Area -->
+      <div class="flex-1 flex min-h-0 relative">
+        <!-- Side-by-Side Tree View Container -->
+        <div id="treeContainer" class="flex-1 flex flex-col min-h-0 overflow-hidden bg-white dark:bg-slate-900">
+          <!-- Tree Pane Column Header Bar -->
+          <div class="grid grid-cols-2 divide-x divide-slate-200 dark:divide-slate-800 border-b border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950 text-xs font-semibold shrink-0">
+            <div class="px-4 py-1.5 flex items-center justify-between text-slate-700 dark:text-slate-300">
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+                <span>Response A (Base)</span>
+              </div>
+              <span id="colStatusA" class="font-mono text-[11px] text-slate-500">200 OK &bull; 124ms</span>
+            </div>
+            <div class="px-4 py-1.5 flex items-center justify-between text-slate-700 dark:text-slate-300">
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span>Response B (Target)</span>
+              </div>
+              <span id="colStatusB" class="font-mono text-[11px] text-slate-500">200 OK &bull; 89ms</span>
+            </div>
+          </div>
+
+          <!-- Synchronized Tree Scroll Area -->
+          <div id="treeScrollArea" class="flex-1 overflow-auto custom-scroll font-mono text-xs select-text">
+            <div id="treeRowsWrapper" class="min-w-full inline-block">
+              <!-- Diff rows rendered dynamically here -->
+            </div>
+          </div>
+
+          <!-- Empty or Error State -->
+          <div id="emptyDiffState" class="hidden absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-white/90 dark:bg-slate-900/90 z-10">
+            <div class="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 mb-3">
+              <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+            </div>
+            <h3 id="emptyStateTitle" class="text-sm font-bold text-slate-800 dark:text-slate-200">No Valid Responses</h3>
+            <p id="emptyStateDesc" class="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">Paste valid JSON payloads into both inputs above to view their side-by-side semantic tree diff.</p>
+          </div>
+        </div>
+
+        <!-- Slide-over Change List Drawer -->
+        <aside id="changeListDrawer" class="hidden w-80 md:w-96 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shrink-0 z-10 shadow-lg">
+          <div class="p-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-950">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-xs text-slate-800 dark:text-slate-200">Differences Change Log</span>
+              <span id="drawerDiffCount" class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">0</span>
+            </div>
+            <button id="closeDrawerBtn" type="button" class="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+          <div class="p-2 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+            <p class="text-[11px] text-slate-500 dark:text-slate-400">Click any change to scroll and highlight the field in the tree.</p>
+          </div>
+          <div id="changeListItems" class="flex-1 overflow-y-auto custom-scroll divide-y divide-slate-100 dark:divide-slate-800/80">
+            <!-- Dynamic change list items -->
+          </div>
+        </aside>
+      </div>
     </main>
 
     <!-- Export & Report Modal Dialog -->
     <div id="reportModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-        <div
-            class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <!-- Modal Header -->
-            <div class="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                    <span id="modalIcon" class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                    <h3 id="modalTitle" class="text-sm font-bold text-slate-900 dark:text-white">API Response Diff Report</h3>
-                </div>
-                <button id="closeModalBtn" type="button"
-                    class="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                </button>
-            </div>
-
-            <!-- Modal Tabs (Markdown vs JSON Patch) -->
-            <div class="px-5 pt-3 flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 text-xs">
-                <button id="modalTabMarkdown" type="button"
-                    class="pb-2 font-semibold text-emerald-600 dark:text-emerald-400 border-b-2 border-emerald-500">
-                    Markdown Summary
-                </button>
-                <button id="modalTabPatch" type="button"
-                    class="pb-2 font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">
-                    RFC 6902 JSON Patch
-                </button>
-            </div>
-
-            <!-- Modal Content Textarea -->
-            <div class="p-5 flex-1 min-h-[250px] flex flex-col">
-                <textarea id="modalTextContent" readonly spellcheck="false"
-                    class="w-full flex-1 p-3 font-mono text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 focus:outline-none custom-scroll resize-none"></textarea>
-            </div>
-
-            <!-- Modal Footer -->
-            <div class="px-5 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex items-center justify-between">
-                <span id="modalFooterNote" class="text-xs text-slate-500 dark:text-slate-400">Ready to paste into GitHub PRs, Slack, or documentation.</span>
-                <div class="flex items-center gap-2">
-                    <button id="copyModalContentBtn" type="button"
-                        class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs flex items-center gap-1.5 transition">
-                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                        </svg>
-                        <span>Copy to Clipboard</span>
-                    </button>
-                </div>
-            </div>
+      <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <!-- Modal Header -->
+        <div class="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span id="modalIcon" class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+            <h3 id="modalTitle" class="text-sm font-bold text-slate-900 dark:text-white">API Response Diff Report</h3>
+          </div>
+          <button id="closeModalBtn" type="button" class="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
         </div>
+
+        <!-- Modal Tabs (Markdown vs JSON Patch) -->
+        <div class="px-5 pt-3 flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 text-xs">
+          <button id="modalTabMarkdown" type="button" class="pb-2 font-semibold text-emerald-600 dark:text-emerald-400 border-b-2 border-emerald-500">Markdown Summary</button>
+          <button id="modalTabPatch" type="button" class="pb-2 font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">RFC 6902 JSON Patch</button>
+        </div>
+
+        <!-- Modal Content Textarea -->
+        <div class="p-5 flex-1 min-h-[250px] flex flex-col">
+          <textarea id="modalTextContent" readonly spellcheck="false" class="w-full flex-1 p-3 font-mono text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 focus:outline-none custom-scroll resize-none"></textarea>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="px-5 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex items-center justify-between">
+          <span id="modalFooterNote" class="text-xs text-slate-500 dark:text-slate-400">Ready to paste into GitHub PRs, Slack, or documentation.</span>
+          <div class="flex items-center gap-2">
+            <button id="copyModalContentBtn" type="button" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs flex items-center gap-1.5 transition">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <span>Copy to Clipboard</span>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Notification Toast -->
-    <div id="toastNotification"
-        class="hidden fixed bottom-5 right-5 bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-4 py-2.5 rounded-xl shadow-2xl text-xs font-medium flex items-center gap-2 z-50 transform transition-all duration-200">
-        <svg class="w-4 h-4 text-emerald-400 dark:text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="20 6 9 17 4 12"></polyline>
-        </svg>
-        <span id="toastMessage">Copied to clipboard!</span>
+    <div id="toastNotification" class="hidden fixed bottom-5 right-5 bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-4 py-2.5 rounded-xl shadow-2xl text-xs font-medium flex items-center gap-2 z-50 transform transition-all duration-200">
+      <svg class="w-4 h-4 text-emerald-400 dark:text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+      <span id="toastMessage">Copied to clipboard!</span>
     </div>
 
     <!-- Core Interactive Script -->
     <script>
-        (function () {
-            'use strict';
+      (function () {
+        "use strict";
 
-            // --- HTML Sanitization Helper ---
-            function escapeHtml(str) {
-                if (str === null || str === undefined) return '';
-                return String(str)
-                    .replace(/&/g, '&amp;')
-                    .replace(/</g, '&lt;')
-                    .replace(/>/g, '&gt;')
-                    .replace(/"/g, '&quot;')
-                    .replace(/'/g, '&#39;');
+        // --- HTML Sanitization Helper ---
+        function escapeHtml(str) {
+          if (str === null || str === undefined) return "";
+          return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+        }
+
+        // --- Theme Management ---
+        var themeToggleBtn = document.getElementById("themeToggleBtn");
+        themeToggleBtn.addEventListener("click", function () {
+          var isDark = document.documentElement.classList.contains("dark");
+          try {
+            if (isDark) {
+              document.documentElement.classList.remove("dark");
+              localStorage.setItem("api_differ_theme", "light");
+            } else {
+              document.documentElement.classList.add("dark");
+              localStorage.setItem("api_differ_theme", "dark");
             }
+          } catch (e) {}
+        });
 
-            // --- Theme Management ---
-            var themeToggleBtn = document.getElementById('themeToggleBtn');
-            themeToggleBtn.addEventListener('click', function () {
-                var isDark = document.documentElement.classList.contains('dark');
-                try {
-                    if (isDark) {
-                        document.documentElement.classList.remove('dark');
-                        localStorage.setItem('api_differ_theme', 'light');
-                    } else {
-                        document.documentElement.classList.add('dark');
-                        localStorage.setItem('api_differ_theme', 'dark');
-                    }
-                } catch (e) { }
-            });
-
-            // --- Scenario Presets ---
-            var PRESETS = {
-                profile_evolution: {
-                    metaA: { status: '200 OK', time: '124ms' },
-                    metaB: { status: '200 OK', time: '89ms' },
-                    payloadA: {
-                        status: 200,
-                        apiVersion: "v1.4.2",
-                        user: {
-                            id: 10842,
-                            username: "alex_developer",
-                            email: "alex@example.io",
-                            role: "contributor",
-                            is_verified: true,
-                            legacy_auth_token: "tok_sec_994a8bc31f",
-                            profile: {
-                                firstName: "Alex",
-                                lastName: "Rivera",
-                                country: "US",
-                                avatarUrl: "https://cdn.example.com/avatars/10842.png"
-                            },
-                            permissions: [
-                                "read:reports",
-                                "write:drafts"
-                            ]
-                        },
-                        server: {
-                            region: "us-east-1",
-                            cluster: "prod-alpha-02"
-                        }
-                    },
-                    payloadB: {
-                        status: 200,
-                        apiVersion: "v2.0.0",
-                        user: {
-                            id: 10842,
-                            username: "alex_developer",
-                            email: "alex.rivera@enterprise.org",
-                            role: "administrator",
-                            is_verified: true,
-                            two_factor_enabled: true,
-                            profile: {
-                                firstName: "Alex",
-                                lastName: "Rivera",
-                                country: "CA",
-                                avatarUrl: "https://cdn.example.com/avatars/10842_v2.png",
-                                timezone: "America/Toronto"
-                            },
-                            permissions: [
-                                "read:reports",
-                                "write:drafts",
-                                "publish:releases",
-                                "admin:billing"
-                            ]
-                        },
-                        server: {
-                            region: "us-east-1",
-                            cluster: "prod-edge-09",
-                            latency_ms: 14.8
-                        }
-                    }
+        // --- Scenario Presets ---
+        var PRESETS = {
+          profile_evolution: {
+            metaA: { status: "200 OK", time: "124ms" },
+            metaB: { status: "200 OK", time: "89ms" },
+            payloadA: {
+              status: 200,
+              apiVersion: "v1.4.2",
+              user: {
+                id: 10842,
+                username: "alex_developer",
+                email: "alex@example.io",
+                role: "contributor",
+                is_verified: true,
+                legacy_auth_token: "tok_sec_994a8bc31f",
+                profile: {
+                  firstName: "Alex",
+                  lastName: "Rivera",
+                  country: "US",
+                  avatarUrl: "https://cdn.example.com/avatars/10842.png"
                 },
-                ecom_catalog: {
-                    metaA: { status: '200 OK', time: '180ms' },
-                    metaB: { status: '200 OK', time: '142ms' },
-                    payloadA: {
-                        category: "laptops",
-                        page: 1,
-                        total_items: 3,
-                        currency: "USD",
-                        items: [
-                            { id: "SKU-001", name: "UltraBook Pro 14", price: 1299.99, in_stock: true, rating: 4.7 },
-                            { id: "SKU-002", name: "Gaming Beast X", price: 1899.00, in_stock: false, rating: 4.5 },
-                            { id: "SKU-003", name: "EcoBook Air 13", price: 899.50, in_stock: true, rating: 4.2 }
-                        ],
-                        promotions_applied: []
-                    },
-                    payloadB: {
-                        category: "laptops",
-                        page: 1,
-                        total_items: 3,
-                        currency: "USD",
-                        items: [
-                            { id: "SKU-001", name: "UltraBook Pro 14", price: 1199.99, in_stock: true, rating: 4.8 },
-                            { id: "SKU-003", name: "EcoBook Air 13", price: 849.00, in_stock: true, rating: 4.3 },
-                            { id: "SKU-004", name: "ProStation Studio 16", price: 2499.00, in_stock: true, rating: 4.9 }
-                        ],
-                        promotions_applied: [
-                            { code: "SUMMER100", discount_amount: 100 }
-                        ]
-                    }
+                permissions: ["read:reports", "write:drafts"]
+              },
+              server: {
+                region: "us-east-1",
+                cluster: "prod-alpha-02"
+              }
+            },
+            payloadB: {
+              status: 200,
+              apiVersion: "v2.0.0",
+              user: {
+                id: 10842,
+                username: "alex_developer",
+                email: "alex.rivera@enterprise.org",
+                role: "administrator",
+                is_verified: true,
+                two_factor_enabled: true,
+                profile: {
+                  firstName: "Alex",
+                  lastName: "Rivera",
+                  country: "CA",
+                  avatarUrl: "https://cdn.example.com/avatars/10842_v2.png",
+                  timezone: "America/Toronto"
                 },
-                orders_pagination: {
-                    metaA: { status: '200 OK', time: '95ms' },
-                    metaB: { status: '200 OK', time: '110ms' },
-                    payloadA: {
-                        data: {
-                            orders: [
-                                { order_id: "ORD-901", total: 49.99, status: "pending", items_count: 2 },
-                                { order_id: "ORD-902", total: 120.00, status: "delivered", items_count: 5 },
-                                { order_id: "ORD-903", total: 85.50, status: "processing", items_count: 3 }
-                            ],
-                            pagination: {
-                                current_page: 1,
-                                per_page: 3,
-                                total_records: 45,
-                                has_next: true
-                            }
-                        }
-                    },
-                    payloadB: {
-                        data: {
-                            orders: [
-                                { order_id: "ORD-901", total: 49.99, status: "shipped", tracking_number: "TRK-881920", items_count: 2 },
-                                { order_id: "ORD-903", total: 85.50, status: "delivered", items_count: 3 },
-                                { order_id: "ORD-904", total: 210.00, status: "pending", items_count: 4 }
-                            ],
-                            pagination: {
-                                current_page: 1,
-                                per_page: 3,
-                                total_records: 44,
-                                has_next: true
-                            }
-                        }
-                    }
-                },
-                success_vs_error: {
-                    metaA: { status: '200 OK', time: '64ms' },
-                    metaB: { status: '403 Forbidden', time: '38ms' },
-                    payloadA: {
-                        status: "success",
-                        code: 200,
-                        data: {
-                            session_id: "sess_91823abf",
-                            authenticated: true,
-                            scopes: ["user:read", "user:write", "analytics:view"],
-                            token_expires_in: 3600
-                        }
-                    },
-                    payloadB: {
-                        status: "error",
-                        code: 403,
-                        error: {
-                            type: "ForbiddenError",
-                            message: "Access restricted: IP is not whitelisted for tenant.",
-                            error_code: "AUTH_IP_RESTRICTED",
-                            documentation_url: "https://api.example.com/docs/auth-errors",
-                            trace_id: "trace_9921443a"
-                        }
-                    }
-                },
-                graphql_microservice: {
-                    metaA: { status: '200 OK', time: '150ms' },
-                    metaB: { status: '200 OK', time: '135ms' },
-                    payloadA: {
-                        data: {
-                            service: "inventory-sync",
-                            health: "healthy",
-                            sync_count: 1420,
-                            config: {
-                                batch_size: 50,
-                                timeout_seconds: 30,
-                                retry_policy: {
-                                    max_attempts: 3,
-                                    backoff_factor: 2.0
-                                }
-                            }
-                        }
-                    },
-                    payloadB: {
-                        data: {
-                            service: "inventory-sync",
-                            health: "degraded",
-                            sync_count: 1540,
-                            drift_detected: true,
-                            config: {
-                                batch_size: 100,
-                                timeout_seconds: 45,
-                                retry_policy: {
-                                    max_attempts: 5,
-                                    backoff_factor: 1.5,
-                                    jitter: true
-                                }
-                            }
-                        }
-                    }
+                permissions: ["read:reports", "write:drafts", "publish:releases", "admin:billing"]
+              },
+              server: {
+                region: "us-east-1",
+                cluster: "prod-edge-09",
+                latency_ms: 14.8
+              }
+            }
+          },
+          ecom_catalog: {
+            metaA: { status: "200 OK", time: "180ms" },
+            metaB: { status: "200 OK", time: "142ms" },
+            payloadA: {
+              category: "laptops",
+              page: 1,
+              total_items: 3,
+              currency: "USD",
+              items: [
+                { id: "SKU-001", name: "UltraBook Pro 14", price: 1299.99, in_stock: true, rating: 4.7 },
+                { id: "SKU-002", name: "Gaming Beast X", price: 1899.0, in_stock: false, rating: 4.5 },
+                { id: "SKU-003", name: "EcoBook Air 13", price: 899.5, in_stock: true, rating: 4.2 }
+              ],
+              promotions_applied: []
+            },
+            payloadB: {
+              category: "laptops",
+              page: 1,
+              total_items: 3,
+              currency: "USD",
+              items: [
+                { id: "SKU-001", name: "UltraBook Pro 14", price: 1199.99, in_stock: true, rating: 4.8 },
+                { id: "SKU-003", name: "EcoBook Air 13", price: 849.0, in_stock: true, rating: 4.3 },
+                { id: "SKU-004", name: "ProStation Studio 16", price: 2499.0, in_stock: true, rating: 4.9 }
+              ],
+              promotions_applied: [{ code: "SUMMER100", discount_amount: 100 }]
+            }
+          },
+          orders_pagination: {
+            metaA: { status: "200 OK", time: "95ms" },
+            metaB: { status: "200 OK", time: "110ms" },
+            payloadA: {
+              data: {
+                orders: [
+                  { order_id: "ORD-901", total: 49.99, status: "pending", items_count: 2 },
+                  { order_id: "ORD-902", total: 120.0, status: "delivered", items_count: 5 },
+                  { order_id: "ORD-903", total: 85.5, status: "processing", items_count: 3 }
+                ],
+                pagination: {
+                  current_page: 1,
+                  per_page: 3,
+                  total_records: 45,
+                  has_next: true
                 }
+              }
+            },
+            payloadB: {
+              data: {
+                orders: [
+                  { order_id: "ORD-901", total: 49.99, status: "shipped", tracking_number: "TRK-881920", items_count: 2 },
+                  { order_id: "ORD-903", total: 85.5, status: "delivered", items_count: 3 },
+                  { order_id: "ORD-904", total: 210.0, status: "pending", items_count: 4 }
+                ],
+                pagination: {
+                  current_page: 1,
+                  per_page: 3,
+                  total_records: 44,
+                  has_next: true
+                }
+              }
+            }
+          },
+          success_vs_error: {
+            metaA: { status: "200 OK", time: "64ms" },
+            metaB: { status: "403 Forbidden", time: "38ms" },
+            payloadA: {
+              status: "success",
+              code: 200,
+              data: {
+                session_id: "sess_91823abf",
+                authenticated: true,
+                scopes: ["user:read", "user:write", "analytics:view"],
+                token_expires_in: 3600
+              }
+            },
+            payloadB: {
+              status: "error",
+              code: 403,
+              error: {
+                type: "ForbiddenError",
+                message: "Access restricted: IP is not whitelisted for tenant.",
+                error_code: "AUTH_IP_RESTRICTED",
+                documentation_url: "https://api.example.com/docs/auth-errors",
+                trace_id: "trace_9921443a"
+              }
+            }
+          },
+          graphql_microservice: {
+            metaA: { status: "200 OK", time: "150ms" },
+            metaB: { status: "200 OK", time: "135ms" },
+            payloadA: {
+              data: {
+                service: "inventory-sync",
+                health: "healthy",
+                sync_count: 1420,
+                config: {
+                  batch_size: 50,
+                  timeout_seconds: 30,
+                  retry_policy: {
+                    max_attempts: 3,
+                    backoff_factor: 2.0
+                  }
+                }
+              }
+            },
+            payloadB: {
+              data: {
+                service: "inventory-sync",
+                health: "degraded",
+                sync_count: 1540,
+                drift_detected: true,
+                config: {
+                  batch_size: 100,
+                  timeout_seconds: 45,
+                  retry_policy: {
+                    max_attempts: 5,
+                    backoff_factor: 1.5,
+                    jitter: true
+                  }
+                }
+              }
+            }
+          }
+        };
+
+        // --- DOM Elements ---
+        var jsonInputA = document.getElementById("jsonInputA");
+        var jsonInputB = document.getElementById("jsonInputB");
+        var jsonErrorA = document.getElementById("jsonErrorA");
+        var jsonErrorB = document.getElementById("jsonErrorB");
+        var metaStatusA = document.getElementById("metaStatusA");
+        var metaTimeA = document.getElementById("metaTimeA");
+        var metaStatusB = document.getElementById("metaStatusB");
+        var metaTimeB = document.getElementById("metaTimeB");
+        var colStatusA = document.getElementById("colStatusA");
+        var colStatusB = document.getElementById("colStatusB");
+
+        var presetSelect = document.getElementById("presetSelect");
+        var resetBtn = document.getElementById("resetBtn");
+        var swapBtn = document.getElementById("swapBtn");
+        var formatBothBtn = document.getElementById("formatBothBtn");
+        var clearBothBtn = document.getElementById("clearBothBtn");
+        var fileInputA = document.getElementById("fileInputA");
+        var fileInputB = document.getElementById("fileInputB");
+
+        var toggleRawInputsBtn = document.getElementById("toggleRawInputsBtn");
+        var rawInputsContent = document.getElementById("rawInputsContent");
+        var rawInputsChevron = document.getElementById("rawInputsChevron");
+        var rawInputSummaryBadge = document.getElementById("rawInputSummaryBadge");
+
+        var treeRowsWrapper = document.getElementById("treeRowsWrapper");
+        var treeScrollArea = document.getElementById("treeScrollArea");
+        var emptyDiffState = document.getElementById("emptyDiffState");
+        var emptyStateTitle = document.getElementById("emptyStateTitle");
+        var emptyStateDesc = document.getElementById("emptyStateDesc");
+
+        var badgeTotalDiffs = document.getElementById("badgeTotalDiffs");
+        var statAdded = document.getElementById("statAdded");
+        var statRemoved = document.getElementById("statRemoved");
+        var statChanged = document.getElementById("statChanged");
+        var statUnchanged = document.getElementById("statUnchanged");
+        var statSimilarity = document.getElementById("statSimilarity");
+
+        var filterAddBtn = document.getElementById("filterAddBtn");
+        var filterRemBtn = document.getElementById("filterRemBtn");
+        var filterChgBtn = document.getElementById("filterChgBtn");
+        var diffOnlyCheckbox = document.getElementById("diffOnlyCheckbox");
+        var arrayDiffMode = document.getElementById("arrayDiffMode");
+        var diffSearchInput = document.getElementById("diffSearchInput");
+        var clearSearchBtn = document.getElementById("clearSearchBtn");
+
+        var expandAllBtn = document.getElementById("expandAllBtn");
+        var collapseAllBtn = document.getElementById("collapseAllBtn");
+        var collapseUnchangedBtn = document.getElementById("collapseUnchangedBtn");
+
+        var toggleChangeListBtn = document.getElementById("toggleChangeListBtn");
+        var changeListDrawer = document.getElementById("changeListDrawer");
+        var closeDrawerBtn = document.getElementById("closeDrawerBtn");
+        var changeListItems = document.getElementById("changeListItems");
+        var changeListBadge = document.getElementById("changeListBadge");
+        var drawerDiffCount = document.getElementById("drawerDiffCount");
+
+        var copyReportBtn = document.getElementById("copyReportBtn");
+        var copyPatchBtn = document.getElementById("copyPatchBtn");
+        var reportModal = document.getElementById("reportModal");
+        var closeModalBtn = document.getElementById("closeModalBtn");
+        var modalTabMarkdown = document.getElementById("modalTabMarkdown");
+        var modalTabPatch = document.getElementById("modalTabPatch");
+        var modalTextContent = document.getElementById("modalTextContent");
+        var copyModalContentBtn = document.getElementById("copyModalContentBtn");
+        var modalTitle = document.getElementById("modalTitle");
+        var modalFooterNote = document.getElementById("modalFooterNote");
+        var modalIcon = document.getElementById("modalIcon");
+
+        var toastNotification = document.getElementById("toastNotification");
+        var toastMessage = document.getElementById("toastMessage");
+
+        // --- State Variables ---
+        var activeDiffRows = [];
+        var activeChangesList = [];
+        var activeFilterType = "all"; // 'all', 'added', 'removed', 'changed'
+        var collapsedNodePaths = new Set();
+        var parsedObjA = null;
+        var parsedObjB = null;
+
+        // --- Notification Toast Helper ---
+        var toastTimer = null;
+        function showToast(msg) {
+          toastMessage.textContent = msg;
+          toastNotification.classList.remove("hidden");
+          if (toastTimer) clearTimeout(toastTimer);
+          toastTimer = setTimeout(function () {
+            toastNotification.classList.add("hidden");
+          }, 2400);
+        }
+
+        // --- Type Determination ---
+        function getType(v) {
+          if (v === null) return "null";
+          if (v === undefined) return "undefined";
+          if (Array.isArray(v)) return "array";
+          return typeof v;
+        }
+
+        // --- Load Preset Scenario ---
+        function loadPreset(key) {
+          var p = PRESETS[key] || PRESETS.profile_evolution;
+          jsonInputA.value = JSON.stringify(p.payloadA, null, 2);
+          jsonInputB.value = JSON.stringify(p.payloadB, null, 2);
+          metaStatusA.value = p.metaA.status;
+          metaTimeA.value = p.metaA.time;
+          metaStatusB.value = p.metaB.status;
+          metaTimeB.value = p.metaB.time;
+          collapsedNodePaths.clear();
+          recomputeDiff();
+        }
+
+        // --- Raw Inputs Drawer Collapse Toggle ---
+        toggleRawInputsBtn.addEventListener("click", function () {
+          var isHidden = rawInputsContent.classList.contains("hidden");
+          if (isHidden) {
+            rawInputsContent.classList.remove("hidden");
+            rawInputsChevron.classList.remove("-rotate-90");
+          } else {
+            rawInputsContent.classList.add("hidden");
+            rawInputsChevron.classList.add("-rotate-90");
+          }
+        });
+
+        // --- Prettify Format JSON Inputs ---
+        formatBothBtn.addEventListener("click", function () {
+          try {
+            if (jsonInputA.value.trim()) {
+              jsonInputA.value = JSON.stringify(JSON.parse(jsonInputA.value), null, 2);
+            }
+          } catch (e) {}
+          try {
+            if (jsonInputB.value.trim()) {
+              jsonInputB.value = JSON.stringify(JSON.parse(jsonInputB.value), null, 2);
+            }
+          } catch (e) {}
+          recomputeDiff();
+          showToast("JSON payloads formatted");
+        });
+
+        // --- Clear Both Inputs ---
+        clearBothBtn.addEventListener("click", function () {
+          jsonInputA.value = "";
+          jsonInputB.value = "";
+          collapsedNodePaths.clear();
+          recomputeDiff();
+        });
+
+        // --- Swap Inputs ---
+        swapBtn.addEventListener("click", function () {
+          var tempVal = jsonInputA.value;
+          jsonInputA.value = jsonInputB.value;
+          jsonInputB.value = tempVal;
+
+          var tempStat = metaStatusA.value;
+          metaStatusA.value = metaStatusB.value;
+          metaStatusB.value = tempStat;
+
+          var tempTime = metaTimeA.value;
+          metaTimeA.value = metaTimeB.value;
+          metaTimeB.value = tempTime;
+
+          collapsedNodePaths.clear();
+          recomputeDiff();
+          showToast("Swapped Response A and Response B");
+        });
+
+        // --- File Upload Handlers ---
+        function setupFileUpload(inputEl, targetTextArea) {
+          inputEl.addEventListener("change", function (e) {
+            var file = e.target.files[0];
+            if (!file) return;
+            var reader = new FileReader();
+            reader.onload = function (event) {
+              targetTextArea.value = event.target.result;
+              inputEl.value = "";
+              recomputeDiff();
+              showToast("Loaded " + file.name);
             };
+            reader.readAsText(file);
+          });
+        }
+        setupFileUpload(fileInputA, jsonInputA);
+        setupFileUpload(fileInputB, jsonInputB);
 
-            // --- DOM Elements ---
-            var jsonInputA = document.getElementById('jsonInputA');
-            var jsonInputB = document.getElementById('jsonInputB');
-            var jsonErrorA = document.getElementById('jsonErrorA');
-            var jsonErrorB = document.getElementById('jsonErrorB');
-            var metaStatusA = document.getElementById('metaStatusA');
-            var metaTimeA = document.getElementById('metaTimeA');
-            var metaStatusB = document.getElementById('metaStatusB');
-            var metaTimeB = document.getElementById('metaTimeB');
-            var colStatusA = document.getElementById('colStatusA');
-            var colStatusB = document.getElementById('colStatusB');
+        // --- Semantic Diff Engine ---
+        function diffValues(valA, valB, key, path, pointer, depth, rows, changes, arrayMode) {
+          var typeA = getType(valA);
+          var typeB = getType(valB);
 
-            var presetSelect = document.getElementById('presetSelect');
-            var resetBtn = document.getElementById('resetBtn');
-            var swapBtn = document.getElementById('swapBtn');
-            var formatBothBtn = document.getElementById('formatBothBtn');
-            var clearBothBtn = document.getElementById('clearBothBtn');
-            var fileInputA = document.getElementById('fileInputA');
-            var fileInputB = document.getElementById('fileInputB');
+          // Case 1: Added in B (valA is undefined)
+          if (typeA === "undefined") {
+            rows.push({
+              id: "row_" + rows.length,
+              path: path,
+              pointer: pointer,
+              key: key,
+              depth: depth,
+              status: "added",
+              isContainer: false,
+              typeA: "undefined",
+              typeB: typeB,
+              valA: undefined,
+              valB: valB
+            });
+            changes.push({
+              type: "added",
+              path: path || "(root)",
+              pointer: pointer,
+              oldVal: undefined,
+              newVal: valB
+            });
+            return;
+          }
 
-            var toggleRawInputsBtn = document.getElementById('toggleRawInputsBtn');
-            var rawInputsContent = document.getElementById('rawInputsContent');
-            var rawInputsChevron = document.getElementById('rawInputsChevron');
-            var rawInputSummaryBadge = document.getElementById('rawInputSummaryBadge');
+          // Case 2: Removed in B (valB is undefined)
+          if (typeB === "undefined") {
+            rows.push({
+              id: "row_" + rows.length,
+              path: path,
+              pointer: pointer,
+              key: key,
+              depth: depth,
+              status: "removed",
+              isContainer: false,
+              typeA: typeA,
+              typeB: "undefined",
+              valA: valA,
+              valB: undefined
+            });
+            changes.push({
+              type: "removed",
+              path: path || "(root)",
+              pointer: pointer,
+              oldVal: valA,
+              newVal: undefined
+            });
+            return;
+          }
 
-            var treeRowsWrapper = document.getElementById('treeRowsWrapper');
-            var treeScrollArea = document.getElementById('treeScrollArea');
-            var emptyDiffState = document.getElementById('emptyDiffState');
-            var emptyStateTitle = document.getElementById('emptyStateTitle');
-            var emptyStateDesc = document.getElementById('emptyStateDesc');
+          // Case 3: Both exist - Type Mismatch
+          if (typeA !== typeB) {
+            rows.push({
+              id: "row_" + rows.length,
+              path: path,
+              pointer: pointer,
+              key: key,
+              depth: depth,
+              status: "changed",
+              isContainer: false,
+              typeA: typeA,
+              typeB: typeB,
+              valA: valA,
+              valB: valB,
+              typeMismatch: true
+            });
+            changes.push({
+              type: "changed",
+              path: path || "(root)",
+              pointer: pointer,
+              oldVal: valA,
+              newVal: valB,
+              note: "Type changed: " + typeA + " -> " + typeB
+            });
+            return;
+          }
 
-            var badgeTotalDiffs = document.getElementById('badgeTotalDiffs');
-            var statAdded = document.getElementById('statAdded');
-            var statRemoved = document.getElementById('statRemoved');
-            var statChanged = document.getElementById('statChanged');
-            var statUnchanged = document.getElementById('statUnchanged');
-            var statSimilarity = document.getElementById('statSimilarity');
+          // Case 4: Both are plain Objects
+          if (typeA === "object") {
+            var keysSet = Object.create(null);
+            var keysA = Object.keys(valA);
+            var keysB = Object.keys(valB);
+            for (var i = 0; i < keysA.length; i++) keysSet[keysA[i]] = true;
+            for (var j = 0; j < keysB.length; j++) keysSet[keysB[j]] = true;
+            var allKeys = Object.keys(keysSet);
 
-            var filterAddBtn = document.getElementById('filterAddBtn');
-            var filterRemBtn = document.getElementById('filterRemBtn');
-            var filterChgBtn = document.getElementById('filterChgBtn');
-            var diffOnlyCheckbox = document.getElementById('diffOnlyCheckbox');
-            var arrayDiffMode = document.getElementById('arrayDiffMode');
-            var diffSearchInput = document.getElementById('diffSearchInput');
-            var clearSearchBtn = document.getElementById('clearSearchBtn');
+            var openIndex = rows.length;
+            var openObjRow = {
+              id: "row_" + openIndex,
+              path: path,
+              pointer: pointer,
+              key: key,
+              depth: depth,
+              status: "unchanged",
+              isContainer: true,
+              containerType: "object",
+              bracket: "open",
+              typeA: "object",
+              typeB: "object",
+              valA: valA,
+              valB: valB
+            };
+            rows.push(openObjRow);
 
-            var expandAllBtn = document.getElementById('expandAllBtn');
-            var collapseAllBtn = document.getElementById('collapseAllBtn');
-            var collapseUnchangedBtn = document.getElementById('collapseUnchangedBtn');
-
-            var toggleChangeListBtn = document.getElementById('toggleChangeListBtn');
-            var changeListDrawer = document.getElementById('changeListDrawer');
-            var closeDrawerBtn = document.getElementById('closeDrawerBtn');
-            var changeListItems = document.getElementById('changeListItems');
-            var changeListBadge = document.getElementById('changeListBadge');
-            var drawerDiffCount = document.getElementById('drawerDiffCount');
-
-            var copyReportBtn = document.getElementById('copyReportBtn');
-            var copyPatchBtn = document.getElementById('copyPatchBtn');
-            var reportModal = document.getElementById('reportModal');
-            var closeModalBtn = document.getElementById('closeModalBtn');
-            var modalTabMarkdown = document.getElementById('modalTabMarkdown');
-            var modalTabPatch = document.getElementById('modalTabPatch');
-            var modalTextContent = document.getElementById('modalTextContent');
-            var copyModalContentBtn = document.getElementById('copyModalContentBtn');
-            var modalTitle = document.getElementById('modalTitle');
-            var modalFooterNote = document.getElementById('modalFooterNote');
-            var modalIcon = document.getElementById('modalIcon');
-
-            var toastNotification = document.getElementById('toastNotification');
-            var toastMessage = document.getElementById('toastMessage');
-
-            // --- State Variables ---
-            var activeDiffRows = [];
-            var activeChangesList = [];
-            var activeFilterType = 'all'; // 'all', 'added', 'removed', 'changed'
-            var collapsedNodePaths = new Set();
-            var parsedObjA = null;
-            var parsedObjB = null;
-
-            // --- Notification Toast Helper ---
-            var toastTimer = null;
-            function showToast(msg) {
-                toastMessage.textContent = msg;
-                toastNotification.classList.remove('hidden');
-                if (toastTimer) clearTimeout(toastTimer);
-                toastTimer = setTimeout(function () {
-                    toastNotification.classList.add('hidden');
-                }, 2400);
+            var initialChangesLen = changes.length;
+            for (var k = 0; k < allKeys.length; k++) {
+              var prop = allKeys[k];
+              var subPath = path ? path + "." + prop : prop;
+              var subPtr = pointer + "/" + prop.replace(/~/g, "~0").replace(/\//g, "~1");
+              var itemA = Object.prototype.hasOwnProperty.call(valA, prop) ? valA[prop] : undefined;
+              var itemB = Object.prototype.hasOwnProperty.call(valB, prop) ? valB[prop] : undefined;
+              diffValues(itemA, itemB, prop, subPath, subPtr, depth + 1, rows, changes, arrayMode);
             }
 
-            // --- Type Determination ---
-            function getType(v) {
-                if (v === null) return 'null';
-                if (v === undefined) return 'undefined';
-                if (Array.isArray(v)) return 'array';
-                return typeof v;
+            if (changes.length > initialChangesLen) {
+              openObjRow.status = "container-changed";
             }
 
-            // --- Load Preset Scenario ---
-            function loadPreset(key) {
-                var p = PRESETS[key] || PRESETS.profile_evolution;
-                jsonInputA.value = JSON.stringify(p.payloadA, null, 2);
-                jsonInputB.value = JSON.stringify(p.payloadB, null, 2);
-                metaStatusA.value = p.metaA.status;
-                metaTimeA.value = p.metaA.time;
-                metaStatusB.value = p.metaB.status;
-                metaTimeB.value = p.metaB.time;
-                collapsedNodePaths.clear();
-                recomputeDiff();
-            }
-
-            // --- Raw Inputs Drawer Collapse Toggle ---
-            toggleRawInputsBtn.addEventListener('click', function () {
-                var isHidden = rawInputsContent.classList.contains('hidden');
-                if (isHidden) {
-                    rawInputsContent.classList.remove('hidden');
-                    rawInputsChevron.classList.remove('-rotate-90');
-                } else {
-                    rawInputsContent.classList.add('hidden');
-                    rawInputsChevron.classList.add('-rotate-90');
-                }
+            rows.push({
+              id: "row_" + rows.length,
+              path: path,
+              pointer: pointer,
+              key: key,
+              depth: depth,
+              status: openObjRow.status,
+              isContainer: true,
+              containerType: "object",
+              bracket: "close"
             });
+            return;
+          }
 
-            // --- Prettify Format JSON Inputs ---
-            formatBothBtn.addEventListener('click', function () {
-                try {
-                    if (jsonInputA.value.trim()) {
-                        jsonInputA.value = JSON.stringify(JSON.parse(jsonInputA.value), null, 2);
-                    }
-                } catch (e) { }
-                try {
-                    if (jsonInputB.value.trim()) {
-                        jsonInputB.value = JSON.stringify(JSON.parse(jsonInputB.value), null, 2);
-                    }
-                } catch (e) { }
-                recomputeDiff();
-                showToast('JSON payloads formatted');
-            });
+          // Case 5: Both are Arrays
+          if (typeA === "array") {
+            var openArrIndex = rows.length;
+            var openArrRow = {
+              id: "row_" + openArrIndex,
+              path: path,
+              pointer: pointer,
+              key: key,
+              depth: depth,
+              status: "unchanged",
+              isContainer: true,
+              containerType: "array",
+              bracket: "open",
+              typeA: "array",
+              typeB: "array",
+              valA: valA,
+              valB: valB
+            };
+            rows.push(openArrRow);
 
-            // --- Clear Both Inputs ---
-            clearBothBtn.addEventListener('click', function () {
-                jsonInputA.value = '';
-                jsonInputB.value = '';
-                collapsedNodePaths.clear();
-                recomputeDiff();
-            });
+            var initialArrChanges = changes.length;
 
-            // --- Swap Inputs ---
-            swapBtn.addEventListener('click', function () {
-                var tempVal = jsonInputA.value;
-                jsonInputA.value = jsonInputB.value;
-                jsonInputB.value = tempVal;
-
-                var tempStat = metaStatusA.value;
-                metaStatusA.value = metaStatusB.value;
-                metaStatusB.value = tempStat;
-
-                var tempTime = metaTimeA.value;
-                metaTimeA.value = metaTimeB.value;
-                metaTimeB.value = tempTime;
-
-                collapsedNodePaths.clear();
-                recomputeDiff();
-                showToast('Swapped Response A and Response B');
-            });
-
-            // --- File Upload Handlers ---
-            function setupFileUpload(inputEl, targetTextArea) {
-                inputEl.addEventListener('change', function (e) {
-                    var file = e.target.files[0];
-                    if (!file) return;
-                    var reader = new FileReader();
-                    reader.onload = function (event) {
-                        targetTextArea.value = event.target.result;
-                        inputEl.value = '';
-                        recomputeDiff();
-                        showToast('Loaded ' + file.name);
-                    };
-                    reader.readAsText(file);
+            // Smart ID Matching
+            var canUseIdMatch = arrayMode === "id" && valA.length > 0 && valB.length > 0;
+            var idField = null;
+            if (canUseIdMatch) {
+              var candidateFields = ["id", "_id", "uuid", "key", "code", "order_id"];
+              for (var f = 0; f < candidateFields.length; f++) {
+                var cand = candidateFields[f];
+                var aHas = valA.every(function (item) {
+                  return item && typeof item === "object" && cand in item;
                 });
-            }
-            setupFileUpload(fileInputA, jsonInputA);
-            setupFileUpload(fileInputB, jsonInputB);
-
-            // --- Semantic Diff Engine ---
-            function diffValues(valA, valB, key, path, pointer, depth, rows, changes, arrayMode) {
-                var typeA = getType(valA);
-                var typeB = getType(valB);
-
-                // Case 1: Added in B (valA is undefined)
-                if (typeA === 'undefined') {
-                    rows.push({
-                        id: 'row_' + rows.length,
-                        path: path,
-                        pointer: pointer,
-                        key: key,
-                        depth: depth,
-                        status: 'added',
-                        isContainer: false,
-                        typeA: 'undefined',
-                        typeB: typeB,
-                        valA: undefined,
-                        valB: valB
-                    });
-                    changes.push({
-                        type: 'added',
-                        path: path || '(root)',
-                        pointer: pointer,
-                        oldVal: undefined,
-                        newVal: valB
-                    });
-                    return;
-                }
-
-                // Case 2: Removed in B (valB is undefined)
-                if (typeB === 'undefined') {
-                    rows.push({
-                        id: 'row_' + rows.length,
-                        path: path,
-                        pointer: pointer,
-                        key: key,
-                        depth: depth,
-                        status: 'removed',
-                        isContainer: false,
-                        typeA: typeA,
-                        typeB: 'undefined',
-                        valA: valA,
-                        valB: undefined
-                    });
-                    changes.push({
-                        type: 'removed',
-                        path: path || '(root)',
-                        pointer: pointer,
-                        oldVal: valA,
-                        newVal: undefined
-                    });
-                    return;
-                }
-
-                // Case 3: Both exist - Type Mismatch
-                if (typeA !== typeB) {
-                    rows.push({
-                        id: 'row_' + rows.length,
-                        path: path,
-                        pointer: pointer,
-                        key: key,
-                        depth: depth,
-                        status: 'changed',
-                        isContainer: false,
-                        typeA: typeA,
-                        typeB: typeB,
-                        valA: valA,
-                        valB: valB,
-                        typeMismatch: true
-                    });
-                    changes.push({
-                        type: 'changed',
-                        path: path || '(root)',
-                        pointer: pointer,
-                        oldVal: valA,
-                        newVal: valB,
-                        note: 'Type changed: ' + typeA + ' -> ' + typeB
-                    });
-                    return;
-                }
-
-                // Case 4: Both are plain Objects
-                if (typeA === 'object') {
-                    var keysSet = Object.create(null);
-                    var keysA = Object.keys(valA);
-                    var keysB = Object.keys(valB);
-                    for (var i = 0; i < keysA.length; i++) keysSet[keysA[i]] = true;
-                    for (var j = 0; j < keysB.length; j++) keysSet[keysB[j]] = true;
-                    var allKeys = Object.keys(keysSet);
-
-                    var openIndex = rows.length;
-                    var openObjRow = {
-                        id: 'row_' + openIndex,
-                        path: path,
-                        pointer: pointer,
-                        key: key,
-                        depth: depth,
-                        status: 'unchanged',
-                        isContainer: true,
-                        containerType: 'object',
-                        bracket: 'open',
-                        typeA: 'object',
-                        typeB: 'object',
-                        valA: valA,
-                        valB: valB
-                    };
-                    rows.push(openObjRow);
-
-                    var initialChangesLen = changes.length;
-                    for (var k = 0; k < allKeys.length; k++) {
-                        var prop = allKeys[k];
-                        var subPath = path ? (path + '.' + prop) : prop;
-                        var subPtr = pointer + '/' + prop.replace(/~/g, '~0').replace(/\//g, '~1');
-                        var itemA = Object.prototype.hasOwnProperty.call(valA, prop) ? valA[prop] : undefined;
-                        var itemB = Object.prototype.hasOwnProperty.call(valB, prop) ? valB[prop] : undefined;
-                        diffValues(itemA, itemB, prop, subPath, subPtr, depth + 1, rows, changes, arrayMode);
-                    }
-
-                    if (changes.length > initialChangesLen) {
-                        openObjRow.status = 'container-changed';
-                    }
-
-                    rows.push({
-                        id: 'row_' + rows.length,
-                        path: path,
-                        pointer: pointer,
-                        key: key,
-                        depth: depth,
-                        status: openObjRow.status,
-                        isContainer: true,
-                        containerType: 'object',
-                        bracket: 'close'
-                    });
-                    return;
-                }
-
-                // Case 5: Both are Arrays
-                if (typeA === 'array') {
-                    var openArrIndex = rows.length;
-                    var openArrRow = {
-                        id: 'row_' + openArrIndex,
-                        path: path,
-                        pointer: pointer,
-                        key: key,
-                        depth: depth,
-                        status: 'unchanged',
-                        isContainer: true,
-                        containerType: 'array',
-                        bracket: 'open',
-                        typeA: 'array',
-                        typeB: 'array',
-                        valA: valA,
-                        valB: valB
-                    };
-                    rows.push(openArrRow);
-
-                    var initialArrChanges = changes.length;
-
-                    // Smart ID Matching
-                    var canUseIdMatch = arrayMode === 'id' && valA.length > 0 && valB.length > 0;
-                    var idField = null;
-                    if (canUseIdMatch) {
-                        var candidateFields = ['id', '_id', 'uuid', 'key', 'code', 'order_id'];
-                        for (var f = 0; f < candidateFields.length; f++) {
-                            var cand = candidateFields[f];
-                            var aHas = valA.every(function (item) { return item && typeof item === 'object' && cand in item; });
-                            var bHas = valB.every(function (item) { return item && typeof item === 'object' && cand in item; });
-                            if (aHas && bHas) {
-                                var setA = new Set();
-                                var uniqueA = true;
-                                for (var ia = 0; ia < valA.length; ia++) {
-                                    var v = valA[ia][cand];
-                                    if (setA.has(v)) { uniqueA = false; break; }
-                                    setA.add(v);
-                                }
-                                var setB = new Set();
-                                var uniqueB = true;
-                                for (var ib = 0; ib < valB.length; ib++) {
-                                    var vb = valB[ib][cand];
-                                    if (setB.has(vb)) { uniqueB = false; break; }
-                                    setB.add(vb);
-                                }
-                                if (uniqueA && uniqueB) {
-                                    idField = cand;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
-                    if (idField) {
-                        var mapA = new Map();
-                        valA.forEach(function (item, idx) { mapA.set(item[idField], { item: item, idx: idx }); });
-                        var mapB = new Map();
-                        valB.forEach(function (item, idx) { mapB.set(item[idField], { item: item, idx: idx }); });
-                        var handledIds = new Set();
-
-                        var isReordered = valA.length !== valB.length;
-                        if (!isReordered) {
-                            for (var idx = 0; idx < valA.length; idx++) {
-                                if (valA[idx][idField] !== valB[idx][idField]) {
-                                    isReordered = true;
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (isReordered) {
-                            // Entire array replacement op for valid RFC 6902 patch execution
-                            changes.push({
-                                type: 'changed',
-                                path: path || '(root)',
-                                pointer: pointer,
-                                oldVal: valA,
-                                newVal: valB,
-                                note: 'Array reordered / elements modified'
-                            });
-                            // Build visual tree rows with a dummy changes list so visual matching is shown in UI
-                            var dummyChanges = [];
-                            valB.forEach(function (bItem, bIdx) {
-                                var idVal = bItem[idField];
-                                handledIds.add(idVal);
-                                var label = '[' + idField + '=' + idVal + ']';
-                                var subPath = path + label;
-                                var subPtr = pointer + '/' + bIdx;
-                                if (mapA.has(idVal)) {
-                                    diffValues(mapA.get(idVal).item, bItem, label, subPath, subPtr, depth + 1, rows, dummyChanges, arrayMode);
-                                } else {
-                                    diffValues(undefined, bItem, label, subPath, subPtr, depth + 1, rows, dummyChanges, arrayMode);
-                                }
-                            });
-                            valA.forEach(function (aItem, aIdx) {
-                                var idVal = aItem[idField];
-                                if (!handledIds.has(idVal)) {
-                                    var label = '[' + idField + '=' + idVal + ']';
-                                    var subPath = path + label;
-                                    var subPtr = pointer + '/' + aIdx;
-                                    diffValues(aItem, undefined, label, subPath, subPtr, depth + 1, rows, dummyChanges, arrayMode);
-                                }
-                            });
-                        } else {
-                            // Same order: 1-to-1 matching at identical indices
-                            valB.forEach(function (bItem, bIdx) {
-                                var idVal = bItem[idField];
-                                handledIds.add(idVal);
-                                var label = '[' + idField + '=' + idVal + ']';
-                                var subPath = path + label;
-                                var subPtr = pointer + '/' + bIdx;
-                                if (mapA.has(idVal)) {
-                                    diffValues(mapA.get(idVal).item, bItem, label, subPath, subPtr, depth + 1, rows, changes, arrayMode);
-                                } else {
-                                    diffValues(undefined, bItem, label, subPath, subPtr, depth + 1, rows, changes, arrayMode);
-                                }
-                            });
-                            valA.forEach(function (aItem, aIdx) {
-                                var idVal = aItem[idField];
-                                if (!handledIds.has(idVal)) {
-                                    var label = '[' + idField + '=' + idVal + ']';
-                                    var subPath = path + label;
-                                    var subPtr = pointer + '/' + aIdx;
-                                    diffValues(aItem, undefined, label, subPath, subPtr, depth + 1, rows, changes, arrayMode);
-                                }
-                            });
-                        }
-                    } else {
-                        // Standard Index-based Diff
-                        if (valA.length !== valB.length) {
-                            changes.push({
-                                type: 'changed',
-                                path: path || '(root)',
-                                pointer: pointer,
-                                oldVal: valA,
-                                newVal: valB,
-                                note: 'Array length changed'
-                            });
-                            var dummyChanges = [];
-                            var maxLen = Math.max(valA.length, valB.length);
-                            for (var i = 0; i < maxLen; i++) {
-                                var subPath = path + '[' + i + ']';
-                                var subPtr = pointer + '/' + i;
-                                diffValues(valA[i], valB[i], '[' + i + ']', subPath, subPtr, depth + 1, rows, dummyChanges, arrayMode);
-                            }
-                        } else {
-                            var maxLen = valA.length;
-                            for (var i = 0; i < maxLen; i++) {
-                                var subPath = path + '[' + i + ']';
-                                var subPtr = pointer + '/' + i;
-                                diffValues(valA[i], valB[i], '[' + i + ']', subPath, subPtr, depth + 1, rows, changes, arrayMode);
-                            }
-                        }
-                    }
-
-                    if (changes.length > initialArrChanges) {
-                        openArrRow.status = 'container-changed';
-                    }
-
-                    rows.push({
-                        id: 'row_' + rows.length,
-                        path: path,
-                        pointer: pointer,
-                        key: key,
-                        depth: depth,
-                        status: openArrRow.status,
-                        isContainer: true,
-                        containerType: 'array',
-                        bracket: 'close'
-                    });
-                    return;
-                }
-
-                // Case 6: Primitives
-                if (valA === valB) {
-                    rows.push({
-                        id: 'row_' + rows.length,
-                        path: path,
-                        pointer: pointer,
-                        key: key,
-                        depth: depth,
-                        status: 'unchanged',
-                        isContainer: false,
-                        typeA: typeA,
-                        typeB: typeB,
-                        valA: valA,
-                        valB: valB
-                    });
-                } else {
-                    rows.push({
-                        id: 'row_' + rows.length,
-                        path: path,
-                        pointer: pointer,
-                        key: key,
-                        depth: depth,
-                        status: 'changed',
-                        isContainer: false,
-                        typeA: typeA,
-                        typeB: typeB,
-                        valA: valA,
-                        valB: valB
-                    });
-                    changes.push({
-                        type: 'changed',
-                        path: path || '(root)',
-                        pointer: pointer,
-                        oldVal: valA,
-                        newVal: valB
-                    });
-                }
-            }
-
-            // --- Recompute Diff Main Function ---
-            function recomputeDiff() {
-                var rawA = jsonInputA.value.trim();
-                var rawB = jsonInputB.value.trim();
-
-                // Validate JSON A
-                var errA = null;
-                parsedObjA = null;
-                if (!rawA) {
-                    errA = 'Response A is empty';
-                } else {
-                    try {
-                        parsedObjA = JSON.parse(rawA);
-                    } catch (e) {
-                        errA = 'Invalid JSON in Response A: ' + e.message;
-                    }
-                }
-
-                // Validate JSON B
-                var errB = null;
-                parsedObjB = null;
-                if (!rawB) {
-                    errB = 'Response B is empty';
-                } else {
-                    try {
-                        parsedObjB = JSON.parse(rawB);
-                    } catch (e) {
-                        errB = 'Invalid JSON in Response B: ' + e.message;
-                    }
-                }
-
-                if (errA) {
-                    jsonErrorA.textContent = errA;
-                    jsonErrorA.classList.remove('hidden');
-                } else {
-                    jsonErrorA.classList.add('hidden');
-                }
-
-                if (errB) {
-                    jsonErrorB.textContent = errB;
-                    jsonErrorB.classList.remove('hidden');
-                } else {
-                    jsonErrorB.classList.add('hidden');
-                }
-
-                // Update Column Status Headers
-                colStatusA.textContent = (metaStatusA.value || '200') + ' • ' + (metaTimeA.value || '0ms');
-                colStatusB.textContent = (metaStatusB.value || '200') + ' • ' + (metaTimeB.value || '0ms');
-
-                if (errA || errB) {
-                    treeRowsWrapper.innerHTML = '';
-                    emptyDiffState.classList.remove('hidden');
-                    emptyStateTitle.textContent = 'JSON Syntax Error';
-                    emptyStateDesc.textContent = errA || errB;
-                    updateSummaryCounters(0, 0, 0, 0, 0);
-                    return;
-                }
-
-                emptyDiffState.classList.add('hidden');
-
-                // Perform Diff
-                activeDiffRows = [];
-                activeChangesList = [];
-                var arrayMode = arrayDiffMode.value;
-
-                try {
-                    diffValues(parsedObjA, parsedObjB, '', '', '', 0, activeDiffRows, activeChangesList, arrayMode);
-                } catch (e) {
-                    treeRowsWrapper.innerHTML = '';
-                    emptyDiffState.classList.remove('hidden');
-                    emptyStateTitle.textContent = 'Diff Computation Error';
-                    emptyStateDesc.textContent = e.name === 'RangeError'
-                        ? 'Maximum call stack size exceeded (JSON structure is too deep to diff).'
-                        : ('Diff error: ' + e.message);
-                    updateSummaryCounters(0, 0, 0, 0, 0, 0);
-                    renderChangeListDrawer([]);
-                    return;
-                }
-
-                // Compute Counters
-                var adds = 0;
-                var rems = 0;
-                var chgs = 0;
-                var unchgs = 0;
-
-                activeDiffRows.forEach(function (r) {
-                    if (r.bracket === 'close') return;
-                    if (r.status === 'added') adds++;
-                    else if (r.status === 'removed') rems++;
-                    else if (r.status === 'changed') chgs++;
-                    else if (r.status === 'unchanged') unchgs++;
+                var bHas = valB.every(function (item) {
+                  return item && typeof item === "object" && cand in item;
                 });
-
-                var totalDiffs = activeChangesList.length;
-                var totalLeaves = adds + rems + chgs + unchgs;
-                var similarity = totalLeaves > 0 ? Math.round((unchgs / totalLeaves) * 100) : 100;
-
-                updateSummaryCounters(totalDiffs, adds, rems, chgs, unchgs, similarity);
-                renderChangeListDrawer(activeChangesList);
-                renderTreeRows();
-            }
-
-            // --- Update Summary Badges ---
-            function updateSummaryCounters(total, adds, rems, chgs, unchgs, similarity) {
-                badgeTotalDiffs.textContent = total;
-                statAdded.textContent = '+' + adds;
-                statRemoved.textContent = '-' + rems;
-                statChanged.textContent = '~' + chgs;
-                statUnchanged.textContent = unchgs;
-                statSimilarity.textContent = similarity + '%';
-                changeListBadge.textContent = total;
-                drawerDiffCount.textContent = total + ' diffs';
-                rawInputSummaryBadge.textContent = total + ' difference' + (total === 1 ? '' : 's');
-            }
-
-            // --- Format JSON Syntax Value ---
-            function renderValueSpan(val, type) {
-                if (type === 'undefined') return '<span class="text-slate-400 dark:text-slate-600 italic">undefined</span>';
-                if (val === null) return '<span class="text-red-500 font-bold">null</span>';
-                if (type === 'string') return '<span class="text-emerald-600 dark:text-emerald-400">"' + escapeHtml(val) + '"</span>';
-                if (type === 'number') return '<span class="text-blue-600 dark:text-cyan-400 font-semibold">' + val + '</span>';
-                if (type === 'boolean') return '<span class="text-purple-600 dark:text-purple-400 font-bold">' + val + '</span>';
-                return '<span class="text-slate-700 dark:text-slate-300">' + escapeHtml(JSON.stringify(val)) + '</span>';
-            }
-
-            // --- Render Side-by-Side Tree Rows ---
-            function renderTreeRows() {
-                var search = diffSearchInput.value.trim().toLowerCase();
-                var diffOnly = diffOnlyCheckbox.checked;
-
-                var html = '';
-                var collapsedAncestors = [];
-
-                for (var i = 0; i < activeDiffRows.length; i++) {
-                    var r = activeDiffRows[i];
-
-                    // Determine if hidden by a collapsed parent
-                    if (r.bracket === 'close') {
-                        if (collapsedAncestors.length > 0 && collapsedAncestors[collapsedAncestors.length - 1] === r.pointer) {
-                            collapsedAncestors.pop();
-                            continue; // hide close bracket when parent is collapsed
-                        }
+                if (aHas && bHas) {
+                  var setA = new Set();
+                  var uniqueA = true;
+                  for (var ia = 0; ia < valA.length; ia++) {
+                    var v = valA[ia][cand];
+                    if (setA.has(v)) {
+                      uniqueA = false;
+                      break;
                     }
-
-                    var isHiddenByCollapse = collapsedAncestors.length > 0;
-                    if (isHiddenByCollapse) {
-                        continue;
+                    setA.add(v);
+                  }
+                  var setB = new Set();
+                  var uniqueB = true;
+                  for (var ib = 0; ib < valB.length; ib++) {
+                    var vb = valB[ib][cand];
+                    if (setB.has(vb)) {
+                      uniqueB = false;
+                      break;
                     }
-
-                    if (r.isContainer && r.bracket === 'open' && collapsedNodePaths.has(r.pointer)) {
-                        collapsedAncestors.push(r.pointer);
-                    }
-
-                    // Filtering by status
-                    var matchesFilter = true;
-                    if (activeFilterType === 'added' && r.status !== 'added') matchesFilter = false;
-                    if (activeFilterType === 'removed' && r.status !== 'removed') matchesFilter = false;
-                    if (activeFilterType === 'changed' && r.status !== 'changed') matchesFilter = false;
-
-                    // "Differences Only" filter
-                    if (diffOnly && r.status === 'unchanged' && !r.isContainer) {
-                        matchesFilter = false;
-                    }
-
-                    // Keyword Search filter
-                    if (search) {
-                        var textToSearch = (r.key + ' ' + r.path + ' ' + JSON.stringify(r.valA) + ' ' + JSON.stringify(r.valB)).toLowerCase();
-                        if (textToSearch.indexOf(search) === -1) {
-                            matchesFilter = false;
-                        }
-                    }
-
-                    if (!matchesFilter) continue;
-
-                    // Row Background styling
-                    var rowBgClass = '';
-                    if (r.status === 'added') rowBgClass = 'diff-row-added';
-                    else if (r.status === 'removed') rowBgClass = 'diff-row-removed';
-                    else if (r.status === 'changed') rowBgClass = 'diff-row-changed';
-
-                    var indentPx = r.depth * 18 + 8;
-                    var isNodeCollapsed = collapsedNodePaths.has(r.pointer);
-
-                    // Chevron Icon for Containers
-                    var chevronHtml = '';
-                    if (r.isContainer && r.bracket === 'open') {
-                        chevronHtml = '<button type="button" data-collapse-path="' + escapeHtml(r.pointer) + '" class="toggle-node-btn inline-flex items-center justify-center w-4 h-4 mr-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-transform ' + (isNodeCollapsed ? '-rotate-90' : '') + '">' +
-                            '<svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>' +
-                            '</button>';
-                    } else if (r.depth > 0) {
-                        chevronHtml = '<span class="inline-block w-4 mr-1"></span>';
-                    }
-
-                    // --- Build Left Cell Content (Response A) ---
-                    var leftContent = '';
-                    if (r.bracket === 'close') {
-                        var bracketChar = r.containerType === 'array' ? ']' : '}';
-                        leftContent = '<span class="text-slate-500">' + bracketChar + '</span>';
-                    } else if (r.status === 'added') {
-                        leftContent = '<div class="text-slate-400 dark:text-slate-600 italic text-[11px] py-0.5 select-none opacity-50 flex items-center gap-1.5">' +
-                            '<span class="w-2.5 h-0.5 bg-slate-300 dark:bg-slate-700 inline-block"></span>' +
-                            '<span>(field not present in Response A)</span>' +
-                            '</div>';
-                    } else {
-                        var keySpan = r.key ? ('<span class="text-purple-700 dark:text-purple-300 font-semibold">' + escapeHtml(r.key) + ':</span> ') : '';
-                        if (r.isContainer) {
-                            var openChar = r.containerType === 'array' ? '[' : '{';
-                            var collapsedSummary = isNodeCollapsed ? (' <span class="text-slate-400 text-[10px] bg-slate-200 dark:bg-slate-800 px-1.5 py-0.2 rounded font-sans">...' + r.containerType + '</span> ' + (r.containerType === 'array' ? ']' : '}')) : '';
-                            leftContent = chevronHtml + keySpan + '<span class="text-slate-500">' + openChar + '</span>' + collapsedSummary;
-                        } else {
-                            leftContent = chevronHtml + keySpan + renderValueSpan(r.valA, r.typeA);
-                        }
-                    }
-
-                    // --- Build Right Cell Content (Response B) ---
-                    var rightContent = '';
-                    if (r.bracket === 'close') {
-                        var bracketChar = r.containerType === 'array' ? ']' : '}';
-                        rightContent = '<span class="text-slate-500">' + bracketChar + '</span>';
-                    } else if (r.status === 'removed') {
-                        rightContent = '<div class="text-slate-400 dark:text-slate-600 italic text-[11px] py-0.5 select-none opacity-50 flex items-center gap-1.5">' +
-                            '<span class="w-2.5 h-0.5 bg-slate-300 dark:bg-slate-700 inline-block"></span>' +
-                            '<span>(field removed in Response B)</span>' +
-                            '</div>';
-                    } else {
-                        var keySpan = r.key ? ('<span class="text-purple-700 dark:text-purple-300 font-semibold">' + escapeHtml(r.key) + ':</span> ') : '';
-                        if (r.isContainer) {
-                            var openChar = r.containerType === 'array' ? '[' : '{';
-                            var collapsedSummary = isNodeCollapsed ? (' <span class="text-slate-400 text-[10px] bg-slate-200 dark:bg-slate-800 px-1.5 py-0.2 rounded font-sans">...' + r.containerType + '</span> ' + (r.containerType === 'array' ? ']' : '}')) : '';
-                            rightContent = chevronHtml + keySpan + '<span class="text-slate-500">' + openChar + '</span>' + collapsedSummary;
-                        } else {
-                            rightContent = chevronHtml + keySpan + renderValueSpan(r.valB, r.typeB);
-                        }
-                    }
-
-                    // Status Gutter Icon
-                    var statusIcon = '';
-                    if (r.status === 'added') statusIcon = '<span class="text-emerald-500 font-bold text-xs" title="Added field">+</span>';
-                    else if (r.status === 'removed') statusIcon = '<span class="text-rose-500 font-bold text-xs" title="Removed field">-</span>';
-                    else if (r.status === 'changed') statusIcon = '<span class="text-amber-500 font-bold text-xs" title="Modified value">~</span>';
-
-                    // Row HTML (Grid layout ensuring synchronized heights)
-                    html += '<div id="' + r.id + '" class="tree-diff-row grid grid-cols-2 divide-x divide-slate-200 dark:divide-slate-800 border-b border-slate-100 dark:border-slate-800/40 hover:bg-slate-100/60 dark:hover:bg-slate-800/40 transition-colors ' + rowBgClass + '">' +
-                        // Left Cell
-                        '<div class="py-1 px-2 flex items-start overflow-hidden text-ellipsis whitespace-pre" style="padding-left: ' + indentPx + 'px;">' +
-                        '<div class="w-4 shrink-0 flex items-center justify-center mr-1 select-none">' + (r.status === 'removed' ? statusIcon : '') + '</div>' +
-                        '<div class="flex-1 truncate">' + leftContent + '</div>' +
-                        '</div>' +
-                        // Right Cell
-                        '<div class="py-1 px-2 flex items-start overflow-hidden text-ellipsis whitespace-pre" style="padding-left: ' + indentPx + 'px;">' +
-                        '<div class="w-4 shrink-0 flex items-center justify-center mr-1 select-none">' + (r.status === 'added' ? statusIcon : (r.status === 'changed' ? statusIcon : '')) + '</div>' +
-                        '<div class="flex-1 truncate">' + rightContent + '</div>' +
-                        '</div>' +
-                        '</div>';
+                    setB.add(vb);
+                  }
+                  if (uniqueA && uniqueB) {
+                    idField = cand;
+                    break;
+                  }
                 }
-
-                treeRowsWrapper.innerHTML = html;
-
-                // Bind Collapse Click Events
-                var collapseButtons = treeRowsWrapper.querySelectorAll('.toggle-node-btn');
-                collapseButtons.forEach(function (btn) {
-                    btn.addEventListener('click', function (e) {
-                        e.stopPropagation();
-                        var p = this.getAttribute('data-collapse-path');
-                        if (collapsedNodePaths.has(p)) {
-                            collapsedNodePaths.delete(p);
-                        } else {
-                            collapsedNodePaths.add(p);
-                        }
-                        renderTreeRows();
-                    });
-                });
+              }
             }
 
-            // --- Render Change List Drawer ---
-            function renderChangeListDrawer(changes) {
-                if (!changes || changes.length === 0) {
-                    changeListItems.innerHTML = '<div class="p-6 text-center text-slate-400 text-xs">No differences found. Both responses are identical!</div>';
-                    return;
+            if (idField) {
+              var mapA = new Map();
+              valA.forEach(function (item, idx) {
+                mapA.set(item[idField], { item: item, idx: idx });
+              });
+              var mapB = new Map();
+              valB.forEach(function (item, idx) {
+                mapB.set(item[idField], { item: item, idx: idx });
+              });
+              var handledIds = new Set();
+
+              var isReordered = valA.length !== valB.length;
+              if (!isReordered) {
+                for (var idx = 0; idx < valA.length; idx++) {
+                  if (valA[idx][idField] !== valB[idx][idField]) {
+                    isReordered = true;
+                    break;
+                  }
                 }
+              }
 
-                var html = '';
-                changes.forEach(function (c, idx) {
-                    var typeBadge = '';
-                    if (c.type === 'added') {
-                        typeBadge = '<span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">Added (+)</span>';
-                    } else if (c.type === 'removed') {
-                        typeBadge = '<span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300">Removed (-)</span>';
-                    } else {
-                        typeBadge = '<span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">Changed (~)</span>';
-                    }
-
-                    var valPreview = '';
-                    if (c.type === 'added') {
-                        valPreview = '<div class="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 truncate mt-1">New: ' + escapeHtml(JSON.stringify(c.newVal)) + '</div>';
-                    } else if (c.type === 'removed') {
-                        valPreview = '<div class="text-[11px] font-mono text-rose-600 dark:text-rose-400 truncate mt-1">Old: ' + escapeHtml(JSON.stringify(c.oldVal)) + '</div>';
-                    } else {
-                        valPreview = '<div class="text-[11px] font-mono text-slate-500 truncate mt-1">' +
-                            '<span class="line-through text-rose-500">' + escapeHtml(JSON.stringify(c.oldVal)) + '</span> &rarr; ' +
-                            '<span class="text-emerald-500 font-semibold">' + escapeHtml(JSON.stringify(c.newVal)) + '</span>' +
-                            '</div>';
-                    }
-
-                    html += '<div data-jump-path="' + escapeHtml(c.pointer) + '" class="change-list-item p-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer transition">' +
-                        '<div class="flex items-center justify-between gap-2">' +
-                        '<span class="font-mono text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">' + escapeHtml(c.path) + '</span>' +
-                        typeBadge +
-                        '</div>' +
-                        valPreview +
-                        '</div>';
+              if (isReordered) {
+                // Entire array replacement op for valid RFC 6902 patch execution
+                changes.push({
+                  type: "changed",
+                  path: path || "(root)",
+                  pointer: pointer,
+                  oldVal: valA,
+                  newVal: valB,
+                  note: "Array reordered / elements modified"
                 });
-
-                changeListItems.innerHTML = html;
-
-                // Bind click to scroll to node
-                var items = changeListItems.querySelectorAll('.change-list-item');
-                items.forEach(function (el) {
-                    el.addEventListener('click', function () {
-                        var jumpPath = this.getAttribute('data-jump-path');
-                        // Expand parents if collapsed
-                        var matchingRow = activeDiffRows.find(function (r) { return r.pointer === jumpPath; });
-                        if (matchingRow) {
-                            // Clear any parent collapses so it's visible
-                            collapsedNodePaths.clear();
-                            renderTreeRows();
-                            var domRow = document.getElementById(matchingRow.id);
-                            if (domRow) {
-                                domRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                domRow.classList.add('pulse-highlight');
-                                setTimeout(function () { domRow.classList.remove('pulse-highlight'); }, 1600);
-                            }
-                        }
-                    });
+                // Build visual tree rows with a dummy changes list so visual matching is shown in UI
+                var dummyChanges = [];
+                valB.forEach(function (bItem, bIdx) {
+                  var idVal = bItem[idField];
+                  handledIds.add(idVal);
+                  var label = "[" + idField + "=" + idVal + "]";
+                  var subPath = path + label;
+                  var subPtr = pointer + "/" + bIdx;
+                  if (mapA.has(idVal)) {
+                    diffValues(mapA.get(idVal).item, bItem, label, subPath, subPtr, depth + 1, rows, dummyChanges, arrayMode);
+                  } else {
+                    diffValues(undefined, bItem, label, subPath, subPtr, depth + 1, rows, dummyChanges, arrayMode);
+                  }
                 });
-            }
-
-            // --- Filter Buttons Click Handlers ---
-            function setFilter(type) {
-                activeFilterType = type;
-                var pills = [filterAddBtn, filterRemBtn, filterChgBtn];
-                pills.forEach(function (btn) { btn.classList.remove('ring-2', 'ring-emerald-500'); });
-                if (type === 'added') filterAddBtn.classList.add('ring-2', 'ring-emerald-500');
-                if (type === 'removed') filterRemBtn.classList.add('ring-2', 'ring-emerald-500');
-                if (type === 'changed') filterChgBtn.classList.add('ring-2', 'ring-emerald-500');
-                renderTreeRows();
-            }
-
-            filterAddBtn.addEventListener('click', function () {
-                setFilter(activeFilterType === 'added' ? 'all' : 'added');
-            });
-            filterRemBtn.addEventListener('click', function () {
-                setFilter(activeFilterType === 'removed' ? 'all' : 'removed');
-            });
-            filterChgBtn.addEventListener('click', function () {
-                setFilter(activeFilterType === 'changed' ? 'all' : 'changed');
-            });
-
-            diffOnlyCheckbox.addEventListener('change', renderTreeRows);
-            arrayDiffMode.addEventListener('change', recomputeDiff);
-
-            // --- Search Input Filter ---
-            diffSearchInput.addEventListener('input', function () {
-                if (this.value) {
-                    clearSearchBtn.classList.remove('hidden');
-                } else {
-                    clearSearchBtn.classList.add('hidden');
+                valA.forEach(function (aItem, aIdx) {
+                  var idVal = aItem[idField];
+                  if (!handledIds.has(idVal)) {
+                    var label = "[" + idField + "=" + idVal + "]";
+                    var subPath = path + label;
+                    var subPtr = pointer + "/" + aIdx;
+                    diffValues(aItem, undefined, label, subPath, subPtr, depth + 1, rows, dummyChanges, arrayMode);
+                  }
+                });
+              } else {
+                // Same order: 1-to-1 matching at identical indices
+                valB.forEach(function (bItem, bIdx) {
+                  var idVal = bItem[idField];
+                  handledIds.add(idVal);
+                  var label = "[" + idField + "=" + idVal + "]";
+                  var subPath = path + label;
+                  var subPtr = pointer + "/" + bIdx;
+                  if (mapA.has(idVal)) {
+                    diffValues(mapA.get(idVal).item, bItem, label, subPath, subPtr, depth + 1, rows, changes, arrayMode);
+                  } else {
+                    diffValues(undefined, bItem, label, subPath, subPtr, depth + 1, rows, changes, arrayMode);
+                  }
+                });
+                valA.forEach(function (aItem, aIdx) {
+                  var idVal = aItem[idField];
+                  if (!handledIds.has(idVal)) {
+                    var label = "[" + idField + "=" + idVal + "]";
+                    var subPath = path + label;
+                    var subPtr = pointer + "/" + aIdx;
+                    diffValues(aItem, undefined, label, subPath, subPtr, depth + 1, rows, changes, arrayMode);
+                  }
+                });
+              }
+            } else {
+              // Standard Index-based Diff
+              if (valA.length !== valB.length) {
+                changes.push({
+                  type: "changed",
+                  path: path || "(root)",
+                  pointer: pointer,
+                  oldVal: valA,
+                  newVal: valB,
+                  note: "Array length changed"
+                });
+                var dummyChanges = [];
+                var maxLen = Math.max(valA.length, valB.length);
+                for (var i = 0; i < maxLen; i++) {
+                  var subPath = path + "[" + i + "]";
+                  var subPtr = pointer + "/" + i;
+                  diffValues(valA[i], valB[i], "[" + i + "]", subPath, subPtr, depth + 1, rows, dummyChanges, arrayMode);
                 }
-                renderTreeRows();
-            });
+              } else {
+                var maxLen = valA.length;
+                for (var i = 0; i < maxLen; i++) {
+                  var subPath = path + "[" + i + "]";
+                  var subPtr = pointer + "/" + i;
+                  diffValues(valA[i], valB[i], "[" + i + "]", subPath, subPtr, depth + 1, rows, changes, arrayMode);
+                }
+              }
+            }
 
-            clearSearchBtn.addEventListener('click', function () {
-                diffSearchInput.value = '';
-                clearSearchBtn.classList.add('hidden');
-                renderTreeRows();
-            });
+            if (changes.length > initialArrChanges) {
+              openArrRow.status = "container-changed";
+            }
 
-            // --- Expand / Collapse Tree Controls ---
-            expandAllBtn.addEventListener('click', function () {
+            rows.push({
+              id: "row_" + rows.length,
+              path: path,
+              pointer: pointer,
+              key: key,
+              depth: depth,
+              status: openArrRow.status,
+              isContainer: true,
+              containerType: "array",
+              bracket: "close"
+            });
+            return;
+          }
+
+          // Case 6: Primitives
+          if (valA === valB) {
+            rows.push({
+              id: "row_" + rows.length,
+              path: path,
+              pointer: pointer,
+              key: key,
+              depth: depth,
+              status: "unchanged",
+              isContainer: false,
+              typeA: typeA,
+              typeB: typeB,
+              valA: valA,
+              valB: valB
+            });
+          } else {
+            rows.push({
+              id: "row_" + rows.length,
+              path: path,
+              pointer: pointer,
+              key: key,
+              depth: depth,
+              status: "changed",
+              isContainer: false,
+              typeA: typeA,
+              typeB: typeB,
+              valA: valA,
+              valB: valB
+            });
+            changes.push({
+              type: "changed",
+              path: path || "(root)",
+              pointer: pointer,
+              oldVal: valA,
+              newVal: valB
+            });
+          }
+        }
+
+        // --- Recompute Diff Main Function ---
+        function recomputeDiff() {
+          var rawA = jsonInputA.value.trim();
+          var rawB = jsonInputB.value.trim();
+
+          // Validate JSON A
+          var errA = null;
+          parsedObjA = null;
+          if (!rawA) {
+            errA = "Response A is empty";
+          } else {
+            try {
+              parsedObjA = JSON.parse(rawA);
+            } catch (e) {
+              errA = "Invalid JSON in Response A: " + e.message;
+            }
+          }
+
+          // Validate JSON B
+          var errB = null;
+          parsedObjB = null;
+          if (!rawB) {
+            errB = "Response B is empty";
+          } else {
+            try {
+              parsedObjB = JSON.parse(rawB);
+            } catch (e) {
+              errB = "Invalid JSON in Response B: " + e.message;
+            }
+          }
+
+          if (errA) {
+            jsonErrorA.textContent = errA;
+            jsonErrorA.classList.remove("hidden");
+          } else {
+            jsonErrorA.classList.add("hidden");
+          }
+
+          if (errB) {
+            jsonErrorB.textContent = errB;
+            jsonErrorB.classList.remove("hidden");
+          } else {
+            jsonErrorB.classList.add("hidden");
+          }
+
+          // Update Column Status Headers
+          colStatusA.textContent = (metaStatusA.value || "200") + " • " + (metaTimeA.value || "0ms");
+          colStatusB.textContent = (metaStatusB.value || "200") + " • " + (metaTimeB.value || "0ms");
+
+          if (errA || errB) {
+            treeRowsWrapper.innerHTML = "";
+            emptyDiffState.classList.remove("hidden");
+            emptyStateTitle.textContent = "JSON Syntax Error";
+            emptyStateDesc.textContent = errA || errB;
+            updateSummaryCounters(0, 0, 0, 0, 0);
+            return;
+          }
+
+          emptyDiffState.classList.add("hidden");
+
+          // Perform Diff
+          activeDiffRows = [];
+          activeChangesList = [];
+          var arrayMode = arrayDiffMode.value;
+
+          try {
+            diffValues(parsedObjA, parsedObjB, "", "", "", 0, activeDiffRows, activeChangesList, arrayMode);
+          } catch (e) {
+            treeRowsWrapper.innerHTML = "";
+            emptyDiffState.classList.remove("hidden");
+            emptyStateTitle.textContent = "Diff Computation Error";
+            emptyStateDesc.textContent = e.name === "RangeError" ? "Maximum call stack size exceeded (JSON structure is too deep to diff)." : "Diff error: " + e.message;
+            updateSummaryCounters(0, 0, 0, 0, 0, 0);
+            renderChangeListDrawer([]);
+            return;
+          }
+
+          // Compute Counters
+          var adds = 0;
+          var rems = 0;
+          var chgs = 0;
+          var unchgs = 0;
+
+          activeDiffRows.forEach(function (r) {
+            if (r.bracket === "close") return;
+            if (r.status === "added") adds++;
+            else if (r.status === "removed") rems++;
+            else if (r.status === "changed") chgs++;
+            else if (r.status === "unchanged") unchgs++;
+          });
+
+          var totalDiffs = activeChangesList.length;
+          var totalLeaves = adds + rems + chgs + unchgs;
+          var similarity = totalLeaves > 0 ? Math.round((unchgs / totalLeaves) * 100) : 100;
+
+          updateSummaryCounters(totalDiffs, adds, rems, chgs, unchgs, similarity);
+          renderChangeListDrawer(activeChangesList);
+          renderTreeRows();
+        }
+
+        // --- Update Summary Badges ---
+        function updateSummaryCounters(total, adds, rems, chgs, unchgs, similarity) {
+          badgeTotalDiffs.textContent = total;
+          statAdded.textContent = "+" + adds;
+          statRemoved.textContent = "-" + rems;
+          statChanged.textContent = "~" + chgs;
+          statUnchanged.textContent = unchgs;
+          statSimilarity.textContent = similarity + "%";
+          changeListBadge.textContent = total;
+          drawerDiffCount.textContent = total + " diffs";
+          rawInputSummaryBadge.textContent = total + " difference" + (total === 1 ? "" : "s");
+        }
+
+        // --- Format JSON Syntax Value ---
+        function renderValueSpan(val, type) {
+          if (type === "undefined") return '<span class="text-slate-400 dark:text-slate-600 italic">undefined</span>';
+          if (val === null) return '<span class="text-red-500 font-bold">null</span>';
+          if (type === "string") return '<span class="text-emerald-600 dark:text-emerald-400">"' + escapeHtml(val) + '"</span>';
+          if (type === "number") return '<span class="text-blue-600 dark:text-cyan-400 font-semibold">' + val + "</span>";
+          if (type === "boolean") return '<span class="text-purple-600 dark:text-purple-400 font-bold">' + val + "</span>";
+          return '<span class="text-slate-700 dark:text-slate-300">' + escapeHtml(JSON.stringify(val)) + "</span>";
+        }
+
+        // --- Render Side-by-Side Tree Rows ---
+        function renderTreeRows() {
+          var search = diffSearchInput.value.trim().toLowerCase();
+          var diffOnly = diffOnlyCheckbox.checked;
+
+          var html = "";
+          var collapsedAncestors = [];
+
+          for (var i = 0; i < activeDiffRows.length; i++) {
+            var r = activeDiffRows[i];
+
+            // Determine if hidden by a collapsed parent
+            if (r.bracket === "close") {
+              if (collapsedAncestors.length > 0 && collapsedAncestors[collapsedAncestors.length - 1] === r.pointer) {
+                collapsedAncestors.pop();
+                continue; // hide close bracket when parent is collapsed
+              }
+            }
+
+            var isHiddenByCollapse = collapsedAncestors.length > 0;
+            if (isHiddenByCollapse) {
+              continue;
+            }
+
+            if (r.isContainer && r.bracket === "open" && collapsedNodePaths.has(r.pointer)) {
+              collapsedAncestors.push(r.pointer);
+            }
+
+            // Filtering by status
+            var matchesFilter = true;
+            if (activeFilterType === "added" && r.status !== "added") matchesFilter = false;
+            if (activeFilterType === "removed" && r.status !== "removed") matchesFilter = false;
+            if (activeFilterType === "changed" && r.status !== "changed") matchesFilter = false;
+
+            // "Differences Only" filter
+            if (diffOnly && r.status === "unchanged" && !r.isContainer) {
+              matchesFilter = false;
+            }
+
+            // Keyword Search filter
+            if (search) {
+              var textToSearch = (r.key + " " + r.path + " " + JSON.stringify(r.valA) + " " + JSON.stringify(r.valB)).toLowerCase();
+              if (textToSearch.indexOf(search) === -1) {
+                matchesFilter = false;
+              }
+            }
+
+            if (!matchesFilter) continue;
+
+            // Row Background styling
+            var rowBgClass = "";
+            if (r.status === "added") rowBgClass = "diff-row-added";
+            else if (r.status === "removed") rowBgClass = "diff-row-removed";
+            else if (r.status === "changed") rowBgClass = "diff-row-changed";
+
+            var indentPx = r.depth * 18 + 8;
+            var isNodeCollapsed = collapsedNodePaths.has(r.pointer);
+
+            // Chevron Icon for Containers
+            var chevronHtml = "";
+            if (r.isContainer && r.bracket === "open") {
+              chevronHtml = '<button type="button" data-collapse-path="' + escapeHtml(r.pointer) + '" class="toggle-node-btn inline-flex items-center justify-center w-4 h-4 mr-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-transform ' + (isNodeCollapsed ? "-rotate-90" : "") + '">' + '<svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>' + "</button>";
+            } else if (r.depth > 0) {
+              chevronHtml = '<span class="inline-block w-4 mr-1"></span>';
+            }
+
+            // --- Build Left Cell Content (Response A) ---
+            var leftContent = "";
+            if (r.bracket === "close") {
+              var bracketChar = r.containerType === "array" ? "]" : "}";
+              leftContent = '<span class="text-slate-500">' + bracketChar + "</span>";
+            } else if (r.status === "added") {
+              leftContent = '<div class="text-slate-400 dark:text-slate-600 italic text-[11px] py-0.5 select-none opacity-50 flex items-center gap-1.5">' + '<span class="w-2.5 h-0.5 bg-slate-300 dark:bg-slate-700 inline-block"></span>' + "<span>(field not present in Response A)</span>" + "</div>";
+            } else {
+              var keySpan = r.key ? '<span class="text-purple-700 dark:text-purple-300 font-semibold">' + escapeHtml(r.key) + ":</span> " : "";
+              if (r.isContainer) {
+                var openChar = r.containerType === "array" ? "[" : "{";
+                var collapsedSummary = isNodeCollapsed ? ' <span class="text-slate-400 text-[10px] bg-slate-200 dark:bg-slate-800 px-1.5 py-0.2 rounded font-sans">...' + r.containerType + "</span> " + (r.containerType === "array" ? "]" : "}") : "";
+                leftContent = chevronHtml + keySpan + '<span class="text-slate-500">' + openChar + "</span>" + collapsedSummary;
+              } else {
+                leftContent = chevronHtml + keySpan + renderValueSpan(r.valA, r.typeA);
+              }
+            }
+
+            // --- Build Right Cell Content (Response B) ---
+            var rightContent = "";
+            if (r.bracket === "close") {
+              var bracketChar = r.containerType === "array" ? "]" : "}";
+              rightContent = '<span class="text-slate-500">' + bracketChar + "</span>";
+            } else if (r.status === "removed") {
+              rightContent = '<div class="text-slate-400 dark:text-slate-600 italic text-[11px] py-0.5 select-none opacity-50 flex items-center gap-1.5">' + '<span class="w-2.5 h-0.5 bg-slate-300 dark:bg-slate-700 inline-block"></span>' + "<span>(field removed in Response B)</span>" + "</div>";
+            } else {
+              var keySpan = r.key ? '<span class="text-purple-700 dark:text-purple-300 font-semibold">' + escapeHtml(r.key) + ":</span> " : "";
+              if (r.isContainer) {
+                var openChar = r.containerType === "array" ? "[" : "{";
+                var collapsedSummary = isNodeCollapsed ? ' <span class="text-slate-400 text-[10px] bg-slate-200 dark:bg-slate-800 px-1.5 py-0.2 rounded font-sans">...' + r.containerType + "</span> " + (r.containerType === "array" ? "]" : "}") : "";
+                rightContent = chevronHtml + keySpan + '<span class="text-slate-500">' + openChar + "</span>" + collapsedSummary;
+              } else {
+                rightContent = chevronHtml + keySpan + renderValueSpan(r.valB, r.typeB);
+              }
+            }
+
+            // Status Gutter Icon
+            var statusIcon = "";
+            if (r.status === "added") statusIcon = '<span class="text-emerald-500 font-bold text-xs" title="Added field">+</span>';
+            else if (r.status === "removed") statusIcon = '<span class="text-rose-500 font-bold text-xs" title="Removed field">-</span>';
+            else if (r.status === "changed") statusIcon = '<span class="text-amber-500 font-bold text-xs" title="Modified value">~</span>';
+
+            // Row HTML (Grid layout ensuring synchronized heights)
+            html +=
+              '<div id="' +
+              r.id +
+              '" class="tree-diff-row grid grid-cols-2 divide-x divide-slate-200 dark:divide-slate-800 border-b border-slate-100 dark:border-slate-800/40 hover:bg-slate-100/60 dark:hover:bg-slate-800/40 transition-colors ' +
+              rowBgClass +
+              '">' +
+              // Left Cell
+              '<div class="py-1 px-2 flex items-start overflow-hidden text-ellipsis whitespace-pre" style="padding-left: ' +
+              indentPx +
+              'px;">' +
+              '<div class="w-4 shrink-0 flex items-center justify-center mr-1 select-none">' +
+              (r.status === "removed" ? statusIcon : "") +
+              "</div>" +
+              '<div class="flex-1 truncate">' +
+              leftContent +
+              "</div>" +
+              "</div>" +
+              // Right Cell
+              '<div class="py-1 px-2 flex items-start overflow-hidden text-ellipsis whitespace-pre" style="padding-left: ' +
+              indentPx +
+              'px;">' +
+              '<div class="w-4 shrink-0 flex items-center justify-center mr-1 select-none">' +
+              (r.status === "added" ? statusIcon : r.status === "changed" ? statusIcon : "") +
+              "</div>" +
+              '<div class="flex-1 truncate">' +
+              rightContent +
+              "</div>" +
+              "</div>" +
+              "</div>";
+          }
+
+          treeRowsWrapper.innerHTML = html;
+
+          // Bind Collapse Click Events
+          var collapseButtons = treeRowsWrapper.querySelectorAll(".toggle-node-btn");
+          collapseButtons.forEach(function (btn) {
+            btn.addEventListener("click", function (e) {
+              e.stopPropagation();
+              var p = this.getAttribute("data-collapse-path");
+              if (collapsedNodePaths.has(p)) {
+                collapsedNodePaths.delete(p);
+              } else {
+                collapsedNodePaths.add(p);
+              }
+              renderTreeRows();
+            });
+          });
+        }
+
+        // --- Render Change List Drawer ---
+        function renderChangeListDrawer(changes) {
+          if (!changes || changes.length === 0) {
+            changeListItems.innerHTML = '<div class="p-6 text-center text-slate-400 text-xs">No differences found. Both responses are identical!</div>';
+            return;
+          }
+
+          var html = "";
+          changes.forEach(function (c, idx) {
+            var typeBadge = "";
+            if (c.type === "added") {
+              typeBadge = '<span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">Added (+)</span>';
+            } else if (c.type === "removed") {
+              typeBadge = '<span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300">Removed (-)</span>';
+            } else {
+              typeBadge = '<span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">Changed (~)</span>';
+            }
+
+            var valPreview = "";
+            if (c.type === "added") {
+              valPreview = '<div class="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 truncate mt-1">New: ' + escapeHtml(JSON.stringify(c.newVal)) + "</div>";
+            } else if (c.type === "removed") {
+              valPreview = '<div class="text-[11px] font-mono text-rose-600 dark:text-rose-400 truncate mt-1">Old: ' + escapeHtml(JSON.stringify(c.oldVal)) + "</div>";
+            } else {
+              valPreview = '<div class="text-[11px] font-mono text-slate-500 truncate mt-1">' + '<span class="line-through text-rose-500">' + escapeHtml(JSON.stringify(c.oldVal)) + "</span> &rarr; " + '<span class="text-emerald-500 font-semibold">' + escapeHtml(JSON.stringify(c.newVal)) + "</span>" + "</div>";
+            }
+
+            html += '<div data-jump-path="' + escapeHtml(c.pointer) + '" class="change-list-item p-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer transition">' + '<div class="flex items-center justify-between gap-2">' + '<span class="font-mono text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">' + escapeHtml(c.path) + "</span>" + typeBadge + "</div>" + valPreview + "</div>";
+          });
+
+          changeListItems.innerHTML = html;
+
+          // Bind click to scroll to node
+          var items = changeListItems.querySelectorAll(".change-list-item");
+          items.forEach(function (el) {
+            el.addEventListener("click", function () {
+              var jumpPath = this.getAttribute("data-jump-path");
+              // Expand parents if collapsed
+              var matchingRow = activeDiffRows.find(function (r) {
+                return r.pointer === jumpPath;
+              });
+              if (matchingRow) {
+                // Clear any parent collapses so it's visible
                 collapsedNodePaths.clear();
                 renderTreeRows();
-                showToast('Expanded all nodes');
-            });
-
-            collapseAllBtn.addEventListener('click', function () {
-                activeDiffRows.forEach(function (r) {
-                    if (r.isContainer && r.bracket === 'open' && r.pointer) {
-                        collapsedNodePaths.add(r.pointer);
-                    }
-                });
-                renderTreeRows();
-                showToast('Collapsed all container nodes');
-            });
-
-            collapseUnchangedBtn.addEventListener('click', function () {
-                collapsedNodePaths.clear();
-                activeDiffRows.forEach(function (r) {
-                    if (r.isContainer && r.bracket === 'open' && r.status === 'unchanged' && r.pointer) {
-                        collapsedNodePaths.add(r.pointer);
-                    }
-                });
-                renderTreeRows();
-                showToast('Collapsed identical objects');
-            });
-
-            // --- Change List Drawer Toggle ---
-            toggleChangeListBtn.addEventListener('click', function () {
-                var isHidden = changeListDrawer.classList.contains('hidden');
-                if (isHidden) {
-                    changeListDrawer.classList.remove('hidden');
-                } else {
-                    changeListDrawer.classList.add('hidden');
+                var domRow = document.getElementById(matchingRow.id);
+                if (domRow) {
+                  domRow.scrollIntoView({ behavior: "smooth", block: "center" });
+                  domRow.classList.add("pulse-highlight");
+                  setTimeout(function () {
+                    domRow.classList.remove("pulse-highlight");
+                  }, 1600);
                 }
+              }
             });
+          });
+        }
 
-            closeDrawerBtn.addEventListener('click', function () {
-                changeListDrawer.classList.add('hidden');
+        // --- Filter Buttons Click Handlers ---
+        function setFilter(type) {
+          activeFilterType = type;
+          var pills = [filterAddBtn, filterRemBtn, filterChgBtn];
+          pills.forEach(function (btn) {
+            btn.classList.remove("ring-2", "ring-emerald-500");
+          });
+          if (type === "added") filterAddBtn.classList.add("ring-2", "ring-emerald-500");
+          if (type === "removed") filterRemBtn.classList.add("ring-2", "ring-emerald-500");
+          if (type === "changed") filterChgBtn.classList.add("ring-2", "ring-emerald-500");
+          renderTreeRows();
+        }
+
+        filterAddBtn.addEventListener("click", function () {
+          setFilter(activeFilterType === "added" ? "all" : "added");
+        });
+        filterRemBtn.addEventListener("click", function () {
+          setFilter(activeFilterType === "removed" ? "all" : "removed");
+        });
+        filterChgBtn.addEventListener("click", function () {
+          setFilter(activeFilterType === "changed" ? "all" : "changed");
+        });
+
+        diffOnlyCheckbox.addEventListener("change", renderTreeRows);
+        arrayDiffMode.addEventListener("change", recomputeDiff);
+
+        // --- Search Input Filter ---
+        diffSearchInput.addEventListener("input", function () {
+          if (this.value) {
+            clearSearchBtn.classList.remove("hidden");
+          } else {
+            clearSearchBtn.classList.add("hidden");
+          }
+          renderTreeRows();
+        });
+
+        clearSearchBtn.addEventListener("click", function () {
+          diffSearchInput.value = "";
+          clearSearchBtn.classList.add("hidden");
+          renderTreeRows();
+        });
+
+        // --- Expand / Collapse Tree Controls ---
+        expandAllBtn.addEventListener("click", function () {
+          collapsedNodePaths.clear();
+          renderTreeRows();
+          showToast("Expanded all nodes");
+        });
+
+        collapseAllBtn.addEventListener("click", function () {
+          activeDiffRows.forEach(function (r) {
+            if (r.isContainer && r.bracket === "open" && r.pointer) {
+              collapsedNodePaths.add(r.pointer);
+            }
+          });
+          renderTreeRows();
+          showToast("Collapsed all container nodes");
+        });
+
+        collapseUnchangedBtn.addEventListener("click", function () {
+          collapsedNodePaths.clear();
+          activeDiffRows.forEach(function (r) {
+            if (r.isContainer && r.bracket === "open" && r.status === "unchanged" && r.pointer) {
+              collapsedNodePaths.add(r.pointer);
+            }
+          });
+          renderTreeRows();
+          showToast("Collapsed identical objects");
+        });
+
+        // --- Change List Drawer Toggle ---
+        toggleChangeListBtn.addEventListener("click", function () {
+          var isHidden = changeListDrawer.classList.contains("hidden");
+          if (isHidden) {
+            changeListDrawer.classList.remove("hidden");
+          } else {
+            changeListDrawer.classList.add("hidden");
+          }
+        });
+
+        closeDrawerBtn.addEventListener("click", function () {
+          changeListDrawer.classList.add("hidden");
+        });
+
+        // --- Generate Markdown Summary Report ---
+        function generateMarkdownReport() {
+          var lines = [];
+          lines.push("# API Response Diff Report");
+          lines.push("");
+          lines.push("- **Response A (Base):** " + (metaStatusA.value || "200") + " (" + (metaTimeA.value || "N/A") + ")");
+          lines.push("- **Response B (Target):** " + (metaStatusB.value || "200") + " (" + (metaTimeB.value || "N/A") + ")");
+          lines.push("- **Total Differences:** " + activeChangesList.length);
+          lines.push("- **Similarity Index:** " + statSimilarity.textContent);
+          lines.push("");
+
+          var addedList = activeChangesList.filter(function (c) {
+            return c.type === "added";
+          });
+          var removedList = activeChangesList.filter(function (c) {
+            return c.type === "removed";
+          });
+          var changedList = activeChangesList.filter(function (c) {
+            return c.type === "changed";
+          });
+
+          if (addedList.length > 0) {
+            lines.push("### Added Fields (" + addedList.length + ")");
+            addedList.forEach(function (c) {
+              lines.push("- `+" + c.path + "`: `" + JSON.stringify(c.newVal) + "`");
             });
+            lines.push("");
+          }
 
-            // --- Generate Markdown Summary Report ---
-            function generateMarkdownReport() {
-                var lines = [];
-                lines.push('# API Response Diff Report');
-                lines.push('');
-                lines.push('- **Response A (Base):** ' + (metaStatusA.value || '200') + ' (' + (metaTimeA.value || 'N/A') + ')');
-                lines.push('- **Response B (Target):** ' + (metaStatusB.value || '200') + ' (' + (metaTimeB.value || 'N/A') + ')');
-                lines.push('- **Total Differences:** ' + activeChangesList.length);
-                lines.push('- **Similarity Index:** ' + statSimilarity.textContent);
-                lines.push('');
+          if (removedList.length > 0) {
+            lines.push("### Removed Fields (" + removedList.length + ")");
+            removedList.forEach(function (c) {
+              lines.push("- `-" + c.path + "`: `" + JSON.stringify(c.oldVal) + "`");
+            });
+            lines.push("");
+          }
 
-                var addedList = activeChangesList.filter(function (c) { return c.type === 'added'; });
-                var removedList = activeChangesList.filter(function (c) { return c.type === 'removed'; });
-                var changedList = activeChangesList.filter(function (c) { return c.type === 'changed'; });
+          if (changedList.length > 0) {
+            lines.push("### Modified Fields (" + changedList.length + ")");
+            changedList.forEach(function (c) {
+              lines.push("- `~" + c.path + "`: `" + JSON.stringify(c.oldVal) + "` ➔ `" + JSON.stringify(c.newVal) + "`");
+            });
+            lines.push("");
+          }
 
-                if (addedList.length > 0) {
-                    lines.push('### Added Fields (' + addedList.length + ')');
-                    addedList.forEach(function (c) {
-                        lines.push('- `+' + c.path + '`: `' + JSON.stringify(c.newVal) + '`');
-                    });
-                    lines.push('');
-                }
+          if (activeChangesList.length === 0) {
+            lines.push("*No differences detected. Payloads are identical.*");
+          }
 
-                if (removedList.length > 0) {
-                    lines.push('### Removed Fields (' + removedList.length + ')');
-                    removedList.forEach(function (c) {
-                        lines.push('- `-' + c.path + '`: `' + JSON.stringify(c.oldVal) + '`');
-                    });
-                    lines.push('');
-                }
+          return lines.join("\n");
+        }
 
-                if (changedList.length > 0) {
-                    lines.push('### Modified Fields (' + changedList.length + ')');
-                    changedList.forEach(function (c) {
-                        lines.push('- `~' + c.path + '`: `' + JSON.stringify(c.oldVal) + '` ➔ `' + JSON.stringify(c.newVal) + '`');
-                    });
-                    lines.push('');
-                }
-
-                if (activeChangesList.length === 0) {
-                    lines.push('*No differences detected. Payloads are identical.*');
-                }
-
-                return lines.join('\n');
+        // --- Generate RFC 6902 JSON Patch ---
+        function generateJsonPatch() {
+          var patch = [];
+          activeChangesList.forEach(function (c) {
+            var ptr = c.pointer;
+            if (ptr === undefined || ptr === null) {
+              ptr = "/" + (c.path || "").replace(/\./g, "/");
+            }
+            if (ptr !== "" && !ptr.startsWith("/")) {
+              ptr = "/" + ptr;
             }
 
-            // --- Generate RFC 6902 JSON Patch ---
-            function generateJsonPatch() {
-                var patch = [];
-                activeChangesList.forEach(function (c) {
-                    var ptr = c.pointer;
-                    if (ptr === undefined || ptr === null) {
-                        ptr = '/' + (c.path || '').replace(/\./g, '/');
-                    }
-                    if (ptr !== '' && !ptr.startsWith('/')) {
-                        ptr = '/' + ptr;
-                    }
-
-                    if (c.type === 'added') {
-                        patch.push({ op: 'add', path: ptr, value: c.newVal });
-                    } else if (c.type === 'removed') {
-                        patch.push({ op: 'remove', path: ptr });
-                    } else if (c.type === 'changed') {
-                        patch.push({ op: 'replace', path: ptr, value: c.newVal });
-                    }
-                });
-                return JSON.stringify(patch, null, 2);
+            if (c.type === "added") {
+              patch.push({ op: "add", path: ptr, value: c.newVal });
+            } else if (c.type === "removed") {
+              patch.push({ op: "remove", path: ptr });
+            } else if (c.type === "changed") {
+              patch.push({ op: "replace", path: ptr, value: c.newVal });
             }
+          });
+          return JSON.stringify(patch, null, 2);
+        }
 
-            // --- Modal Open & Tab Handling ---
-            var activeModalTab = 'markdown';
-            function openReportModal(initialTab) {
-                activeModalTab = initialTab || 'markdown';
-                updateModalContent();
-                reportModal.classList.remove('hidden');
-            }
+        // --- Modal Open & Tab Handling ---
+        var activeModalTab = "markdown";
+        function openReportModal(initialTab) {
+          activeModalTab = initialTab || "markdown";
+          updateModalContent();
+          reportModal.classList.remove("hidden");
+        }
 
-            function updateModalContent() {
-                if (activeModalTab === 'markdown') {
-                    modalTabMarkdown.className = 'pb-2 font-semibold text-emerald-600 dark:text-emerald-400 border-b-2 border-emerald-500';
-                    modalTabPatch.className = 'pb-2 font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200';
-                    modalTitle.textContent = 'API Response Diff Markdown Report';
-                    modalTextContent.value = generateMarkdownReport();
-                    modalFooterNote.textContent = 'Ready to paste directly into GitHub Pull Requests, Jira tickets, or Slack.';
-                } else {
-                    modalTabPatch.className = 'pb-2 font-semibold text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-500';
-                    modalTabMarkdown.className = 'pb-2 font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200';
-                    modalTitle.textContent = 'RFC 6902 JSON Patch Payload';
-                    modalTextContent.value = generateJsonPatch();
-                    modalFooterNote.textContent = 'Standard RFC 6902 JSON patch array usable with jsonpatch libraries.';
-                }
-            }
+        function updateModalContent() {
+          if (activeModalTab === "markdown") {
+            modalTabMarkdown.className = "pb-2 font-semibold text-emerald-600 dark:text-emerald-400 border-b-2 border-emerald-500";
+            modalTabPatch.className = "pb-2 font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200";
+            modalTitle.textContent = "API Response Diff Markdown Report";
+            modalTextContent.value = generateMarkdownReport();
+            modalFooterNote.textContent = "Ready to paste directly into GitHub Pull Requests, Jira tickets, or Slack.";
+          } else {
+            modalTabPatch.className = "pb-2 font-semibold text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-500";
+            modalTabMarkdown.className = "pb-2 font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200";
+            modalTitle.textContent = "RFC 6902 JSON Patch Payload";
+            modalTextContent.value = generateJsonPatch();
+            modalFooterNote.textContent = "Standard RFC 6902 JSON patch array usable with jsonpatch libraries.";
+          }
+        }
 
-            modalTabMarkdown.addEventListener('click', function () {
-                activeModalTab = 'markdown';
-                updateModalContent();
+        modalTabMarkdown.addEventListener("click", function () {
+          activeModalTab = "markdown";
+          updateModalContent();
+        });
+
+        modalTabPatch.addEventListener("click", function () {
+          activeModalTab = "patch";
+          updateModalContent();
+        });
+
+        closeModalBtn.addEventListener("click", function () {
+          reportModal.classList.add("hidden");
+        });
+
+        reportModal.addEventListener("click", function (e) {
+          if (e.target === reportModal) {
+            reportModal.classList.add("hidden");
+          }
+        });
+
+        copyReportBtn.addEventListener("click", function () {
+          openReportModal("markdown");
+        });
+
+        copyPatchBtn.addEventListener("click", function () {
+          openReportModal("patch");
+        });
+
+        copyModalContentBtn.addEventListener("click", function () {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(modalTextContent.value).then(function () {
+              showToast("Copied to clipboard!");
             });
+          } else {
+            modalTextContent.select();
+            document.execCommand("copy");
+            showToast("Copied to clipboard!");
+          }
+        });
 
-            modalTabPatch.addEventListener('click', function () {
-                activeModalTab = 'patch';
-                updateModalContent();
-            });
+        // --- Presets Change Event ---
+        presetSelect.addEventListener("change", function () {
+          loadPreset(this.value);
+        });
 
-            closeModalBtn.addEventListener('click', function () {
-                reportModal.classList.add('hidden');
-            });
+        resetBtn.addEventListener("click", function () {
+          presetSelect.value = "profile_evolution";
+          loadPreset("profile_evolution");
+          showToast("Reset to default scenario");
+        });
 
-            reportModal.addEventListener('click', function (e) {
-                if (e.target === reportModal) {
-                    reportModal.classList.add('hidden');
-                }
-            });
+        // --- Debounced Input Listeners ---
+        var debounceTimer = null;
+        function onInputChange() {
+          if (debounceTimer) clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(recomputeDiff, 160);
+        }
+        jsonInputA.addEventListener("input", onInputChange);
+        jsonInputB.addEventListener("input", onInputChange);
+        metaStatusA.addEventListener("input", onInputChange);
+        metaTimeA.addEventListener("input", onInputChange);
+        metaStatusB.addEventListener("input", onInputChange);
+        metaTimeB.addEventListener("input", onInputChange);
 
-            copyReportBtn.addEventListener('click', function () {
-                openReportModal('markdown');
-            });
-
-            copyPatchBtn.addEventListener('click', function () {
-                openReportModal('patch');
-            });
-
-            copyModalContentBtn.addEventListener('click', function () {
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(modalTextContent.value).then(function () {
-                        showToast('Copied to clipboard!');
-                    });
-                } else {
-                    modalTextContent.select();
-                    document.execCommand('copy');
-                    showToast('Copied to clipboard!');
-                }
-            });
-
-            // --- Presets Change Event ---
-            presetSelect.addEventListener('change', function () {
-                loadPreset(this.value);
-            });
-
-            resetBtn.addEventListener('click', function () {
-                presetSelect.value = 'profile_evolution';
-                loadPreset('profile_evolution');
-                showToast('Reset to default scenario');
-            });
-
-            // --- Debounced Input Listeners ---
-            var debounceTimer = null;
-            function onInputChange() {
-                if (debounceTimer) clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(recomputeDiff, 160);
-            }
-            jsonInputA.addEventListener('input', onInputChange);
-            jsonInputB.addEventListener('input', onInputChange);
-            metaStatusA.addEventListener('input', onInputChange);
-            metaTimeA.addEventListener('input', onInputChange);
-            metaStatusB.addEventListener('input', onInputChange);
-            metaTimeB.addEventListener('input', onInputChange);
-
-            // --- Initial Load ---
-            loadPreset('profile_evolution');
-
-        })();
+        // --- Initial Load ---
+        loadPreset("profile_evolution");
+      })();
     </script>
-</body>
-
+  </body>
 </html>

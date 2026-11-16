@@ -1,1347 +1,1242 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en" class="dark">
-
-<head>
+  <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Regex Pattern Debugger &amp; Match Visualizer — One File Tools</title>
     <script>
-      (function() {
-        var t = localStorage.getItem('regex_debugger_theme');
-        if (t === 'light') document.documentElement.classList.remove('dark');
-        else if (!t && window.matchMedia('(prefers-color-scheme: light)').matches) document.documentElement.classList.remove('dark');
+      (function () {
+        var t = localStorage.getItem("regex_debugger_theme");
+        if (t === "light") document.documentElement.classList.remove("dark");
+        else if (!t && window.matchMedia("(prefers-color-scheme: light)").matches) document.documentElement.classList.remove("dark");
       })();
     </script>
     <script src="https://cdn.tailwindcss.com/3.4.17"></script>
     <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-                        mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace']
-                    },
-                    colors: {
-                        brand: {
-                            50: '#eef2ff',
-                            100: '#e0e7ff',
-                            200: '#c7d2fe',
-                            300: '#a5b4fc',
-                            400: '#818cf8',
-                            500: '#6366f1',
-                            600: '#4f46e5',
-                            700: '#4338ca',
-                            800: '#3730a3',
-                            900: '#312e81',
-                            950: '#1e1b4b'
-                        }
-                    }
-                }
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ["Inter", "system-ui", "-apple-system", "sans-serif"],
+              mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"]
+            },
+            colors: {
+              brand: {
+                50: "#eef2ff",
+                100: "#e0e7ff",
+                200: "#c7d2fe",
+                300: "#a5b4fc",
+                400: "#818cf8",
+                500: "#6366f1",
+                600: "#4f46e5",
+                700: "#4338ca",
+                800: "#3730a3",
+                900: "#312e81",
+                950: "#1e1b4b"
+              }
             }
-        };
+          }
+        }
+      };
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
-        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <style>
-        * {
-            box-sizing: border-box;
-        }
+      * {
+        box-sizing: border-box;
+      }
 
-        html,
-        body {
-            height: 100%;
-            margin: 0;
-        }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
 
-        /* Custom scrollbar */
-        .custom-scroll::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
+      /* Custom scrollbar */
+      .custom-scroll::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
 
-        .custom-scroll::-webkit-scrollbar-track {
-            background: transparent;
-        }
+      .custom-scroll::-webkit-scrollbar-track {
+        background: transparent;
+      }
 
-        .custom-scroll::-webkit-scrollbar-thumb {
-            background: rgba(148, 163, 184, 0.3);
-            border-radius: 9999px;
-        }
+      .custom-scroll::-webkit-scrollbar-thumb {
+        background: rgba(148, 163, 184, 0.3);
+        border-radius: 9999px;
+      }
 
-        .custom-scroll::-webkit-scrollbar-thumb:hover {
-            background: rgba(148, 163, 184, 0.5);
-        }
+      .custom-scroll::-webkit-scrollbar-thumb:hover {
+        background: rgba(148, 163, 184, 0.5);
+      }
 
-        /* Highlighting overlay synchronization */
-        .editor-backdrop mark {
-            border-radius: 3px;
-            padding: 1px 0;
-            color: inherit;
-        }
+      /* Highlighting overlay synchronization */
+      .editor-backdrop mark {
+        border-radius: 3px;
+        padding: 1px 0;
+        color: inherit;
+      }
 
-        .match-c0 {
-            background-color: rgba(99, 102, 241, 0.28);
-            border-bottom: 2px solid #6366f1;
-        }
+      .match-c0 {
+        background-color: rgba(99, 102, 241, 0.28);
+        border-bottom: 2px solid #6366f1;
+      }
 
-        .match-c1 {
-            background-color: rgba(16, 185, 129, 0.28);
-            border-bottom: 2px solid #10b981;
-        }
+      .match-c1 {
+        background-color: rgba(16, 185, 129, 0.28);
+        border-bottom: 2px solid #10b981;
+      }
 
-        .match-c2 {
-            background-color: rgba(245, 158, 11, 0.28);
-            border-bottom: 2px solid #f59e0b;
-        }
+      .match-c2 {
+        background-color: rgba(245, 158, 11, 0.28);
+        border-bottom: 2px solid #f59e0b;
+      }
 
-        .match-c3 {
-            background-color: rgba(236, 72, 153, 0.28);
-            border-bottom: 2px solid #ec4899;
-        }
+      .match-c3 {
+        background-color: rgba(236, 72, 153, 0.28);
+        border-bottom: 2px solid #ec4899;
+      }
 
-        .match-c4 {
-            background-color: rgba(14, 165, 233, 0.28);
-            border-bottom: 2px solid #0ea5e9;
-        }
+      .match-c4 {
+        background-color: rgba(14, 165, 233, 0.28);
+        border-bottom: 2px solid #0ea5e9;
+      }
 
-        .match-c5 {
-            background-color: rgba(168, 85, 247, 0.28);
-            border-bottom: 2px solid #a855f7;
-        }
+      .match-c5 {
+        background-color: rgba(168, 85, 247, 0.28);
+        border-bottom: 2px solid #a855f7;
+      }
 
-        /* Stepper character pointer track */
-        .char-cell {
-            min-width: 28px;
-            height: 36px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
-            position: relative;
-            transition: all 0.15s ease;
-        }
+      /* Stepper character pointer track */
+      .char-cell {
+        min-width: 28px;
+        height: 36px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 13px;
+        position: relative;
+        transition: all 0.15s ease;
+      }
 
-        .char-cell.active-step {
-            background-color: rgba(99, 102, 241, 0.25);
-            outline: 2px solid #6366f1;
-            border-radius: 4px;
-            font-weight: 700;
-        }
+      .char-cell.active-step {
+        background-color: rgba(99, 102, 241, 0.25);
+        outline: 2px solid #6366f1;
+        border-radius: 4px;
+        font-weight: 700;
+      }
 
-        .char-cell.matched-step {
-            background-color: rgba(16, 185, 129, 0.2);
-            color: #10b981;
-        }
+      .char-cell.matched-step {
+        background-color: rgba(16, 185, 129, 0.2);
+        color: #10b981;
+      }
 
-        .char-cell.backtracked-step {
-            background-color: rgba(244, 63, 94, 0.2);
-            color: #f43f5e;
-        }
+      .char-cell.backtracked-step {
+        background-color: rgba(244, 63, 94, 0.2);
+        color: #f43f5e;
+      }
     </style>
-</head>
+  </head>
 
-<body
-    class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans antialiased flex flex-col min-h-screen lg:h-screen lg:overflow-hidden">
-
+  <body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans antialiased flex flex-col min-h-screen lg:h-screen lg:overflow-hidden">
     <!-- Top Header Navigation -->
-    <header
-        class="border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0 z-20">
-        <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 text-white flex items-center justify-center shadow-md shadow-brand-500/20">
-                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                    <path d="M8 11h6"></path>
-                    <path d="M11 8v6"></path>
-                </svg>
-            </div>
-            <div>
-                <h1 class="text-sm sm:text-base font-bold tracking-tight leading-none text-slate-900 dark:text-white flex items-center gap-2">
-                    Regex Pattern Debugger &amp; Match Visualizer
-                    <span class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-brand-100 text-brand-700 dark:bg-brand-950 dark:text-brand-300 border border-brand-200 dark:border-brand-800">Simulator</span>
-                </h1>
-                <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Step-by-step match evaluation, AST breakdown, ReDoS heuristics, and group inspector</p>
-            </div>
+    <header class="border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0 z-20">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 text-white flex items-center justify-center shadow-md shadow-brand-500/20">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            <path d="M8 11h6"></path>
+            <path d="M11 8v6"></path>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-sm sm:text-base font-bold tracking-tight leading-none text-slate-900 dark:text-white flex items-center gap-2">
+            Regex Pattern Debugger &amp; Match Visualizer
+            <span class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-brand-100 text-brand-700 dark:bg-brand-950 dark:text-brand-300 border border-brand-200 dark:border-brand-800">Simulator</span>
+          </h1>
+          <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Step-by-step match evaluation, AST breakdown, ReDoS heuristics, and group inspector</p>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <!-- Presets Dropdown -->
+        <div class="flex items-center gap-1.5">
+          <label for="presetSelect" class="text-xs font-medium text-slate-500 dark:text-slate-400 hidden sm:inline">Presets:</label>
+          <select id="presetSelect" class="text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 font-medium focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-800 dark:text-slate-200">
+            <option value="email">Email Address</option>
+            <option value="url">RFC 3986 Web URL</option>
+            <option value="ipv4">IPv4 Address</option>
+            <option value="semver">Semantic Version (SemVer)</option>
+            <option value="iso_date">ISO 8601 Date (YYYY-MM-DD)</option>
+            <option value="strong_pw">Strong Password (Lookaheads)</option>
+            <option value="html_tag">HTML Tag &amp; Attributes</option>
+            <option value="hex_color">CSS Hex Color</option>
+            <option value="greedy_vs_lazy">Greedy vs Lazy Quantifier</option>
+            <option value="backtrack_demo">Backtracking Demo (Catastrophic Risk)</option>
+          </select>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2">
-            <!-- Presets Dropdown -->
-            <div class="flex items-center gap-1.5">
-                <label for="presetSelect" class="text-xs font-medium text-slate-500 dark:text-slate-400 hidden sm:inline">Presets:</label>
-                <select id="presetSelect"
-                    class="text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 font-medium focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-800 dark:text-slate-200">
-                    <option value="email">Email Address</option>
-                    <option value="url">RFC 3986 Web URL</option>
-                    <option value="ipv4">IPv4 Address</option>
-                    <option value="semver">Semantic Version (SemVer)</option>
-                    <option value="iso_date">ISO 8601 Date (YYYY-MM-DD)</option>
-                    <option value="strong_pw">Strong Password (Lookaheads)</option>
-                    <option value="html_tag">HTML Tag &amp; Attributes</option>
-                    <option value="hex_color">CSS Hex Color</option>
-                    <option value="greedy_vs_lazy">Greedy vs Lazy Quantifier</option>
-                    <option value="backtrack_demo">Backtracking Demo (Catastrophic Risk)</option>
-                </select>
-            </div>
+        <!-- Cheat Sheet Modal Button -->
+        <button id="cheatSheetBtn" type="button" class="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition text-slate-700 dark:text-slate-200">
+          <svg class="w-3.5 h-3.5 text-brand-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+          </svg>
+          <span>Reference</span>
+        </button>
 
-            <!-- Cheat Sheet Modal Button -->
-            <button id="cheatSheetBtn" type="button"
-                class="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition text-slate-700 dark:text-slate-200">
-                <svg class="w-3.5 h-3.5 text-brand-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
-                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
-                </svg>
-                <span>Reference</span>
-            </button>
+        <!-- Copy Regex Button -->
+        <button id="copyRegexBtn" type="button" title="Copy Regex literal" class="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition text-slate-700 dark:text-slate-200">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          <span>Copy Regex</span>
+        </button>
 
-            <!-- Copy Regex Button -->
-            <button id="copyRegexBtn" type="button" title="Copy Regex literal"
-                class="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition text-slate-700 dark:text-slate-200">
-                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                </svg>
-                <span>Copy Regex</span>
-            </button>
-
-            <!-- Theme Toggle Button -->
-            <button id="themeToggleBtn" type="button" title="Toggle Dark/Light Mode"
-                class="p-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition">
-                <svg id="sunIcon" class="w-4 h-4 hidden dark:block text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="5"></circle>
-                    <line x1="12" y1="1" x2="12" y2="3"></line>
-                    <line x1="12" y1="21" x2="12" y2="23"></line>
-                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-                    <line x1="1" y1="12" x2="3" y2="12"></line>
-                    <line x1="21" y1="12" x2="23" y2="12"></line>
-                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-                </svg>
-                <svg id="moonIcon" class="w-4 h-4 block dark:hidden text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-                </svg>
-            </button>
-        </div>
+        <!-- Theme Toggle Button -->
+        <button id="themeToggleBtn" type="button" title="Toggle Dark/Light Mode" class="p-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition">
+          <svg id="sunIcon" class="w-4 h-4 hidden dark:block text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+          <svg id="moonIcon" class="w-4 h-4 block dark:hidden text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
+      </div>
     </header>
 
     <!-- Main Regex Input & Flags Toolbar -->
     <div class="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3 shrink-0 z-10 shadow-sm">
-        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            <!-- Pattern Input Container -->
-            <div class="flex-1 flex items-center bg-slate-100 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-1.5 focus-within:ring-2 focus-within:ring-brand-500 focus-within:border-brand-500 transition shadow-inner">
-                <span class="text-brand-500 dark:text-brand-400 font-mono font-bold text-lg select-none mr-2">/</span>
-                <input id="patternInput" type="text" spellcheck="false"
-                    class="flex-1 bg-transparent border-0 outline-none font-mono text-sm leading-relaxed text-slate-900 dark:text-slate-100 placeholder-slate-400"
-                    placeholder="Enter regular expression pattern..." />
-                <span class="text-brand-500 dark:text-brand-400 font-mono font-bold text-lg select-none ml-2">/</span>
-            </div>
-
-            <!-- Flag Pills -->
-            <div class="flex flex-wrap items-center gap-1.5 bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200 dark:border-slate-800 self-start sm:self-auto">
-                <span class="text-[10px] uppercase font-bold text-slate-400 px-1 select-none">Flags:</span>
-                <button type="button" data-flag="g" title="Global (find all matches)"
-                    class="flag-pill px-2 py-1 text-xs font-mono font-semibold rounded-md transition bg-brand-600 text-white shadow-sm">g</button>
-                <button type="button" data-flag="i" title="Ignore Case (case-insensitive)"
-                    class="flag-pill px-2 py-1 text-xs font-mono font-semibold rounded-md transition bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">i</button>
-                <button type="button" data-flag="m" title="Multiline (^ and $ match line boundaries)"
-                    class="flag-pill px-2 py-1 text-xs font-mono font-semibold rounded-md transition bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">m</button>
-                <button type="button" data-flag="s" title="DotAll (. matches newline characters)"
-                    class="flag-pill px-2 py-1 text-xs font-mono font-semibold rounded-md transition bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">s</button>
-                <button type="button" data-flag="u" title="Unicode (treat pattern as sequence of unicode code points)"
-                    class="flag-pill px-2 py-1 text-xs font-mono font-semibold rounded-md transition bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">u</button>
-                <button type="button" data-flag="y" title="Sticky (matches only from lastIndex)"
-                    class="flag-pill px-2 py-1 text-xs font-mono font-semibold rounded-md transition bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">y</button>
-            </div>
+      <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        <!-- Pattern Input Container -->
+        <div class="flex-1 flex items-center bg-slate-100 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-1.5 focus-within:ring-2 focus-within:ring-brand-500 focus-within:border-brand-500 transition shadow-inner">
+          <span class="text-brand-500 dark:text-brand-400 font-mono font-bold text-lg select-none mr-2">/</span>
+          <input id="patternInput" type="text" spellcheck="false" class="flex-1 bg-transparent border-0 outline-none font-mono text-sm leading-relaxed text-slate-900 dark:text-slate-100 placeholder-slate-400" placeholder="Enter regular expression pattern..." />
+          <span class="text-brand-500 dark:text-brand-400 font-mono font-bold text-lg select-none ml-2">/</span>
         </div>
 
-        <!-- Syntax Error Banner -->
-        <div id="errorBanner" class="hidden mt-2.5 p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-xs text-rose-700 dark:text-rose-300 flex items-start gap-2">
-            <svg class="w-4 h-4 shrink-0 mt-0.5 text-rose-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="12" y1="8" x2="12" y2="12"></line>
-                <line x1="12" y1="16" x2="12.01" y2="16"></line>
-            </svg>
-            <div>
-                <span class="font-bold">Regex Syntax Error:</span> <span id="errorMessage">Invalid regular expression</span>
-            </div>
+        <!-- Flag Pills -->
+        <div class="flex flex-wrap items-center gap-1.5 bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200 dark:border-slate-800 self-start sm:self-auto">
+          <span class="text-[10px] uppercase font-bold text-slate-400 px-1 select-none">Flags:</span>
+          <button type="button" data-flag="g" title="Global (find all matches)" class="flag-pill px-2 py-1 text-xs font-mono font-semibold rounded-md transition bg-brand-600 text-white shadow-sm">g</button>
+          <button type="button" data-flag="i" title="Ignore Case (case-insensitive)" class="flag-pill px-2 py-1 text-xs font-mono font-semibold rounded-md transition bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">i</button>
+          <button type="button" data-flag="m" title="Multiline (^ and $ match line boundaries)" class="flag-pill px-2 py-1 text-xs font-mono font-semibold rounded-md transition bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">m</button>
+          <button type="button" data-flag="s" title="DotAll (. matches newline characters)" class="flag-pill px-2 py-1 text-xs font-mono font-semibold rounded-md transition bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">s</button>
+          <button type="button" data-flag="u" title="Unicode (treat pattern as sequence of unicode code points)" class="flag-pill px-2 py-1 text-xs font-mono font-semibold rounded-md transition bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">u</button>
+          <button type="button" data-flag="y" title="Sticky (matches only from lastIndex)" class="flag-pill px-2 py-1 text-xs font-mono font-semibold rounded-md transition bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">y</button>
         </div>
+      </div>
 
-        <!-- ReDoS / Backtracking Warning Banner -->
-        <div id="warningBanner" class="hidden mt-2.5 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
-            <svg class="w-4 h-4 shrink-0 mt-0.5 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                <line x1="12" y1="9" x2="12" y2="13"></line>
-                <line x1="12" y1="17" x2="12.01" y2="17"></line>
-            </svg>
-            <div>
-                <span class="font-bold">Potential Catastrophic Backtracking (ReDoS Risk):</span>
-                <span id="warningMessage">Nested quantifiers detected. May execute in exponential time on non-matching inputs.</span>
-            </div>
+      <!-- Syntax Error Banner -->
+      <div id="errorBanner" class="hidden mt-2.5 p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-xs text-rose-700 dark:text-rose-300 flex items-start gap-2">
+        <svg class="w-4 h-4 shrink-0 mt-0.5 text-rose-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <div><span class="font-bold">Regex Syntax Error:</span> <span id="errorMessage">Invalid regular expression</span></div>
+      </div>
+
+      <!-- ReDoS / Backtracking Warning Banner -->
+      <div id="warningBanner" class="hidden mt-2.5 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
+        <svg class="w-4 h-4 shrink-0 mt-0.5 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+          <line x1="12" y1="9" x2="12" y2="13"></line>
+          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+        <div>
+          <span class="font-bold">Potential Catastrophic Backtracking (ReDoS Risk):</span>
+          <span id="warningMessage">Nested quantifiers detected. May execute in exponential time on non-matching inputs.</span>
         </div>
+      </div>
     </div>
 
     <!-- Main Workspace Split -->
     <main class="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
+      <!-- Left Column: Tooling Tabs (Debugger, Breakdown, Matches, Substitution, Code Export) -->
+      <section class="w-full lg:w-[500px] xl:w-[560px] border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shrink-0 lg:h-full min-h-0">
+        <!-- Panel Tabs Navigation -->
+        <div class="grid grid-cols-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 shrink-0 text-xs font-semibold">
+          <button type="button" data-tab="debugger" class="tab-btn py-2.5 text-center border-b-2 border-brand-500 text-brand-600 dark:text-brand-400 bg-white dark:bg-slate-900 transition flex items-center justify-center gap-1">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            <span>Debugger</span>
+          </button>
+          <button type="button" data-tab="breakdown" class="tab-btn py-2.5 text-center border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition">Breakdown</button>
+          <button type="button" data-tab="matches" class="tab-btn py-2.5 text-center border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition">Matches (<span id="tabMatchCount">0</span>)</button>
+          <button type="button" data-tab="replace" class="tab-btn py-2.5 text-center border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition">Replace</button>
+          <button type="button" data-tab="export" class="tab-btn py-2.5 text-center border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition">Export</button>
+        </div>
 
-        <!-- Left Column: Tooling Tabs (Debugger, Breakdown, Matches, Substitution, Code Export) -->
-        <section class="w-full lg:w-[500px] xl:w-[560px] border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shrink-0 lg:h-full min-h-0">
+        <!-- Tab Panels Area -->
+        <div class="flex-1 overflow-y-auto custom-scroll p-4 min-h-[280px]">
+          <!-- TAB 1: STEP-BY-STEP DEBUGGER -->
+          <div id="tab-debugger" class="tab-panel space-y-4">
+            <!-- Debugger Control Bar -->
+            <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-3 space-y-3 shadow-sm">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Match Step Simulator
+                </span>
+                <span id="stepCounterBadge" class="text-xs font-mono font-semibold px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300"> Step 0 / 0 </span>
+              </div>
 
-            <!-- Panel Tabs Navigation -->
-            <div class="grid grid-cols-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 shrink-0 text-xs font-semibold">
-                <button type="button" data-tab="debugger"
-                    class="tab-btn py-2.5 text-center border-b-2 border-brand-500 text-brand-600 dark:text-brand-400 bg-white dark:bg-slate-900 transition flex items-center justify-center gap-1">
-                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                    </svg>
-                    <span>Debugger</span>
+              <!-- Stepper Buttons -->
+              <div class="flex items-center gap-2">
+                <button id="stepResetBtn" type="button" title="Reset to start" class="px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium transition flex items-center gap-1">
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="1 4 1 10 7 10"></polyline>
+                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                  </svg>
+                  <span>Reset</span>
                 </button>
-                <button type="button" data-tab="breakdown"
-                    class="tab-btn py-2.5 text-center border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition">
-                    Breakdown
+
+                <button id="stepPrevBtn" type="button" title="Previous step" class="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium transition flex items-center gap-1">
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                  </svg>
+                  <span>Step</span>
                 </button>
-                <button type="button" data-tab="matches"
-                    class="tab-btn py-2.5 text-center border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition">
-                    Matches (<span id="tabMatchCount">0</span>)
+
+                <button id="stepPlayPauseBtn" type="button" class="flex-1 py-1.5 px-3 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold shadow-sm transition flex items-center justify-center gap-1.5">
+                  <svg id="playIcon" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                  </svg>
+                  <svg id="pauseIcon" class="w-3.5 h-3.5 hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="6" y="4" width="4" height="16"></rect>
+                    <rect x="14" y="4" width="4" height="16"></rect>
+                  </svg>
+                  <span id="playBtnText">Auto Play</span>
                 </button>
-                <button type="button" data-tab="replace"
-                    class="tab-btn py-2.5 text-center border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition">
-                    Replace
+
+                <button id="stepNextBtn" type="button" title="Next step" class="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium transition flex items-center gap-1">
+                  <span>Step</span>
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
                 </button>
-                <button type="button" data-tab="export"
-                    class="tab-btn py-2.5 text-center border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition">
-                    Export
-                </button>
+              </div>
+
+              <!-- Speed Controls -->
+              <div class="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                <span>Speed:</span>
+                <div class="flex items-center gap-1">
+                  <button type="button" data-speed="800" class="speed-btn px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-slate-200 dark:bg-slate-800 hover:bg-brand-500 hover:text-white transition">0.5x</button>
+                  <button type="button" data-speed="400" class="speed-btn px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-brand-600 text-white transition">1x</button>
+                  <button type="button" data-speed="150" class="speed-btn px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-slate-200 dark:bg-slate-800 hover:bg-brand-500 hover:text-white transition">2x</button>
+                  <button type="button" data-speed="50" class="speed-btn px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-slate-200 dark:bg-slate-800 hover:bg-brand-500 hover:text-white transition">4x</button>
+                </div>
+              </div>
             </div>
 
-            <!-- Tab Panels Area -->
-            <div class="flex-1 overflow-y-auto custom-scroll p-4 min-h-[280px]">
-
-                <!-- TAB 1: STEP-BY-STEP DEBUGGER -->
-                <div id="tab-debugger" class="tab-panel space-y-4">
-                    <!-- Debugger Control Bar -->
-                    <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-3 space-y-3 shadow-sm">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
-                                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                                Match Step Simulator
-                            </span>
-                            <span id="stepCounterBadge" class="text-xs font-mono font-semibold px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                                Step 0 / 0
-                            </span>
-                        </div>
-
-                        <!-- Stepper Buttons -->
-                        <div class="flex items-center gap-2">
-                            <button id="stepResetBtn" type="button" title="Reset to start"
-                                class="px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium transition flex items-center gap-1">
-                                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <polyline points="1 4 1 10 7 10"></polyline>
-                                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-                                </svg>
-                                <span>Reset</span>
-                            </button>
-
-                            <button id="stepPrevBtn" type="button" title="Previous step"
-                                class="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium transition flex items-center gap-1">
-                                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <polyline points="15 18 9 12 15 6"></polyline>
-                                </svg>
-                                <span>Step</span>
-                            </button>
-
-                            <button id="stepPlayPauseBtn" type="button"
-                                class="flex-1 py-1.5 px-3 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold shadow-sm transition flex items-center justify-center gap-1.5">
-                                <svg id="playIcon" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                                </svg>
-                                <svg id="pauseIcon" class="w-3.5 h-3.5 hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <rect x="6" y="4" width="4" height="16"></rect>
-                                    <rect x="14" y="4" width="4" height="16"></rect>
-                                </svg>
-                                <span id="playBtnText">Auto Play</span>
-                            </button>
-
-                            <button id="stepNextBtn" type="button" title="Next step"
-                                class="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium transition flex items-center gap-1">
-                                <span>Step</span>
-                                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <polyline points="9 18 15 12 9 6"></polyline>
-                                </svg>
-                            </button>
-                        </div>
-
-                        <!-- Speed Controls -->
-                        <div class="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-                            <span>Speed:</span>
-                            <div class="flex items-center gap-1">
-                                <button type="button" data-speed="800" class="speed-btn px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-slate-200 dark:bg-slate-800 hover:bg-brand-500 hover:text-white transition">0.5x</button>
-                                <button type="button" data-speed="400" class="speed-btn px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-brand-600 text-white transition">1x</button>
-                                <button type="button" data-speed="150" class="speed-btn px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-slate-200 dark:bg-slate-800 hover:bg-brand-500 hover:text-white transition">2x</button>
-                                <button type="button" data-speed="50" class="speed-btn px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-slate-200 dark:bg-slate-800 hover:bg-brand-500 hover:text-white transition">4x</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Visual Stepper Tape / Pointer -->
-                    <div class="space-y-2">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">String Character Tape</span>
-                            <span id="pointerPosLabel" class="text-[11px] font-mono text-slate-500">Position: index 0</span>
-                        </div>
-                        <div id="stepperTapeContainer" class="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-x-auto custom-scroll whitespace-nowrap shadow-inner min-h-[56px] flex items-center">
-                            <!-- Character cells injected dynamically -->
-                        </div>
-                    </div>
-
-                    <!-- Current Step Verdict / Explanation Card -->
-                    <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-3 space-y-2">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">Current Evaluation</span>
-                            <span id="stepActionBadge" class="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-brand-100 dark:bg-brand-950 text-brand-700 dark:text-brand-300">
-                                READY
-                            </span>
-                        </div>
-                        <div id="stepExplanation" class="text-xs font-mono text-slate-700 dark:text-slate-300 leading-relaxed bg-white dark:bg-slate-900 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 min-h-[50px]">
-                            Press Next or Play to begin stepping through regex evaluation.
-                        </div>
-                    </div>
-
-                    <!-- Step History Log -->
-                    <div class="space-y-1.5">
-                        <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">Execution Trail</span>
-                        <div id="stepLogList" class="max-h-[180px] overflow-y-auto custom-scroll space-y-1 p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-[11px] font-mono">
-                            <!-- Log items dynamically appended -->
-                        </div>
-                    </div>
-                </div>
-
-                <!-- TAB 2: AST PATTERN BREAKDOWN -->
-                <div id="tab-breakdown" class="tab-panel hidden space-y-3">
-                    <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                        <span>Tokens in pattern (<span id="tokenCountBadge">0</span>):</span>
-                        <span class="text-[11px]">Hover token to inspect</span>
-                    </div>
-                    <div id="tokenTreeContainer" class="space-y-2">
-                        <!-- Token cards rendered dynamically -->
-                    </div>
-                </div>
-
-                <!-- TAB 3: MATCHES & CAPTURE GROUPS -->
-                <div id="tab-matches" class="tab-panel hidden space-y-3">
-                    <!-- Match Metrics Bar -->
-                    <div class="grid grid-cols-3 gap-2 text-center">
-                        <div class="rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-2">
-                            <div class="text-[10px] uppercase text-slate-400 font-semibold">Total Matches</div>
-                            <div id="metricTotalMatches" class="font-mono text-sm font-bold text-brand-600 dark:text-brand-400 mt-0.5">0</div>
-                        </div>
-                        <div class="rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-2">
-                            <div class="text-[10px] uppercase text-slate-400 font-semibold">Capture Groups</div>
-                            <div id="metricCaptureGroups" class="font-mono text-sm font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">0</div>
-                        </div>
-                        <div class="rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-2">
-                            <div class="text-[10px] uppercase text-slate-400 font-semibold">Exec Time</div>
-                            <div id="metricExecTime" class="font-mono text-sm font-bold text-slate-700 dark:text-slate-300 mt-0.5">0.0ms</div>
-                        </div>
-                    </div>
-
-                    <!-- Matches List -->
-                    <div id="matchesContainer" class="space-y-2.5">
-                        <!-- Match cards injected dynamically -->
-                    </div>
-                </div>
-
-                <!-- TAB 4: STRING REPLACEMENT / SUBSTITUTION -->
-                <div id="tab-replace" class="tab-panel hidden space-y-3">
-                    <div class="space-y-1.5">
-                        <label for="replaceTemplateInput" class="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between">
-                            <span>Substitution Template</span>
-                            <span class="text-[11px] font-mono text-slate-400">Supports $1, $2, $&amp;, $`</span>
-                        </label>
-                        <input id="replaceTemplateInput" type="text" spellcheck="false"
-                            value="[Match: $&]"
-                            placeholder="e.g. <a href='$1'>$2</a> or [$1]"
-                            class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-3 py-2 font-mono text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500" />
-                    </div>
-
-                    <div class="space-y-1.5">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">Replacement Output</span>
-                            <button id="copyReplacedBtn" type="button"
-                                class="text-[11px] font-medium px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition">
-                                Copy Result
-                            </button>
-                        </div>
-                        <textarea id="replaceOutputArea" rows="7" readonly spellcheck="false"
-                            class="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-2 font-mono text-xs leading-relaxed text-slate-800 dark:text-slate-200 focus:outline-none custom-scroll resize-y"></textarea>
-                    </div>
-                </div>
-
-                <!-- TAB 5: CODE EXPORT -->
-                <div id="tab-export" class="tab-panel hidden space-y-3">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">Target Language</span>
-                        <div class="flex items-center gap-1">
-                            <button type="button" data-lang="js" class="lang-tab-btn px-2.5 py-1 rounded text-xs font-medium bg-brand-600 text-white transition">JS/TS</button>
-                            <button type="button" data-lang="python" class="lang-tab-btn px-2.5 py-1 rounded text-xs font-medium bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700 transition">Python</button>
-                            <button type="button" data-lang="go" class="lang-tab-btn px-2.5 py-1 rounded text-xs font-medium bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700 transition">Go</button>
-                            <button type="button" data-lang="php" class="lang-tab-btn px-2.5 py-1 rounded text-xs font-medium bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700 transition">PHP</button>
-                        </div>
-                    </div>
-
-                    <div class="relative">
-                        <pre id="codeExportPre"
-                            class="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-900 text-slate-100 font-mono text-xs overflow-x-auto custom-scroll leading-relaxed"></pre>
-                        <button id="copyCodeSnippetBtn" type="button"
-                            class="absolute top-2.5 right-2.5 px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-medium border border-slate-700 transition">
-                            Copy Code
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Right Column: Test String & Synchronized Highlight Overlay -->
-        <section class="flex-1 flex flex-col bg-slate-100/60 dark:bg-slate-950/60 min-h-0 overflow-hidden">
-            <!-- Test String Toolbar -->
-            <div class="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 shrink-0">
-                <div class="flex items-center gap-2">
-                    <span class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Test String</span>
-                    <span id="matchStatsBadge" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-brand-100 dark:bg-brand-950 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-800">
-                        0 matches
-                    </span>
-                </div>
-
-                <div class="flex items-center gap-1.5">
-                    <!-- Match Navigator -->
-                    <div class="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 border border-slate-200 dark:border-slate-700 text-xs">
-                        <button id="prevMatchBtn" type="button" title="Previous match"
-                            class="p-1 rounded hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition">
-                            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="15 18 9 12 15 6"></polyline>
-                            </svg>
-                        </button>
-                        <span id="matchNavIndex" class="px-2 font-mono text-[11px] font-medium text-slate-700 dark:text-slate-300">0 of 0</span>
-                        <button id="nextMatchBtn" type="button" title="Next match"
-                            class="p-1 rounded hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition">
-                            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="9 18 15 12 9 6"></polyline>
-                            </svg>
-                        </button>
-                    </div>
-
-                    <button id="loadSampleBtn" type="button"
-                        class="text-xs font-medium px-2.5 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition">
-                        Sample Text
-                    </button>
-                    <button id="clearTestTextBtn" type="button"
-                        class="text-xs font-medium px-2 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 transition">
-                        Clear
-                    </button>
-                </div>
+            <!-- Visual Stepper Tape / Pointer -->
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">String Character Tape</span>
+                <span id="pointerPosLabel" class="text-[11px] font-mono text-slate-500">Position: index 0</span>
+              </div>
+              <div id="stepperTapeContainer" class="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-x-auto custom-scroll whitespace-nowrap shadow-inner min-h-[56px] flex items-center">
+                <!-- Character cells injected dynamically -->
+              </div>
             </div>
 
-            <!-- Editor Container with Layered Highlighting -->
-            <div class="flex-1 relative overflow-hidden select-text p-4">
-                <div class="relative w-full h-full rounded-2xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
-
-                    <!-- Synchronized Backdrop for Highlights -->
-                    <div id="highlightBackdrop"
-                        class="editor-backdrop absolute inset-0 p-4 font-mono text-sm leading-relaxed whitespace-pre-wrap break-words overflow-y-auto pointer-events-none custom-scroll text-transparent select-none z-0">
-                    </div>
-
-                    <!-- Transparent Textarea for User Input -->
-                    <textarea id="testTextInput" spellcheck="false"
-                        placeholder="Enter text to match against the regular expression..."
-                        class="absolute inset-0 w-full h-full p-4 font-mono text-sm leading-relaxed whitespace-pre-wrap break-words overflow-y-auto bg-transparent text-slate-900 dark:text-slate-100 outline-none border-0 resize-none z-10 custom-scroll caret-brand-500"></textarea>
-                </div>
+            <!-- Current Step Verdict / Explanation Card -->
+            <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-3 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">Current Evaluation</span>
+                <span id="stepActionBadge" class="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-brand-100 dark:bg-brand-950 text-brand-700 dark:text-brand-300"> READY </span>
+              </div>
+              <div id="stepExplanation" class="text-xs font-mono text-slate-700 dark:text-slate-300 leading-relaxed bg-white dark:bg-slate-900 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 min-h-[50px]">Press Next or Play to begin stepping through regex evaluation.</div>
             </div>
 
-            <!-- Bottom String Metadata Footer -->
-            <div class="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-2 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 shrink-0">
-                <div class="flex items-center gap-3">
-                    <span>Length: <strong id="charCountStat" class="font-mono text-slate-800 dark:text-slate-200">0</strong> chars</span>
-                    <span>Lines: <strong id="lineCountStat" class="font-mono text-slate-800 dark:text-slate-200">1</strong></span>
-                </div>
-                <div class="text-[11px] text-slate-400">
-                    Press <kbd class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 font-mono text-[10px]">Ctrl+Enter</kbd> to re-evaluate
-                </div>
+            <!-- Step History Log -->
+            <div class="space-y-1.5">
+              <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">Execution Trail</span>
+              <div id="stepLogList" class="max-h-[180px] overflow-y-auto custom-scroll space-y-1 p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-[11px] font-mono">
+                <!-- Log items dynamically appended -->
+              </div>
             </div>
-        </section>
+          </div>
+
+          <!-- TAB 2: AST PATTERN BREAKDOWN -->
+          <div id="tab-breakdown" class="tab-panel hidden space-y-3">
+            <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+              <span>Tokens in pattern (<span id="tokenCountBadge">0</span>):</span>
+              <span class="text-[11px]">Hover token to inspect</span>
+            </div>
+            <div id="tokenTreeContainer" class="space-y-2">
+              <!-- Token cards rendered dynamically -->
+            </div>
+          </div>
+
+          <!-- TAB 3: MATCHES & CAPTURE GROUPS -->
+          <div id="tab-matches" class="tab-panel hidden space-y-3">
+            <!-- Match Metrics Bar -->
+            <div class="grid grid-cols-3 gap-2 text-center">
+              <div class="rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-2">
+                <div class="text-[10px] uppercase text-slate-400 font-semibold">Total Matches</div>
+                <div id="metricTotalMatches" class="font-mono text-sm font-bold text-brand-600 dark:text-brand-400 mt-0.5">0</div>
+              </div>
+              <div class="rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-2">
+                <div class="text-[10px] uppercase text-slate-400 font-semibold">Capture Groups</div>
+                <div id="metricCaptureGroups" class="font-mono text-sm font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">0</div>
+              </div>
+              <div class="rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-2">
+                <div class="text-[10px] uppercase text-slate-400 font-semibold">Exec Time</div>
+                <div id="metricExecTime" class="font-mono text-sm font-bold text-slate-700 dark:text-slate-300 mt-0.5">0.0ms</div>
+              </div>
+            </div>
+
+            <!-- Matches List -->
+            <div id="matchesContainer" class="space-y-2.5">
+              <!-- Match cards injected dynamically -->
+            </div>
+          </div>
+
+          <!-- TAB 4: STRING REPLACEMENT / SUBSTITUTION -->
+          <div id="tab-replace" class="tab-panel hidden space-y-3">
+            <div class="space-y-1.5">
+              <label for="replaceTemplateInput" class="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between">
+                <span>Substitution Template</span>
+                <span class="text-[11px] font-mono text-slate-400">Supports $1, $2, $&amp;, $`</span>
+              </label>
+              <input id="replaceTemplateInput" type="text" spellcheck="false" value="[Match: $&]" placeholder="e.g. <a href='$1'>$2</a> or [$1]" class="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-3 py-2 font-mono text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            </div>
+
+            <div class="space-y-1.5">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">Replacement Output</span>
+                <button id="copyReplacedBtn" type="button" class="text-[11px] font-medium px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition">Copy Result</button>
+              </div>
+              <textarea id="replaceOutputArea" rows="7" readonly spellcheck="false" class="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-2 font-mono text-xs leading-relaxed text-slate-800 dark:text-slate-200 focus:outline-none custom-scroll resize-y"></textarea>
+            </div>
+          </div>
+
+          <!-- TAB 5: CODE EXPORT -->
+          <div id="tab-export" class="tab-panel hidden space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">Target Language</span>
+              <div class="flex items-center gap-1">
+                <button type="button" data-lang="js" class="lang-tab-btn px-2.5 py-1 rounded text-xs font-medium bg-brand-600 text-white transition">JS/TS</button>
+                <button type="button" data-lang="python" class="lang-tab-btn px-2.5 py-1 rounded text-xs font-medium bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700 transition">Python</button>
+                <button type="button" data-lang="go" class="lang-tab-btn px-2.5 py-1 rounded text-xs font-medium bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700 transition">Go</button>
+                <button type="button" data-lang="php" class="lang-tab-btn px-2.5 py-1 rounded text-xs font-medium bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700 transition">PHP</button>
+              </div>
+            </div>
+
+            <div class="relative">
+              <pre id="codeExportPre" class="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-900 text-slate-100 font-mono text-xs overflow-x-auto custom-scroll leading-relaxed"></pre>
+              <button id="copyCodeSnippetBtn" type="button" class="absolute top-2.5 right-2.5 px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-medium border border-slate-700 transition">Copy Code</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Test String & Synchronized Highlight Overlay -->
+      <section class="flex-1 flex flex-col bg-slate-100/60 dark:bg-slate-950/60 min-h-0 overflow-hidden">
+        <!-- Test String Toolbar -->
+        <div class="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 shrink-0">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Test String</span>
+            <span id="matchStatsBadge" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-brand-100 dark:bg-brand-950 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-800"> 0 matches </span>
+          </div>
+
+          <div class="flex items-center gap-1.5">
+            <!-- Match Navigator -->
+            <div class="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 border border-slate-200 dark:border-slate-700 text-xs">
+              <button id="prevMatchBtn" type="button" title="Previous match" class="p-1 rounded hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+              </button>
+              <span id="matchNavIndex" class="px-2 font-mono text-[11px] font-medium text-slate-700 dark:text-slate-300">0 of 0</span>
+              <button id="nextMatchBtn" type="button" title="Next match" class="p-1 rounded hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+              </button>
+            </div>
+
+            <button id="loadSampleBtn" type="button" class="text-xs font-medium px-2.5 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition">Sample Text</button>
+            <button id="clearTestTextBtn" type="button" class="text-xs font-medium px-2 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 transition">Clear</button>
+          </div>
+        </div>
+
+        <!-- Editor Container with Layered Highlighting -->
+        <div class="flex-1 relative overflow-hidden select-text p-4">
+          <div class="relative w-full h-full rounded-2xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
+            <!-- Synchronized Backdrop for Highlights -->
+            <div id="highlightBackdrop" class="editor-backdrop absolute inset-0 p-4 font-mono text-sm leading-relaxed whitespace-pre-wrap break-words overflow-y-auto pointer-events-none custom-scroll text-transparent select-none z-0"></div>
+
+            <!-- Transparent Textarea for User Input -->
+            <textarea id="testTextInput" spellcheck="false" placeholder="Enter text to match against the regular expression..." class="absolute inset-0 w-full h-full p-4 font-mono text-sm leading-relaxed whitespace-pre-wrap break-words overflow-y-auto bg-transparent text-slate-900 dark:text-slate-100 outline-none border-0 resize-none z-10 custom-scroll caret-brand-500"></textarea>
+          </div>
+        </div>
+
+        <!-- Bottom String Metadata Footer -->
+        <div class="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-2 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 shrink-0">
+          <div class="flex items-center gap-3">
+            <span>Length: <strong id="charCountStat" class="font-mono text-slate-800 dark:text-slate-200">0</strong> chars</span>
+            <span>Lines: <strong id="lineCountStat" class="font-mono text-slate-800 dark:text-slate-200">1</strong></span>
+          </div>
+          <div class="text-[11px] text-slate-400">Press <kbd class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 font-mono text-[10px]">Ctrl+Enter</kbd> to re-evaluate</div>
+        </div>
+      </section>
     </main>
 
     <!-- Reference / Cheat Sheet Modal -->
     <div id="cheatSheetModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
-        <div class="w-full max-w-2xl max-h-[85vh] rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl flex flex-col overflow-hidden">
-            <!-- Modal Header -->
-            <div class="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-                <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <svg class="w-4 h-4 text-brand-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-                    </svg>
-                    Regex Quick Reference &amp; Cheat Sheet
-                </h3>
-                <button id="closeModalBtn" type="button" class="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                </button>
-            </div>
-
-            <!-- Modal Body -->
-            <div class="p-5 overflow-y-auto custom-scroll space-y-4 text-xs">
-                <!-- Anchors -->
-                <div>
-                    <h4 class="font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider text-[10px] mb-2 text-brand-600 dark:text-brand-400">Anchors &amp; Boundaries</h4>
-                    <div class="grid grid-cols-2 gap-2 font-mono">
-                        <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                            <span class="text-brand-500 font-bold">^</span> — Start of string/line
-                        </div>
-                        <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                            <span class="text-brand-500 font-bold">$</span> — End of string/line
-                        </div>
-                        <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                            <span class="text-brand-500 font-bold">\b</span> — Word boundary
-                        </div>
-                        <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                            <span class="text-brand-500 font-bold">\B</span> — Non-word boundary
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Quantifiers -->
-                <div>
-                    <h4 class="font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider text-[10px] mb-2 text-emerald-600 dark:text-emerald-400">Quantifiers</h4>
-                    <div class="grid grid-cols-2 gap-2 font-mono">
-                        <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                            <span class="text-emerald-500 font-bold">*</span> — 0 or more (greedy)
-                        </div>
-                        <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                            <span class="text-emerald-500 font-bold">*?</span> — 0 or more (lazy)
-                        </div>
-                        <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                            <span class="text-emerald-500 font-bold">+</span> — 1 or more (greedy)
-                        </div>
-                        <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                            <span class="text-emerald-500 font-bold">+?</span> — 1 or more (lazy)
-                        </div>
-                        <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                            <span class="text-emerald-500 font-bold">?</span> — 0 or 1 optional
-                        </div>
-                        <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                            <span class="text-emerald-500 font-bold">{n,m}</span> — Between n and m times
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Character Classes -->
-                <div>
-                    <h4 class="font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider text-[10px] mb-2 text-amber-600 dark:text-amber-400">Character Classes</h4>
-                    <div class="grid grid-cols-2 gap-2 font-mono">
-                        <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                            <span class="text-amber-500 font-bold">\d / \D</span> — Digit / Non-digit
-                        </div>
-                        <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                            <span class="text-amber-500 font-bold">\w / \W</span> — Word / Non-word char
-                        </div>
-                        <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                            <span class="text-amber-500 font-bold">\s / \S</span> — Whitespace / Non-whitespace
-                        </div>
-                        <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                            <span class="text-amber-500 font-bold">.</span> — Any character (except newline)
-                        </div>
-                        <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                            <span class="text-amber-500 font-bold">[a-z]</span> — Character in range
-                        </div>
-                        <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                            <span class="text-amber-500 font-bold">[^a-z]</span> — Negated range
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Groups & Lookarounds -->
-                <div>
-                    <h4 class="font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider text-[10px] mb-2 text-purple-600 dark:text-purple-400">Groups &amp; Lookarounds</h4>
-                    <div class="grid grid-cols-2 gap-2 font-mono">
-                        <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                            <span class="text-purple-500 font-bold">(...)</span> — Capturing group
-                        </div>
-                        <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                            <span class="text-purple-500 font-bold">(?:...)</span> — Non-capturing group
-                        </div>
-                        <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                            <span class="text-purple-500 font-bold">(?&lt;name&gt;...)</span> — Named capture group
-                        </div>
-                        <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                            <span class="text-purple-500 font-bold">(?=...)</span> — Positive Lookahead
-                        </div>
-                        <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                            <span class="text-purple-500 font-bold">(?!...)</span> — Negative Lookahead
-                        </div>
-                        <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                            <span class="text-purple-500 font-bold">(?&lt;=...)</span> — Positive Lookbehind
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-right">
-                <button id="closeModalBottomBtn" type="button"
-                    class="px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-medium text-xs transition">
-                    Close Reference
-                </button>
-            </div>
+      <div class="w-full max-w-2xl max-h-[85vh] rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl flex flex-col overflow-hidden">
+        <!-- Modal Header -->
+        <div class="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+          <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <svg class="w-4 h-4 text-brand-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+            </svg>
+            Regex Quick Reference &amp; Cheat Sheet
+          </h3>
+          <button id="closeModalBtn" type="button" class="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
         </div>
+
+        <!-- Modal Body -->
+        <div class="p-5 overflow-y-auto custom-scroll space-y-4 text-xs">
+          <!-- Anchors -->
+          <div>
+            <h4 class="font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider text-[10px] mb-2 text-brand-600 dark:text-brand-400">Anchors &amp; Boundaries</h4>
+            <div class="grid grid-cols-2 gap-2 font-mono">
+              <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800"><span class="text-brand-500 font-bold">^</span> — Start of string/line</div>
+              <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800"><span class="text-brand-500 font-bold">$</span> — End of string/line</div>
+              <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800"><span class="text-brand-500 font-bold">\b</span> — Word boundary</div>
+              <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800"><span class="text-brand-500 font-bold">\B</span> — Non-word boundary</div>
+            </div>
+          </div>
+
+          <!-- Quantifiers -->
+          <div>
+            <h4 class="font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider text-[10px] mb-2 text-emerald-600 dark:text-emerald-400">Quantifiers</h4>
+            <div class="grid grid-cols-2 gap-2 font-mono">
+              <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800"><span class="text-emerald-500 font-bold">*</span> — 0 or more (greedy)</div>
+              <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800"><span class="text-emerald-500 font-bold">*?</span> — 0 or more (lazy)</div>
+              <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800"><span class="text-emerald-500 font-bold">+</span> — 1 or more (greedy)</div>
+              <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800"><span class="text-emerald-500 font-bold">+?</span> — 1 or more (lazy)</div>
+              <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800"><span class="text-emerald-500 font-bold">?</span> — 0 or 1 optional</div>
+              <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800"><span class="text-emerald-500 font-bold">{n,m}</span> — Between n and m times</div>
+            </div>
+          </div>
+
+          <!-- Character Classes -->
+          <div>
+            <h4 class="font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider text-[10px] mb-2 text-amber-600 dark:text-amber-400">Character Classes</h4>
+            <div class="grid grid-cols-2 gap-2 font-mono">
+              <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800"><span class="text-amber-500 font-bold">\d / \D</span> — Digit / Non-digit</div>
+              <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800"><span class="text-amber-500 font-bold">\w / \W</span> — Word / Non-word char</div>
+              <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800"><span class="text-amber-500 font-bold">\s / \S</span> — Whitespace / Non-whitespace</div>
+              <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800"><span class="text-amber-500 font-bold">.</span> — Any character (except newline)</div>
+              <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800"><span class="text-amber-500 font-bold">[a-z]</span> — Character in range</div>
+              <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800"><span class="text-amber-500 font-bold">[^a-z]</span> — Negated range</div>
+            </div>
+          </div>
+
+          <!-- Groups & Lookarounds -->
+          <div>
+            <h4 class="font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider text-[10px] mb-2 text-purple-600 dark:text-purple-400">Groups &amp; Lookarounds</h4>
+            <div class="grid grid-cols-2 gap-2 font-mono">
+              <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800"><span class="text-purple-500 font-bold">(...)</span> — Capturing group</div>
+              <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800"><span class="text-purple-500 font-bold">(?:...)</span> — Non-capturing group</div>
+              <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800"><span class="text-purple-500 font-bold">(?&lt;name&gt;...)</span> — Named capture group</div>
+              <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800"><span class="text-purple-500 font-bold">(?=...)</span> — Positive Lookahead</div>
+              <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800"><span class="text-purple-500 font-bold">(?!...)</span> — Negative Lookahead</div>
+              <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800"><span class="text-purple-500 font-bold">(?&lt;=...)</span> — Positive Lookbehind</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-right">
+          <button id="closeModalBottomBtn" type="button" class="px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-medium text-xs transition">Close Reference</button>
+        </div>
+      </div>
     </div>
 
     <!-- Toast Notification -->
-    <div id="toast"
-        class="fixed bottom-5 right-5 z-50 bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-3.5 py-2 rounded-xl text-xs font-semibold shadow-xl transition-all transform translate-y-12 opacity-0 pointer-events-none flex items-center gap-2">
-        <svg class="w-4 h-4 text-emerald-400 dark:text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="20 6 9 17 4 12"></polyline>
-        </svg>
-        <span id="toastMsg">Action complete</span>
+    <div id="toast" class="fixed bottom-5 right-5 z-50 bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-3.5 py-2 rounded-xl text-xs font-semibold shadow-xl transition-all transform translate-y-12 opacity-0 pointer-events-none flex items-center gap-2">
+      <svg class="w-4 h-4 text-emerald-400 dark:text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+      <span id="toastMsg">Action complete</span>
     </div>
 
     <!-- Application Script -->
     <script>
-        (function() {
-            // =========================================================================
-            // PRESETS LIBRARY
-            // =========================================================================
-            const PRESETS = {
-                email: {
-                    name: 'Email Address',
-                    pattern: '([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})',
-                    flags: 'g',
-                    sample: 'Contact our support team at support@example.com or reach out directly to founder.alex+beta@startup.io for investor inquiries.\nInvalid candidates: invalid@, @missing.org, plainaddress.'
-                },
-                url: {
-                    name: 'RFC 3986 Web URL',
-                    pattern: 'https?:\\/\\/(?:www\\.)?[-a-zA-Z0-9@:%._\\+~#=]{1,256}\\.[a-zA-Z0-9()]{1,6}\\b(?:[-a-zA-Z0-9()@:%_\\+.~#?&\\/=]*)',
-                    flags: 'gi',
-                    sample: 'Explore the documentation at https://developer.mozilla.org/en-US/docs/Web/JavaScript or check https://github.com/praveenscience/One-File-Tools for open-source tools.'
-                },
-                ipv4: {
-                    name: 'IPv4 Address',
-                    pattern: '\\b(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\b',
-                    flags: 'g',
-                    sample: 'Server clusters bound to local gateway 192.168.1.1 and public resolver 8.8.8.8.\nSecondary gateway: 10.0.0.254\nOut of range reject: 999.123.456.789'
-                },
-                semver: {
-                    name: 'Semantic Version (SemVer)',
-                    pattern: 'v?(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?',
-                    flags: 'g',
-                    sample: 'Active releases:\nv1.0.0\n2.14.3-beta.1+build.2026\nv0.9.1-alpha\n3.0.0-rc.2\nInvalid versions: 01.2.3, 1.2'
-                },
-                iso_date: {
-                    name: 'ISO 8601 Date (YYYY-MM-DD)',
-                    pattern: '(?<year>\\d{4})-(?<month>0[1-9]|1[0-2])-(?<day>0[1-9]|[12]\\d|3[01])',
-                    flags: 'g',
-                    sample: 'Milestone timeline:\nSprint Kickoff: 2026-03-15\nMidterm Review: 2026-06-30\nFinal Delivery: 2026-11-20\nMalformed: 2026-13-40'
-                },
-                strong_pw: {
-                    name: 'Strong Password (Lookaheads)',
-                    pattern: '^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,}$',
-                    flags: 'm',
-                    sample: 'Pass1234!\nweakpassword\nNoSpecial123\nSuper$ecure2026\nalllowercase'
-                },
-                html_tag: {
-                    name: 'HTML Tag & Attributes',
-                    pattern: '<([a-zA-Z1-6]+)([^>]*?)>(.*?)<\\/\\1>',
-                    flags: 'gs',
-                    sample: '<div class="card">\n  <h1 id="title">Hello World</h1>\n  <p>Learn regular expressions today.</p>\n</div>'
-                },
-                hex_color: {
-                    name: 'CSS Hex Color',
-                    pattern: '#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\\b',
-                    flags: 'g',
-                    sample: 'Brand theme palette: primary is #4f46e5, secondary #10b981, dark #0f172a, with translucent overlay #6366f180. Short hex: #fff, #333.'
-                },
-                greedy_vs_lazy: {
-                    name: 'Greedy vs Lazy Quantifier',
-                    pattern: '<.*?>',
-                    flags: 'g',
-                    sample: 'Compare lazy <.*?> against greedy <.*>.\nSample html: <b>first</b> and <i>second</i>'
-                },
-                backtrack_demo: {
-                    name: 'Backtracking Demo (Catastrophic Risk)',
-                    pattern: '(a+)+$',
-                    flags: 'm',
-                    sample: 'aaaaaaaaaaaaaaaaaaaaa!\nTry typing more "a"s followed by "!" to observe catastrophic backtracking steps.'
-                }
-            };
+      (function () {
+        // =========================================================================
+        // PRESETS LIBRARY
+        // =========================================================================
+        const PRESETS = {
+          email: {
+            name: "Email Address",
+            pattern: "([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})",
+            flags: "g",
+            sample: "Contact our support team at support@example.com or reach out directly to founder.alex+beta@startup.io for investor inquiries.\nInvalid candidates: invalid@, @missing.org, plainaddress."
+          },
+          url: {
+            name: "RFC 3986 Web URL",
+            pattern: "https?:\\/\\/(?:www\\.)?[-a-zA-Z0-9@:%._\\+~#=]{1,256}\\.[a-zA-Z0-9()]{1,6}\\b(?:[-a-zA-Z0-9()@:%_\\+.~#?&\\/=]*)",
+            flags: "gi",
+            sample: "Explore the documentation at https://developer.mozilla.org/en-US/docs/Web/JavaScript or check https://github.com/praveenscience/One-File-Tools for open-source tools."
+          },
+          ipv4: {
+            name: "IPv4 Address",
+            pattern: "\\b(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\b",
+            flags: "g",
+            sample: "Server clusters bound to local gateway 192.168.1.1 and public resolver 8.8.8.8.\nSecondary gateway: 10.0.0.254\nOut of range reject: 999.123.456.789"
+          },
+          semver: {
+            name: "Semantic Version (SemVer)",
+            pattern: "v?(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?",
+            flags: "g",
+            sample: "Active releases:\nv1.0.0\n2.14.3-beta.1+build.2026\nv0.9.1-alpha\n3.0.0-rc.2\nInvalid versions: 01.2.3, 1.2"
+          },
+          iso_date: {
+            name: "ISO 8601 Date (YYYY-MM-DD)",
+            pattern: "(?<year>\\d{4})-(?<month>0[1-9]|1[0-2])-(?<day>0[1-9]|[12]\\d|3[01])",
+            flags: "g",
+            sample: "Milestone timeline:\nSprint Kickoff: 2026-03-15\nMidterm Review: 2026-06-30\nFinal Delivery: 2026-11-20\nMalformed: 2026-13-40"
+          },
+          strong_pw: {
+            name: "Strong Password (Lookaheads)",
+            pattern: "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,}$",
+            flags: "m",
+            sample: "Pass1234!\nweakpassword\nNoSpecial123\nSuper$ecure2026\nalllowercase"
+          },
+          html_tag: {
+            name: "HTML Tag & Attributes",
+            pattern: "<([a-zA-Z1-6]+)([^>]*?)>(.*?)<\\/\\1>",
+            flags: "gs",
+            sample: '<div class="card">\n  <h1 id="title">Hello World</h1>\n  <p>Learn regular expressions today.</p>\n</div>'
+          },
+          hex_color: {
+            name: "CSS Hex Color",
+            pattern: "#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\\b",
+            flags: "g",
+            sample: "Brand theme palette: primary is #4f46e5, secondary #10b981, dark #0f172a, with translucent overlay #6366f180. Short hex: #fff, #333."
+          },
+          greedy_vs_lazy: {
+            name: "Greedy vs Lazy Quantifier",
+            pattern: "<.*?>",
+            flags: "g",
+            sample: "Compare lazy <.*?> against greedy <.*>.\nSample html: <b>first</b> and <i>second</i>"
+          },
+          backtrack_demo: {
+            name: "Backtracking Demo (Catastrophic Risk)",
+            pattern: "(a+)+$",
+            flags: "m",
+            sample: 'aaaaaaaaaaaaaaaaaaaaa!\nTry typing more "a"s followed by "!" to observe catastrophic backtracking steps.'
+          }
+        };
 
-            // =========================================================================
-            // APPLICATION STATE
-            // =========================================================================
-            const state = {
-                pattern: '([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})',
-                flags: new Set(['g']),
-                testText: PRESETS.email.sample,
-                activeTab: 'debugger',
-                currentLanguage: 'js',
-                substitution: '[$1 AT $2]',
-                matches: [],
-                currentMatchIndex: 0,
-                // Debugger simulation state
-                simulation: {
-                    steps: [],
-                    currentStep: 0,
-                    isPlaying: false,
-                    timer: null,
-                    speed: 400
-                }
-            };
+        // =========================================================================
+        // APPLICATION STATE
+        // =========================================================================
+        const state = {
+          pattern: "([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})",
+          flags: new Set(["g"]),
+          testText: PRESETS.email.sample,
+          activeTab: "debugger",
+          currentLanguage: "js",
+          substitution: "[$1 AT $2]",
+          matches: [],
+          currentMatchIndex: 0,
+          // Debugger simulation state
+          simulation: {
+            steps: [],
+            currentStep: 0,
+            isPlaying: false,
+            timer: null,
+            speed: 400
+          }
+        };
 
-            // =========================================================================
-            // DOM ELEMENTS
-            // =========================================================================
-            const el = {
-                patternInput: document.getElementById('patternInput'),
-                presetSelect: document.getElementById('presetSelect'),
-                errorBanner: document.getElementById('errorBanner'),
-                errorMessage: document.getElementById('errorMessage'),
-                warningBanner: document.getElementById('warningBanner'),
-                warningMessage: document.getElementById('warningMessage'),
-                testTextInput: document.getElementById('testTextInput'),
-                highlightBackdrop: document.getElementById('highlightBackdrop'),
-                matchStatsBadge: document.getElementById('matchStatsBadge'),
-                tabMatchCount: document.getElementById('tabMatchCount'),
-                prevMatchBtn: document.getElementById('prevMatchBtn'),
-                nextMatchBtn: document.getElementById('nextMatchBtn'),
-                matchNavIndex: document.getElementById('matchNavIndex'),
-                loadSampleBtn: document.getElementById('loadSampleBtn'),
-                clearTestTextBtn: document.getElementById('clearTestTextBtn'),
-                charCountStat: document.getElementById('charCountStat'),
-                lineCountStat: document.getElementById('lineCountStat'),
-                copyRegexBtn: document.getElementById('copyRegexBtn'),
-                themeToggleBtn: document.getElementById('themeToggleBtn'),
-                flagPills: document.querySelectorAll('.flag-pill'),
-                tabBtns: document.querySelectorAll('.tab-btn'),
-                tabPanels: document.querySelectorAll('.tab-panel'),
-                // Debugger elements
-                stepCounterBadge: document.getElementById('stepCounterBadge'),
-                stepResetBtn: document.getElementById('stepResetBtn'),
-                stepPrevBtn: document.getElementById('stepPrevBtn'),
-                stepNextBtn: document.getElementById('stepNextBtn'),
-                stepPlayPauseBtn: document.getElementById('stepPlayPauseBtn'),
-                playIcon: document.getElementById('playIcon'),
-                pauseIcon: document.getElementById('pauseIcon'),
-                playBtnText: document.getElementById('playBtnText'),
-                stepperTapeContainer: document.getElementById('stepperTapeContainer'),
-                stepActionBadge: document.getElementById('stepActionBadge'),
-                stepExplanation: document.getElementById('stepExplanation'),
-                stepLogList: document.getElementById('stepLogList'),
-                speedBtns: document.querySelectorAll('.speed-btn'),
-                pointerPosLabel: document.getElementById('pointerPosLabel'),
-                // Breakdown elements
-                tokenCountBadge: document.getElementById('tokenCountBadge'),
-                tokenTreeContainer: document.getElementById('tokenTreeContainer'),
-                // Matches elements
-                metricTotalMatches: document.getElementById('metricTotalMatches'),
-                metricCaptureGroups: document.getElementById('metricCaptureGroups'),
-                metricExecTime: document.getElementById('metricExecTime'),
-                matchesContainer: document.getElementById('matchesContainer'),
-                // Replace elements
-                replaceTemplateInput: document.getElementById('replaceTemplateInput'),
-                replaceOutputArea: document.getElementById('replaceOutputArea'),
-                copyReplacedBtn: document.getElementById('copyReplacedBtn'),
-                // Export elements
-                codeExportPre: document.getElementById('codeExportPre'),
-                copyCodeSnippetBtn: document.getElementById('copyCodeSnippetBtn'),
-                langTabBtns: document.querySelectorAll('.lang-tab-btn'),
-                // Cheat Sheet Modal
-                cheatSheetBtn: document.getElementById('cheatSheetBtn'),
-                cheatSheetModal: document.getElementById('cheatSheetModal'),
-                closeModalBtn: document.getElementById('closeModalBtn'),
-                closeModalBottomBtn: document.getElementById('closeModalBottomBtn'),
-                toast: document.getElementById('toast'),
-                toastMsg: document.getElementById('toastMsg')
-            };
+        // =========================================================================
+        // DOM ELEMENTS
+        // =========================================================================
+        const el = {
+          patternInput: document.getElementById("patternInput"),
+          presetSelect: document.getElementById("presetSelect"),
+          errorBanner: document.getElementById("errorBanner"),
+          errorMessage: document.getElementById("errorMessage"),
+          warningBanner: document.getElementById("warningBanner"),
+          warningMessage: document.getElementById("warningMessage"),
+          testTextInput: document.getElementById("testTextInput"),
+          highlightBackdrop: document.getElementById("highlightBackdrop"),
+          matchStatsBadge: document.getElementById("matchStatsBadge"),
+          tabMatchCount: document.getElementById("tabMatchCount"),
+          prevMatchBtn: document.getElementById("prevMatchBtn"),
+          nextMatchBtn: document.getElementById("nextMatchBtn"),
+          matchNavIndex: document.getElementById("matchNavIndex"),
+          loadSampleBtn: document.getElementById("loadSampleBtn"),
+          clearTestTextBtn: document.getElementById("clearTestTextBtn"),
+          charCountStat: document.getElementById("charCountStat"),
+          lineCountStat: document.getElementById("lineCountStat"),
+          copyRegexBtn: document.getElementById("copyRegexBtn"),
+          themeToggleBtn: document.getElementById("themeToggleBtn"),
+          flagPills: document.querySelectorAll(".flag-pill"),
+          tabBtns: document.querySelectorAll(".tab-btn"),
+          tabPanels: document.querySelectorAll(".tab-panel"),
+          // Debugger elements
+          stepCounterBadge: document.getElementById("stepCounterBadge"),
+          stepResetBtn: document.getElementById("stepResetBtn"),
+          stepPrevBtn: document.getElementById("stepPrevBtn"),
+          stepNextBtn: document.getElementById("stepNextBtn"),
+          stepPlayPauseBtn: document.getElementById("stepPlayPauseBtn"),
+          playIcon: document.getElementById("playIcon"),
+          pauseIcon: document.getElementById("pauseIcon"),
+          playBtnText: document.getElementById("playBtnText"),
+          stepperTapeContainer: document.getElementById("stepperTapeContainer"),
+          stepActionBadge: document.getElementById("stepActionBadge"),
+          stepExplanation: document.getElementById("stepExplanation"),
+          stepLogList: document.getElementById("stepLogList"),
+          speedBtns: document.querySelectorAll(".speed-btn"),
+          pointerPosLabel: document.getElementById("pointerPosLabel"),
+          // Breakdown elements
+          tokenCountBadge: document.getElementById("tokenCountBadge"),
+          tokenTreeContainer: document.getElementById("tokenTreeContainer"),
+          // Matches elements
+          metricTotalMatches: document.getElementById("metricTotalMatches"),
+          metricCaptureGroups: document.getElementById("metricCaptureGroups"),
+          metricExecTime: document.getElementById("metricExecTime"),
+          matchesContainer: document.getElementById("matchesContainer"),
+          // Replace elements
+          replaceTemplateInput: document.getElementById("replaceTemplateInput"),
+          replaceOutputArea: document.getElementById("replaceOutputArea"),
+          copyReplacedBtn: document.getElementById("copyReplacedBtn"),
+          // Export elements
+          codeExportPre: document.getElementById("codeExportPre"),
+          copyCodeSnippetBtn: document.getElementById("copyCodeSnippetBtn"),
+          langTabBtns: document.querySelectorAll(".lang-tab-btn"),
+          // Cheat Sheet Modal
+          cheatSheetBtn: document.getElementById("cheatSheetBtn"),
+          cheatSheetModal: document.getElementById("cheatSheetModal"),
+          closeModalBtn: document.getElementById("closeModalBtn"),
+          closeModalBottomBtn: document.getElementById("closeModalBottomBtn"),
+          toast: document.getElementById("toast"),
+          toastMsg: document.getElementById("toastMsg")
+        };
 
-            // =========================================================================
-            // TOKENIZER & PARSER (AST GENERATION)
-            // =========================================================================
-            function tokenizePattern(pattern) {
-                const tokens = [];
-                let i = 0;
-                let groupCounter = 0;
+        // =========================================================================
+        // TOKENIZER & PARSER (AST GENERATION)
+        // =========================================================================
+        function tokenizePattern(pattern) {
+          const tokens = [];
+          let i = 0;
+          let groupCounter = 0;
 
-                while (i < pattern.length) {
-                    const ch = pattern[i];
+          while (i < pattern.length) {
+            const ch = pattern[i];
 
-                    if (ch === '\\') {
-                        const next = pattern[i + 1] || '';
-                        let desc = `Escaped literal character '${next}'`;
-                        let category = 'Escaped';
+            if (ch === "\\") {
+              const next = pattern[i + 1] || "";
+              let desc = `Escaped literal character '${next}'`;
+              let category = "Escaped";
 
-                        if (next === 'd') { desc = 'Digit character [0-9]'; category = 'Class'; }
-                        else if (next === 'D') { desc = 'Non-digit character [^0-9]'; category = 'Class'; }
-                        else if (next === 'w') { desc = 'Word character [a-zA-Z0-9_]'; category = 'Class'; }
-                        else if (next === 'W') { desc = 'Non-word character'; category = 'Class'; }
-                        else if (next === 's') { desc = 'Whitespace character (space, tab, newline)'; category = 'Class'; }
-                        else if (next === 'S') { desc = 'Non-whitespace character'; category = 'Class'; }
-                        else if (next === 'b') { desc = 'Word boundary'; category = 'Anchor'; }
-                        else if (next === 'B') { desc = 'Non-word boundary'; category = 'Anchor'; }
+              if (next === "d") {
+                desc = "Digit character [0-9]";
+                category = "Class";
+              } else if (next === "D") {
+                desc = "Non-digit character [^0-9]";
+                category = "Class";
+              } else if (next === "w") {
+                desc = "Word character [a-zA-Z0-9_]";
+                category = "Class";
+              } else if (next === "W") {
+                desc = "Non-word character";
+                category = "Class";
+              } else if (next === "s") {
+                desc = "Whitespace character (space, tab, newline)";
+                category = "Class";
+              } else if (next === "S") {
+                desc = "Non-whitespace character";
+                category = "Class";
+              } else if (next === "b") {
+                desc = "Word boundary";
+                category = "Anchor";
+              } else if (next === "B") {
+                desc = "Non-word boundary";
+                category = "Anchor";
+              }
 
-                        tokens.push({
-                            type: 'escape',
-                            category,
-                            raw: '\\' + next,
-                            desc,
-                            startIndex: i,
-                            endIndex: i + 2
-                        });
-                        i += 2;
-                    } else if (ch === '[') {
-                        let j = i + 1;
-                        const isNegated = pattern[j] === '^';
-                        if (isNegated) j++;
-                        if (pattern[j] === ']') j++; // edge-case: []a] or [^]a]
+              tokens.push({
+                type: "escape",
+                category,
+                raw: "\\" + next,
+                desc,
+                startIndex: i,
+                endIndex: i + 2
+              });
+              i += 2;
+            } else if (ch === "[") {
+              let j = i + 1;
+              const isNegated = pattern[j] === "^";
+              if (isNegated) j++;
+              if (pattern[j] === "]") j++; // edge-case: []a] or [^]a]
 
-                        while (j < pattern.length && pattern[j] !== ']') {
-                            if (pattern[j] === '\\') j++;
-                            j++;
-                        }
-                        const raw = pattern.slice(i, j + 1);
-                        tokens.push({
-                            type: 'class',
-                            category: 'Class',
-                            raw,
-                            desc: isNegated ? `Negated character set (none of '${raw.slice(2, -1)}')` : `Character set (any character in '${raw.slice(1, -1)}')`,
-                            startIndex: i,
-                            endIndex: j + 1
-                        });
-                        i = j + 1;
-                    } else if (ch === '(') {
-                        if (pattern.slice(i, i + 3) === '(?:') {
-                            tokens.push({ type: 'group_open', category: 'Group', raw: '(?:', desc: 'Non-capturing group start', startIndex: i, endIndex: i + 3 });
-                            i += 3;
-                        } else if (pattern.slice(i, i + 3) === '(?=') {
-                            tokens.push({ type: 'group_open', category: 'Lookaround', raw: '(?=', desc: 'Positive Lookahead start (must be followed by)', startIndex: i, endIndex: i + 3 });
-                            i += 3;
-                        } else if (pattern.slice(i, i + 3) === '(?!') {
-                            tokens.push({ type: 'group_open', category: 'Lookaround', raw: '(?!', desc: 'Negative Lookahead start (must NOT be followed by)', startIndex: i, endIndex: i + 3 });
-                            i += 3;
-                        } else if (pattern.slice(i, i + 4) === '(?<=') {
-                            tokens.push({ type: 'group_open', category: 'Lookaround', raw: '(?<=', desc: 'Positive Lookbehind start (must be preceded by)', startIndex: i, endIndex: i + 4 });
-                            i += 4;
-                        } else if (pattern.slice(i, i + 4) === '(?<!') {
-                            tokens.push({ type: 'group_open', category: 'Lookaround', raw: '(?<!', desc: 'Negative Lookbehind start (must NOT be preceded by)', startIndex: i, endIndex: i + 4 });
-                            i += 4;
-                        } else if (pattern.slice(i, i + 3) === '(?<') {
-                            const closeAngle = pattern.indexOf('>', i + 3);
-                            if (closeAngle !== -1) {
-                                const name = pattern.slice(i + 3, closeAngle);
-                                groupCounter++;
-                                tokens.push({ type: 'group_open', category: 'Group', raw: pattern.slice(i, closeAngle + 1), desc: `Named capturing group start '<${name}>' (Group #${groupCounter})`, startIndex: i, endIndex: closeAngle + 1 });
-                                i = closeAngle + 1;
-                            } else {
-                                tokens.push({ type: 'literal', category: 'Literal', raw: ch, desc: "Literal '('", startIndex: i, endIndex: i + 1 });
-                                i++;
-                            }
-                        } else {
-                            groupCounter++;
-                            tokens.push({ type: 'group_open', category: 'Group', raw: '(', desc: `Capturing group start (Group #${groupCounter})`, startIndex: i, endIndex: i + 1 });
-                            i++;
-                        }
-                    } else if (ch === ')') {
-                        tokens.push({ type: 'group_close', category: 'Group', raw: ')', desc: 'Group end', startIndex: i, endIndex: i + 1 });
-                        i++;
-                    } else if (ch === '*' || ch === '+' || ch === '?') {
-                        const isLazy = pattern[i + 1] === '?';
-                        const raw = isLazy ? ch + '?' : ch;
-                        let desc = '';
-                        if (ch === '*') desc = isLazy ? '0 or more times (lazy / ungreedy)' : '0 or more times (greedy)';
-                        else if (ch === '+') desc = isLazy ? '1 or more times (lazy / ungreedy)' : '1 or more times (greedy)';
-                        else if (ch === '?') desc = isLazy ? '0 or 1 time (lazy)' : '0 or 1 time (optional)';
-
-                        tokens.push({ type: 'quantifier', category: 'Quantifier', raw, desc, startIndex: i, endIndex: i + (isLazy ? 2 : 1) });
-                        i += isLazy ? 2 : 1;
-                    } else if (ch === '{') {
-                        const endBrace = pattern.indexOf('}', i);
-                        if (endBrace !== -1) {
-                            const isLazy = pattern[endBrace + 1] === '?';
-                            const raw = pattern.slice(i, endBrace + (isLazy ? 2 : 1));
-                            tokens.push({ type: 'quantifier', category: 'Quantifier', raw, desc: `Custom range quantifier '${raw}'`, startIndex: i, endIndex: endBrace + (isLazy ? 2 : 1) });
-                            i = endBrace + (isLazy ? 2 : 1);
-                        } else {
-                            tokens.push({ type: 'literal', category: 'Literal', raw: ch, desc: "Literal '{'", startIndex: i, endIndex: i + 1 });
-                            i++;
-                        }
-                    } else if (ch === '^') {
-                        tokens.push({ type: 'anchor', category: 'Anchor', raw: '^', desc: 'Start of string or start of line', startIndex: i, endIndex: i + 1 });
-                        i++;
-                    } else if (ch === '$') {
-                        tokens.push({ type: 'anchor', category: 'Anchor', raw: '$', desc: 'End of string or end of line', startIndex: i, endIndex: i + 1 });
-                        i++;
-                    } else if (ch === '|') {
-                        tokens.push({ type: 'alternation', category: 'Logic', raw: '|', desc: 'Alternation (OR operator)', startIndex: i, endIndex: i + 1 });
-                        i++;
-                    } else if (ch === '.') {
-                        tokens.push({ type: 'wildcard', category: 'Class', raw: '.', desc: 'Any character (wildcard)', startIndex: i, endIndex: i + 1 });
-                        i++;
-                    } else {
-                        tokens.push({ type: 'literal', category: 'Literal', raw: ch, desc: `Literal character '${ch}'`, startIndex: i, endIndex: i + 1 });
-                        i++;
-                    }
-                }
-
-                return tokens;
-            }
-
-            // Detect potential catastrophic backtracking (ReDoS) heuristic
-            function checkBacktrackingRisk(pattern) {
-                // Heuristic: nested quantifiers like (a+)+, (.*)*, ([a-z]+)+, etc.
-                const redosPattern = /\((?:[^()]*[+*]|\([a-zA-Z0-9|+*]+\))[+*]\)[+*]|\((?:[a-zA-Z0-9_]+[+*]?\|)+[a-zA-Z0-9_]*[+*]\)[+*]/;
-                return redosPattern.test(pattern);
-            }
-
-            // =========================================================================
-            // SIMULATION STEP GENERATOR (ENGINE EMULATION)
-            // =========================================================================
-            function buildSimulationSteps(pattern, flagsStr, text) {
-                const steps = [];
-                const maxSteps = 250; // Safety cap
-                if (!pattern || !text) return steps;
-
-                let regex;
-                try {
-                    regex = new RegExp(pattern, flagsStr);
-                } catch (_) {
-                    return steps;
-                }
-
-                const tokens = tokenizePattern(pattern);
-                let textIndex = 0;
-                let stepCount = 0;
-
-                // Step 0: Initial
-                steps.push({
-                    textIndex: 0,
-                    tokenIndex: 0,
-                    action: 'START',
-                    type: 'info',
-                    message: `Engine initialized. Pattern: /${pattern}/${flagsStr}, Input Length: ${text.length}`
-                });
-
-                // Find matches with native RegExp to guide the stepper accurately
-                const globalRegex = new RegExp(pattern, flagsStr.includes('g') ? flagsStr : flagsStr + 'g');
-                const matches = [];
-                let m;
-                while ((m = globalRegex.exec(text)) !== null) {
-                    matches.push({
-                        index: m.index,
-                        text: m[0],
-                        length: m[0].length,
-                        groups: m.slice(1)
-                    });
-                    if (m[0].length === 0) {
-                        globalRegex.lastIndex++;
-                    }
-                    if (matches.length > 30) break;
-                }
-
-                if (matches.length === 0) {
-                    // Demonstrate evaluation failure and advance
-                    for (let pos = 0; pos < Math.min(text.length, 12); pos++) {
-                        stepCount++;
-                        steps.push({
-                            textIndex: pos,
-                            tokenIndex: 0,
-                            action: 'TEST',
-                            type: 'test',
-                            message: `Position ${pos}: Testing '${escapeChar(text[pos])}' against start of pattern`
-                        });
-                        stepCount++;
-                        steps.push({
-                            textIndex: pos,
-                            tokenIndex: 0,
-                            action: 'MISMATCH',
-                            type: 'fail',
-                            message: `Position ${pos}: Mismatch. Advancing string pointer to index ${pos + 1}`
-                        });
-                    }
-                    steps.push({
-                        textIndex: text.length,
-                        tokenIndex: tokens.length - 1,
-                        action: 'COMPLETE',
-                        type: 'info',
-                        message: 'Engine finished traversal: No match found.'
-                    });
-                    return steps;
-                }
-
-                // Simulate steps towards the first few matches
-                let currentPos = 0;
-                for (const match of matches) {
-                    if (stepCount > maxSteps) break;
-
-                    // Lead up to match index
-                    while (currentPos < match.index && stepCount < maxSteps) {
-                        stepCount++;
-                        steps.push({
-                            textIndex: currentPos,
-                            tokenIndex: 0,
-                            action: 'ADVANCE',
-                            type: 'test',
-                            message: `Scanning string at index ${currentPos} ('${escapeChar(text[currentPos])}')...`
-                        });
-                        currentPos++;
-                    }
-
-                    // Matching inside the matched token range
-                    stepCount++;
-                    steps.push({
-                        textIndex: match.index,
-                        tokenIndex: 0,
-                        action: 'MATCH_START',
-                        type: 'match',
-                        message: `Potential match triggered at index ${match.index}!`
-                    });
-
-                    // Walk tokens for match
-                    for (let ti = 0; ti < Math.min(tokens.length, 10); ti++) {
-                        if (stepCount > maxSteps) break;
-                        const tok = tokens[ti];
-                        stepCount++;
-                        steps.push({
-                            textIndex: Math.min(match.index + ti, match.index + match.length),
-                            tokenIndex: ti,
-                            action: 'TOKEN_EVAL',
-                            type: 'match',
-                            message: `Evaluating token #${ti + 1} (${tok.raw}): ${tok.desc}`
-                        });
-                    }
-
-                    stepCount++;
-                    steps.push({
-                        textIndex: match.index + match.length,
-                        tokenIndex: tokens.length - 1,
-                        action: 'MATCH_SUCCESS',
-                        type: 'success',
-                        message: `Match confirmed: "${match.text}" [${match.index}..${match.index + match.length}]`
-                    });
-
-                    currentPos = match.index + match.length;
-                    if (matches.length > 1) {
-                        stepCount++;
-                        steps.push({
-                            textIndex: currentPos,
-                            tokenIndex: 0,
-                            action: 'NEXT_MATCH',
-                            type: 'info',
-                            message: `Continuing global search from index ${currentPos}...`
-                        });
-                    }
-                }
-
-                steps.push({
-                    textIndex: text.length,
-                    tokenIndex: tokens.length - 1,
-                    action: 'FINISHED',
-                    type: 'success',
-                    message: `Evaluation complete. Total matches found: ${matches.length}`
-                });
-
-                return steps;
-            }
-
-            function escapeChar(ch) {
-                if (ch === '\n') return '\\n';
-                if (ch === '\t') return '\\t';
-                if (ch === ' ') return '␣';
-                return ch || '';
-            }
-
-            // =========================================================================
-            // CORE EXECUTION & UPDATE ENGINE
-            // =========================================================================
-            function updateAll() {
-                const pattern = el.patternInput.value;
-                const flagsStr = Array.from(state.flags).sort().join('');
-                const text = el.testTextInput.value;
-
-                state.pattern = pattern;
-                state.testText = text;
-
-                // Update text stats
-                el.charCountStat.textContent = text.length;
-                el.lineCountStat.textContent = text.split('\n').length;
-
-                // Validate Regex Syntax
-                let regex = null;
-                let parseError = null;
-
-                try {
-                    regex = new RegExp(pattern, flagsStr);
-                    el.errorBanner.classList.add('hidden');
-                } catch (err) {
-                    parseError = err.message;
-                    el.errorBanner.classList.remove('hidden');
-                    el.errorMessage.textContent = err.message;
-                }
-
-                // Check ReDoS Risk
-                if (pattern && checkBacktrackingRisk(pattern)) {
-                    el.warningBanner.classList.remove('hidden');
+              while (j < pattern.length && pattern[j] !== "]") {
+                if (pattern[j] === "\\") j++;
+                j++;
+              }
+              const raw = pattern.slice(i, j + 1);
+              tokens.push({
+                type: "class",
+                category: "Class",
+                raw,
+                desc: isNegated ? `Negated character set (none of '${raw.slice(2, -1)}')` : `Character set (any character in '${raw.slice(1, -1)}')`,
+                startIndex: i,
+                endIndex: j + 1
+              });
+              i = j + 1;
+            } else if (ch === "(") {
+              if (pattern.slice(i, i + 3) === "(?:") {
+                tokens.push({ type: "group_open", category: "Group", raw: "(?:", desc: "Non-capturing group start", startIndex: i, endIndex: i + 3 });
+                i += 3;
+              } else if (pattern.slice(i, i + 3) === "(?=") {
+                tokens.push({ type: "group_open", category: "Lookaround", raw: "(?=", desc: "Positive Lookahead start (must be followed by)", startIndex: i, endIndex: i + 3 });
+                i += 3;
+              } else if (pattern.slice(i, i + 3) === "(?!") {
+                tokens.push({ type: "group_open", category: "Lookaround", raw: "(?!", desc: "Negative Lookahead start (must NOT be followed by)", startIndex: i, endIndex: i + 3 });
+                i += 3;
+              } else if (pattern.slice(i, i + 4) === "(?<=") {
+                tokens.push({ type: "group_open", category: "Lookaround", raw: "(?<=", desc: "Positive Lookbehind start (must be preceded by)", startIndex: i, endIndex: i + 4 });
+                i += 4;
+              } else if (pattern.slice(i, i + 4) === "(?<!") {
+                tokens.push({ type: "group_open", category: "Lookaround", raw: "(?<!", desc: "Negative Lookbehind start (must NOT be preceded by)", startIndex: i, endIndex: i + 4 });
+                i += 4;
+              } else if (pattern.slice(i, i + 3) === "(?<") {
+                const closeAngle = pattern.indexOf(">", i + 3);
+                if (closeAngle !== -1) {
+                  const name = pattern.slice(i + 3, closeAngle);
+                  groupCounter++;
+                  tokens.push({ type: "group_open", category: "Group", raw: pattern.slice(i, closeAngle + 1), desc: `Named capturing group start '<${name}>' (Group #${groupCounter})`, startIndex: i, endIndex: closeAngle + 1 });
+                  i = closeAngle + 1;
                 } else {
-                    el.warningBanner.classList.add('hidden');
+                  tokens.push({ type: "literal", category: "Literal", raw: ch, desc: "Literal '('", startIndex: i, endIndex: i + 1 });
+                  i++;
                 }
+              } else {
+                groupCounter++;
+                tokens.push({ type: "group_open", category: "Group", raw: "(", desc: `Capturing group start (Group #${groupCounter})`, startIndex: i, endIndex: i + 1 });
+                i++;
+              }
+            } else if (ch === ")") {
+              tokens.push({ type: "group_close", category: "Group", raw: ")", desc: "Group end", startIndex: i, endIndex: i + 1 });
+              i++;
+            } else if (ch === "*" || ch === "+" || ch === "?") {
+              const isLazy = pattern[i + 1] === "?";
+              const raw = isLazy ? ch + "?" : ch;
+              let desc = "";
+              if (ch === "*") desc = isLazy ? "0 or more times (lazy / ungreedy)" : "0 or more times (greedy)";
+              else if (ch === "+") desc = isLazy ? "1 or more times (lazy / ungreedy)" : "1 or more times (greedy)";
+              else if (ch === "?") desc = isLazy ? "0 or 1 time (lazy)" : "0 or 1 time (optional)";
 
-                if (!regex || parseError) {
-                    renderEmptyResults();
-                    return;
-                }
+              tokens.push({ type: "quantifier", category: "Quantifier", raw, desc, startIndex: i, endIndex: i + (isLazy ? 2 : 1) });
+              i += isLazy ? 2 : 1;
+            } else if (ch === "{") {
+              const endBrace = pattern.indexOf("}", i);
+              if (endBrace !== -1) {
+                const isLazy = pattern[endBrace + 1] === "?";
+                const raw = pattern.slice(i, endBrace + (isLazy ? 2 : 1));
+                tokens.push({ type: "quantifier", category: "Quantifier", raw, desc: `Custom range quantifier '${raw}'`, startIndex: i, endIndex: endBrace + (isLazy ? 2 : 1) });
+                i = endBrace + (isLazy ? 2 : 1);
+              } else {
+                tokens.push({ type: "literal", category: "Literal", raw: ch, desc: "Literal '{'", startIndex: i, endIndex: i + 1 });
+                i++;
+              }
+            } else if (ch === "^") {
+              tokens.push({ type: "anchor", category: "Anchor", raw: "^", desc: "Start of string or start of line", startIndex: i, endIndex: i + 1 });
+              i++;
+            } else if (ch === "$") {
+              tokens.push({ type: "anchor", category: "Anchor", raw: "$", desc: "End of string or end of line", startIndex: i, endIndex: i + 1 });
+              i++;
+            } else if (ch === "|") {
+              tokens.push({ type: "alternation", category: "Logic", raw: "|", desc: "Alternation (OR operator)", startIndex: i, endIndex: i + 1 });
+              i++;
+            } else if (ch === ".") {
+              tokens.push({ type: "wildcard", category: "Class", raw: ".", desc: "Any character (wildcard)", startIndex: i, endIndex: i + 1 });
+              i++;
+            } else {
+              tokens.push({ type: "literal", category: "Literal", raw: ch, desc: `Literal character '${ch}'`, startIndex: i, endIndex: i + 1 });
+              i++;
+            }
+          }
 
-                // Execute Matching with timing
-                const startTime = performance.now();
-                const matches = [];
+          return tokens;
+        }
 
-                try {
-                    const execRegex = new RegExp(pattern, flagsStr.includes('g') ? flagsStr : flagsStr + 'g');
-                    let m;
-                    while ((m = execRegex.exec(text)) !== null) {
-                        matches.push({
-                            index: m.index,
-                            text: m[0],
-                            length: m[0].length,
-                            groups: m.slice(1),
-                            namedGroups: m.groups || {}
-                        });
-                        if (m[0].length === 0) {
-                            execRegex.lastIndex++;
-                        }
-                        if (matches.length > 500) break; // Limit for performance
-                    }
-                } catch (e) {
-                    console.error(e);
-                }
+        // Detect potential catastrophic backtracking (ReDoS) heuristic
+        function checkBacktrackingRisk(pattern) {
+          // Heuristic: nested quantifiers like (a+)+, (.*)*, ([a-z]+)+, etc.
+          const redosPattern = /\((?:[^()]*[+*]|\([a-zA-Z0-9|+*]+\))[+*]\)[+*]|\((?:[a-zA-Z0-9_]+[+*]?\|)+[a-zA-Z0-9_]*[+*]\)[+*]/;
+          return redosPattern.test(pattern);
+        }
 
-                const elapsed = performance.now() - startTime;
-                state.matches = matches;
+        // =========================================================================
+        // SIMULATION STEP GENERATOR (ENGINE EMULATION)
+        // =========================================================================
+        function buildSimulationSteps(pattern, flagsStr, text) {
+          const steps = [];
+          const maxSteps = 250; // Safety cap
+          if (!pattern || !text) return steps;
 
-                // Update Badges & Metrics
-                el.matchStatsBadge.textContent = `${matches.length} match${matches.length === 1 ? '' : 'es'}`;
-                el.tabMatchCount.textContent = matches.length;
-                el.metricTotalMatches.textContent = matches.length;
-                el.metricExecTime.textContent = `${elapsed.toFixed(1)}ms`;
+          let regex;
+          try {
+            regex = new RegExp(pattern, flagsStr);
+          } catch (_) {
+            return steps;
+          }
 
-                // Calculate group count
-                let totalGroups = 0;
-                if (matches.length > 0) {
-                    totalGroups = matches[0].groups.length;
-                }
-                el.metricCaptureGroups.textContent = totalGroups;
+          const tokens = tokenizePattern(pattern);
+          let textIndex = 0;
+          let stepCount = 0;
 
-                // Update Match Navigator
-                updateMatchNavigator();
+          // Step 0: Initial
+          steps.push({
+            textIndex: 0,
+            tokenIndex: 0,
+            action: "START",
+            type: "info",
+            message: `Engine initialized. Pattern: /${pattern}/${flagsStr}, Input Length: ${text.length}`
+          });
 
-                // Render Visual Highlights
-                renderHighlights(text, matches);
+          // Find matches with native RegExp to guide the stepper accurately
+          const globalRegex = new RegExp(pattern, flagsStr.includes("g") ? flagsStr : flagsStr + "g");
+          const matches = [];
+          let m;
+          while ((m = globalRegex.exec(text)) !== null) {
+            matches.push({
+              index: m.index,
+              text: m[0],
+              length: m[0].length,
+              groups: m.slice(1)
+            });
+            if (m[0].length === 0) {
+              globalRegex.lastIndex++;
+            }
+            if (matches.length > 30) break;
+          }
 
-                // Render AST Breakdown
-                renderASTBreakdown(pattern);
+          if (matches.length === 0) {
+            // Demonstrate evaluation failure and advance
+            for (let pos = 0; pos < Math.min(text.length, 12); pos++) {
+              stepCount++;
+              steps.push({
+                textIndex: pos,
+                tokenIndex: 0,
+                action: "TEST",
+                type: "test",
+                message: `Position ${pos}: Testing '${escapeChar(text[pos])}' against start of pattern`
+              });
+              stepCount++;
+              steps.push({
+                textIndex: pos,
+                tokenIndex: 0,
+                action: "MISMATCH",
+                type: "fail",
+                message: `Position ${pos}: Mismatch. Advancing string pointer to index ${pos + 1}`
+              });
+            }
+            steps.push({
+              textIndex: text.length,
+              tokenIndex: tokens.length - 1,
+              action: "COMPLETE",
+              type: "info",
+              message: "Engine finished traversal: No match found."
+            });
+            return steps;
+          }
 
-                // Render Match Cards
-                renderMatchCards(matches);
+          // Simulate steps towards the first few matches
+          let currentPos = 0;
+          for (const match of matches) {
+            if (stepCount > maxSteps) break;
 
-                // Render Substitution
-                renderSubstitution(pattern, flagsStr, text);
-
-                // Render Code Export
-                renderCodeExport(pattern, flagsStr, text);
-
-                // Rebuild Stepper Simulation
-                state.simulation.steps = buildSimulationSteps(pattern, flagsStr, text);
-                state.simulation.currentStep = 0;
-                renderSimulationTape();
-                renderSimulationStep();
+            // Lead up to match index
+            while (currentPos < match.index && stepCount < maxSteps) {
+              stepCount++;
+              steps.push({
+                textIndex: currentPos,
+                tokenIndex: 0,
+                action: "ADVANCE",
+                type: "test",
+                message: `Scanning string at index ${currentPos} ('${escapeChar(text[currentPos])}')...`
+              });
+              currentPos++;
             }
 
-            function renderEmptyResults() {
-                el.matchStatsBadge.textContent = '0 matches';
-                el.tabMatchCount.textContent = '0';
-                el.metricTotalMatches.textContent = '0';
-                el.metricCaptureGroups.textContent = '0';
-                el.metricExecTime.textContent = '0.0ms';
-                el.highlightBackdrop.innerHTML = escapeHtml(el.testTextInput.value);
-                el.matchesContainer.innerHTML = '<div class="text-xs text-slate-400 p-4 text-center">No valid matches to display.</div>';
-                el.tokenTreeContainer.innerHTML = '<div class="text-xs text-slate-400 p-4 text-center">Invalid pattern syntax.</div>';
-                el.replaceOutputArea.value = el.testTextInput.value;
-                state.simulation.steps = [];
-                renderSimulationTape();
-                renderSimulationStep();
+            // Matching inside the matched token range
+            stepCount++;
+            steps.push({
+              textIndex: match.index,
+              tokenIndex: 0,
+              action: "MATCH_START",
+              type: "match",
+              message: `Potential match triggered at index ${match.index}!`
+            });
+
+            // Walk tokens for match
+            for (let ti = 0; ti < Math.min(tokens.length, 10); ti++) {
+              if (stepCount > maxSteps) break;
+              const tok = tokens[ti];
+              stepCount++;
+              steps.push({
+                textIndex: Math.min(match.index + ti, match.index + match.length),
+                tokenIndex: ti,
+                action: "TOKEN_EVAL",
+                type: "match",
+                message: `Evaluating token #${ti + 1} (${tok.raw}): ${tok.desc}`
+              });
             }
 
-            // =========================================================================
-            // HIGHLIGHTING ENGINE (SYNCHRONIZED BACKDROP)
-            // =========================================================================
-            function renderHighlights(text, matches) {
-                if (!matches.length || !text) {
-                    el.highlightBackdrop.innerHTML = escapeHtml(text) + '<br/>';
-                    return;
-                }
+            stepCount++;
+            steps.push({
+              textIndex: match.index + match.length,
+              tokenIndex: tokens.length - 1,
+              action: "MATCH_SUCCESS",
+              type: "success",
+              message: `Match confirmed: "${match.text}" [${match.index}..${match.index + match.length}]`
+            });
 
-                let html = '';
-                let lastIndex = 0;
-
-                matches.forEach((m, i) => {
-                    if (m.index < lastIndex) return; // Skip overlapping edge cases
-
-                    // Plain text before match
-                    const plain = text.slice(lastIndex, m.index);
-                    html += escapeHtml(plain);
-
-                    // Match text wrapped with alternating color classes
-                    const matchText = text.slice(m.index, m.index + m.length);
-                    const colorClass = `match-c${i % 6}`;
-                    const isSelected = (i === state.currentMatchIndex) ? 'ring-2 ring-brand-500 font-bold' : '';
-
-                    html += `<mark id="match-mark-${i}" class="${colorClass} ${isSelected}" title="Match #${i + 1} [${m.index}..${m.index + m.length}]">${escapeHtml(matchText)}</mark>`;
-
-                    lastIndex = m.index + m.length;
-                });
-
-                // Trailing text
-                if (lastIndex < text.length) {
-                    html += escapeHtml(text.slice(lastIndex));
-                }
-
-                // Add trailing break to match textarea line height
-                html += '<br/>';
-                el.highlightBackdrop.innerHTML = html;
+            currentPos = match.index + match.length;
+            if (matches.length > 1) {
+              stepCount++;
+              steps.push({
+                textIndex: currentPos,
+                tokenIndex: 0,
+                action: "NEXT_MATCH",
+                type: "info",
+                message: `Continuing global search from index ${currentPos}...`
+              });
             }
+          }
 
-            // =========================================================================
-            // AST TOKEN BREAKDOWN
-            // =========================================================================
-            function renderASTBreakdown(pattern) {
-                const tokens = tokenizePattern(pattern);
-                el.tokenCountBadge.textContent = tokens.length;
+          steps.push({
+            textIndex: text.length,
+            tokenIndex: tokens.length - 1,
+            action: "FINISHED",
+            type: "success",
+            message: `Evaluation complete. Total matches found: ${matches.length}`
+          });
 
-                if (!tokens.length) {
-                    el.tokenTreeContainer.innerHTML = '<div class="text-xs text-slate-400 text-center p-3">Empty pattern</div>';
-                    return;
-                }
+          return steps;
+        }
 
-                let html = '';
-                tokens.forEach((t, i) => {
-                    let badgeColor = 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
-                    if (t.category === 'Anchor') badgeColor = 'bg-brand-100 text-brand-700 dark:bg-brand-950 dark:text-brand-300';
-                    else if (t.category === 'Class') badgeColor = 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300';
-                    else if (t.category === 'Quantifier') badgeColor = 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300';
-                    else if (t.category === 'Group' || t.category === 'Lookaround') badgeColor = 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300';
-                    else if (t.category === 'Logic') badgeColor = 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300';
+        function escapeChar(ch) {
+          if (ch === "\n") return "\\n";
+          if (ch === "\t") return "\\t";
+          if (ch === " ") return "␣";
+          return ch || "";
+        }
 
-                    html += `
+        // =========================================================================
+        // CORE EXECUTION & UPDATE ENGINE
+        // =========================================================================
+        function updateAll() {
+          const pattern = el.patternInput.value;
+          const flagsStr = Array.from(state.flags).sort().join("");
+          const text = el.testTextInput.value;
+
+          state.pattern = pattern;
+          state.testText = text;
+
+          // Update text stats
+          el.charCountStat.textContent = text.length;
+          el.lineCountStat.textContent = text.split("\n").length;
+
+          // Validate Regex Syntax
+          let regex = null;
+          let parseError = null;
+
+          try {
+            regex = new RegExp(pattern, flagsStr);
+            el.errorBanner.classList.add("hidden");
+          } catch (err) {
+            parseError = err.message;
+            el.errorBanner.classList.remove("hidden");
+            el.errorMessage.textContent = err.message;
+          }
+
+          // Check ReDoS Risk
+          if (pattern && checkBacktrackingRisk(pattern)) {
+            el.warningBanner.classList.remove("hidden");
+          } else {
+            el.warningBanner.classList.add("hidden");
+          }
+
+          if (!regex || parseError) {
+            renderEmptyResults();
+            return;
+          }
+
+          // Execute Matching with timing
+          const startTime = performance.now();
+          const matches = [];
+
+          try {
+            const execRegex = new RegExp(pattern, flagsStr.includes("g") ? flagsStr : flagsStr + "g");
+            let m;
+            while ((m = execRegex.exec(text)) !== null) {
+              matches.push({
+                index: m.index,
+                text: m[0],
+                length: m[0].length,
+                groups: m.slice(1),
+                namedGroups: m.groups || {}
+              });
+              if (m[0].length === 0) {
+                execRegex.lastIndex++;
+              }
+              if (matches.length > 500) break; // Limit for performance
+            }
+          } catch (e) {
+            console.error(e);
+          }
+
+          const elapsed = performance.now() - startTime;
+          state.matches = matches;
+
+          // Update Badges & Metrics
+          el.matchStatsBadge.textContent = `${matches.length} match${matches.length === 1 ? "" : "es"}`;
+          el.tabMatchCount.textContent = matches.length;
+          el.metricTotalMatches.textContent = matches.length;
+          el.metricExecTime.textContent = `${elapsed.toFixed(1)}ms`;
+
+          // Calculate group count
+          let totalGroups = 0;
+          if (matches.length > 0) {
+            totalGroups = matches[0].groups.length;
+          }
+          el.metricCaptureGroups.textContent = totalGroups;
+
+          // Update Match Navigator
+          updateMatchNavigator();
+
+          // Render Visual Highlights
+          renderHighlights(text, matches);
+
+          // Render AST Breakdown
+          renderASTBreakdown(pattern);
+
+          // Render Match Cards
+          renderMatchCards(matches);
+
+          // Render Substitution
+          renderSubstitution(pattern, flagsStr, text);
+
+          // Render Code Export
+          renderCodeExport(pattern, flagsStr, text);
+
+          // Rebuild Stepper Simulation
+          state.simulation.steps = buildSimulationSteps(pattern, flagsStr, text);
+          state.simulation.currentStep = 0;
+          renderSimulationTape();
+          renderSimulationStep();
+        }
+
+        function renderEmptyResults() {
+          el.matchStatsBadge.textContent = "0 matches";
+          el.tabMatchCount.textContent = "0";
+          el.metricTotalMatches.textContent = "0";
+          el.metricCaptureGroups.textContent = "0";
+          el.metricExecTime.textContent = "0.0ms";
+          el.highlightBackdrop.innerHTML = escapeHtml(el.testTextInput.value);
+          el.matchesContainer.innerHTML = '<div class="text-xs text-slate-400 p-4 text-center">No valid matches to display.</div>';
+          el.tokenTreeContainer.innerHTML = '<div class="text-xs text-slate-400 p-4 text-center">Invalid pattern syntax.</div>';
+          el.replaceOutputArea.value = el.testTextInput.value;
+          state.simulation.steps = [];
+          renderSimulationTape();
+          renderSimulationStep();
+        }
+
+        // =========================================================================
+        // HIGHLIGHTING ENGINE (SYNCHRONIZED BACKDROP)
+        // =========================================================================
+        function renderHighlights(text, matches) {
+          if (!matches.length || !text) {
+            el.highlightBackdrop.innerHTML = escapeHtml(text) + "<br/>";
+            return;
+          }
+
+          let html = "";
+          let lastIndex = 0;
+
+          matches.forEach((m, i) => {
+            if (m.index < lastIndex) return; // Skip overlapping edge cases
+
+            // Plain text before match
+            const plain = text.slice(lastIndex, m.index);
+            html += escapeHtml(plain);
+
+            // Match text wrapped with alternating color classes
+            const matchText = text.slice(m.index, m.index + m.length);
+            const colorClass = `match-c${i % 6}`;
+            const isSelected = i === state.currentMatchIndex ? "ring-2 ring-brand-500 font-bold" : "";
+
+            html += `<mark id="match-mark-${i}" class="${colorClass} ${isSelected}" title="Match #${i + 1} [${m.index}..${m.index + m.length}]">${escapeHtml(matchText)}</mark>`;
+
+            lastIndex = m.index + m.length;
+          });
+
+          // Trailing text
+          if (lastIndex < text.length) {
+            html += escapeHtml(text.slice(lastIndex));
+          }
+
+          // Add trailing break to match textarea line height
+          html += "<br/>";
+          el.highlightBackdrop.innerHTML = html;
+        }
+
+        // =========================================================================
+        // AST TOKEN BREAKDOWN
+        // =========================================================================
+        function renderASTBreakdown(pattern) {
+          const tokens = tokenizePattern(pattern);
+          el.tokenCountBadge.textContent = tokens.length;
+
+          if (!tokens.length) {
+            el.tokenTreeContainer.innerHTML = '<div class="text-xs text-slate-400 text-center p-3">Empty pattern</div>';
+            return;
+          }
+
+          let html = "";
+          tokens.forEach((t, i) => {
+            let badgeColor = "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
+            if (t.category === "Anchor") badgeColor = "bg-brand-100 text-brand-700 dark:bg-brand-950 dark:text-brand-300";
+            else if (t.category === "Class") badgeColor = "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300";
+            else if (t.category === "Quantifier") badgeColor = "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300";
+            else if (t.category === "Group" || t.category === "Lookaround") badgeColor = "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300";
+            else if (t.category === "Logic") badgeColor = "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300";
+
+            html += `
                         <div class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-brand-500/50 transition flex items-start gap-3 shadow-sm">
                             <span class="text-xs font-mono font-bold px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-950 text-brand-600 dark:text-brand-400 border border-slate-200 dark:border-slate-800 shrink-0">
                                 ${escapeHtml(t.raw)}
@@ -1355,49 +1250,49 @@
                             </div>
                         </div>
                     `;
-                });
+          });
 
-                el.tokenTreeContainer.innerHTML = html;
-            }
+          el.tokenTreeContainer.innerHTML = html;
+        }
 
-            // =========================================================================
-            // MATCH CARDS
-            // =========================================================================
-            function renderMatchCards(matches) {
-                if (!matches.length) {
-                    el.matchesContainer.innerHTML = '<div class="text-xs text-slate-400 text-center p-4">No matches found in sample text.</div>';
-                    return;
-                }
+        // =========================================================================
+        // MATCH CARDS
+        // =========================================================================
+        function renderMatchCards(matches) {
+          if (!matches.length) {
+            el.matchesContainer.innerHTML = '<div class="text-xs text-slate-400 text-center p-4">No matches found in sample text.</div>';
+            return;
+          }
 
-                let html = '';
-                matches.slice(0, 50).forEach((m, idx) => {
-                    const hasGroups = m.groups && m.groups.length > 0;
-                    const hasNamed = m.namedGroups && Object.keys(m.namedGroups).length > 0;
+          let html = "";
+          matches.slice(0, 50).forEach((m, idx) => {
+            const hasGroups = m.groups && m.groups.length > 0;
+            const hasNamed = m.namedGroups && Object.keys(m.namedGroups).length > 0;
 
-                    let groupsHtml = '';
-                    if (hasGroups) {
-                        m.groups.forEach((gVal, gIdx) => {
-                            groupsHtml += `
+            let groupsHtml = "";
+            if (hasGroups) {
+              m.groups.forEach((gVal, gIdx) => {
+                groupsHtml += `
                                 <div class="flex items-center justify-between text-[11px] py-1 border-t border-slate-100 dark:border-slate-800/60">
                                     <span class="font-mono text-slate-400">Group #${gIdx + 1}:</span>
-                                    <span class="font-mono font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[240px]">${escapeHtml(gVal ?? 'undefined')}</span>
+                                    <span class="font-mono font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[240px]">${escapeHtml(gVal ?? "undefined")}</span>
                                 </div>
                             `;
-                        });
-                    }
+              });
+            }
 
-                    if (hasNamed) {
-                        for (const [name, val] of Object.entries(m.namedGroups)) {
-                            groupsHtml += `
+            if (hasNamed) {
+              for (const [name, val] of Object.entries(m.namedGroups)) {
+                groupsHtml += `
                                 <div class="flex items-center justify-between text-[11px] py-1 border-t border-slate-100 dark:border-slate-800/60 text-purple-600 dark:text-purple-400">
                                     <span class="font-mono">&lt;${escapeHtml(name)}&gt;:</span>
-                                    <span class="font-mono font-semibold truncate max-w-[240px]">${escapeHtml(val ?? 'undefined')}</span>
+                                    <span class="font-mono font-semibold truncate max-w-[240px]">${escapeHtml(val ?? "undefined")}</span>
                                 </div>
                             `;
-                        }
-                    }
+              }
+            }
 
-                    html += `
+            html += `
                         <div class="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm space-y-2">
                             <div class="flex items-center justify-between">
                                 <span class="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
@@ -1409,41 +1304,41 @@
                             <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-950 font-mono text-xs text-brand-600 dark:text-brand-400 break-all border border-slate-200/60 dark:border-slate-800/60">
                                 ${escapeHtml(m.text)}
                             </div>
-                            ${groupsHtml ? `<div class="pt-1">${groupsHtml}</div>` : ''}
+                            ${groupsHtml ? `<div class="pt-1">${groupsHtml}</div>` : ""}
                         </div>
                     `;
-                });
+          });
 
-                if (matches.length > 50) {
-                    html += `<div class="text-center text-xs text-slate-400 py-2">+ ${matches.length - 50} more matches omitted for brevity</div>`;
-                }
+          if (matches.length > 50) {
+            html += `<div class="text-center text-xs text-slate-400 py-2">+ ${matches.length - 50} more matches omitted for brevity</div>`;
+          }
 
-                el.matchesContainer.innerHTML = html;
-            }
+          el.matchesContainer.innerHTML = html;
+        }
 
-            // =========================================================================
-            // SUBSTITUTION / REPLACE ENGINE
-            // =========================================================================
-            function renderSubstitution(pattern, flagsStr, text) {
-                const template = el.replaceTemplateInput.value;
-                try {
-                    const regex = new RegExp(pattern, flagsStr);
-                    const result = text.replace(regex, template);
-                    el.replaceOutputArea.value = result;
-                } catch (e) {
-                    el.replaceOutputArea.value = `Error in substitution: ${e.message}`;
-                }
-            }
+        // =========================================================================
+        // SUBSTITUTION / REPLACE ENGINE
+        // =========================================================================
+        function renderSubstitution(pattern, flagsStr, text) {
+          const template = el.replaceTemplateInput.value;
+          try {
+            const regex = new RegExp(pattern, flagsStr);
+            const result = text.replace(regex, template);
+            el.replaceOutputArea.value = result;
+          } catch (e) {
+            el.replaceOutputArea.value = `Error in substitution: ${e.message}`;
+          }
+        }
 
-            // =========================================================================
-            // CODE SNIPPET GENERATOR
-            // =========================================================================
-            function renderCodeExport(pattern, flagsStr, text) {
-                const lang = state.currentLanguage;
-                let code = '';
+        // =========================================================================
+        // CODE SNIPPET GENERATOR
+        // =========================================================================
+        function renderCodeExport(pattern, flagsStr, text) {
+          const lang = state.currentLanguage;
+          let code = "";
 
-                if (lang === 'js') {
-                    code = `// JavaScript / TypeScript Regex Execution
+          if (lang === "js") {
+            code = `// JavaScript / TypeScript Regex Execution
 const pattern = /${pattern}/${flagsStr};
 const text = ${JSON.stringify(text.slice(0, 120))}...;
 
@@ -1459,8 +1354,8 @@ matches.forEach((match, index) => {
         console.log('Capture Groups:', match.slice(1));
     }
 });`;
-                } else if (lang === 'python') {
-                    code = `# Python re module snippet
+          } else if (lang === "python") {
+            code = `# Python re module snippet
 import re
 
 pattern = r"${pattern}"
@@ -1468,7 +1363,7 @@ text = """${text.slice(0, 120)}..."""
 
 # Compile flags
 flags = 0
-${flagsStr.includes('i') ? 'flags |= re.IGNORECASE\n' : ''}${flagsStr.includes('m') ? 'flags |= re.MULTILINE\n' : ''}${flagsStr.includes('s') ? 'flags |= re.DOTALL\n' : ''}
+${flagsStr.includes("i") ? "flags |= re.IGNORECASE\n" : ""}${flagsStr.includes("m") ? "flags |= re.MULTILINE\n" : ""}${flagsStr.includes("s") ? "flags |= re.DOTALL\n" : ""}
 regex = re.compile(pattern, flags)
 
 # Find all matches with groups
@@ -1476,8 +1371,8 @@ for match in regex.finditer(text):
     print(f"Match: {match.group()} at {match.span()}")
     if match.groups():
         print(f"Groups: {match.groups()}")`;
-                } else if (lang === 'go') {
-                    code = `// Go regexp snippet
+          } else if (lang === "go") {
+            code = `// Go regexp snippet
 package main
 
 import (
@@ -1496,8 +1391,8 @@ func main() {
 		fmt.Printf("Match #%d: %s\\n", i+1, match[0])
 	}
 }`;
-                } else if (lang === 'php') {
-                    code = `<?php
+          } else if (lang === "php") {
+            code = `<?php
 // PHP preg_match_all snippet
 $pattern = '/${pattern}/${flagsStr}';
 $text = "${addslashes(text.slice(0, 100))}";
@@ -1508,388 +1403,382 @@ if (preg_match_all($pattern, $text, $matches, PREG_SET_ORDER | PREG_OFFSET_CAPTU
     }
 }
 ?>`;
-                }
+          }
 
-                el.codeExportPre.textContent = code;
-            }
+          el.codeExportPre.textContent = code;
+        }
 
-            function addslashes(str) {
-                return str.replace(/[\\"']/g, '\\$&').replace(/\u0000/g, '\\0');
-            }
+        function addslashes(str) {
+          return str.replace(/[\\"']/g, "\\$&").replace(/\u0000/g, "\\0");
+        }
 
-            // =========================================================================
-            // SIMULATION STEPPER RENDERING & INTERACTION
-            // =========================================================================
-            function renderSimulationTape() {
-                const text = el.testTextInput.value || ' ';
-                const displayLen = Math.min(text.length, 36);
+        // =========================================================================
+        // SIMULATION STEPPER RENDERING & INTERACTION
+        // =========================================================================
+        function renderSimulationTape() {
+          const text = el.testTextInput.value || " ";
+          const displayLen = Math.min(text.length, 36);
 
-                let html = '';
-                for (let i = 0; i < displayLen; i++) {
-                    const ch = escapeChar(text[i]);
-                    html += `
+          let html = "";
+          for (let i = 0; i < displayLen; i++) {
+            const ch = escapeChar(text[i]);
+            html += `
                         <div id="tape-cell-${i}" class="char-cell border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 rounded">
                             ${escapeHtml(ch)}
                         </div>
                     `;
-                }
+          }
 
-                if (text.length > displayLen) {
-                    html += `<div class="px-2 text-xs text-slate-400">...</div>`;
-                }
+          if (text.length > displayLen) {
+            html += `<div class="px-2 text-xs text-slate-400">...</div>`;
+          }
 
-                el.stepperTapeContainer.innerHTML = html;
-            }
+          el.stepperTapeContainer.innerHTML = html;
+        }
 
-            function renderSimulationStep() {
-                const steps = state.simulation.steps;
-                const total = steps.length;
-                const current = state.simulation.currentStep;
+        function renderSimulationStep() {
+          const steps = state.simulation.steps;
+          const total = steps.length;
+          const current = state.simulation.currentStep;
 
-                el.stepCounterBadge.textContent = `Step ${total === 0 ? 0 : current + 1} / ${total}`;
+          el.stepCounterBadge.textContent = `Step ${total === 0 ? 0 : current + 1} / ${total}`;
 
-                if (total === 0 || current >= total) {
-                    el.stepActionBadge.textContent = 'IDLE';
-                    el.stepActionBadge.className = 'text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400';
-                    el.stepExplanation.textContent = 'No simulation steps ready. Enter a pattern and sample text.';
-                    el.pointerPosLabel.textContent = 'Position: -';
-                    return;
-                }
+          if (total === 0 || current >= total) {
+            el.stepActionBadge.textContent = "IDLE";
+            el.stepActionBadge.className = "text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400";
+            el.stepExplanation.textContent = "No simulation steps ready. Enter a pattern and sample text.";
+            el.pointerPosLabel.textContent = "Position: -";
+            return;
+          }
 
-                const s = steps[current];
+          const s = steps[current];
 
-                // Update Action Badge
-                el.stepActionBadge.textContent = s.action;
-                if (s.type === 'match') {
-                    el.stepActionBadge.className = 'text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-brand-100 dark:bg-brand-950 text-brand-700 dark:text-brand-300';
-                } else if (s.type === 'success') {
-                    el.stepActionBadge.className = 'text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400';
-                } else if (s.type === 'fail') {
-                    el.stepActionBadge.className = 'text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-400';
-                } else {
-                    el.stepActionBadge.className = 'text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300';
-                }
+          // Update Action Badge
+          el.stepActionBadge.textContent = s.action;
+          if (s.type === "match") {
+            el.stepActionBadge.className = "text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-brand-100 dark:bg-brand-950 text-brand-700 dark:text-brand-300";
+          } else if (s.type === "success") {
+            el.stepActionBadge.className = "text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400";
+          } else if (s.type === "fail") {
+            el.stepActionBadge.className = "text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-400";
+          } else {
+            el.stepActionBadge.className = "text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300";
+          }
 
-                // Update Explanation
-                el.stepExplanation.textContent = s.message;
-                el.pointerPosLabel.textContent = `Position: index ${s.textIndex}`;
+          // Update Explanation
+          el.stepExplanation.textContent = s.message;
+          el.pointerPosLabel.textContent = `Position: index ${s.textIndex}`;
 
-                // Update visual character cell highlight
-                document.querySelectorAll('.char-cell').forEach(cell => {
-                    cell.classList.remove('active-step', 'matched-step', 'backtracked-step');
-                });
+          // Update visual character cell highlight
+          document.querySelectorAll(".char-cell").forEach((cell) => {
+            cell.classList.remove("active-step", "matched-step", "backtracked-step");
+          });
 
-                const activeCell = document.getElementById(`tape-cell-${s.textIndex}`);
-                if (activeCell) {
-                    activeCell.classList.add('active-step');
-                    if (s.type === 'success') activeCell.classList.add('matched-step');
-                    else if (s.type === 'fail') activeCell.classList.add('backtracked-step');
-                    activeCell.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-                }
+          const activeCell = document.getElementById(`tape-cell-${s.textIndex}`);
+          if (activeCell) {
+            activeCell.classList.add("active-step");
+            if (s.type === "success") activeCell.classList.add("matched-step");
+            else if (s.type === "fail") activeCell.classList.add("backtracked-step");
+            activeCell.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+          }
 
-                // Append to Log list
-                const logItem = document.createElement('div');
-                logItem.className = 'py-0.5 border-b border-slate-100 dark:border-slate-800/40 flex items-center justify-between text-[10px]';
-                logItem.innerHTML = `
+          // Append to Log list
+          const logItem = document.createElement("div");
+          logItem.className = "py-0.5 border-b border-slate-100 dark:border-slate-800/40 flex items-center justify-between text-[10px]";
+          logItem.innerHTML = `
                     <span class="text-slate-400">#${current + 1} [idx:${s.textIndex}]</span>
                     <span class="font-semibold text-slate-700 dark:text-slate-300 truncate max-w-[260px]">${escapeHtml(s.message)}</span>
                 `;
-                el.stepLogList.appendChild(logItem);
-                el.stepLogList.scrollTop = el.stepLogList.scrollHeight;
-            }
+          el.stepLogList.appendChild(logItem);
+          el.stepLogList.scrollTop = el.stepLogList.scrollHeight;
+        }
 
-            function stepForward() {
-                if (state.simulation.currentStep < state.simulation.steps.length - 1) {
-                    state.simulation.currentStep++;
-                    renderSimulationStep();
-                } else {
-                    pauseSimulation();
-                }
-            }
+        function stepForward() {
+          if (state.simulation.currentStep < state.simulation.steps.length - 1) {
+            state.simulation.currentStep++;
+            renderSimulationStep();
+          } else {
+            pauseSimulation();
+          }
+        }
 
-            function stepBackward() {
-                if (state.simulation.currentStep > 0) {
-                    state.simulation.currentStep--;
-                    renderSimulationStep();
-                }
-            }
+        function stepBackward() {
+          if (state.simulation.currentStep > 0) {
+            state.simulation.currentStep--;
+            renderSimulationStep();
+          }
+        }
 
-            function resetSimulation() {
-                pauseSimulation();
-                state.simulation.currentStep = 0;
-                el.stepLogList.innerHTML = '';
-                renderSimulationStep();
-            }
+        function resetSimulation() {
+          pauseSimulation();
+          state.simulation.currentStep = 0;
+          el.stepLogList.innerHTML = "";
+          renderSimulationStep();
+        }
 
-            function togglePlaySimulation() {
-                if (state.simulation.isPlaying) {
-                    pauseSimulation();
-                } else {
-                    playSimulation();
-                }
-            }
+        function togglePlaySimulation() {
+          if (state.simulation.isPlaying) {
+            pauseSimulation();
+          } else {
+            playSimulation();
+          }
+        }
 
-            function playSimulation() {
-                if (state.simulation.currentStep >= state.simulation.steps.length - 1) {
-                    state.simulation.currentStep = 0;
-                    el.stepLogList.innerHTML = '';
-                }
-                state.simulation.isPlaying = true;
-                el.playIcon.classList.add('hidden');
-                el.pauseIcon.classList.remove('hidden');
-                el.playBtnText.textContent = 'Pause';
+        function playSimulation() {
+          if (state.simulation.currentStep >= state.simulation.steps.length - 1) {
+            state.simulation.currentStep = 0;
+            el.stepLogList.innerHTML = "";
+          }
+          state.simulation.isPlaying = true;
+          el.playIcon.classList.add("hidden");
+          el.pauseIcon.classList.remove("hidden");
+          el.playBtnText.textContent = "Pause";
 
-                clearInterval(state.simulation.timer);
-                state.simulation.timer = setInterval(() => {
-                    stepForward();
-                }, state.simulation.speed);
-            }
+          clearInterval(state.simulation.timer);
+          state.simulation.timer = setInterval(() => {
+            stepForward();
+          }, state.simulation.speed);
+        }
 
-            function pauseSimulation() {
-                state.simulation.isPlaying = false;
-                clearInterval(state.simulation.timer);
-                el.playIcon.classList.remove('hidden');
-                el.pauseIcon.classList.add('hidden');
-                el.playBtnText.textContent = 'Auto Play';
-            }
+        function pauseSimulation() {
+          state.simulation.isPlaying = false;
+          clearInterval(state.simulation.timer);
+          el.playIcon.classList.remove("hidden");
+          el.pauseIcon.classList.add("hidden");
+          el.playBtnText.textContent = "Auto Play";
+        }
 
-            // =========================================================================
-            // MATCH NAVIGATOR
-            // =========================================================================
-            function updateMatchNavigator() {
-                const total = state.matches.length;
-                if (total === 0) {
-                    el.matchNavIndex.textContent = '0 of 0';
-                    return;
-                }
-                if (state.currentMatchIndex >= total) state.currentMatchIndex = 0;
-                el.matchNavIndex.textContent = `${state.currentMatchIndex + 1} of ${total}`;
+        // =========================================================================
+        // MATCH NAVIGATOR
+        // =========================================================================
+        function updateMatchNavigator() {
+          const total = state.matches.length;
+          if (total === 0) {
+            el.matchNavIndex.textContent = "0 of 0";
+            return;
+          }
+          if (state.currentMatchIndex >= total) state.currentMatchIndex = 0;
+          el.matchNavIndex.textContent = `${state.currentMatchIndex + 1} of ${total}`;
 
-                // Scroll to active mark
-                const mark = document.getElementById(`match-mark-${state.currentMatchIndex}`);
-                if (mark) {
-                    mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }
-            }
+          // Scroll to active mark
+          const mark = document.getElementById(`match-mark-${state.currentMatchIndex}`);
+          if (mark) {
+            mark.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+        }
 
-            // =========================================================================
-            // UTILITIES
-            // =========================================================================
-            function escapeHtml(str) {
-                if (!str) return '';
-                return str
-                    .replace(/&/g, '&amp;')
-                    .replace(/</g, '&lt;')
-                    .replace(/>/g, '&gt;')
-                    .replace(/"/g, '&quot;')
-                    .replace(/'/g, '&#039;');
-            }
+        // =========================================================================
+        // UTILITIES
+        // =========================================================================
+        function escapeHtml(str) {
+          if (!str) return "";
+          return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
 
-            function showToast(msg) {
-                el.toastMsg.textContent = msg;
-                el.toast.classList.remove('translate-y-12', 'opacity-0');
-                el.toast.classList.add('translate-y-0', 'opacity-100');
-                setTimeout(() => {
-                    el.toast.classList.remove('translate-y-0', 'opacity-100');
-                    el.toast.classList.add('translate-y-12', 'opacity-0');
-                }, 2200);
-            }
+        function showToast(msg) {
+          el.toastMsg.textContent = msg;
+          el.toast.classList.remove("translate-y-12", "opacity-0");
+          el.toast.classList.add("translate-y-0", "opacity-100");
+          setTimeout(() => {
+            el.toast.classList.remove("translate-y-0", "opacity-100");
+            el.toast.classList.add("translate-y-12", "opacity-0");
+          }, 2200);
+        }
 
-            // =========================================================================
-            // EVENT LISTENERS & SETUP
-            // =========================================================================
-            el.patternInput.addEventListener('input', () => updateAll());
-            el.testTextInput.addEventListener('input', () => updateAll());
-            el.replaceTemplateInput.addEventListener('input', () => {
-                const pattern = el.patternInput.value;
-                const flagsStr = Array.from(state.flags).sort().join('');
-                renderSubstitution(pattern, flagsStr, el.testTextInput.value);
+        // =========================================================================
+        // EVENT LISTENERS & SETUP
+        // =========================================================================
+        el.patternInput.addEventListener("input", () => updateAll());
+        el.testTextInput.addEventListener("input", () => updateAll());
+        el.replaceTemplateInput.addEventListener("input", () => {
+          const pattern = el.patternInput.value;
+          const flagsStr = Array.from(state.flags).sort().join("");
+          renderSubstitution(pattern, flagsStr, el.testTextInput.value);
+        });
+
+        // Synchronize scroll between textarea and highlight overlay
+        el.testTextInput.addEventListener("scroll", () => {
+          el.highlightBackdrop.scrollTop = el.testTextInput.scrollTop;
+          el.highlightBackdrop.scrollLeft = el.testTextInput.scrollLeft;
+        });
+
+        // Preset Selection
+        el.presetSelect.addEventListener("change", (e) => {
+          const key = e.target.value;
+          const preset = PRESETS[key];
+          if (preset) {
+            el.patternInput.value = preset.pattern;
+            state.flags = new Set(preset.flags.split(""));
+            el.testTextInput.value = preset.sample;
+
+            // Sync flag pills UI
+            el.flagPills.forEach((pill) => {
+              const f = pill.dataset.flag;
+              if (state.flags.has(f)) {
+                pill.className = "flag-pill px-2 py-1 text-xs font-mono font-semibold rounded-md transition bg-brand-600 text-white shadow-sm";
+              } else {
+                pill.className = "flag-pill px-2 py-1 text-xs font-mono font-semibold rounded-md transition bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white";
+              }
             });
 
-            // Synchronize scroll between textarea and highlight overlay
-            el.testTextInput.addEventListener('scroll', () => {
-                el.highlightBackdrop.scrollTop = el.testTextInput.scrollTop;
-                el.highlightBackdrop.scrollLeft = el.testTextInput.scrollLeft;
-            });
-
-            // Preset Selection
-            el.presetSelect.addEventListener('change', (e) => {
-                const key = e.target.value;
-                const preset = PRESETS[key];
-                if (preset) {
-                    el.patternInput.value = preset.pattern;
-                    state.flags = new Set(preset.flags.split(''));
-                    el.testTextInput.value = preset.sample;
-
-                    // Sync flag pills UI
-                    el.flagPills.forEach(pill => {
-                        const f = pill.dataset.flag;
-                        if (state.flags.has(f)) {
-                            pill.className = 'flag-pill px-2 py-1 text-xs font-mono font-semibold rounded-md transition bg-brand-600 text-white shadow-sm';
-                        } else {
-                            pill.className = 'flag-pill px-2 py-1 text-xs font-mono font-semibold rounded-md transition bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white';
-                        }
-                    });
-
-                    updateAll();
-                    showToast(`Loaded preset: ${preset.name}`);
-                }
-            });
-
-            // Flag Pills Toggle
-            el.flagPills.forEach(pill => {
-                pill.addEventListener('click', () => {
-                    const flag = pill.dataset.flag;
-                    if (state.flags.has(flag)) {
-                        state.flags.delete(flag);
-                        pill.className = 'flag-pill px-2 py-1 text-xs font-mono font-semibold rounded-md transition bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white';
-                    } else {
-                        state.flags.add(flag);
-                        pill.className = 'flag-pill px-2 py-1 text-xs font-mono font-semibold rounded-md transition bg-brand-600 text-white shadow-sm';
-                    }
-                    updateAll();
-                });
-            });
-
-            // Tool Tab Switching
-            el.tabBtns.forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const tabKey = btn.dataset.tab;
-                    state.activeTab = tabKey;
-
-                    el.tabBtns.forEach(b => {
-                        b.classList.remove('border-brand-500', 'text-brand-600', 'dark:text-brand-400', 'bg-white', 'dark:bg-slate-900');
-                        b.classList.add('border-transparent', 'text-slate-500', 'dark:text-slate-400');
-                    });
-                    btn.classList.add('border-brand-500', 'text-brand-600', 'dark:text-brand-400', 'bg-white', 'dark:bg-slate-900');
-                    btn.classList.remove('border-transparent', 'text-slate-500', 'dark:text-slate-400');
-
-                    el.tabPanels.forEach(panel => {
-                        if (panel.id === `tab-${tabKey}`) panel.classList.remove('hidden');
-                        else panel.classList.add('hidden');
-                    });
-                });
-            });
-
-            // Language Switcher for Code Export
-            el.langTabBtns.forEach(btn => {
-                btn.addEventListener('click', () => {
-                    state.currentLanguage = btn.dataset.lang;
-                    el.langTabBtns.forEach(b => {
-                        b.className = 'lang-tab-btn px-2.5 py-1 rounded text-xs font-medium bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700 transition';
-                    });
-                    btn.className = 'lang-tab-btn px-2.5 py-1 rounded text-xs font-medium bg-brand-600 text-white transition';
-
-                    const flagsStr = Array.from(state.flags).sort().join('');
-                    renderCodeExport(el.patternInput.value, flagsStr, el.testTextInput.value);
-                });
-            });
-
-            // Match Navigation
-            el.prevMatchBtn.addEventListener('click', () => {
-                if (state.matches.length === 0) return;
-                state.currentMatchIndex = (state.currentMatchIndex - 1 + state.matches.length) % state.matches.length;
-                updateMatchNavigator();
-                renderHighlights(state.testText, state.matches);
-            });
-
-            el.nextMatchBtn.addEventListener('click', () => {
-                if (state.matches.length === 0) return;
-                state.currentMatchIndex = (state.currentMatchIndex + 1) % state.matches.length;
-                updateMatchNavigator();
-                renderHighlights(state.testText, state.matches);
-            });
-
-            // Stepper Controls
-            el.stepPlayPauseBtn.addEventListener('click', togglePlaySimulation);
-            el.stepNextBtn.addEventListener('click', stepForward);
-            el.stepPrevBtn.addEventListener('click', stepBackward);
-            el.stepResetBtn.addEventListener('click', resetSimulation);
-
-            // Stepper Speed buttons
-            el.speedBtns.forEach(btn => {
-                btn.addEventListener('click', () => {
-                    state.simulation.speed = parseInt(btn.dataset.speed, 10);
-                    el.speedBtns.forEach(b => {
-                        b.className = 'speed-btn px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-slate-200 dark:bg-slate-800 hover:bg-brand-500 hover:text-white transition';
-                    });
-                    btn.className = 'speed-btn px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-brand-600 text-white transition';
-
-                    if (state.simulation.isPlaying) {
-                        playSimulation(); // Restart interval with new speed
-                    }
-                });
-            });
-
-            // Copy Action Buttons
-            el.copyRegexBtn.addEventListener('click', () => {
-                const flagsStr = Array.from(state.flags).sort().join('');
-                navigator.clipboard.writeText(`/${el.patternInput.value}/${flagsStr}`).then(() => {
-                    showToast('Copied regex literal to clipboard');
-                });
-            });
-
-            el.copyReplacedBtn.addEventListener('click', () => {
-                navigator.clipboard.writeText(el.replaceOutputArea.value).then(() => {
-                    showToast('Copied replaced output to clipboard');
-                });
-            });
-
-            el.copyCodeSnippetBtn.addEventListener('click', () => {
-                navigator.clipboard.writeText(el.codeExportPre.textContent).then(() => {
-                    showToast('Copied code snippet');
-                });
-            });
-
-            el.loadSampleBtn.addEventListener('click', () => {
-                const key = el.presetSelect.value;
-                if (PRESETS[key]) {
-                    el.testTextInput.value = PRESETS[key].sample;
-                    updateAll();
-                    showToast('Reloaded sample text');
-                }
-            });
-
-            el.clearTestTextBtn.addEventListener('click', () => {
-                el.testTextInput.value = '';
-                updateAll();
-            });
-
-            // Cheat Sheet Modal toggles
-            el.cheatSheetBtn.addEventListener('click', () => el.cheatSheetModal.classList.remove('hidden'));
-            el.closeModalBtn.addEventListener('click', () => el.cheatSheetModal.classList.add('hidden'));
-            el.closeModalBottomBtn.addEventListener('click', () => el.cheatSheetModal.classList.add('hidden'));
-            el.cheatSheetModal.addEventListener('click', (e) => {
-                if (e.target === el.cheatSheetModal) el.cheatSheetModal.classList.add('hidden');
-            });
-
-            // Theme Toggle
-            el.themeToggleBtn.addEventListener('click', () => {
-                const isDark = document.documentElement.classList.toggle('dark');
-                try {
-                    localStorage.setItem('regex_debugger_theme', isDark ? 'dark' : 'light');
-                } catch (_) {}
-            });
-
-            // Keyboard Shortcuts
-            window.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape' && !el.cheatSheetModal.classList.contains('hidden')) {
-                    el.cheatSheetModal.classList.add('hidden');
-                }
-                if (e.ctrlKey && e.key === 'Enter') {
-                    updateAll();
-                    showToast('Re-evaluated expression');
-                }
-            });
-
-            // =========================================================================
-            // INITIALIZATION
-            // =========================================================================
-            el.patternInput.value = state.pattern;
-            el.testTextInput.value = state.testText;
             updateAll();
-        })();
-    </script>
-</body>
+            showToast(`Loaded preset: ${preset.name}`);
+          }
+        });
 
+        // Flag Pills Toggle
+        el.flagPills.forEach((pill) => {
+          pill.addEventListener("click", () => {
+            const flag = pill.dataset.flag;
+            if (state.flags.has(flag)) {
+              state.flags.delete(flag);
+              pill.className = "flag-pill px-2 py-1 text-xs font-mono font-semibold rounded-md transition bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white";
+            } else {
+              state.flags.add(flag);
+              pill.className = "flag-pill px-2 py-1 text-xs font-mono font-semibold rounded-md transition bg-brand-600 text-white shadow-sm";
+            }
+            updateAll();
+          });
+        });
+
+        // Tool Tab Switching
+        el.tabBtns.forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const tabKey = btn.dataset.tab;
+            state.activeTab = tabKey;
+
+            el.tabBtns.forEach((b) => {
+              b.classList.remove("border-brand-500", "text-brand-600", "dark:text-brand-400", "bg-white", "dark:bg-slate-900");
+              b.classList.add("border-transparent", "text-slate-500", "dark:text-slate-400");
+            });
+            btn.classList.add("border-brand-500", "text-brand-600", "dark:text-brand-400", "bg-white", "dark:bg-slate-900");
+            btn.classList.remove("border-transparent", "text-slate-500", "dark:text-slate-400");
+
+            el.tabPanels.forEach((panel) => {
+              if (panel.id === `tab-${tabKey}`) panel.classList.remove("hidden");
+              else panel.classList.add("hidden");
+            });
+          });
+        });
+
+        // Language Switcher for Code Export
+        el.langTabBtns.forEach((btn) => {
+          btn.addEventListener("click", () => {
+            state.currentLanguage = btn.dataset.lang;
+            el.langTabBtns.forEach((b) => {
+              b.className = "lang-tab-btn px-2.5 py-1 rounded text-xs font-medium bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700 transition";
+            });
+            btn.className = "lang-tab-btn px-2.5 py-1 rounded text-xs font-medium bg-brand-600 text-white transition";
+
+            const flagsStr = Array.from(state.flags).sort().join("");
+            renderCodeExport(el.patternInput.value, flagsStr, el.testTextInput.value);
+          });
+        });
+
+        // Match Navigation
+        el.prevMatchBtn.addEventListener("click", () => {
+          if (state.matches.length === 0) return;
+          state.currentMatchIndex = (state.currentMatchIndex - 1 + state.matches.length) % state.matches.length;
+          updateMatchNavigator();
+          renderHighlights(state.testText, state.matches);
+        });
+
+        el.nextMatchBtn.addEventListener("click", () => {
+          if (state.matches.length === 0) return;
+          state.currentMatchIndex = (state.currentMatchIndex + 1) % state.matches.length;
+          updateMatchNavigator();
+          renderHighlights(state.testText, state.matches);
+        });
+
+        // Stepper Controls
+        el.stepPlayPauseBtn.addEventListener("click", togglePlaySimulation);
+        el.stepNextBtn.addEventListener("click", stepForward);
+        el.stepPrevBtn.addEventListener("click", stepBackward);
+        el.stepResetBtn.addEventListener("click", resetSimulation);
+
+        // Stepper Speed buttons
+        el.speedBtns.forEach((btn) => {
+          btn.addEventListener("click", () => {
+            state.simulation.speed = parseInt(btn.dataset.speed, 10);
+            el.speedBtns.forEach((b) => {
+              b.className = "speed-btn px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-slate-200 dark:bg-slate-800 hover:bg-brand-500 hover:text-white transition";
+            });
+            btn.className = "speed-btn px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-brand-600 text-white transition";
+
+            if (state.simulation.isPlaying) {
+              playSimulation(); // Restart interval with new speed
+            }
+          });
+        });
+
+        // Copy Action Buttons
+        el.copyRegexBtn.addEventListener("click", () => {
+          const flagsStr = Array.from(state.flags).sort().join("");
+          navigator.clipboard.writeText(`/${el.patternInput.value}/${flagsStr}`).then(() => {
+            showToast("Copied regex literal to clipboard");
+          });
+        });
+
+        el.copyReplacedBtn.addEventListener("click", () => {
+          navigator.clipboard.writeText(el.replaceOutputArea.value).then(() => {
+            showToast("Copied replaced output to clipboard");
+          });
+        });
+
+        el.copyCodeSnippetBtn.addEventListener("click", () => {
+          navigator.clipboard.writeText(el.codeExportPre.textContent).then(() => {
+            showToast("Copied code snippet");
+          });
+        });
+
+        el.loadSampleBtn.addEventListener("click", () => {
+          const key = el.presetSelect.value;
+          if (PRESETS[key]) {
+            el.testTextInput.value = PRESETS[key].sample;
+            updateAll();
+            showToast("Reloaded sample text");
+          }
+        });
+
+        el.clearTestTextBtn.addEventListener("click", () => {
+          el.testTextInput.value = "";
+          updateAll();
+        });
+
+        // Cheat Sheet Modal toggles
+        el.cheatSheetBtn.addEventListener("click", () => el.cheatSheetModal.classList.remove("hidden"));
+        el.closeModalBtn.addEventListener("click", () => el.cheatSheetModal.classList.add("hidden"));
+        el.closeModalBottomBtn.addEventListener("click", () => el.cheatSheetModal.classList.add("hidden"));
+        el.cheatSheetModal.addEventListener("click", (e) => {
+          if (e.target === el.cheatSheetModal) el.cheatSheetModal.classList.add("hidden");
+        });
+
+        // Theme Toggle
+        el.themeToggleBtn.addEventListener("click", () => {
+          const isDark = document.documentElement.classList.toggle("dark");
+          try {
+            localStorage.setItem("regex_debugger_theme", isDark ? "dark" : "light");
+          } catch (_) {}
+        });
+
+        // Keyboard Shortcuts
+        window.addEventListener("keydown", (e) => {
+          if (e.key === "Escape" && !el.cheatSheetModal.classList.contains("hidden")) {
+            el.cheatSheetModal.classList.add("hidden");
+          }
+          if (e.ctrlKey && e.key === "Enter") {
+            updateAll();
+            showToast("Re-evaluated expression");
+          }
+        });
+
+        // =========================================================================
+        // INITIALIZATION
+        // =========================================================================
+        el.patternInput.value = state.pattern;
+        el.testTextInput.value = state.testText;
+        updateAll();
+      })();
+    </script>
+  </body>
 </html>
