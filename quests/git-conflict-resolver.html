@@ -11,11 +11,13 @@
   <!-- Dark Mode FOUC Prevention -->
   <script>
     (function () {
-      var t = localStorage.getItem('git_conflict_theme');
-      if (t === 'light') document.documentElement.setAttribute('data-theme', 'light');
-      else if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
-      else if (window.matchMedia('(prefers-color-scheme: light)').matches) document.documentElement.setAttribute('data-theme', 'light');
-      else document.documentElement.setAttribute('data-theme', 'dark');
+      try {
+        var t = localStorage.getItem('git_conflict_theme');
+        if (t === 'light') document.documentElement.setAttribute('data-theme', 'light');
+        else if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+        else if (window.matchMedia('(prefers-color-scheme: light)').matches) document.documentElement.setAttribute('data-theme', 'light');
+        else document.documentElement.setAttribute('data-theme', 'dark');
+      } catch (e) { }
     })();
   </script>
 
@@ -459,7 +461,69 @@
       box-shadow: 0 0 0 1px #a855f7;
     }
 
-    /* Live Resolved Preview Drawer */
+    .btn-resolve-opt.selected-manual {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: #f59e0b;
+      color: #fbbf24;
+      box-shadow: 0 0 0 1px #f59e0b;
+    }
+
+    /* Multi-File Tabs Bar */
+    .file-tabs-bar {
+      display: flex;
+      gap: 0.4rem;
+      padding: 0.6rem 1.25rem 0;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+    }
+
+    .file-tab-btn {
+      padding: 0.4rem 0.85rem;
+      border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+      font-size: 0.8rem;
+      font-weight: 700;
+      font-family: var(--font-sans);
+      cursor: pointer;
+      background: var(--surface-raised);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      border-bottom: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: all 0.15s ease;
+    }
+
+    .file-tab-btn:hover {
+      color: var(--text);
+      background: rgba(56, 189, 248, 0.1);
+    }
+
+    .file-tab-btn.active {
+      background: var(--bg);
+      color: var(--accent);
+      border-color: var(--border);
+      border-top: 2px solid var(--accent);
+    }
+
+    /* Inline Strategic Hint Banner */
+    .hint-banner {
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      border-radius: var(--radius-sm);
+      padding: 0.75rem 1.25rem;
+      margin: 0.75rem 1.25rem 0;
+      color: #fbbf24;
+      font-size: 0.85rem;
+      line-height: 1.45;
+      display: none;
+      align-items: center;
+      gap: 0.6rem;
+      animation: fadeIn 0.2s ease-out;
+    }
+
+    /* Live Resolved Preview / Editor Drawer */
     .resolved-preview-box {
       background: var(--surface-raised);
       border-top: 1px solid var(--border);
@@ -472,13 +536,37 @@
       color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 0.04em;
-      margin-bottom: 0.4rem;
+      margin-bottom: 0.45rem;
       display: flex;
       align-items: center;
+      justify-content: space-between;
       gap: 0.5rem;
     }
 
-    .resolved-code-view {
+    .marker-status-badge {
+      font-size: 0.72rem;
+      padding: 0.15rem 0.55rem;
+      border-radius: 9999px;
+      font-weight: 700;
+      text-transform: none;
+      letter-spacing: normal;
+    }
+
+    .marker-status-clean {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .marker-status-warn {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .resolved-code-editor {
+      width: 100%;
+      min-height: 120px;
       font-family: var(--font-mono);
       font-size: 0.82rem;
       color: #38bdf8;
@@ -486,7 +574,22 @@
       padding: 0.65rem 0.9rem;
       border-radius: var(--radius-sm);
       border: 1px solid var(--border);
-      white-space: pre-wrap;
+      white-space: pre;
+      resize: vertical;
+      outline: none;
+      line-height: 1.45;
+      box-sizing: border-box;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+
+    .resolved-code-editor:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-subtle);
+    }
+
+    .resolved-code-editor.has-markers {
+      border-color: #ef4444;
+      background: rgba(239, 68, 68, 0.06);
     }
 
     /* Bottom Action Controls */
@@ -767,24 +870,31 @@
         <!-- Injected dynamically -->
       </div>
 
+      <!-- Inline Strategic Hint Banner -->
+      <div class="hint-banner" id="hintBanner"></div>
+
+      <!-- Multi-File Tabs Bar (Active on multi-file missions) -->
+      <div class="file-tabs-bar" id="fileTabsBar" style="display:none;"></div>
+
       <!-- Code Viewer with Interactive Conflict Markers -->
       <div class="code-viewer-container" id="codeViewer">
         <!-- Rendered lines & hunks -->
       </div>
 
-      <!-- Live Resolved Preview Drawer -->
+      <!-- Live Resolved Preview & Editor Drawer -->
       <div class="resolved-preview-box">
         <div class="resolved-preview-head">
-          <span>👁️ Live Resolution Preview (What Git will commit)</span>
+          <span>👁️ Live Resolution Editor (What Git will stage &amp; commit)</span>
+          <span id="markerStatusBadge" class="marker-status-badge marker-status-clean">✓ Markers Cleared</span>
         </div>
-        <pre class="resolved-code-view" id="resolvedPreview">// Resolution will appear here...</pre>
+        <textarea class="resolved-code-editor" id="resolvedEditor" spellcheck="false" placeholder="// Select a resolution option or edit directly..."></textarea>
       </div>
     </div>
 
     <!-- Bottom Action Controls -->
     <div class="arena-action-row">
       <div style="font-size:0.8rem; color:var(--text-muted);" id="keyboardHint">
-        Shortcut: Press <strong>1</strong> for HEAD, <strong>2</strong> for Incoming, <strong>3</strong> for Both, <strong>Enter</strong> to Commit.
+        Shortcut: Press <strong>1</strong> for HEAD, <strong>2</strong> for Incoming, <strong>3</strong> for Both, <strong>4</strong> for Manual, <strong>Enter</strong> to Commit.
       </div>
       <div style="display:flex; gap:0.5rem;">
         <button id="commitBtn" class="btn-commit" disabled>
@@ -855,7 +965,7 @@
         var current = document.documentElement.getAttribute('data-theme');
         var next = current === 'light' ? 'dark' : 'light';
         document.documentElement.setAttribute('data-theme', next);
-        localStorage.setItem('git_conflict_theme', next);
+        try { localStorage.setItem('git_conflict_theme', next); } catch (e) { }
         updateThemeIcon();
       });
 
@@ -863,202 +973,377 @@
       var SCENARIOS = [
         {
           id: 1,
-          file: 'config/server.js',
           branchHead: 'main',
           branchIncoming: 'feature/dev-setup',
           timerSec: 40,
-          scenario: 'Two developers changed the server listen port. <strong>main</strong> hardened the configuration to read from environment variables for production containers, while <strong>feature/dev-setup</strong> hardcoded port 3000.',
-          prefix: ['// Server configuration', 'const express = require("express");', 'const app = express();', ''],
-          hunk: {
-            head: 'const PORT = process.env.PORT || 8080;',
-            incoming: 'const PORT = 3000;',
-            bothCombined: 'const PORT = process.env.PORT || 3000;',
-            correctChoice: 'head' // Accepting head preserves container compatibility
-          },
-          suffix: ['', 'app.listen(PORT, () => {', '  console.log(`Server listening on port ${PORT}`);', '});'],
+          scenario: 'Two developers changed the server listen port. <strong>main</strong> hardened configuration to read from environment variables for production containers, while <strong>feature/dev-setup</strong> set port 3000.',
           hint: 'Production cloud deployments require reading from process.env.PORT rather than hardcoding port 3000.',
-          why: 'Accepting HEAD (`process.env.PORT || 8080`) ensures Docker, Heroku, or Kubernetes environments can dynamically bind their assigned port, whereas hardcoding 3000 breaks container deployments.'
+          why: 'Accepting HEAD (or manual merge with port 3000 default) preserves dynamic container port binding via process.env.PORT. Pure concatenation creates a duplicate const PORT declaration causing a runtime crash.',
+          files: [
+            {
+              fileName: 'config/server.js',
+              prefix: ['// Server configuration', 'const express = require("express");', 'const app = express();', ''],
+              hunks: [
+                {
+                  id: 'h1',
+                  name: 'Listen Port',
+                  head: 'const PORT = process.env.PORT || 8080;',
+                  incoming: 'const PORT = 3000;',
+                  both: 'const PORT = process.env.PORT || 8080;\nconst PORT = 3000;',
+                  manual: 'const PORT = process.env.PORT || 3000;',
+                  correctChoice: 'head',
+                  acceptableResolutions: [
+                    'const PORT = process.env.PORT || 8080;',
+                    'const PORT = process.env.PORT || 3000;'
+                  ]
+                }
+              ],
+              suffix: ['', 'app.listen(PORT, () => {', '  console.log(`Server listening on port ${PORT}`);', '});']
+            }
+          ]
         },
         {
           id: 2,
-          file: 'package.json',
           branchHead: 'main',
           branchIncoming: 'feature/jwt-auth',
           timerSec: 45,
-          scenario: 'Parallel development: <strong>main</strong> merged an HTTP client update (`axios`), while <strong>feature/jwt-auth</strong> added `jsonwebtoken` to handle tokens. Both packages are required.',
-          prefix: ['{', '  "name": "enterprise-api",', '  "version": "2.4.0",', '  "dependencies": {'],
-          hunk: {
-            head: '    "axios": "^1.6.0"',
-            incoming: '    "jsonwebtoken": "^9.0.2"',
-            bothCombined: '    "axios": "^1.6.0",\n    "jsonwebtoken": "^9.0.2"',
-            correctChoice: 'both' // Both dependencies are needed
-          },
-          suffix: ['  }', '}'],
+          scenario: 'Parallel feature development: <strong>main</strong> added HTTP client <code>axios</code>, while <strong>feature/jwt-auth</strong> added <code>jsonwebtoken</code>. Both packages are required.',
           hint: 'Both dependencies are introduced by different ongoing features. Neither can be dropped!',
-          why: 'Accepting Both Changes combines the dependencies so that HTTP request services (`axios`) and token authentication services (`jsonwebtoken`) both compile and run without missing module errors.'
+          why: 'Accepting Both Changes properly retains both axios (for API requests) and jsonwebtoken (for auth token signing).',
+          files: [
+            {
+              fileName: 'package.json',
+              prefix: ['{', '  "name": "enterprise-api",', '  "version": "2.4.0",', '  "dependencies": {'],
+              hunks: [
+                {
+                  id: 'h1',
+                  name: 'Dependencies',
+                  head: '    "axios": "^1.6.0",',
+                  incoming: '    "jsonwebtoken": "^9.0.2"',
+                  both: '    "axios": "^1.6.0",\n    "jsonwebtoken": "^9.0.2"',
+                  manual: '    "axios": "^1.6.0",\n    "jsonwebtoken": "^9.0.2"',
+                  correctChoice: 'both',
+                  acceptableResolutions: [
+                    '    "axios": "^1.6.0",\n    "jsonwebtoken": "^9.0.2"'
+                  ]
+                }
+              ],
+              suffix: ['  }', '}']
+            }
+          ]
         },
         {
           id: 3,
-          file: 'utils/crypto.js',
           branchHead: 'main',
           branchIncoming: 'feature/user-tokens',
           timerSec: 40,
-          scenario: 'Security Hotfix: The security team on <strong>main</strong> deprecated vulnerable MD5 hashing in favor of SHA-256. The feature branch still uses the old MD5 hash call.',
-          prefix: ['const crypto = require("crypto");', '', 'function generateAuthToken(payload) {'],
-          hunk: {
-            head: '  return crypto.createHash("sha256").update(payload).digest("hex");',
-            incoming: '  return crypto.createHash("md5").update(payload).digest("hex");',
-            bothCombined: '  return crypto.createHash("sha256").update(payload).digest("hex");',
-            correctChoice: 'head'
-          },
-          suffix: ['}', '', 'module.exports = { generateAuthToken };'],
+          scenario: 'Security Hotfix: The security team on <strong>main</strong> deprecated vulnerable MD5 hashing in favor of SHA-256. The incoming branch still calls the old MD5 algorithm.',
           hint: 'MD5 is cryptographically broken and vulnerable to collisions. The security patch on main must win.',
-          why: 'Accepting HEAD preserves the cryptographically secure SHA-256 hash. Accepting incoming would re-introduce an insecure MD5 algorithm into authentication tokens.'
+          why: 'Accepting HEAD preserves cryptographically secure SHA-256 hashing. MD5 is collision-vulnerable; concatenating both or choosing incoming re-introduces security vulnerabilities.',
+          files: [
+            {
+              fileName: 'utils/crypto.js',
+              prefix: ['const crypto = require("crypto");', '', 'function generateAuthToken(payload) {'],
+              hunks: [
+                {
+                  id: 'h1',
+                  name: 'Hash Algorithm',
+                  head: '  return crypto.createHash("sha256").update(payload).digest("hex");',
+                  incoming: '  return crypto.createHash("md5").update(payload).digest("hex");',
+                  both: '  return crypto.createHash("sha256").update(payload).digest("hex");\n  return crypto.createHash("md5").update(payload).digest("hex");',
+                  manual: '  return crypto.createHash("sha256").update(payload).digest("hex");',
+                  correctChoice: 'head',
+                  acceptableResolutions: [
+                    'return crypto.createHash("sha256").update(payload).digest("hex");'
+                  ]
+                }
+              ],
+              suffix: ['}', '', 'module.exports = { generateAuthToken };']
+            }
+          ]
         },
         {
           id: 4,
-          file: 'src/index.js',
           branchHead: 'main',
           branchIncoming: 'feature/analytics-score',
           timerSec: 45,
-          scenario: 'Consolidating Module Imports: Two teams added distinct helper imports from the same local module file `helpers.js`.',
-          prefix: ['// Application bootstrap', ''],
-          hunk: {
-            head: 'import { formatUser, validateEmail } from "./helpers.js";',
-            incoming: 'import { formatUser, calculateScore } from "./helpers.js";',
-            bothCombined: 'import { formatUser, validateEmail, calculateScore } from "./helpers.js";',
-            correctChoice: 'both'
-          },
-          suffix: ['', 'export function initApp() {', '  console.log("App initialized");', '}'],
-          hint: 'Merge the named imports into a single import statement containing all required functions.',
-          why: 'Combining both named imports (`formatUser`, `validateEmail`, `calculateScore`) ensures both user validation and score calculation functions are available without namespace collisions.'
+          scenario: 'Multi-Hunk Conflict: Two teams added distinct helper imports and startup procedures in the application bootstrap file.',
+          hint: 'Hunk 1 requires a single consolidated import to prevent duplicate identifier errors. Hunk 2 requires executing both functions.',
+          why: 'Hunk 1 requires Manual Merge to unify formatUser, validateEmail, and calculateScore under one import. Hunk 2 combines both initialization calls.',
+          files: [
+            {
+              fileName: 'src/index.js',
+              prefix: ['// Application bootstrap', ''],
+              hunks: [
+                {
+                  id: 'h1',
+                  name: 'Named Imports',
+                  head: 'import { formatUser, validateEmail } from "./helpers.js";',
+                  incoming: 'import { formatUser, calculateScore } from "./helpers.js";',
+                  both: 'import { formatUser, validateEmail } from "./helpers.js";\nimport { formatUser, calculateScore } from "./helpers.js";',
+                  manual: 'import { formatUser, validateEmail, calculateScore } from "./helpers.js";',
+                  correctChoice: 'manual',
+                  acceptableResolutions: [
+                    'import { formatUser, validateEmail, calculateScore } from "./helpers.js";',
+                    'import { formatUser, calculateScore, validateEmail } from "./helpers.js";'
+                  ]
+                },
+                {
+                  id: 'h2',
+                  name: 'App Bootstrap',
+                  preHunk: ['', 'export function initApp() {', '  console.log("Starting server services...");'],
+                  head: '  validateEmail(process.env.ADMIN_EMAIL);',
+                  incoming: '  calculateScore(0);',
+                  both: '  validateEmail(process.env.ADMIN_EMAIL);\n  calculateScore(0);',
+                  manual: '  validateEmail(process.env.ADMIN_EMAIL);\n  calculateScore(0);',
+                  correctChoice: 'both',
+                  acceptableResolutions: [
+                    'validateEmail(process.env.ADMIN_EMAIL);\n  calculateScore(0);',
+                    'calculateScore(0);\n  validateEmail(process.env.ADMIN_EMAIL);'
+                  ]
+                }
+              ],
+              suffix: ['}', '']
+            }
+          ]
         },
         {
           id: 5,
-          file: 'routes/api.js',
           branchHead: 'main',
           branchIncoming: 'feature/stripe-checkout',
           timerSec: 40,
-          scenario: 'Route Registration: <strong>main</strong> added a users search endpoint, while the incoming branch added a Stripe checkout endpoint.',
-          prefix: ['const express = require("express");', 'const router = express.Router();', ''],
-          hunk: {
-            head: 'router.get("/users/search", authMiddleware, searchUsers);',
-            incoming: 'router.post("/billing/checkout", stripeLimiter, processCheckout);',
-            bothCombined: 'router.get("/users/search", authMiddleware, searchUsers);\nrouter.post("/billing/checkout", stripeLimiter, processCheckout);',
-            correctChoice: 'both'
-          },
-          suffix: ['', 'module.exports = router;'],
+          scenario: 'Independent Route Registration: <strong>main</strong> added a users search endpoint, while incoming added a Stripe checkout endpoint.',
           hint: 'Endpoints are independent route handlers. Both should be mounted on the router.',
-          why: 'Accepting Both maintains both API capabilities: users can search directory profiles and proceed to the Stripe checkout pipeline.'
+          why: 'Accepting Both retains both the user search GET route and the Stripe checkout POST route.',
+          files: [
+            {
+              fileName: 'routes/api.js',
+              prefix: ['const express = require("express");', 'const router = express.Router();', ''],
+              hunks: [
+                {
+                  id: 'h1',
+                  name: 'Route Handlers',
+                  head: 'router.get("/users/search", authMiddleware, searchUsers);',
+                  incoming: 'router.post("/billing/checkout", stripeLimiter, processCheckout);',
+                  both: 'router.get("/users/search", authMiddleware, searchUsers);\nrouter.post("/billing/checkout", stripeLimiter, processCheckout);',
+                  manual: 'router.get("/users/search", authMiddleware, searchUsers);\nrouter.post("/billing/checkout", stripeLimiter, processCheckout);',
+                  correctChoice: 'both'
+                }
+              ],
+              suffix: ['', 'module.exports = router;']
+            }
+          ]
         },
         {
           id: 6,
-          file: 'db/schema.sql',
           branchHead: 'main',
           branchIncoming: 'feature/phone-verification',
           timerSec: 45,
-          scenario: 'Database Migration: Both branches add new columns to the `users` table via ALTER TABLE statements.',
-          prefix: ['-- Database schema updates', 'BEGIN TRANSACTION;', ''],
-          hunk: {
-            head: 'ALTER TABLE users ADD COLUMN phone_number VARCHAR(20);',
-            incoming: 'ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE;',
-            bothCombined: 'ALTER TABLE users ADD COLUMN phone_number VARCHAR(20);\nALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE;',
-            correctChoice: 'both'
-          },
-          suffix: ['', 'COMMIT;'],
+          scenario: 'Parallel Schema Migrations: Both branches add new columns to the `users` table via ALTER TABLE statements.',
           hint: 'Both schema migrations are necessary for user identity and phone verification.',
-          why: 'Both database columns (`phone_number` and `is_verified`) are needed for the user profile. Discarding either causes runtime column-not-found SQL exceptions.'
+          why: 'Both ALTER TABLE statements are needed. Discarding either column causes runtime column-not-found SQL exceptions.',
+          files: [
+            {
+              fileName: 'db/schema.sql',
+              prefix: ['-- Database schema updates', 'BEGIN TRANSACTION;', ''],
+              hunks: [
+                {
+                  id: 'h1',
+                  name: 'Schema Columns',
+                  head: 'ALTER TABLE users ADD COLUMN phone_number VARCHAR(20);',
+                  incoming: 'ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE;',
+                  both: 'ALTER TABLE users ADD COLUMN phone_number VARCHAR(20);\nALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE;',
+                  manual: 'ALTER TABLE users ADD COLUMN phone_number VARCHAR(20);\nALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE;',
+                  correctChoice: 'both'
+                }
+              ],
+              suffix: ['', 'COMMIT;']
+            }
+          ]
         },
         {
           id: 7,
-          file: 'controllers/auth.js',
           branchHead: 'main',
           branchIncoming: 'feature/legacy-patch',
           timerSec: 45,
-          scenario: 'Modern Async/Await vs Legacy Promises: <strong>main</strong> refactored to clean `async/await` with typed error handling, while the incoming branch still uses old nested `.then()` callbacks.',
-          prefix: ['class AuthController {', '  async handleLogin(req, res) {'],
-          hunk: {
-            head: '    const user = await User.findById(req.userId);\n    if (!user) throw new NotFoundError("User not found");',
-            incoming: '    User.findById(req.userId).then(user => {\n      if (!user) return res.status(404).send("User not found");\n    });',
-            bothCombined: '    const user = await User.findById(req.userId);\n    if (!user) throw new NotFoundError("User not found");',
-            correctChoice: 'head'
-          },
-          suffix: ['    return res.json({ status: "success", user });', '  }', '}'],
+          scenario: 'Modern Async/Await vs Nested Promises: <strong>main</strong> refactored to clean async/await with typed error handling, while incoming used old .then() callbacks.',
           hint: 'Maintain codebase consistency with async/await and throw errors for centralized middleware.',
-          why: 'Accepting HEAD preserves modern async/await execution and centralized error handling. Mixing unhandled Promise rejections with async handlers causes unhandled rejection crashes.'
+          why: 'Accepting HEAD preserves modern async/await execution and centralized error handling instead of legacy nested Promise callbacks.',
+          files: [
+            {
+              fileName: 'controllers/auth.js',
+              prefix: ['class AuthController {', '  async handleLogin(req, res) {'],
+              hunks: [
+                {
+                  id: 'h1',
+                  name: 'Query Handler',
+                  head: '    const user = await User.findById(req.userId);\n    if (!user) throw new NotFoundError("User not found");',
+                  incoming: '    User.findById(req.userId).then(user => {\n      if (!user) return res.status(404).send("User not found");\n    });',
+                  both: '    const user = await User.findById(req.userId);\n    if (!user) throw new NotFoundError("User not found");\n    User.findById(req.userId).then(user => {\n      if (!user) return res.status(404).send("User not found");\n    });',
+                  manual: '    const user = await User.findById(req.userId);\n    if (!user) throw new NotFoundError("User not found");',
+                  correctChoice: 'head'
+                }
+              ],
+              suffix: ['    return res.json({ status: "success", user });', '  }', '}']
+            }
+          ]
         },
         {
           id: 8,
-          file: 'app.js',
           branchHead: 'main',
           branchIncoming: 'feature/helmet-security',
           timerSec: 50,
-          scenario: 'Middleware Security Hardening: <strong>main</strong> configured CORS origins, while incoming added Helmet security headers.',
-          prefix: ['const express = require("express");', 'const app = express();', ''],
-          hunk: {
-            head: 'app.use(cors({ origin: process.env.ALLOWED_ORIGIN, credentials: true }));',
-            incoming: 'app.use(helmet({ contentSecurityPolicy: false }));',
-            bothCombined: 'app.use(cors({ origin: process.env.ALLOWED_ORIGIN, credentials: true }));\napp.use(helmet({ contentSecurityPolicy: false }));',
-            correctChoice: 'both'
-          },
-          suffix: ['', 'app.use(express.json());', 'module.exports = app;'],
+          scenario: 'Multi-Hunk Security Middleware: <strong>main</strong> configured CORS origins, while incoming introduced Helmet HTTP security headers.',
           hint: 'Web apps require both CORS domain filtering and Helmet HTTP security headers.',
-          why: 'Accepting Both Changes mounts both the CORS cross-origin configuration and Helmet defensive HTTP headers, protecting the API from origin hijacking and clickjacking simultaneously.'
+          why: 'Accepting Both in both hunks imports and mounts both CORS domain access rules and Helmet defensive security headers.',
+          files: [
+            {
+              fileName: 'app.js',
+              prefix: ['const express = require("express");', 'const app = express();', ''],
+              hunks: [
+                {
+                  id: 'h1',
+                  name: 'Middleware Imports',
+                  head: 'const cors = require("cors");',
+                  incoming: 'const helmet = require("helmet");',
+                  both: 'const cors = require("cors");\nconst helmet = require("helmet");',
+                  manual: 'const cors = require("cors");\nconst helmet = require("helmet");',
+                  correctChoice: 'both'
+                },
+                {
+                  id: 'h2',
+                  name: 'Middleware Mounting',
+                  preHunk: ['', '// Security headers and CORS configuration'],
+                  head: 'app.use(cors({ origin: process.env.ALLOWED_ORIGIN, credentials: true }));',
+                  incoming: 'app.use(helmet({ contentSecurityPolicy: false }));',
+                  both: 'app.use(cors({ origin: process.env.ALLOWED_ORIGIN, credentials: true }));\napp.use(helmet({ contentSecurityPolicy: false }));',
+                  manual: 'app.use(cors({ origin: process.env.ALLOWED_ORIGIN, credentials: true }));\napp.use(helmet({ contentSecurityPolicy: false }));',
+                  correctChoice: 'both'
+                }
+              ],
+              suffix: ['', 'app.use(express.json());', 'module.exports = app;']
+            }
+          ]
         },
         {
           id: 9,
-          file: 'services/notification.js',
           branchHead: 'main',
           branchIncoming: 'feature/email-resilience',
           timerSec: 50,
-          scenario: 'Retry Logic Collision: <strong>main</strong> implemented exponential backoff with max 3 retries. Incoming changed it to a static loop.',
-          prefix: ['async function sendNotificationWithRetry(payload) {'],
-          hunk: {
-            head: '  for (let attempt = 1; attempt <= 3; attempt++) {\n    try { return await sendMail(payload); }\n    catch (err) { await delay(Math.pow(2, attempt) * 100); }\n  }',
-            incoming: '  for (let i = 0; i < 5; i++) {\n    try { return await sendMail(payload); }\n    catch (e) { await delay(500); }\n  }',
-            bothCombined: '  for (let attempt = 1; attempt <= 3; attempt++) {\n    try { return await sendMail(payload); }\n    catch (err) { await delay(Math.pow(2, attempt) * 100); }\n  }',
-            correctChoice: 'head'
-          },
-          suffix: ['  throw new Error("Delivery failed after maximum attempts");', '}'],
+          scenario: 'Retry Algorithm Collision: <strong>main</strong> implemented exponential backoff with max 3 retries. Incoming changed it to a static loop without jitter.',
           hint: 'Exponential backoff prevents thundering herd load on mail servers during outages.',
-          why: 'HEAD utilizes standard exponential backoff (`Math.pow(2, attempt)`), which avoids swamping recovering mail servers during transient outages.'
+          why: 'HEAD utilizes standard exponential backoff (Math.pow(2, attempt)), which avoids swamping recovering mail servers during transient outages.',
+          files: [
+            {
+              fileName: 'services/notification.js',
+              prefix: ['async function sendNotificationWithRetry(payload) {'],
+              hunks: [
+                {
+                  id: 'h1',
+                  name: 'Retry Loop',
+                  head: '  for (let attempt = 1; attempt <= 3; attempt++) {\n    try { return await sendMail(payload); }\n    catch (err) { await delay(Math.pow(2, attempt) * 100); }\n  }',
+                  incoming: '  for (let i = 0; i < 5; i++) {\n    try { return await sendMail(payload); }\n    catch (e) { await delay(500); }\n  }',
+                  both: '  for (let attempt = 1; attempt <= 3; attempt++) {\n    try { return await sendMail(payload); }\n    catch (err) { await delay(Math.pow(2, attempt) * 100); }\n  }\n  for (let i = 0; i < 5; i++) {\n    try { return await sendMail(payload); }\n    catch (e) { await delay(500); }\n  }',
+                  manual: '  for (let attempt = 1; attempt <= 3; attempt++) {\n    try { return await sendMail(payload); }\n    catch (err) { await delay(Math.pow(2, attempt) * 100); }\n  }',
+                  correctChoice: 'head'
+                }
+              ],
+              suffix: ['  throw new Error("Delivery failed after maximum attempts");', '}']
+            }
+          ]
         },
         {
           id: 10,
-          file: 'services/payment.js',
           branchHead: 'main',
           branchIncoming: 'feature/idempotency-keys',
-          timerSec: 55,
-          scenario: 'Grandmaster Challenge: <strong>main</strong> implemented Stripe webhook signature verification, while incoming introduced Idempotency-Key headers to prevent duplicate charges.',
-          prefix: ['async function processPayment(req) {', '  const sig = req.headers["stripe-signature"];', '  const idempotencyKey = req.headers["idempotency-key"];', ''],
-          hunk: {
-            head: '  const event = stripe.webhooks.constructEvent(req.rawBody, sig, WEBHOOK_SECRET);',
-            incoming: '  const charge = await stripe.charges.create(req.body, { idempotencyKey });',
-            bothCombined: '  const event = stripe.webhooks.constructEvent(req.rawBody, sig, WEBHOOK_SECRET);\n  const charge = await stripe.charges.create(req.body, { idempotencyKey });',
-            correctChoice: 'both'
-          },
-          suffix: ['', '  return { status: "processed", event, charge };', '}'],
-          hint: 'A resilient payment pipeline requires both webhook authentication and idempotency keys.',
-          why: 'Both systems are critical: Webhook signature verification prevents forged payment events, while idempotency keys protect customers from accidental double charges on retry.'
+          timerSec: 60,
+          scenario: 'Grandmaster Multi-File Merge: Resolving conflicts across both the API route layer and core payment service to support webhook verification and idempotency protection.',
+          hint: 'Grandmaster Challenge: Resilient payment pipeline requires both webhook authentication and idempotency keys across routes and services.',
+          why: 'In this multi-file merge, the billing route mounts both the webhook and charge endpoints, while the payment service safely accepts options and executes both webhook event construction and idempotent payment processing.',
+          files: [
+            {
+              fileName: 'routes/billing.js',
+              prefix: ['const express = require("express");', 'const router = express.Router();', ''],
+              hunks: [
+                {
+                  id: 'h1',
+                  name: 'Billing Endpoints',
+                  head: 'router.post("/webhook", express.raw({ type: "application/json" }), handleWebhook);',
+                  incoming: 'router.post("/charge", authRequired, processPaymentRoute);',
+                  both: 'router.post("/webhook", express.raw({ type: "application/json" }), handleWebhook);\nrouter.post("/charge", authRequired, processPaymentRoute);',
+                  manual: 'router.post("/webhook", express.raw({ type: "application/json" }), handleWebhook);\nrouter.post("/charge", authRequired, processPaymentRoute);',
+                  correctChoice: 'both'
+                }
+              ],
+              suffix: ['', 'module.exports = router;']
+            },
+            {
+              fileName: 'services/payment.js',
+              prefix: ['// Core payment service pipeline', 'const stripe = require("stripe")(process.env.STRIPE_SECRET);', ''],
+              hunks: [
+                {
+                  id: 'h1',
+                  name: 'Handler Signature',
+                  head: 'async function processPayment(req) {',
+                  incoming: 'async function processPayment(req, options = {}) {',
+                  both: 'async function processPayment(req) {\nasync function processPayment(req, options = {}) {',
+                  manual: 'async function processPayment(req, options = {}) {',
+                  correctChoice: 'incoming',
+                  acceptableResolutions: [
+                    'async function processPayment(req, options = {}) {'
+                  ]
+                },
+                {
+                  id: 'h2',
+                  name: 'Webhook & Charge',
+                  preHunk: ['  const sig = req.headers["stripe-signature"];', '  const idempotencyKey = req.headers["idempotency-key"];', ''],
+                  head: '  const event = stripe.webhooks.constructEvent(req.rawBody, sig, WEBHOOK_SECRET);',
+                  incoming: '  const charge = await stripe.charges.create(req.body, { idempotencyKey });',
+                  both: '  const event = stripe.webhooks.constructEvent(req.rawBody, sig, WEBHOOK_SECRET);\n  const charge = await stripe.charges.create(req.body, { idempotencyKey });',
+                  manual: '  const event = stripe.webhooks.constructEvent(req.rawBody, sig, WEBHOOK_SECRET);\n  const charge = await stripe.charges.create(req.body, { idempotencyKey });',
+                  correctChoice: 'both'
+                }
+              ],
+              suffix: ['', '  return { status: "processed", event, charge };', '}']
+            }
+          ]
         }
       ];
 
       // --- State Variables ---
       var currentMissionIdx = 0;
+      var activeFileIdx = 0;
       var score = 0;
       var streak = 0;
       var maxStreak = 0;
       var timerSeconds = 45;
       var timerTotal = 45;
       var timerInterval = null;
-      var selectedResolution = null; // 'head', 'incoming', 'both'
+      var isMissionResolved = false;
       var hintUsed = false;
       var totalCorrect = 0;
+      var hunkResolutions = []; // hunkResolutions[fileIdx][hunkIdx] = choice string
+      var fileEditorTexts = []; // fileEditorTexts[fileIdx] = full resolved code
 
-      // --- Sound Synthesizer (Web Audio API) ---
+      // --- Sound Synthesizer (Shared AudioContext Singleton) ---
+      var sharedAudioCtx = null;
+      function getAudioContext() {
+        if (!sharedAudioCtx) {
+          var AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtxClass) {
+            sharedAudioCtx = new AudioCtxClass();
+          }
+        }
+        if (sharedAudioCtx && sharedAudioCtx.state === 'suspended') {
+          sharedAudioCtx.resume().catch(function () {});
+        }
+        return sharedAudioCtx;
+      }
+
       function playAudio(freq, type, duration) {
         try {
-          var ctx = new (window.AudioContext || window.webkitAudioContext)();
+          var ctx = getAudioContext();
+          if (!ctx) return;
           var osc = ctx.createOscillator();
           var gain = ctx.createGain();
           osc.type = type || 'sine';
@@ -1083,6 +1368,12 @@
         setTimeout(function () { playAudio(185, 'sawtooth', 0.3); }, 150);
       }
 
+      document.addEventListener('click', function unlockAudio() {
+        if (sharedAudioCtx && sharedAudioCtx.state === 'suspended') {
+          sharedAudioCtx.resume().catch(function () {});
+        }
+      });
+
       // --- DOM Elements ---
       var statMission = document.getElementById('statMission');
       var statTime = document.getElementById('statTime');
@@ -1094,8 +1385,11 @@
       var branchInfo = document.getElementById('branchInfo');
       var conflictCounterBadge = document.getElementById('conflictCounterBadge');
       var scenarioBanner = document.getElementById('scenarioBanner');
+      var hintBanner = document.getElementById('hintBanner');
+      var fileTabsBar = document.getElementById('fileTabsBar');
       var codeViewer = document.getElementById('codeViewer');
-      var resolvedPreview = document.getElementById('resolvedPreview');
+      var resolvedEditor = document.getElementById('resolvedEditor');
+      var markerStatusBadge = document.getElementById('markerStatusBadge');
 
       var commitBtn = document.getElementById('commitBtn');
       var nextMissionBtn = document.getElementById('nextMissionBtn');
@@ -1144,9 +1438,17 @@
       }
 
       function timeExpired() {
+        if (isMissionResolved) return;
+        isMissionResolved = true;
+        stopCountdown();
         playErrorSound();
         streak = 0;
         statStreak.textContent = '0x 🔥';
+
+        // Lock all options and editor
+        codeViewer.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
+        resolvedEditor.readOnly = true;
+
         debriefBox.className = 'debrief-box show debrief-error';
         debriefTitle.innerHTML = '<span>⏱️</span> Time Expired! Conflict unresolved';
         debriefSummary.textContent = 'The merge timer ran out before this conflict was committed. Streak reset to 0.';
@@ -1154,8 +1456,117 @@
         debriefWhy.innerHTML = '<strong>Correct Strategy:</strong> ' + s.why;
 
         commitBtn.disabled = true;
+        commitBtn.style.display = 'none';
         nextMissionBtn.style.display = 'inline-flex';
         nextMissionBtn.textContent = (currentMissionIdx < SCENARIOS.length - 1) ? 'Next Conflict →' : 'View Mission Report →';
+      }
+
+      // --- File & Hunk String Builders ---
+      function buildInitialFileText(file, s) {
+        var lines = [];
+        lines = lines.concat(file.prefix);
+        file.hunks.forEach(function (hunk, hIdx) {
+          if (hIdx > 0 && hunk.preHunk) {
+            lines = lines.concat(hunk.preHunk);
+          }
+          lines.push('<<<<<<< HEAD (' + s.branchHead + ')');
+          lines.push(hunk.head);
+          lines.push('=======');
+          lines.push(hunk.incoming);
+          lines.push('>>>>>>> ' + s.branchIncoming);
+        });
+        lines = lines.concat(file.suffix);
+        return lines.join('\n');
+      }
+
+      function recomputeFileText(fIdx) {
+        var s = SCENARIOS[currentMissionIdx];
+        var file = s.files[fIdx];
+        var lines = [];
+        lines = lines.concat(file.prefix);
+        file.hunks.forEach(function (hunk, hIdx) {
+          if (hIdx > 0 && hunk.preHunk) {
+            lines = lines.concat(hunk.preHunk);
+          }
+          var choice = hunkResolutions[fIdx] ? hunkResolutions[fIdx][hIdx] : null;
+          if (choice === 'head') {
+            lines.push(hunk.head);
+          } else if (choice === 'incoming') {
+            lines.push(hunk.incoming);
+          } else if (choice === 'both') {
+            lines.push(hunk.both);
+          } else if (choice === 'manual') {
+            lines.push(hunk.manual);
+          } else {
+            lines.push('<<<<<<< HEAD (' + s.branchHead + ')');
+            lines.push(hunk.head);
+            lines.push('=======');
+            lines.push(hunk.incoming);
+            lines.push('>>>>>>> ' + s.branchIncoming);
+          }
+        });
+        lines = lines.concat(file.suffix);
+        return lines.join('\n');
+      }
+
+      function hasConflictMarkers(text) {
+        if (!text) return false;
+        return /<{7}|={7}|>{7}/.test(text);
+      }
+
+      function updateMarkerStatus() {
+        var s = SCENARIOS[currentMissionIdx];
+        if (fileEditorTexts[activeFileIdx] !== undefined) {
+          fileEditorTexts[activeFileIdx] = resolvedEditor.value;
+        }
+
+        var anyMarkers = false;
+        for (var f = 0; f < s.files.length; f++) {
+          if (hasConflictMarkers(fileEditorTexts[f])) {
+            anyMarkers = true;
+            break;
+          }
+        }
+
+        if (anyMarkers) {
+          resolvedEditor.classList.add('has-markers');
+          markerStatusBadge.className = 'marker-status-badge marker-status-warn';
+          markerStatusBadge.textContent = '⚠️ Conflict Markers Detected';
+          commitBtn.disabled = true;
+        } else {
+          resolvedEditor.classList.remove('has-markers');
+          markerStatusBadge.className = 'marker-status-badge marker-status-clean';
+          markerStatusBadge.textContent = '✓ Markers Cleared';
+          if (!isMissionResolved) {
+            commitBtn.disabled = false;
+          }
+        }
+
+        updateConflictBadge();
+      }
+
+      function updateConflictBadge() {
+        var s = SCENARIOS[currentMissionIdx];
+        var totalHunks = 0;
+        var resolvedHunks = 0;
+        for (var f = 0; f < s.files.length; f++) {
+          totalHunks += s.files[f].hunks.length;
+          for (var h = 0; h < s.files[f].hunks.length; h++) {
+            if (hunkResolutions[f] && hunkResolutions[f][h]) {
+              resolvedHunks++;
+            }
+          }
+        }
+
+        var label = totalHunks + (totalHunks === 1 ? ' Conflict Hunk' : ' Conflict Hunks');
+        if (s.files.length > 1) {
+          label += ' (' + s.files.length + ' Files)';
+        }
+        if (resolvedHunks === totalHunks) {
+          conflictCounterBadge.textContent = label + ' • All Resolved';
+        } else {
+          conflictCounterBadge.textContent = label + ' • ' + resolvedHunks + '/' + totalHunks + ' Resolved';
+        }
       }
 
       // --- Load Active Conflict Scenario ---
@@ -1166,101 +1577,172 @@
         }
 
         currentMissionIdx = idx;
-        var s = SCENARIOS[idx];
-        selectedResolution = null;
+        activeFileIdx = 0;
+        isMissionResolved = false;
         hintUsed = false;
+
+        var s = SCENARIOS[idx];
 
         statMission.textContent = (idx + 1) + ' / ' + SCENARIOS.length;
         statScore.textContent = score;
         statStreak.textContent = streak + 'x 🔥';
 
-        fileName.textContent = s.file;
+        fileName.textContent = s.files[0].fileName;
         branchInfo.textContent = 'HEAD: ' + s.branchHead + ' ← ' + s.branchIncoming;
         scenarioBanner.innerHTML = s.scenario;
+        hintBanner.style.display = 'none';
+        hintBanner.innerHTML = '';
 
         debriefBox.classList.remove('show');
         commitBtn.disabled = true;
         commitBtn.style.display = 'inline-flex';
         nextMissionBtn.style.display = 'none';
 
-        resolvedPreview.textContent = '// Select a resolution option (1, 2, or 3) to preview merged code...';
+        hunkResolutions = [];
+        fileEditorTexts = [];
+        for (var f = 0; f < s.files.length; f++) {
+          var hunkArr = [];
+          for (var h = 0; h < s.files[f].hunks.length; h++) {
+            hunkArr.push(null);
+          }
+          hunkResolutions.push(hunkArr);
+          fileEditorTexts.push(buildInitialFileText(s.files[f], s));
+        }
 
-        renderCodeViewer(s);
+        renderFileTabs(s);
+        renderCodeViewer(s.files[activeFileIdx]);
+
+        resolvedEditor.value = fileEditorTexts[activeFileIdx];
+        resolvedEditor.readOnly = false;
+        updateMarkerStatus();
+
         startCountdown(s.timerSec);
       }
 
+      // --- Render Multi-File Navigation Tabs ---
+      function renderFileTabs(s) {
+        if (s.files.length <= 1) {
+          fileTabsBar.style.display = 'none';
+          fileTabsBar.innerHTML = '';
+          return;
+        }
+
+        fileTabsBar.style.display = 'flex';
+        fileTabsBar.innerHTML = '';
+        s.files.forEach(function (file, fIdx) {
+          var btn = document.createElement('button');
+          btn.className = 'file-tab-btn' + (fIdx === activeFileIdx ? ' active' : '');
+          btn.innerHTML = '<span>📄</span> ' + file.fileName;
+          btn.addEventListener('click', function () {
+            if (activeFileIdx === fIdx) return;
+            fileEditorTexts[activeFileIdx] = resolvedEditor.value;
+            activeFileIdx = fIdx;
+            fileName.textContent = file.fileName;
+            renderFileTabs(s);
+            renderCodeViewer(file);
+            resolvedEditor.value = fileEditorTexts[activeFileIdx];
+            updateMarkerStatus();
+          });
+          fileTabsBar.appendChild(btn);
+        });
+      }
+
       // --- Render Code Viewer with Conflict Markers ---
-      function renderCodeViewer(s) {
+      function renderCodeViewer(file) {
         codeViewer.innerHTML = '';
+        var s = SCENARIOS[currentMissionIdx];
         var lineNum = 1;
 
         // Prefix lines
-        s.prefix.forEach(function (line) {
+        file.prefix.forEach(function (line) {
           codeViewer.appendChild(createCodeLine(lineNum++, line));
         });
 
-        // Conflict Hunk Block
-        var hunkContainer = document.createElement('div');
-        hunkContainer.className = 'conflict-hunk';
+        // Hunks
+        file.hunks.forEach(function (hunk, hIdx) {
+          if (hIdx > 0 && hunk.preHunk) {
+            hunk.preHunk.forEach(function (line) {
+              codeViewer.appendChild(createCodeLine(lineNum++, line));
+            });
+          }
 
-        // HEAD Marker
-        var headMarker = document.createElement('div');
-        headMarker.className = 'hunk-marker hunk-head';
-        headMarker.innerHTML = '<span>&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD (Current Change: ' + s.branchHead + ')</span><span>[1]</span>';
-        hunkContainer.appendChild(headMarker);
+          var hunkContainer = document.createElement('div');
+          hunkContainer.className = 'conflict-hunk';
 
-        // HEAD Content
-        var headContent = document.createElement('div');
-        headContent.className = 'hunk-content-head';
-        headContent.textContent = s.hunk.head;
-        hunkContainer.appendChild(headContent);
+          if (file.hunks.length > 1) {
+            var hunkTitle = document.createElement('div');
+            hunkTitle.style.cssText = 'padding:0.3rem 0.75rem; background:rgba(0,0,0,0.3); font-size:0.74rem; font-weight:700; color:var(--text-muted); border-bottom:1px solid var(--border);';
+            hunkTitle.textContent = 'Conflict Hunk ' + (hIdx + 1) + ' of ' + file.hunks.length + (hunk.name ? ': ' + hunk.name : '');
+            hunkContainer.appendChild(hunkTitle);
+          }
 
-        // Divider
-        var divMarker = document.createElement('div');
-        divMarker.className = 'hunk-marker hunk-divider';
-        divMarker.innerHTML = '<span>=======</span><span>Conflict Divider</span>';
-        hunkContainer.appendChild(divMarker);
+          // HEAD Marker
+          var headMarker = document.createElement('div');
+          headMarker.className = 'hunk-marker hunk-head';
+          headMarker.innerHTML = '<span>&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD (Current Change: ' + s.branchHead + ')</span><span>[1]</span>';
+          hunkContainer.appendChild(headMarker);
 
-        // Incoming Content
-        var incContent = document.createElement('div');
-        incContent.className = 'hunk-content-incoming';
-        incContent.textContent = s.hunk.incoming;
-        hunkContainer.appendChild(incContent);
+          // HEAD Content
+          var headContent = document.createElement('div');
+          headContent.className = 'hunk-content-head';
+          headContent.textContent = hunk.head;
+          hunkContainer.appendChild(headContent);
 
-        // Incoming Marker
-        var incMarker = document.createElement('div');
-        incMarker.className = 'hunk-marker hunk-incoming';
-        incMarker.innerHTML = '<span>&gt;&gt;&gt;&gt;&gt;&gt;&gt; ' + s.branchIncoming + ' (Incoming Change)</span><span>[2]</span>';
-        hunkContainer.appendChild(incMarker);
+          // Divider
+          var divMarker = document.createElement('div');
+          divMarker.className = 'hunk-marker hunk-divider';
+          divMarker.innerHTML = '<span>=======</span><span>Conflict Divider</span>';
+          hunkContainer.appendChild(divMarker);
 
-        // Interactive Resolution Actions Bar
-        var actionsBar = document.createElement('div');
-        actionsBar.className = 'hunk-actions-bar';
+          // Incoming Content
+          var incContent = document.createElement('div');
+          incContent.className = 'hunk-content-incoming';
+          incContent.textContent = hunk.incoming;
+          hunkContainer.appendChild(incContent);
 
-        var optHead = document.createElement('button');
-        optHead.className = 'btn-resolve-opt';
-        optHead.innerHTML = '<span>1</span> Accept Current (HEAD)';
-        optHead.addEventListener('click', function () { selectChoice('head'); });
+          // Incoming Marker
+          var incMarker = document.createElement('div');
+          incMarker.className = 'hunk-marker hunk-incoming';
+          incMarker.innerHTML = '<span>&gt;&gt;&gt;&gt;&gt;&gt;&gt; ' + s.branchIncoming + ' (Incoming Change)</span><span>[2]</span>';
+          hunkContainer.appendChild(incMarker);
 
-        var optInc = document.createElement('button');
-        optInc.className = 'btn-resolve-opt';
-        optInc.innerHTML = '<span>2</span> Accept Incoming';
-        optInc.addEventListener('click', function () { selectChoice('incoming'); });
+          // Interactive Resolution Actions Bar
+          var actionsBar = document.createElement('div');
+          actionsBar.className = 'hunk-actions-bar';
 
-        var optBoth = document.createElement('button');
-        optBoth.className = 'btn-resolve-opt';
-        optBoth.innerHTML = '<span>3</span> Accept Both (Combine)';
-        optBoth.addEventListener('click', function () { selectChoice('both'); });
+          var currentChoice = hunkResolutions[activeFileIdx] ? hunkResolutions[activeFileIdx][hIdx] : null;
 
-        actionsBar.appendChild(optHead);
-        actionsBar.appendChild(optInc);
-        actionsBar.appendChild(optBoth);
-        hunkContainer.appendChild(actionsBar);
+          var optHead = document.createElement('button');
+          optHead.className = 'btn-resolve-opt' + (currentChoice === 'head' ? ' selected-head' : '');
+          optHead.innerHTML = '<span>1</span> Accept Current (HEAD)';
+          optHead.addEventListener('click', function () { selectChoice(activeFileIdx, hIdx, 'head'); });
 
-        codeViewer.appendChild(hunkContainer);
+          var optInc = document.createElement('button');
+          optInc.className = 'btn-resolve-opt' + (currentChoice === 'incoming' ? ' selected-incoming' : '');
+          optInc.innerHTML = '<span>2</span> Accept Incoming';
+          optInc.addEventListener('click', function () { selectChoice(activeFileIdx, hIdx, 'incoming'); });
+
+          var optBoth = document.createElement('button');
+          optBoth.className = 'btn-resolve-opt' + (currentChoice === 'both' ? ' selected-both' : '');
+          optBoth.innerHTML = '<span>3</span> Accept Both (Concatenate)';
+          optBoth.addEventListener('click', function () { selectChoice(activeFileIdx, hIdx, 'both'); });
+
+          var optManual = document.createElement('button');
+          optManual.className = 'btn-resolve-opt' + (currentChoice === 'manual' ? ' selected-manual' : '');
+          optManual.innerHTML = '<span>4</span> ✏️ Manual Merge';
+          optManual.addEventListener('click', function () { selectChoice(activeFileIdx, hIdx, 'manual'); });
+
+          actionsBar.appendChild(optHead);
+          actionsBar.appendChild(optInc);
+          actionsBar.appendChild(optBoth);
+          actionsBar.appendChild(optManual);
+
+          hunkContainer.appendChild(actionsBar);
+          codeViewer.appendChild(hunkContainer);
+        });
 
         // Suffix lines
-        s.suffix.forEach(function (line) {
+        file.suffix.forEach(function (line) {
           codeViewer.appendChild(createCodeLine(lineNum++, line));
         });
       }
@@ -1280,59 +1762,113 @@
       }
 
       // --- Resolution Choice Handler ---
-      function selectChoice(choice) {
-        selectedResolution = choice;
-        var s = SCENARIOS[currentMissionIdx];
+      function selectChoice(fIdx, hIdx, choice) {
+        if (isMissionResolved) return;
+        if (!hunkResolutions[fIdx]) return;
 
-        // Update button highlights
-        var buttons = codeViewer.querySelectorAll('.btn-resolve-opt');
-        buttons.forEach(function (b) {
-          b.className = 'btn-resolve-opt';
-        });
+        hunkResolutions[fIdx][hIdx] = choice;
+        fileEditorTexts[fIdx] = recomputeFileText(fIdx);
 
-        if (choice === 'head') buttons[0].classList.add('selected-head');
-        if (choice === 'incoming') buttons[1].classList.add('selected-incoming');
-        if (choice === 'both') buttons[2].classList.add('selected-both');
+        if (fIdx === activeFileIdx) {
+          resolvedEditor.value = fileEditorTexts[fIdx];
+          renderCodeViewer(SCENARIOS[currentMissionIdx].files[activeFileIdx]);
+        }
 
-        // Update Resolved Preview
-        var chosenText = '';
-        if (choice === 'head') chosenText = s.hunk.head;
-        else if (choice === 'incoming') chosenText = s.hunk.incoming;
-        else if (choice === 'both') chosenText = s.hunk.bothCombined;
-
-        var fullPreview = s.prefix.concat([chosenText]).concat(s.suffix).join('\n');
-        resolvedPreview.textContent = fullPreview;
-
-        commitBtn.disabled = false;
+        updateMarkerStatus();
       }
+
+      // --- Editor Input Handler ---
+      resolvedEditor.addEventListener('input', function () {
+        if (isMissionResolved) return;
+        fileEditorTexts[activeFileIdx] = resolvedEditor.value;
+        updateMarkerStatus();
+      });
 
       // --- Commit / Evaluate Resolution ---
       commitBtn.addEventListener('click', function () {
-        if (!selectedResolution) return;
         evaluateCommit();
       });
 
+      function normalizeCode(str) {
+        if (!str) return '';
+        return str.replace(/\r\n/g, '\n').replace(/\s+$/mg, '').trim();
+      }
+
       function evaluateCommit() {
+        if (isMissionResolved) return;
         stopCountdown();
         var s = SCENARIOS[currentMissionIdx];
-        var isCorrect = (selectedResolution === s.hunk.correctChoice);
 
-        if (isCorrect) {
+        // Save current editor text
+        fileEditorTexts[activeFileIdx] = resolvedEditor.value;
+
+        // Check 1: Ensure no conflict markers remain in any file
+        for (var f = 0; f < s.files.length; f++) {
+          if (hasConflictMarkers(fileEditorTexts[f])) {
+            playErrorSound();
+            if (activeFileIdx !== f) {
+              switchFileTab(f);
+            }
+            markerStatusBadge.textContent = '⚠ Cannot commit: Clean conflict markers in ' + s.files[f].fileName;
+            markerStatusBadge.className = 'marker-status-badge marker-status-warn';
+            resolvedEditor.focus();
+            startCountdown(timerSeconds);
+            return;
+          }
+        }
+
+        // Check 2: Evaluate correctness across all files and hunks
+        var allCorrect = true;
+        for (var f = 0; f < s.files.length; f++) {
+          var file = s.files[f];
+          for (var h = 0; h < file.hunks.length; h++) {
+            var hunk = file.hunks[h];
+            var choice = hunkResolutions[f] ? hunkResolutions[f][h] : null;
+
+            var hunkPass = false;
+            if (choice === hunk.correctChoice) {
+              hunkPass = true;
+            } else if (hunk.acceptableResolutions) {
+              var userText = normalizeCode(fileEditorTexts[f]);
+              for (var a = 0; a < hunk.acceptableResolutions.length; a++) {
+                if (userText.includes(normalizeCode(hunk.acceptableResolutions[a]))) {
+                  hunkPass = true;
+                  break;
+                }
+              }
+            } else if (choice === 'manual' && hunk.manual) {
+              if (normalizeCode(fileEditorTexts[f]).includes(normalizeCode(hunk.manual))) {
+                hunkPass = true;
+              }
+            }
+
+            if (!hunkPass) {
+              allCorrect = false;
+              break;
+            }
+          }
+          if (!allCorrect) break;
+        }
+
+        isMissionResolved = true;
+        codeViewer.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
+        resolvedEditor.readOnly = true;
+
+        if (allCorrect) {
           playSuccessSound();
           totalCorrect++;
           streak++;
           if (streak > maxStreak) maxStreak = streak;
 
-          // Points calculation: Base 100 + Speed Bonus + Streak Bonus - Hint Penalty
           var speedBonus = Math.round(timerSeconds * 3.5);
           var streakMultiplier = streak > 1 ? (streak * 25) : 0;
-          var hintPenalty = hintUsed ? 30 : 0;
+          var hintPenalty = hintUsed ? 25 : 0;
           var pointsEarned = Math.max(50, 100 + speedBonus + streakMultiplier - hintPenalty);
           score += pointsEarned;
 
           debriefBox.className = 'debrief-box show debrief-success';
           debriefTitle.innerHTML = '<span>🎉</span> Resolution Verified! Git Clean Merge';
-          debriefSummary.textContent = '+' + pointsEarned + ' points earned! (Speed bonus: +' + speedBonus + ', Streak: ' + streak + 'x)';
+          debriefSummary.textContent = '+' + pointsEarned + ' points earned! (Speed: +' + speedBonus + ', Streak: ' + streak + 'x' + (hintUsed ? ', Hint: -25' : '') + ')';
         } else {
           playErrorSound();
           streak = 0;
@@ -1349,8 +1885,6 @@
         commitBtn.style.display = 'none';
         nextMissionBtn.style.display = 'inline-flex';
         nextMissionBtn.textContent = (currentMissionIdx < SCENARIOS.length - 1) ? 'Next Conflict →' : 'View Mission Report →';
-
-        saveLeaderboard();
       }
 
       // --- Next Mission Button ---
@@ -1358,19 +1892,37 @@
         loadMission(currentMissionIdx + 1);
       });
 
-      // --- Hint Button ---
+      // --- Hint Button (Inline Display, 25 pt penalty) ---
       hintBtn.addEventListener('click', function () {
+        if (isMissionResolved) return;
         var s = SCENARIOS[currentMissionIdx];
         hintUsed = true;
-        alert('💡 Technical Lead Hint:\n\n' + s.hint + '\n\n(-30 point penalty applied if answered correctly)');
+        hintBanner.style.display = 'flex';
+        hintBanner.innerHTML = '<span>💡</span><div><strong>Lead Architect Hint:</strong> ' + s.hint + ' <em style="opacity:0.85">(-25 point penalty applied on commit)</em></div>';
       });
 
       // --- Keyboard Shortcuts ---
       window.addEventListener('keydown', function (e) {
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-        if (e.key === '1') selectChoice('head');
-        else if (e.key === '2') selectChoice('incoming');
-        else if (e.key === '3') selectChoice('both');
+        if (isMissionResolved) {
+          if (e.key === 'Enter' && nextMissionBtn.style.display !== 'none') {
+            loadMission(currentMissionIdx + 1);
+          }
+          return;
+        }
+
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            if (!commitBtn.disabled && commitBtn.style.display !== 'none') {
+              evaluateCommit();
+            }
+          }
+          return;
+        }
+
+        if (e.key === '1') selectChoice(activeFileIdx, 0, 'head');
+        else if (e.key === '2') selectChoice(activeFileIdx, 0, 'incoming');
+        else if (e.key === '3') selectChoice(activeFileIdx, 0, 'both');
+        else if (e.key === '4') selectChoice(activeFileIdx, 0, 'manual');
         else if (e.key === 'Enter') {
           if (!commitBtn.disabled && commitBtn.style.display !== 'none') {
             evaluateCommit();
@@ -1385,6 +1937,8 @@
         stopCountdown();
         var accuracy = Math.round((totalCorrect / SCENARIOS.length) * 100);
 
+        saveLeaderboard();
+
         modalFinalScore.textContent = score;
         modalAccuracy.textContent = accuracy + '%';
         modalMaxStreak.textContent = maxStreak + 'x';
@@ -1395,10 +1949,20 @@
       // --- Local Storage Management ---
       function saveLeaderboard() {
         try {
+          var saved = localStorage.getItem('git_conflict_resolver_best');
+          var bestScore = score;
+          var bestStreak = maxStreak;
+          var bestCorrect = totalCorrect;
+          if (saved) {
+            var prev = JSON.parse(saved);
+            bestScore = Math.max(score, prev.score || 0);
+            bestStreak = Math.max(maxStreak, prev.maxStreak || 0);
+            bestCorrect = Math.max(totalCorrect, prev.totalCorrect || 0);
+          }
           var record = {
-            score: score,
-            maxStreak: maxStreak,
-            totalCorrect: totalCorrect
+            score: bestScore,
+            maxStreak: bestStreak,
+            totalCorrect: bestCorrect
           };
           localStorage.setItem('git_conflict_resolver_best', JSON.stringify(record));
         } catch (e) { }
@@ -1411,6 +1975,9 @@
             var rec = JSON.parse(saved);
             modalFinalScore.textContent = rec.score || 0;
             modalMaxStreak.textContent = (rec.maxStreak || 0) + 'x';
+          } else {
+            modalFinalScore.textContent = score;
+            modalMaxStreak.textContent = maxStreak + 'x';
           }
         } catch (e) { }
       }
@@ -1434,6 +2001,7 @@
         if (confirm('Restart the Git Conflict Resolver from mission 1? Current score will reset.')) {
           score = 0;
           streak = 0;
+          maxStreak = 0;
           totalCorrect = 0;
           loadMission(0);
         }
