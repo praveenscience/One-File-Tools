@@ -1,0 +1,1341 @@
+<!doctype html>
+<!--
+API Rate Limiter Defense Arcade
+Single-file interactive system design simulator & traffic management defense game.
+Built for One File Tools.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>API Rate Limiter Defense Arcade — One File Tools</title>
+    <meta name="description" content="A real-time system design traffic defense arcade game where you protect backend servers from catastrophic overload and DDoS attacks using rate limiting algorithms." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("oft_rate_defense_theme");
+          var theme = stored || (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+          document.documentElement.setAttribute("data-theme", theme);
+        } catch (e) {
+          var fallback = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          document.documentElement.setAttribute("data-theme", fallback);
+        }
+      })();
+    </script>
+
+    <style>
+      :root {
+        --bg: #05070e;
+        --grid-line: #0f1523;
+        --panel: rgba(13, 19, 33, 0.88);
+        --panel-border: #1e293b;
+        --accent: #38bdf8;
+        --accent-hover: #0284c7;
+        --accent-glow: rgba(56, 189, 248, 0.2);
+        --text: #f8fafc;
+        --text-muted: #94a3b8;
+        --text-dim: #64748b;
+        --success: #10b981;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+        --purple: #a855f7;
+        --radius-sm: 8px;
+        --radius-md: 14px;
+        --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+        --font-display: "Space Grotesk", sans-serif;
+      }
+
+      [data-theme="light"] {
+        --bg: #f8fafc;
+        --grid-line: #e2e8f0;
+        --panel: rgba(255, 255, 255, 0.96);
+        --panel-border: #cbd5e1;
+        --accent: #0284c7;
+        --accent-hover: #0369a1;
+        --accent-glow: rgba(2, 132, 199, 0.15);
+        --text: #0f172a;
+        --text-muted: #475569;
+        --text-dim: #94a3b8;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg);
+        background-image: radial-gradient(circle at 10% 10%, rgba(56, 189, 248, 0.05), transparent 30%), radial-gradient(circle at 90% 90%, rgba(16, 185, 129, 0.05), transparent 30%), linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+        background-size:
+          100% 100%,
+          100% 100%,
+          28px 28px,
+          28px 28px;
+        color: var(--text);
+        padding: 24px 16px 60px;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .app {
+        width: 100%;
+        max-width: 1060px;
+      }
+
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+
+      .title-group h1 {
+        font-family: var(--font-display);
+        font-size: 1.85rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        background: linear-gradient(135deg, var(--text) 20%, var(--accent) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .title-group p {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+      }
+
+      .header-actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .btn {
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        color: var(--text);
+        padding: 8px 14px;
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-family: var(--font-display);
+        font-size: 0.85rem;
+        font-weight: 600;
+        transition: all 0.2s ease;
+      }
+
+      .btn svg {
+        width: 15px;
+        height: 15px;
+        stroke: currentColor;
+        stroke-width: 2;
+        fill: none;
+      }
+
+      .btn:hover {
+        border-color: var(--accent);
+        transform: translateY(-1px);
+      }
+
+      .btn-primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #030712;
+        box-shadow: 0 4px 14px var(--accent-glow);
+      }
+
+      .btn-primary:hover {
+        background: var(--accent-hover);
+        color: #fff;
+      }
+
+      /* Telemetry Grid */
+      .stats-bar {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 10px;
+        margin-bottom: 18px;
+      }
+
+      @media (max-width: 900px) {
+        .stats-bar {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
+
+      @media (max-width: 520px) {
+        .stats-bar {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+
+      .stat-pill {
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 9px 12px;
+        backdrop-filter: blur(8px);
+      }
+
+      .stat-pill .label {
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-dim);
+        font-weight: 600;
+      }
+
+      .stat-pill .val {
+        font-family: var(--font-mono);
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-top: 2px;
+      }
+
+      /* Game Canvas Area with aspect ratio */
+      .canvas-container {
+        position: relative;
+        background: rgba(0, 0, 0, 0.45);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-md);
+        overflow: hidden;
+        margin-bottom: 20px;
+        box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+        aspect-ratio: 16 / 9;
+        max-height: 420px;
+        width: 100%;
+      }
+
+      [data-theme="light"] .canvas-container {
+        background: #ffffff;
+        border-color: #cbd5e1;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+      }
+
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      .overlay-screen {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(5, 7, 14, 0.88);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        backdrop-filter: blur(8px);
+        z-index: 10;
+        text-align: center;
+        padding: 24px;
+      }
+
+      [data-theme="light"] .overlay-screen {
+        background: rgba(248, 250, 252, 0.92);
+      }
+
+      .overlay-screen.hidden {
+        display: none;
+      }
+
+      .overlay-screen h2 {
+        font-family: var(--font-display);
+        font-size: 2.1rem;
+        font-weight: 700;
+        margin-bottom: 10px;
+      }
+
+      .overlay-screen p {
+        color: var(--text-muted);
+        max-width: 540px;
+        margin-bottom: 20px;
+        font-size: 0.92rem;
+        line-height: 1.5;
+      }
+
+      /* Control Dashboard */
+      .dashboard {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+        margin-bottom: 24px;
+      }
+
+      @media (max-width: 768px) {
+        .dashboard {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .panel-card {
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-md);
+        padding: 18px 20px;
+        backdrop-filter: blur(12px);
+      }
+
+      .panel-card h3 {
+        font-family: var(--font-display);
+        font-size: 0.95rem;
+        font-weight: 600;
+        margin-bottom: 14px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text);
+      }
+
+      .param-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+        gap: 12px;
+      }
+
+      .param-row label {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        font-weight: 500;
+      }
+
+      .param-row .num {
+        font-family: var(--font-mono);
+        color: var(--accent);
+        font-weight: 600;
+      }
+
+      .param-slider {
+        flex: 1;
+        accent-color: var(--accent);
+        cursor: pointer;
+      }
+
+      select {
+        background: rgba(0, 0, 0, 0.25);
+        border: 1px solid var(--panel-border);
+        color: var(--text);
+        padding: 8px 12px;
+        border-radius: var(--radius-sm);
+        font-family: var(--font-sans);
+        font-size: 0.85rem;
+        outline: none;
+        cursor: pointer;
+        width: 100%;
+      }
+
+      [data-theme="light"] select {
+        background: #ffffff;
+      }
+
+      /* Upgrades Grid */
+      .upgrades-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .upgrade-btn {
+        background: rgba(0, 0, 0, 0.2);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 10px 12px;
+        cursor: pointer;
+        text-align: left;
+        transition: all 0.2s ease;
+        color: var(--text);
+      }
+
+      [data-theme="light"] .upgrade-btn {
+        background: rgba(0, 0, 0, 0.04);
+      }
+
+      .upgrade-btn:hover:not(:disabled) {
+        border-color: var(--accent);
+        background: rgba(56, 189, 248, 0.06);
+      }
+
+      .upgrade-btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      .upgrade-title {
+        font-size: 0.82rem;
+        font-weight: 600;
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 4px;
+      }
+
+      .upgrade-cost {
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+        color: var(--warning);
+        font-weight: 700;
+      }
+
+      .upgrade-desc {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        line-height: 1.3;
+      }
+
+      .track-bg {
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      [data-theme="light"] .track-bg {
+        background: rgba(0, 0, 0, 0.08);
+      }
+
+      footer {
+        text-align: center;
+        font-size: 0.85rem;
+        color: var(--text-dim);
+      }
+
+      footer a {
+        color: var(--text-muted);
+        text-decoration: none;
+      }
+
+      footer a:hover {
+        color: var(--accent);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <div class="title-group">
+          <h1>API Rate Limiter Defense Arcade</h1>
+          <p>System Design Traffic Defense • Protect cluster from overload and malicious DDoS floods</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn" id="themeToggle" aria-label="Toggle Theme">
+            <span id="themeIcon">☀️</span>
+            <span id="themeText" style="font-size: 0.78rem">Light</span>
+          </button>
+          <button class="btn" id="btnPause" aria-label="Pause or Resume Simulation">
+            <span id="pauseIcon">⏸️</span>
+            <span id="pauseText">Pause</span>
+          </button>
+          <button class="btn btn-primary" id="btnRestart" aria-label="Restart Simulation">
+            <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            <span id="gameBtnText">Start Game</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Telemetry Strip -->
+      <section class="stats-bar" aria-label="Live System Telemetry">
+        <div class="stat-pill">
+          <div class="label">Server Health</div>
+          <div class="val" id="statHealth" style="color: var(--success)">100%</div>
+        </div>
+        <div class="stat-pill">
+          <div class="label">Traffic Wave</div>
+          <div class="val" id="statWave">Wave 1 / 10</div>
+        </div>
+        <div class="stat-pill">
+          <div class="label">Throttled (429)</div>
+          <div class="val" id="statThrottled" style="color: var(--warning)">0</div>
+        </div>
+        <div class="stat-pill">
+          <div class="label">Throughput</div>
+          <div class="val" id="statThroughput" style="color: var(--accent)">0 req/s</div>
+        </div>
+        <div class="stat-pill">
+          <div class="label">Avg Latency</div>
+          <div class="val" id="statLatency">40 ms</div>
+        </div>
+        <div class="stat-pill">
+          <div class="label">Budget & Score</div>
+          <div class="val" id="statScore"><span style="color: var(--warning)">$120</span> • 0 pts</div>
+        </div>
+      </section>
+
+      <!-- Canvas Area -->
+      <div class="canvas-container">
+        <canvas id="simCanvas" role="img" aria-label="Real-time traffic flow visualization"></canvas>
+        <div class="overlay-screen" id="overlay">
+          <h2 id="overlayTitle">API Traffic Defense</h2>
+          <p id="overlayDesc">Incoming clients are streaming HTTP requests to your backend cluster. Choose rate limiting algorithms, earn budget by serving traffic and blocking attacks, scale nodes, and stop malicious floods before your server crashes!</p>
+          <button class="btn btn-primary" id="btnOverlayStart">
+            <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            Deploy Rate Limiter
+          </button>
+        </div>
+      </div>
+
+      <!-- Control Dashboard -->
+      <div class="dashboard">
+        <!-- Rate Limiter Settings -->
+        <section class="panel-card" aria-label="Rate Limiter Configuration">
+          <h3>
+            <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; stroke: var(--accent); stroke-width: 2; fill: none">
+              <line x1="4" y1="21" x2="4" y2="14"></line>
+              <line x1="4" y1="10" x2="4" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12" y2="3"></line>
+              <line x1="20" y1="21" x2="20" y2="16"></line>
+              <line x1="20" y1="12" x2="20" y2="3"></line>
+            </svg>
+            Rate Limiter Algorithm
+          </h3>
+          <div style="margin-bottom: 12px">
+            <label for="algoSelect" style="font-size: 0.72rem; text-transform: uppercase; color: var(--text-dim); font-weight: 600; display: block; margin-bottom: 4px">Algorithm Strategy</label>
+            <select id="algoSelect">
+              <option value="token_bucket">Token Bucket (Permits bursts up to bucket capacity)</option>
+              <option value="leaky_bucket">Leaky Bucket FIFO Queue (Strict constant output rate)</option>
+              <option value="fixed_window">Fixed Window Counter (Quota resets every 1s window)</option>
+              <option value="sliding_window">Weighted Sliding Window Counter (Rolling 1s filter)</option>
+            </select>
+          </div>
+
+          <div class="param-row">
+            <label for="sliderCap" id="capLabel">Capacity / Quota: <span class="num" id="capVal">20</span></label>
+            <input type="range" class="param-slider" id="sliderCap" min="5" max="80" value="20" />
+          </div>
+
+          <div class="param-row" id="refillRow">
+            <label for="sliderRefill" id="refillLabel">Refill / Leak Rate: <span class="num" id="refillVal">14</span> /sec</label>
+            <input type="range" class="param-slider" id="sliderRefill" min="2" max="60" value="14" />
+          </div>
+
+          <div id="algoTip" style="font-size: 0.74rem; color: var(--text-dim); line-height: 1.4; margin-top: 8px">💡 <strong>Token Bucket:</strong> Tokens refill up to capacity. Legitimate requests take 1 token; bursts pass smoothly until empty.</div>
+        </section>
+
+        <!-- Upgrades & Infrastructure Scaling -->
+        <section class="panel-card" aria-label="Infrastructure & Cache Scaling">
+          <h3>
+            <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; stroke: var(--success); stroke-width: 2; fill: none">
+              <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
+              <rect x="9" y="9" width="6" height="6"></rect>
+              <line x1="9" y1="1" x2="9" y2="4"></line>
+              <line x1="15" y1="1" x2="15" y2="4"></line>
+            </svg>
+            Infrastructure Defense Upgrades
+          </h3>
+          <div class="upgrades-grid">
+            <button class="upgrade-btn" id="btnUpgradeServers" aria-label="Scale Server Nodes">
+              <div class="upgrade-title">
+                <span>Scale Node</span>
+                <span class="upgrade-cost" id="costServer">$120</span>
+              </div>
+              <div class="upgrade-desc" id="serverCount">1 Node (+8 req/s capacity)</div>
+            </button>
+
+            <button class="upgrade-btn" id="btnUpgradeCache" aria-label="Upgrade Redis Edge Cache">
+              <div class="upgrade-title">
+                <span>Redis Cache</span>
+                <span class="upgrade-cost" id="costCache">$90</span>
+              </div>
+              <div class="upgrade-desc" id="cacheLevel">Lvl 0 (Absorbs read GETs)</div>
+            </button>
+
+            <button class="upgrade-btn" id="btnUpgradeWaf" aria-label="Deploy WAF Bot Shield">
+              <div class="upgrade-title">
+                <span>WAF Bot Shield</span>
+                <span class="upgrade-cost" id="costWaf">$130</span>
+              </div>
+              <div class="upgrade-desc" id="wafStatus">Lvl 0 (Filters DDoS traffic)</div>
+            </button>
+
+            <button class="upgrade-btn" id="btnUpgradeCircuit" aria-label="Deploy Circuit Breaker">
+              <div class="upgrade-title">
+                <span>Circuit Breaker</span>
+                <span class="upgrade-cost" id="costCircuit">$140</span>
+              </div>
+              <div class="upgrade-desc" id="circuitStatus">Locked (Auto-sheds on crisis)</div>
+            </button>
+
+            <button class="upgrade-btn" id="btnUpgradeLoadBalancer" aria-label="Deploy Smart Load Balancer">
+              <div class="upgrade-title">
+                <span>Smart Balancer</span>
+                <span class="upgrade-cost" id="costBalancer">$100</span>
+              </div>
+              <div class="upgrade-desc" id="balancerStatus">Locked (-35% latency)</div>
+            </button>
+          </div>
+
+          <div style="margin-top: 12px">
+            <div style="display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 4px">
+              <span style="color: var(--text-muted)">Cluster Processing Ceiling</span>
+              <span class="num" id="maxCapacity">18 req/sec concurrent</span>
+            </div>
+            <div style="height: 6px; border-radius: 4px; overflow: hidden" class="track-bg">
+              <div id="capacityBar" style="height: 100%; width: 25%; background: var(--accent); transition: width 0.3s ease"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <footer>
+        <p>Part of <a href="https://github.com/praveenscience/One-File-Tools" target="_blank" rel="noopener noreferrer">One File Tools</a> • Open Source with purpose.</p>
+      </footer>
+    </div>
+
+    <script>
+      // Theme handling
+      const themeToggleBtn = document.getElementById("themeToggle");
+      const themeIcon = document.getElementById("themeIcon");
+      const themeText = document.getElementById("themeText");
+
+      function updateThemeUI() {
+        const curTheme = document.documentElement.getAttribute("data-theme") || "dark";
+        if (curTheme === "dark") {
+          themeIcon.textContent = "☀️";
+          themeText.textContent = "Light";
+        } else {
+          themeIcon.textContent = "🌙";
+          themeText.textContent = "Dark";
+        }
+      }
+      updateThemeUI();
+
+      themeToggleBtn.addEventListener("click", () => {
+        const cur = document.documentElement.getAttribute("data-theme") || "dark";
+        const next = cur === "dark" ? "light" : "dark";
+        document.documentElement.setAttribute("data-theme", next);
+        try {
+          localStorage.setItem("oft_rate_defense_theme", next);
+        } catch (e) {}
+        updateThemeUI();
+      });
+
+      // Algorithm Tips & UI Adjustments
+      const algoTips = {
+        token_bucket: "💡 <strong>Token Bucket:</strong> Tokens accumulate up to capacity. Incoming requests consume 1 token instantly, enabling smooth burst absorption.",
+        leaky_bucket: "💡 <strong>Leaky Bucket:</strong> Requests wait in a strict FIFO queue and drip to servers at a constant, uniform rate. Excess drops with 429.",
+        fixed_window: "💡 <strong>Fixed Window Counter:</strong> Window resets count every 1s. Warning: prone to boundary bursts (2x limit across reset edge).",
+        sliding_window: "💡 <strong>Sliding Window Counter:</strong> Weighted calculation blending previous and current 1s windows to eliminate boundary burst loopholes."
+      };
+
+      const algoSelect = document.getElementById("algoSelect");
+      const refillRow = document.getElementById("refillRow");
+      algoSelect.addEventListener("change", (e) => {
+        const val = e.target.value;
+        document.getElementById("algoTip").innerHTML = algoTips[val] || "";
+
+        // If switching away from leaky bucket, drain queue so packets aren't stranded
+        if (leakyQueue.length > 0) {
+          leakyQueue.forEach((p) => {
+            p.state = "to_server";
+          });
+          leakyQueue = [];
+        }
+        leakAccumulator = 0;
+
+        if (val === "fixed_window" || val === "sliding_window") {
+          refillRow.style.opacity = "0.35";
+          document.getElementById("sliderRefill").disabled = true;
+          document.getElementById("refillLabel").innerHTML = 'Window Duration: <span class="num">1.0s</span>';
+        } else {
+          refillRow.style.opacity = "1";
+          document.getElementById("sliderRefill").disabled = false;
+          document.getElementById("refillLabel").innerHTML = `Refill / Leak Rate: <span class="num" id="refillVal">${refillRate}</span> /sec`;
+        }
+      });
+
+      // Canvas Setup
+      const canvas = document.getElementById("simCanvas");
+      const ctx = canvas.getContext("2d");
+
+      function resizeCanvas() {
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width * window.devicePixelRatio;
+        canvas.height = rect.height * window.devicePixelRatio;
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+      }
+      window.addEventListener("resize", resizeCanvas);
+      resizeCanvas();
+
+      // Simulation & Game Variables
+      let isRunning = false;
+      let isPaused = false;
+      let animFrameId = null;
+      let lastFrameTime = performance.now();
+
+      let wave = 1;
+      let score = 0;
+      let budget = 120;
+      let health = 100;
+      let serverNodes = 1;
+      let cacheLevel = 0;
+      let wafLevel = 0;
+      let hasCircuitBreaker = false;
+      let circuitBreakerActive = false;
+      let circuitTimer = 0;
+      let hasLoadBalancer = false;
+
+      // Rate Limiter parameters
+      let capacity = 20;
+      let refillRate = 14;
+      let tokens = 20;
+      let leakAccumulator = 0;
+      let leakyQueue = [];
+
+      // Window algorithms state
+      let prevWindowCount = 0;
+      let currentWindowCount = 0;
+      let currentWindowTimestamp = performance.now();
+
+      // Telemetry metrics
+      let totalClientRequests = 0;
+      let totalServed = 0;
+      let totalThrottled = 0;
+      let totalDroppedLegit = 0;
+      let totalDroppedMalicious = 0;
+      let throughputHistory = [];
+      let recentLatencies = [];
+
+      // Wave configurations
+      const waveConfigs = [
+        { name: "Wave 1: Steady Organic Traffic", rps: 10, duration: 12, maliciousRatio: 0.05, burst: false },
+        { name: "Wave 2: Morning Login Surge", rps: 18, duration: 14, maliciousRatio: 0.1, burst: false },
+        { name: "Wave 3: Search Engine Web Crawlers", rps: 26, duration: 15, maliciousRatio: 0.15, burst: true },
+        { name: "Wave 4: Flash Sale Traffic Spike", rps: 36, duration: 16, maliciousRatio: 0.2, burst: true },
+        { name: "Wave 5: Distributed Micro-bursts", rps: 48, duration: 18, maliciousRatio: 0.25, burst: true },
+        { name: "Wave 6: High Concurrency Ticket Drop", rps: 62, duration: 18, maliciousRatio: 0.3, burst: true },
+        { name: "Wave 7: Credential Stuffing Bots", rps: 76, duration: 20, maliciousRatio: 0.35, burst: true },
+        { name: "Wave 8: Black Friday Sustained Flood", rps: 90, duration: 20, maliciousRatio: 0.4, burst: false },
+        { name: "Wave 9: DNS Amplification Flood", rps: 105, duration: 22, maliciousRatio: 0.45, burst: true },
+        { name: "Wave 10: Global Coordinated DDoS Assault", rps: 120, duration: 25, maliciousRatio: 0.5, burst: true }
+      ];
+
+      let waveElapsedTime = 0;
+      let spawnAccumulator = 0;
+      let packets = [];
+
+      function spawnPacket() {
+        const rect = canvas.getBoundingClientRect();
+        const curConfig = waveConfigs[Math.min(wave - 1, waveConfigs.length - 1)];
+        const isMalicious = Math.random() < curConfig.maliciousRatio;
+        const isGet = Math.random() < 0.65;
+
+        packets.push({
+          x: 15,
+          y: 60 + Math.random() * (rect.height - 120),
+          speed: 150 + Math.random() * 80,
+          state: "to_gateway",
+          radius: isMalicious ? 5 : 4,
+          isMalicious: isMalicious,
+          method: isGet ? "GET" : "POST",
+          processDuration: isMalicious ? 0.35 : 0.18,
+          processProgress: 0,
+          assignedNode: 0,
+          queueStartTime: 0
+        });
+      }
+
+      function evaluateRateLimiter(algo, now) {
+        if (circuitBreakerActive) {
+          if (Math.random() < 0.6) return false;
+        }
+
+        if (algo === "token_bucket") {
+          if (tokens >= 1) {
+            tokens -= 1;
+            return true;
+          }
+          return false;
+        } else if (algo === "leaky_bucket") {
+          if (leakyQueue.length < capacity) {
+            return "queue";
+          }
+          return false;
+        } else if (algo === "fixed_window") {
+          if (now - currentWindowTimestamp >= 1000) {
+            currentWindowTimestamp = now;
+            currentWindowCount = 0;
+          }
+          if (currentWindowCount < capacity) {
+            currentWindowCount++;
+            return true;
+          }
+          return false;
+        } else if (algo === "sliding_window") {
+          if (now - currentWindowTimestamp >= 1000) {
+            prevWindowCount = currentWindowCount;
+            currentWindowCount = 0;
+            currentWindowTimestamp = now;
+          }
+          const elapsed = (now - currentWindowTimestamp) / 1000;
+          const weightedCount = prevWindowCount * (1 - elapsed) + currentWindowCount;
+          if (weightedCount < capacity) {
+            currentWindowCount++;
+            return true;
+          }
+          return false;
+        }
+        return true;
+      }
+
+      function updateSimulation(time) {
+        if (!isRunning) return;
+        if (isPaused) {
+          lastFrameTime = time;
+          animFrameId = requestAnimationFrame(updateSimulation);
+          return;
+        }
+
+        const dt = Math.min(0.1, (time - lastFrameTime) / 1000);
+        lastFrameTime = time;
+
+        const algo = algoSelect.value;
+
+        // Token Refill logic
+        if (algo === "token_bucket") {
+          tokens = Math.min(capacity, tokens + refillRate * dt);
+        }
+
+        // Leaky Bucket draining logic
+        if (algo === "leaky_bucket") {
+          if (leakyQueue.length === 0) {
+            leakAccumulator = 0; // Cap accumulator to prevent bursts when queue empties
+          } else {
+            leakAccumulator += refillRate * dt;
+            while (leakAccumulator >= 1 && leakyQueue.length > 0) {
+              const p = leakyQueue.shift();
+              p.state = "to_server";
+              leakAccumulator -= 1;
+            }
+          }
+        }
+
+        // Circuit breaker timer
+        if (circuitBreakerActive) {
+          circuitTimer -= dt;
+          if (circuitTimer <= 0) {
+            circuitBreakerActive = false;
+          }
+        } else if (hasCircuitBreaker && health < 35) {
+          circuitBreakerActive = true;
+          circuitTimer = 3.0; // 3 seconds load shedding
+        }
+
+        // Spawning with frame-rate independent accumulator
+        const curConfig = waveConfigs[Math.min(wave - 1, waveConfigs.length - 1)];
+        let effectiveRps = curConfig.rps;
+        if (curConfig.burst && Math.sin(time / 600) > 0.35) {
+          effectiveRps *= 1.6;
+        }
+
+        spawnAccumulator += effectiveRps * dt;
+        while (spawnAccumulator >= 1) {
+          spawnPacket();
+          spawnAccumulator -= 1;
+        }
+
+        // Wave progression tracked strictly by elapsed dt
+        waveElapsedTime += dt;
+        if (waveElapsedTime >= curConfig.duration) {
+          waveElapsedTime = 0;
+          if (wave < waveConfigs.length) {
+            wave++;
+            budget += 35; // Controlled wave completion bonus
+            score += 100;
+            document.getElementById("statWave").textContent = `Wave ${wave} / ${waveConfigs.length}`;
+          } else {
+            endGame(true);
+            return;
+          }
+        }
+
+        const rect = canvas.getBoundingClientRect();
+        const width = rect.width;
+        const height = rect.height;
+        const limiterX = width * 0.45;
+        const serverX = width * 0.82;
+
+        let activeOnServer = 0;
+        let newlyServed = 0;
+
+        // Process packets
+        for (let i = packets.length - 1; i >= 0; i--) {
+          const p = packets[i];
+
+          // Flying to Gateway
+          if (p.state === "to_gateway") {
+            p.x += p.speed * dt;
+            if (p.x >= limiterX) {
+              p.x = limiterX;
+              totalClientRequests++;
+
+              // 1. Check WAF Bot Filter
+              if (p.isMalicious && wafLevel > 0 && Math.random() < (wafLevel === 1 ? 0.55 : 0.9)) {
+                p.state = "throttled";
+                totalThrottled++;
+                totalDroppedMalicious++;
+                budget += 1;
+                score += 20;
+                continue;
+              }
+
+              // 2. Check Redis Edge Cache (absorbs GET requests)
+              if (cacheLevel > 0 && p.method === "GET" && !p.isMalicious && Math.random() < cacheLevel * 0.25) {
+                p.state = "cached";
+                newlyServed++;
+                totalServed++;
+                budget += 1;
+                score += 12;
+                recentLatencies.push(hasLoadBalancer ? 12 : 20);
+              } else {
+                const decision = evaluateRateLimiter(algo, time);
+                if (decision === true) {
+                  p.state = "to_server";
+                } else if (decision === "queue") {
+                  p.state = "queued";
+                  p.queueStartTime = time;
+                  leakyQueue.push(p);
+                } else {
+                  // Throttled 429
+                  p.state = "throttled";
+                  totalThrottled++;
+                  if (p.isMalicious) {
+                    totalDroppedMalicious++;
+                    budget += 1; // Controlled bounty
+                    score += 15;
+                  } else {
+                    totalDroppedLegit++;
+                    score = Math.max(0, score - 15); // Penalty for dropping legitimate user traffic
+                  }
+                }
+              }
+            }
+          } else if (p.state === "queued") {
+            // Waiting in Leaky Bucket queue buffer
+            p.x = limiterX - 10 - (leakyQueue.indexOf(p) % 5) * 8;
+          } else if (p.state === "to_server") {
+            p.x += p.speed * dt;
+            if (p.x >= serverX) {
+              p.x = serverX;
+              p.state = "processing";
+              p.assignedNode = totalServed % serverNodes; // Smart distribution across nodes
+            }
+          } else if (p.state === "processing") {
+            activeOnServer++;
+            const nodeCeiling = 10 + serverNodes * 8;
+            const overloadFactor = activeOnServer > nodeCeiling ? (activeOnServer - nodeCeiling) / nodeCeiling : 0;
+            const speedModifier = 1 + overloadFactor * 1.5;
+
+            p.processProgress += dt / (hasLoadBalancer ? p.processDuration * 0.65 : p.processDuration) / speedModifier;
+
+            if (p.processProgress >= 1) {
+              newlyServed++;
+              totalServed++;
+
+              let calculatedLatency = Math.round(p.processDuration * 1000 + overloadFactor * 350);
+              if (p.queueStartTime > 0) {
+                calculatedLatency += Math.round(time - p.queueStartTime);
+              }
+              if (hasLoadBalancer) calculatedLatency = Math.round(calculatedLatency * 0.65);
+              recentLatencies.push(calculatedLatency);
+
+              if (p.isMalicious) {
+                // Malicious request slips in and damages server
+                score = Math.max(0, score - 25);
+                health = Math.max(0, health - 2.5);
+                if (health <= 0) {
+                  endGame(false);
+                  return;
+                }
+              } else {
+                budget += 1;
+                score += 10;
+              }
+
+              packets.splice(i, 1);
+              continue;
+            }
+          } else if (p.state === "throttled" || p.state === "cached") {
+            p.x += p.speed * 0.5 * dt;
+            p.y += (p.state === "throttled" ? 140 : -140) * dt;
+            if (p.x > width || p.y < 0 || p.y > height) {
+              packets.splice(i, 1);
+              continue;
+            }
+          }
+        }
+
+        // Live Throughput calculation
+        throughputHistory.push({ time, count: newlyServed });
+        throughputHistory = throughputHistory.filter((t) => time - t.time <= 1000);
+        const liveThroughput = throughputHistory.reduce((acc, c) => acc + c.count, 0);
+
+        // Latency average
+        if (recentLatencies.length > 25) recentLatencies = recentLatencies.slice(-25);
+        const avgLat = recentLatencies.length > 0 ? Math.round(recentLatencies.reduce((a, b) => a + b, 0) / recentLatencies.length) : 40;
+
+        // Cluster Overload & Health Mechanics
+        const clusterCeiling = 10 + serverNodes * 8;
+        if (activeOnServer > clusterCeiling) {
+          const overloadFactor = (activeOnServer - clusterCeiling) / clusterCeiling;
+          health = Math.max(0, health - overloadFactor * dt * 28);
+          if (health <= 0) {
+            endGame(false);
+            return;
+          }
+        } else if (health > 0) {
+          // Regenerate only if alive
+          health = Math.min(100, health + dt * 2.8);
+        }
+
+        // Telemetry DOM updates
+        const healthEl = document.getElementById("statHealth");
+        healthEl.textContent = `${Math.round(health)}%`;
+        if (health > 60) healthEl.style.color = "var(--success)";
+        else if (health > 30) healthEl.style.color = "var(--warning)";
+        else healthEl.style.color = "var(--danger)";
+
+        document.getElementById("statThrottled").textContent = totalThrottled;
+        document.getElementById("statThroughput").textContent = `${liveThroughput} req/s`;
+        document.getElementById("statLatency").textContent = `${avgLat} ms`;
+        document.getElementById("statScore").innerHTML = `<span style="color: var(--warning)">$${budget}</span> • ${score} pts`;
+
+        updateUpgradesUI();
+
+        // Render Frame
+        render(width, height, limiterX, serverX, algo, time);
+
+        animFrameId = requestAnimationFrame(updateSimulation);
+      }
+
+      function updateUpgradesUI() {
+        const btnS = document.getElementById("btnUpgradeServers");
+        const btnC = document.getElementById("btnUpgradeCache");
+        const btnW = document.getElementById("btnUpgradeWaf");
+        const btnB = document.getElementById("btnUpgradeCircuit");
+        const btnL = document.getElementById("btnUpgradeLoadBalancer");
+
+        btnS.disabled = serverNodes >= 4 || budget < 120;
+        btnC.disabled = cacheLevel >= 3 || budget < 90;
+        btnW.disabled = wafLevel >= 2 || (wafLevel === 0 ? budget < 130 : budget < 200);
+        btnB.disabled = hasCircuitBreaker || budget < 140;
+        btnL.disabled = hasLoadBalancer || budget < 100;
+      }
+
+      function render(width, height, limiterX, serverX, algo, time) {
+        ctx.clearRect(0, 0, width, height);
+        const isDark = (document.documentElement.getAttribute("data-theme") || "dark") === "dark";
+
+        // Zone 1: Client Network
+        ctx.fillStyle = isDark ? "rgba(56, 189, 248, 0.03)" : "rgba(2, 132, 199, 0.04)";
+        ctx.fillRect(0, 0, limiterX, height);
+        ctx.fillStyle = isDark ? "rgba(148, 163, 184, 0.5)" : "rgba(71, 85, 105, 0.6)";
+        ctx.font = "600 11px Inter";
+        ctx.fillText("CLIENT NETWORK", 16, 26);
+
+        // Zone 2: API Gateway
+        ctx.fillStyle = isDark ? "rgba(245, 158, 11, 0.03)" : "rgba(217, 119, 6, 0.04)";
+        ctx.fillRect(limiterX, 0, serverX - limiterX, height);
+        ctx.fillText(`API GATEWAY [${algo.toUpperCase().replace("_", " ")}]`, limiterX + 14, 26);
+
+        // Gateway barrier line
+        ctx.strokeStyle = circuitBreakerActive ? "#ef4444" : isDark ? "rgba(56, 189, 248, 0.4)" : "rgba(2, 132, 199, 0.4)";
+        ctx.lineWidth = circuitBreakerActive ? 3 : 1.5;
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.moveTo(limiterX, 0);
+        ctx.lineTo(limiterX, height);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Algorithm Gauge
+        let ratio = 1;
+        let gaugeLabel = "";
+        if (algo === "token_bucket") {
+          ratio = Math.max(0, Math.min(1, tokens / capacity));
+          gaugeLabel = `${Math.round(tokens)} T`;
+        } else if (algo === "leaky_bucket") {
+          ratio = Math.max(0, Math.min(1, (capacity - leakyQueue.length) / capacity));
+          gaugeLabel = `${leakyQueue.length}/${capacity} Q`;
+        } else if (algo === "sliding_window") {
+          const elapsed = (time - currentWindowTimestamp) / 1000;
+          const weightedCount = prevWindowCount * (1 - elapsed) + currentWindowCount;
+          ratio = Math.max(0, Math.min(1, 1 - weightedCount / capacity));
+          gaugeLabel = `${Math.round(weightedCount)}/${capacity}`;
+        } else {
+          ratio = Math.max(0, Math.min(1, 1 - currentWindowCount / capacity));
+          gaugeLabel = `${currentWindowCount}/${capacity}`;
+        }
+
+        ctx.fillStyle = isDark ? "rgba(15, 23, 42, 0.8)" : "rgba(226, 232, 240, 0.8)";
+        ctx.fillRect(limiterX - 6, height / 2 - 50, 12, 100);
+        ctx.fillStyle = ratio > 0.4 ? "#38bdf8" : ratio > 0.15 ? "#f59e0b" : "#ef4444";
+        ctx.fillRect(limiterX - 6, height / 2 + 50 - 100 * ratio, 12, 100 * ratio);
+
+        ctx.fillStyle = isDark ? "#94a3b8" : "#475569";
+        ctx.font = "600 9px JetBrains Mono";
+        ctx.fillText(gaugeLabel, limiterX - 18, height / 2 + 66);
+
+        // Zone 3: Backend Cluster
+        ctx.fillStyle = isDark ? "rgba(16, 185, 129, 0.03)" : "rgba(5, 150, 105, 0.04)";
+        ctx.fillRect(serverX, 0, width - serverX, height);
+        ctx.fillText("BACKEND CLUSTER", serverX + 14, 26);
+
+        // Render Server Nodes
+        const nodeHeight = Math.min(48, (height - 80) / serverNodes - 10);
+        for (let i = 0; i < serverNodes; i++) {
+          const ny = 55 + i * (nodeHeight + 12);
+          ctx.fillStyle = isDark ? "rgba(15, 23, 42, 0.9)" : "rgba(255, 255, 255, 0.95)";
+          ctx.strokeStyle = health > 40 ? (isDark ? "rgba(16, 185, 129, 0.5)" : "rgba(5, 150, 105, 0.6)") : "#ef4444";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.roundRect(serverX + 12, ny, width - serverX - 24, nodeHeight, 6);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = isDark ? "#f8fafc" : "#0f172a";
+          ctx.font = "700 9px JetBrains Mono";
+          ctx.fillText(`NODE-${i + 1}`, serverX + 20, ny + nodeHeight / 2 + 4);
+        }
+
+        // Render Redis Cache Box
+        if (cacheLevel > 0) {
+          ctx.fillStyle = isDark ? "rgba(168, 85, 247, 0.12)" : "rgba(147, 51, 234, 0.1)";
+          ctx.strokeStyle = "#a855f7";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.roundRect(limiterX + 18, height - 54, 75, 36, 6);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = "#a855f7";
+          ctx.font = "700 9px Inter";
+          ctx.fillText(`REDIS L${cacheLevel}`, limiterX + 26, height - 32);
+        }
+
+        // Render WAF Shield Indicator
+        if (wafLevel > 0) {
+          ctx.fillStyle = isDark ? "rgba(245, 158, 11, 0.12)" : "rgba(217, 119, 6, 0.1)";
+          ctx.strokeStyle = "#f59e0b";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.roundRect(limiterX - 86, height - 54, 74, 36, 6);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = "#f59e0b";
+          ctx.font = "700 9px Inter";
+          ctx.fillText(`WAF L${wafLevel}`, limiterX - 74, height - 32);
+        }
+
+        // Draw Packets
+        packets.forEach((p) => {
+          ctx.beginPath();
+          let targetY = p.y;
+          if (p.state === "processing") {
+            const ny = 55 + p.assignedNode * (nodeHeight + 12);
+            targetY = ny + nodeHeight / 2;
+          }
+          ctx.arc(p.x, targetY, p.radius, 0, Math.PI * 2);
+
+          if (p.state === "to_gateway" || p.state === "queued") {
+            ctx.fillStyle = p.isMalicious ? "#ef4444" : "#38bdf8";
+          } else if (p.state === "to_server" || p.state === "processing") {
+            ctx.fillStyle = p.isMalicious ? "#dc2626" : "#10b981";
+          } else if (p.state === "throttled") {
+            ctx.fillStyle = "#f59e0b";
+          } else if (p.state === "cached") {
+            ctx.fillStyle = "#a855f7";
+          }
+          ctx.fill();
+        });
+      }
+
+      function startGame() {
+        if (animFrameId) cancelAnimationFrame(animFrameId);
+
+        isRunning = true;
+        isPaused = false;
+        wave = 1;
+        score = 0;
+        budget = 120;
+        health = 100;
+        serverNodes = 1;
+        cacheLevel = 0;
+        wafLevel = 0;
+        hasCircuitBreaker = false;
+        circuitBreakerActive = false;
+        hasLoadBalancer = false;
+
+        tokens = capacity;
+        leakAccumulator = 0;
+        leakyQueue = [];
+        prevWindowCount = 0;
+        currentWindowCount = 0;
+        currentWindowTimestamp = performance.now();
+
+        totalClientRequests = 0;
+        totalServed = 0;
+        totalThrottled = 0;
+        totalDroppedLegit = 0;
+        totalDroppedMalicious = 0;
+        throughputHistory = [];
+        recentLatencies = [];
+        packets = [];
+        spawnAccumulator = 0;
+        waveElapsedTime = 0;
+
+        lastFrameTime = performance.now();
+
+        document.getElementById("overlay").classList.add("hidden");
+        document.getElementById("gameBtnText").textContent = "Restart";
+        document.getElementById("pauseText").textContent = "Pause";
+        document.getElementById("pauseIcon").textContent = "⏸️";
+        document.getElementById("statWave").textContent = `Wave 1 / ${waveConfigs.length}`;
+
+        document.getElementById("serverCount").textContent = "1 Node (+8 req/s capacity)";
+        document.getElementById("cacheLevel").textContent = "Lvl 0 (Absorbs read GETs)";
+        document.getElementById("wafStatus").textContent = "Lvl 0 (Filters DDoS traffic)";
+        document.getElementById("circuitStatus").textContent = "Locked (Auto-sheds on crisis)";
+        document.getElementById("balancerStatus").textContent = "Locked (-35% latency)";
+
+        document.getElementById("costServer").textContent = "$120";
+        document.getElementById("costCache").textContent = "$90";
+        document.getElementById("costWaf").textContent = "$130";
+        document.getElementById("costCircuit").textContent = "$140";
+        document.getElementById("costBalancer").textContent = "$100";
+
+        document.getElementById("maxCapacity").textContent = "18 req/sec concurrent";
+        document.getElementById("capacityBar").style.width = "25%";
+
+        animFrameId = requestAnimationFrame(updateSimulation);
+      }
+
+      function endGame(victory) {
+        isRunning = false;
+        if (animFrameId) cancelAnimationFrame(animFrameId);
+
+        const overlay = document.getElementById("overlay");
+        const title = document.getElementById("overlayTitle");
+        const desc = document.getElementById("overlayDesc");
+
+        overlay.classList.remove("hidden");
+        if (victory) {
+          title.textContent = "Cluster Defended! 🏆";
+          title.style.color = "var(--success)";
+          desc.textContent = `Brilliant architectural mastery! You survived all 10 traffic waves with a final score of ${score} pts and $${budget} remaining budget.`;
+        } else {
+          title.textContent = "Cluster Overloaded (HTTP 503)";
+          title.style.color = "var(--danger)";
+          desc.textContent = `The backend cluster was completely overwhelmed and crashed. Deploy WAF bot shields, scale server nodes, and tune your limiter parameters to survive!`;
+        }
+      }
+
+      // Pause handler
+      document.getElementById("btnPause").addEventListener("click", () => {
+        if (!isRunning) return;
+        isPaused = !isPaused;
+        document.getElementById("pauseText").textContent = isPaused ? "Resume" : "Pause";
+        document.getElementById("pauseIcon").textContent = isPaused ? "▶️" : "⏸️";
+      });
+
+      // Tab visibility auto-pause
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden && isRunning && !isPaused) {
+          isPaused = true;
+          document.getElementById("pauseText").textContent = "Resume";
+          document.getElementById("pauseIcon").textContent = "▶️";
+        }
+      });
+
+      // Slider Listeners
+      const sliderCap = document.getElementById("sliderCap");
+      sliderCap.addEventListener("input", (e) => {
+        capacity = parseInt(e.target.value, 10);
+        document.getElementById("capVal").textContent = capacity;
+      });
+
+      const sliderRefill = document.getElementById("sliderRefill");
+      sliderRefill.addEventListener("input", (e) => {
+        refillRate = parseInt(e.target.value, 10);
+        document.getElementById("refillVal").textContent = refillRate;
+      });
+
+      // Upgrade Buttons (Economy Driven)
+      document.getElementById("btnUpgradeServers").addEventListener("click", () => {
+        if (budget >= 120 && serverNodes < 4) {
+          budget -= 120;
+          serverNodes++;
+          document.getElementById("serverCount").textContent = `${serverNodes} Nodes (+${serverNodes * 8} req/s)`;
+          document.getElementById("maxCapacity").textContent = `${10 + serverNodes * 8} req/sec concurrent`;
+          document.getElementById("capacityBar").style.width = `${(serverNodes / 4) * 100}%`;
+          updateUpgradesUI();
+        }
+      });
+
+      document.getElementById("btnUpgradeCache").addEventListener("click", () => {
+        if (budget >= 90 && cacheLevel < 3) {
+          budget -= 90;
+          cacheLevel++;
+          document.getElementById("cacheLevel").textContent = `Lvl ${cacheLevel} (Absorbs ${cacheLevel * 25}% GETs)`;
+          updateUpgradesUI();
+        }
+      });
+
+      document.getElementById("btnUpgradeWaf").addEventListener("click", () => {
+        if (wafLevel === 0 && budget >= 130) {
+          budget -= 130;
+          wafLevel = 1;
+          document.getElementById("wafStatus").textContent = "Lvl 1 (Blocks 55% bots)";
+          document.getElementById("costWaf").textContent = "$200";
+          updateUpgradesUI();
+        } else if (wafLevel === 1 && budget >= 200) {
+          budget -= 200;
+          wafLevel = 2;
+          document.getElementById("wafStatus").textContent = "Lvl 2 (Blocks 90% bots)";
+          document.getElementById("costWaf").textContent = "MAX";
+          updateUpgradesUI();
+        }
+      });
+
+      document.getElementById("btnUpgradeCircuit").addEventListener("click", () => {
+        if (budget >= 140 && !hasCircuitBreaker) {
+          budget -= 140;
+          hasCircuitBreaker = true;
+          document.getElementById("circuitStatus").textContent = "Active (Protects at <35% HP)";
+          document.getElementById("costCircuit").textContent = "OWNED";
+          updateUpgradesUI();
+        }
+      });
+
+      document.getElementById("btnUpgradeLoadBalancer").addEventListener("click", () => {
+        if (budget >= 100 && !hasLoadBalancer) {
+          budget -= 100;
+          hasLoadBalancer = true;
+          document.getElementById("balancerStatus").textContent = "Active (-35% Latency)";
+          document.getElementById("costBalancer").textContent = "OWNED";
+          updateUpgradesUI();
+        }
+      });
+
+      // Start triggers
+      document.getElementById("btnRestart").addEventListener("click", startGame);
+      document.getElementById("btnOverlayStart").addEventListener("click", startGame);
+    </script>
+  </body>
+</html>
