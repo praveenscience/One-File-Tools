@@ -933,7 +933,22 @@ Built for One File Tools.
             if (p.x >= serverX) {
               p.x = serverX;
               p.state = "processing";
-              p.assignedNode = totalServed % serverNodes; // Smart distribution across nodes
+              if (hasLoadBalancer) {
+                // Intelligent load balancing: route to least-congested node
+                const nodeLoads = new Array(serverNodes).fill(0);
+                for (let k = 0; k < packets.length; k++) {
+                  if (packets[k].state === "processing") {
+                    nodeLoads[packets[k].assignedNode % serverNodes]++;
+                  }
+                }
+                let bestNode = 0;
+                for (let n = 1; n < serverNodes; n++) {
+                  if (nodeLoads[n] < nodeLoads[bestNode]) bestNode = n;
+                }
+                p.assignedNode = bestNode;
+              } else {
+                p.assignedNode = totalServed % serverNodes;
+              }
             }
           } else if (p.state === "processing") {
             activeOnServer++;
@@ -1010,7 +1025,9 @@ Built for One File Tools.
         else if (health > 30) healthEl.style.color = "var(--warning)";
         else healthEl.style.color = "var(--danger)";
 
-        document.getElementById("statThrottled").textContent = totalThrottled;
+        const totalDecisions = totalServed + totalThrottled;
+        const rejectRate = totalDecisions > 0 ? Math.round((totalThrottled / totalDecisions) * 100) : 0;
+        document.getElementById("statThrottled").textContent = `${totalThrottled} (${rejectRate}%)`;
         document.getElementById("statThroughput").textContent = `${liveThroughput} req/s`;
         document.getElementById("statLatency").textContent = `${avgLat} ms`;
         document.getElementById("statScore").innerHTML = `<span style="color: var(--warning)">$${budget}</span> • ${score} pts`;
