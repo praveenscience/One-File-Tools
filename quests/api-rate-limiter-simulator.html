@@ -1,0 +1,1605 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>API Rate Limiter Simulator — One File Tools</title>
+    <meta name="description" content="Compare token bucket, sliding window and fixed window rate limiters on the same live traffic, and keep an origin server alive through 10 waves." />
+    <script>
+      (function () {
+        var theme;
+        try {
+          var t = localStorage.getItem("ratelimiter_theme");
+          if (t === "dark" || t === "light") theme = t;
+        } catch (e) {}
+        if (!theme) {
+          theme = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+        }
+        document.documentElement.setAttribute("data-theme", theme);
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Nunito:wght@400;600;700;800&family=Oxanium:wght@600;700;800&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg-primary: #0b0f19;
+        --bg-secondary: #131b2e;
+        --bg-tertiary: #1f2a44;
+        --border-color: #2e3e60;
+        --text-primary: #f8fafc;
+        --text-secondary: #94a3b8;
+        --accent-cyan: #06b6d4;
+        --accent-green: #10b981;
+        --accent-amber: #f59e0b;
+        --accent-red: #ef4444;
+        --accent-purple: #8b5cf6;
+        --accent-pink: #ec4899;
+        --server-healthy: #10b981;
+        --server-warning: #f59e0b;
+        --server-danger: #ef4444;
+        --overlay-bg: rgba(11, 15, 25, 0.9);
+        --font-sans: "Nunito", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --font-heading: "Oxanium", system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+
+      [data-theme="light"] {
+        --bg-primary: #f8fafc;
+        --bg-secondary: #ffffff;
+        --bg-tertiary: #f1f5f9;
+        --border-color: #cbd5e1;
+        --text-primary: #0f172a;
+        --text-secondary: #475569;
+        --accent-cyan: #0e7490;
+        --accent-green: #047857;
+        --accent-amber: #b45309;
+        --accent-red: #b91c1c;
+        --accent-purple: #6d28d9;
+        --accent-pink: #be185d;
+        --server-healthy: #059669;
+        --server-warning: #d97706;
+        --server-danger: #dc2626;
+        --overlay-bg: rgba(248, 250, 252, 0.94);
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        font-family: var(--font-sans);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        line-height: 1.5;
+      }
+
+      :focus-visible {
+        outline: 2px solid var(--accent-cyan);
+        outline-offset: 2px;
+      }
+
+      header {
+        background: var(--bg-secondary);
+        border-bottom: 1px solid var(--border-color);
+        padding: 0.75rem 1rem;
+        position: sticky;
+        top: 0;
+        z-index: 50;
+      }
+
+      .header-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+      }
+
+      .logo-area {
+        text-decoration: none;
+        color: inherit;
+      }
+
+      .logo-badge {
+        font-family: var(--font-heading);
+        font-size: 1.15rem;
+        font-weight: 800;
+        color: var(--text-primary);
+      }
+
+      .logo-badge span {
+        color: var(--accent-cyan);
+      }
+
+      .hud-stats {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        flex-wrap: wrap;
+      }
+
+      .stat-pill {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        padding: 0.3rem 0.6rem;
+        border-radius: 9999px;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+      }
+
+      .stat-label {
+        color: var(--text-secondary);
+        font-size: 0.68rem;
+        text-transform: uppercase;
+      }
+
+      .stat-val {
+        font-weight: 700;
+        color: var(--text-primary);
+      }
+
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .icon-btn {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
+        width: 2.25rem;
+        height: 2.25rem;
+        border-radius: 0.5rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 1rem;
+      }
+
+      .icon-btn:hover {
+        border-color: var(--accent-cyan);
+      }
+
+      main {
+        flex: 1;
+        max-width: 1400px;
+        width: 100%;
+        margin: 0 auto;
+        padding: 1rem 1rem 2rem;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 380px;
+        gap: 1rem;
+      }
+
+      @media (max-width: 1100px) {
+        main {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+
+      .arena-section {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        min-width: 0;
+      }
+
+      .canvas-container {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 0.75rem;
+        position: relative;
+        overflow: hidden;
+        width: 100%;
+        max-width: 900px;
+        margin: 0 auto;
+      }
+
+      canvas {
+        display: block;
+        width: 100%;
+        height: auto;
+        aspect-ratio: 900 / 480;
+        background: #070a13;
+      }
+
+      [data-theme="light"] canvas {
+        background: #eef2f7;
+      }
+
+      .panel-card,
+      .arena-controls {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 0.75rem;
+        padding: 1rem;
+      }
+
+      .arena-controls {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+        max-width: 900px;
+        width: 100%;
+        margin: 0 auto;
+      }
+
+      .wave-title {
+        font-family: var(--font-heading);
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--accent-cyan);
+      }
+
+      .wave-desc {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+      }
+
+      .wave-meta {
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        margin-top: 0.15rem;
+      }
+
+      .action-group {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        font-family: var(--font-sans);
+        font-weight: 700;
+        font-size: 0.875rem;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+      }
+
+      .btn:hover:not(:disabled) {
+        border-color: var(--accent-cyan);
+      }
+
+      .btn-primary {
+        background: var(--accent-green);
+        border-color: var(--accent-green);
+        color: #ffffff;
+      }
+
+      .btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      .sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        min-width: 0;
+      }
+
+      .panel-title {
+        font-family: var(--font-heading);
+        font-size: 1rem;
+        font-weight: 700;
+        margin-bottom: 0.75rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      .meter {
+        margin-bottom: 0.85rem;
+      }
+
+      .meter-header {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.82rem;
+        font-family: var(--font-mono);
+        margin-bottom: 0.3rem;
+      }
+
+      .progress-bar-bg {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        height: 1rem;
+        border-radius: 9999px;
+        overflow: hidden;
+        position: relative;
+      }
+
+      .bar-fill {
+        height: 100%;
+        width: 100%;
+        background: var(--server-healthy);
+        transition: width 0.15s linear;
+      }
+
+      .sla-target {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: var(--text-primary);
+        opacity: 0.6;
+      }
+
+      .count-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.4rem;
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+      }
+
+      .count-grid .stat-pill {
+        justify-content: space-between;
+        border-radius: 0.5rem;
+      }
+
+      .algo-picker {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+        margin-bottom: 0.75rem;
+      }
+
+      .algo-card {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        border-radius: 0.5rem;
+        padding: 0.6rem;
+        cursor: pointer;
+        text-align: left;
+        color: var(--text-primary);
+        font-family: var(--font-sans);
+      }
+
+      .algo-card:hover {
+        border-color: var(--accent-cyan);
+      }
+
+      .algo-card[aria-pressed="true"] {
+        border-color: var(--accent-cyan);
+        box-shadow: inset 0 0 0 1px var(--accent-cyan);
+      }
+
+      .algo-name {
+        font-weight: 800;
+        font-size: 0.82rem;
+        display: block;
+      }
+
+      .algo-desc {
+        font-size: 0.72rem;
+        color: var(--text-secondary);
+        line-height: 1.3;
+        display: block;
+        margin-top: 0.15rem;
+      }
+
+      .slider-group {
+        margin-top: 0.6rem;
+      }
+
+      .slider-label {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.8rem;
+        font-family: var(--font-mono);
+        margin-bottom: 0.2rem;
+      }
+
+      .slider-group.is-disabled {
+        opacity: 0.45;
+      }
+
+      input[type="range"] {
+        width: 100%;
+        accent-color: var(--accent-cyan);
+      }
+
+      .hint {
+        font-size: 0.74rem;
+        color: var(--text-secondary);
+        margin-top: 0.5rem;
+        line-height: 1.4;
+      }
+
+      .compare-wrap {
+        overflow-x: auto;
+      }
+
+      .compare-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+      }
+
+      .compare-table th,
+      .compare-table td {
+        padding: 0.35rem 0.4rem;
+        text-align: right;
+        border-bottom: 1px solid var(--border-color);
+        white-space: nowrap;
+      }
+
+      .compare-table th:first-child,
+      .compare-table td:first-child {
+        text-align: left;
+      }
+
+      .compare-table th {
+        color: var(--text-secondary);
+        font-weight: 600;
+        font-size: 0.68rem;
+        text-transform: uppercase;
+      }
+
+      .compare-table tr.is-active td {
+        color: var(--accent-cyan);
+        font-weight: 700;
+      }
+
+      .upgrade-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+
+      .upgrade-item {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        border-radius: 0.5rem;
+        padding: 0.6rem 0.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+      }
+
+      .upgrade-info h3 {
+        font-size: 0.85rem;
+        margin-bottom: 0.1rem;
+      }
+
+      .upgrade-info p {
+        font-size: 0.73rem;
+        color: var(--text-secondary);
+      }
+
+      .upgrade-btn {
+        padding: 0.35rem 0.65rem;
+        font-size: 0.75rem;
+        white-space: nowrap;
+      }
+
+      .overlay-modal {
+        position: absolute;
+        inset: 0;
+        background: var(--overlay-bg);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 1.25rem;
+        text-align: center;
+        z-index: 10;
+        overflow-y: auto;
+      }
+
+      .overlay-title {
+        font-family: var(--font-heading);
+        font-size: 1.7rem;
+        margin-bottom: 0.4rem;
+      }
+
+      .overlay-desc {
+        color: var(--text-secondary);
+        max-width: 520px;
+        margin-bottom: 1rem;
+        font-size: 0.92rem;
+      }
+
+      @media (max-width: 600px) {
+        .overlay-modal {
+          position: static;
+          border-top: 1px solid var(--border-color);
+        }
+
+        .overlay-title {
+          font-size: 1.2rem;
+        }
+
+        .overlay-desc {
+          font-size: 0.82rem;
+        }
+
+        .algo-picker {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="header-container">
+        <a href="../index.html" class="logo-area" aria-label="Back to One File Tools">
+          <div class="logo-badge">🛡️ <span>API RATE LIMITER SIMULATOR</span></div>
+        </a>
+        <div class="hud-stats" aria-label="Run status">
+          <div class="stat-pill"><span class="stat-label">Wave</span><span class="stat-val" id="stat-wave">1 / 10</span></div>
+          <div class="stat-pill"><span class="stat-label">Credits</span><span class="stat-val" style="color: var(--accent-amber)" id="stat-credits">$40</span></div>
+          <div class="stat-pill"><span class="stat-label">Score</span><span class="stat-val" id="stat-score">0</span></div>
+          <div class="stat-pill" title="Failed waves you can still retry"><span class="stat-label">Rollbacks</span><span class="stat-val" id="stat-rollbacks">2</span></div>
+        </div>
+        <div class="header-actions">
+          <button class="icon-btn" id="btn-sound" type="button" aria-label="Mute sound" aria-pressed="false">🔊</button>
+          <button class="icon-btn" id="theme-toggle" type="button" aria-label="Switch to light theme">☀️</button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="arena-section" aria-label="Traffic pipeline">
+        <div class="canvas-container">
+          <canvas id="sim-canvas" width="900" height="480" role="img" aria-label="Requests flowing from clients through the WAF, cache and rate limiter to the origin servers"></canvas>
+          <div class="overlay-modal" id="modal" role="dialog" aria-modal="false" aria-labelledby="modal-title" hidden>
+            <div class="overlay-title" id="modal-title"></div>
+            <p class="overlay-desc" id="modal-desc"></p>
+            <button class="btn btn-primary" id="modal-btn" type="button"></button>
+          </div>
+        </div>
+
+        <div class="arena-controls">
+          <div>
+            <div class="wave-title" id="wave-name"></div>
+            <div class="wave-desc" id="wave-brief"></div>
+            <div class="wave-meta" id="wave-meta"></div>
+          </div>
+          <div class="action-group">
+            <button class="btn btn-primary" id="btn-start-wave" type="button">▶ Start Wave</button>
+            <button class="btn" id="btn-pause" type="button" disabled>⏸ Pause</button>
+          </div>
+        </div>
+      </section>
+
+      <aside class="sidebar">
+        <section class="panel-card" aria-labelledby="tele-title">
+          <h2 class="panel-title" id="tele-title">🖥️ Origin Telemetry</h2>
+          <div class="meter">
+            <div class="meter-header"><span>Server health</span><span id="health-val">100%</span></div>
+            <div class="progress-bar-bg"><div class="bar-fill" id="health-bar"></div></div>
+          </div>
+          <div class="meter">
+            <div class="meter-header">
+              <span>Legit SLA (target <span id="sla-target-label">80</span>%)</span><span id="sla-val">100%</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div class="bar-fill" id="sla-bar"></div>
+              <div class="sla-target" id="sla-target"></div>
+            </div>
+          </div>
+          <div class="count-grid" aria-live="off">
+            <div class="stat-pill"><span class="stat-label">200 OK</span><span class="stat-val" style="color: var(--accent-green)" id="count-200">0</span></div>
+            <div class="stat-pill"><span class="stat-label">Cache hits</span><span class="stat-val" style="color: var(--accent-cyan)" id="count-cached">0</span></div>
+            <div class="stat-pill"><span class="stat-label">429 Limited</span><span class="stat-val" style="color: var(--accent-amber)" id="count-429">0</span></div>
+            <div class="stat-pill"><span class="stat-label">503 Overload</span><span class="stat-val" style="color: var(--accent-red)" id="count-503">0</span></div>
+            <div class="stat-pill"><span class="stat-label">WAF blocked</span><span class="stat-val" style="color: var(--accent-purple)" id="count-waf">0</span></div>
+            <div class="stat-pill"><span class="stat-label">Bot breaches</span><span class="stat-val" style="color: var(--accent-pink)" id="count-breach">0</span></div>
+            <div class="stat-pill"><span class="stat-label">Served/s</span><span class="stat-val" id="stat-throughput">0</span></div>
+            <div class="stat-pill" title="Simulated: origin queue wait + service time, from the simulation clock"><span class="stat-label">Origin latency</span><span class="stat-val" id="stat-latency">—</span></div>
+            <div class="stat-pill"><span class="stat-label">Queue</span><span class="stat-val" id="stat-queue">0/6</span></div>
+            <div class="stat-pill" title="(429 + 503 + WAF blocks) / requests resolved"><span class="stat-label">Rejected</span><span class="stat-val" id="stat-rejection">0.0%</span></div>
+          </div>
+        </section>
+
+        <section class="panel-card" aria-labelledby="limiter-title">
+          <h2 class="panel-title" id="limiter-title">⚙️ Rate Limiter Gateway</h2>
+          <div class="algo-picker" id="algo-picker">
+            <button type="button" class="algo-card" data-algo="token-bucket" aria-pressed="true">
+              <span class="algo-name">🪣 Token Bucket</span>
+              <span class="algo-desc">Refills at the rate, spends 1 token per request. Burst depth caps spikes.</span>
+            </button>
+            <button type="button" class="algo-card" data-algo="sliding-counter" aria-pressed="false">
+              <span class="algo-name">⚖️ Sliding Window Counter</span>
+              <span class="algo-desc">Current 1 s count + previous count weighted by overlap.</span>
+            </button>
+            <button type="button" class="algo-card" data-algo="sliding-log" aria-pressed="false">
+              <span class="algo-name">⏱️ Sliding Window Log</span>
+              <span class="algo-desc">Keeps every timestamp from the last 1 s. Exact, but memory-heavy.</span>
+            </button>
+            <button type="button" class="algo-card" data-algo="fixed-window" aria-pressed="false">
+              <span class="algo-name">📊 Fixed Window</span>
+              <span class="algo-desc">Counter resets each second. Lets double bursts through at the edge.</span>
+            </button>
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-label"><label for="slider-rate">Rate limit</label><span id="label-rate">18 req/s</span></div>
+            <input type="range" id="slider-rate" min="5" max="60" value="18" />
+          </div>
+          <div class="slider-group" id="burst-group">
+            <div class="slider-label"><label for="slider-burst">Bucket burst depth</label><span id="label-burst">12 tokens</span></div>
+            <input type="range" id="slider-burst" min="1" max="40" value="12" />
+          </div>
+          <p class="hint" id="capacity-hint"></p>
+        </section>
+
+        <section class="panel-card" aria-labelledby="compare-title">
+          <h2 class="panel-title" id="compare-title">🔬 Algorithm Comparison (this wave)</h2>
+          <p class="hint" style="margin-top: 0; margin-bottom: 0.5rem">All four limiters see the same requests with your settings. Only the selected one decides; the others run in shadow mode.</p>
+          <div class="compare-wrap">
+            <table class="compare-table">
+              <thead>
+                <tr>
+                  <th scope="col">Algorithm</th>
+                  <th scope="col">Admitted</th>
+                  <th scope="col">429</th>
+                  <th scope="col">Peak/1 s</th>
+                </tr>
+              </thead>
+              <tbody id="compare-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel-card" aria-labelledby="upgrade-title">
+          <h2 class="panel-title" id="upgrade-title">🏗️ Infrastructure (buy between waves)</h2>
+          <div class="upgrade-list">
+            <div class="upgrade-item">
+              <div class="upgrade-info">
+                <h3>🛡️ WAF Bot Filter</h3>
+                <p id="desc-waf"></p>
+              </div>
+              <button class="btn upgrade-btn" type="button" id="btn-upgrade-waf" data-kind="waf"></button>
+            </div>
+            <div class="upgrade-item">
+              <div class="upgrade-info">
+                <h3>⚡ Redis Edge Cache</h3>
+                <p id="desc-cache"></p>
+              </div>
+              <button class="btn upgrade-btn" type="button" id="btn-upgrade-cache" data-kind="cache"></button>
+            </div>
+            <div class="upgrade-item">
+              <div class="upgrade-info">
+                <h3>⚖️ Load Balancer + 2nd Server</h3>
+                <p id="desc-lb"></p>
+              </div>
+              <button class="btn upgrade-btn" type="button" id="btn-upgrade-lb" data-kind="lb"></button>
+            </div>
+          </div>
+        </section>
+      </aside>
+    </main>
+
+    <script>
+      // ==ENGINE START==
+      /* Pure simulation rules: no DOM access. All time is simulated seconds (g.t),
+       advanced only by step(dt), so pausing or hiding the tab freezes everything. */
+      var RL = (function () {
+        var WAVES = [
+          { name: "Wave 1: Gentle Morning API Calls", desc: "Steady legit traffic, no bots. Tune the limiter so nothing is dropped.", duration: 18, rate: 9, mal: 0, burstMult: 1.6 },
+          { name: "Wave 2: Lunchtime Mobile Rush", desc: "Moderate traffic with small bursts and a few scrapers.", duration: 20, rate: 13, mal: 0.05, burstMult: 1.7 },
+          { name: "Wave 3: Flash Sale Announcement", desc: "Sharp spikes. Compare how each algorithm handles the bursts.", duration: 20, rate: 17, mal: 0.1, burstMult: 2.0 },
+          { name: "Wave 4: Aggressive Web Scraper", desc: "Bots hammer the API. Every bot that reaches the origin costs health.", duration: 22, rate: 20, mal: 0.18, burstMult: 2.0 },
+          { name: "Wave 5: Microservice Retry Storm", desc: "Retries pile up behind the gateway. Watch the origin queue.", duration: 22, rate: 23, mal: 0.22, burstMult: 2.1 },
+          { name: "Wave 6: Marketing Email Campaign", desc: "Sustained concurrency above one server's capacity.", duration: 24, rate: 27, mal: 0.26, burstMult: 2.1 },
+          { name: "Wave 7: Credential Stuffing Attack", desc: "Distributed bot network. The limiter alone cannot tell bots from users.", duration: 24, rate: 31, mal: 0.3, burstMult: 2.2 },
+          { name: "Wave 8: Black Friday Peak Load", desc: "Peak volume on every channel at once.", duration: 26, rate: 35, mal: 0.3, burstMult: 2.2 },
+          { name: "Wave 9: HTTP Flood Assault", desc: "Hostile flood mixed with real shoppers.", duration: 26, rate: 41, mal: 0.35, burstMult: 2.3 },
+          { name: "Wave 10: The DDoS Storm", desc: "Everything at once. Only a balanced architecture survives.", duration: 28, rate: 47, mal: 0.4, burstMult: 2.4 }
+        ];
+
+        var CFG = {
+          startCredits: 40,
+          prices: { waf: 260, cache: 300, lb: 420 },
+          payPerOk: 1, // $ per legit request served (200 OK or cache hit)
+          serverRate: 20, // work units per second per origin server
+          malCost: 2, // a bot request costs 2 work units (heavy queries)
+          queuePerServer: 6, // origin queue slots per server; overflow = 503
+          wafBlock: 0.85,
+          getShare: 0.65,
+          cacheHit: 0.4,
+          dmg503: 1.5,
+          dmgMal: 0.7,
+          sla: 0.8,
+          rollbacks: 2,
+          burstEvery: 5, // average seconds between burst events
+          burstLen: 1.6,
+          x: { spawn: 40, waf: 220, gate: 450, server: 720 }
+        };
+
+        var ALGOS = ["token-bucket", "sliding-counter", "sliding-log", "fixed-window"];
+
+        function makeLimiter(algo) {
+          return { algo: algo, tokens: 0, last: 0, log: [], win: 0, count: 0, prev: 0, admitted: 0, rejected: 0, admitLog: [], peak: 0 };
+        }
+
+        function resetLimiter(L, t, burst) {
+          L.tokens = burst;
+          L.last = t;
+          L.log = [];
+          L.win = Math.floor(t);
+          L.count = 0;
+          L.prev = 0;
+          L.admitted = 0;
+          L.rejected = 0;
+          L.admitLog = [];
+          L.peak = 0;
+        }
+
+        function limiterAllow(L, t, rate, burst) {
+          var ok;
+          if (L.algo === "token-bucket") {
+            L.tokens = Math.min(burst, L.tokens + (t - L.last) * rate);
+            L.last = t;
+            ok = L.tokens >= 1;
+            if (ok) L.tokens -= 1;
+          } else if (L.algo === "fixed-window") {
+            var w = Math.floor(t);
+            if (w !== L.win) {
+              L.win = w;
+              L.count = 0;
+            }
+            ok = L.count < rate;
+            if (ok) L.count++;
+          } else if (L.algo === "sliding-log") {
+            while (L.log.length && L.log[0] <= t - 1) L.log.shift();
+            ok = L.log.length < rate;
+            if (ok) L.log.push(t);
+          } else {
+            // Sliding window counter: previous window's count weighted by its overlap with the last 1 s
+            var w2 = Math.floor(t);
+            if (w2 !== L.win) {
+              L.prev = w2 === L.win + 1 ? L.count : 0;
+              L.count = 0;
+              L.win = w2;
+            }
+            var est = L.prev * (1 - (t - w2)) + L.count;
+            ok = est + 1 <= rate;
+            if (ok) L.count++;
+          }
+          if (ok) {
+            L.admitted++;
+            L.admitLog.push(t);
+            while (L.admitLog.length && L.admitLog[0] <= t - 1) L.admitLog.shift();
+            if (L.admitLog.length > L.peak) L.peak = L.admitLog.length;
+          } else {
+            L.rejected++;
+          }
+          return ok;
+        }
+
+        // Fill level of the active limiter for the gauge: { used, max }
+        function limiterLevel(L, t, rate, burst) {
+          if (L.algo === "token-bucket") {
+            var tok = Math.min(burst, L.tokens + (t - L.last) * rate);
+            return { used: burst - tok, max: burst, label: Math.floor(tok) + " tokens" };
+          }
+          if (L.algo === "fixed-window") {
+            var c = Math.floor(t) === L.win ? L.count : 0;
+            return { used: c, max: rate, label: c + "/" + rate + " this second" };
+          }
+          if (L.algo === "sliding-log") {
+            var n = 0;
+            for (var i = 0; i < L.log.length; i++) if (L.log[i] > t - 1) n++;
+            return { used: n, max: rate, label: n + "/" + rate + " in last 1 s" };
+          }
+          var w = Math.floor(t);
+          var prev = w === L.win ? L.prev : w === L.win + 1 ? L.count : 0;
+          var cur = w === L.win ? L.count : 0;
+          var est = Math.max(0, prev * (1 - (t - w)) + cur);
+          return { used: est, max: rate, label: est.toFixed(1) + "/" + rate + " weighted" };
+        }
+
+        function blankCounts() {
+          return { ok200: 0, r429: 0, cached: 0, waf: 0, r503: 0, breach: 0, legitOffered: 0, legitOk: 0, legitLost: 0 };
+        }
+
+        function create(rng) {
+          var g = {
+            rng: rng,
+            waveIdx: 0,
+            credits: CFG.startCredits,
+            score: 0,
+            rollbacks: CFG.rollbacks,
+            hasWaf: false,
+            hasCache: false,
+            hasLb: false,
+            algo: "token-bucket",
+            rate: 18,
+            burst: 12,
+            events: []
+          };
+          prepareWave(g);
+          return g;
+        }
+
+        // Puts the current wave into the "ready" phase and snapshots economy for Retry.
+        function prepareWave(g) {
+          g.phase = "ready";
+          g.failReason = "";
+          g.t = 0;
+          g.waveT = 0;
+          g.drainT = 0;
+          g.burstLeft = 0;
+          g.spawnAcc = 0;
+          g.health = 100;
+          g.packets = [];
+          g.queue = [];
+          g.servers = [];
+          g.c = blankCounts();
+          g.latency = [];
+          g.servedLog = [];
+          g.limiters = {};
+          for (var i = 0; i < ALGOS.length; i++) {
+            g.limiters[ALGOS[i]] = makeLimiter(ALGOS[i]);
+            resetLimiter(g.limiters[ALGOS[i]], 0, g.burst);
+          }
+          g.snap = { credits: g.credits, score: g.score, hasWaf: g.hasWaf, hasCache: g.hasCache, hasLb: g.hasLb };
+        }
+
+        function serverCount(g) {
+          return g.hasLb ? 2 : 1;
+        }
+
+        function canBuy(g, kind) {
+          if (g.phase !== "ready") return false;
+          var owned = kind === "waf" ? g.hasWaf : kind === "cache" ? g.hasCache : g.hasLb;
+          return !owned && g.credits >= CFG.prices[kind];
+        }
+
+        function buy(g, kind) {
+          if (!canBuy(g, kind)) return false;
+          g.credits -= CFG.prices[kind];
+          if (kind === "waf") g.hasWaf = true;
+          else if (kind === "cache") g.hasCache = true;
+          else g.hasLb = true;
+          // Purchases made before Start count as part of this wave's starting setup.
+          g.snap = { credits: g.credits, score: g.score, hasWaf: g.hasWaf, hasCache: g.hasCache, hasLb: g.hasLb };
+          return true;
+        }
+
+        function startWave(g) {
+          if (g.phase !== "ready") return false;
+          g.phase = "running";
+          g.servers = [];
+          for (var i = 0; i < serverCount(g); i++) g.servers.push(0);
+          for (var a in g.limiters) resetLimiter(g.limiters[a], 0, g.burst);
+          return true;
+        }
+
+        function spawn(g, w) {
+          var r = g.rng;
+          g.packets.push({
+            x: CFG.x.spawn,
+            y: 110 + r() * 260,
+            v: 240 + r() * 60,
+            mal: r() < w.mal,
+            get: r() < CFG.getShare,
+            state: "fly",
+            wafChecked: false,
+            gated: false,
+            ttl: 0
+          });
+        }
+
+        function fx(p, state) {
+          p.state = state;
+          p.ttl = 0.9;
+        }
+
+        function gate(g, p) {
+          var c = g.c;
+          if (!p.mal) c.legitOffered++;
+          // Cache sits in front of the limiter: hits never consume a token or origin capacity.
+          if (!p.mal && p.get && g.hasCache && g.rng() < CFG.cacheHit) {
+            fx(p, "cache");
+            c.cached++;
+            c.legitOk++;
+            g.credits += CFG.payPerOk;
+            g.score += 10;
+            g.servedLog.push(g.t);
+            g.events.push("cache");
+            return;
+          }
+          var ok = false;
+          for (var a in g.limiters) {
+            var res = limiterAllow(g.limiters[a], g.t, g.rate, g.burst);
+            if (a === g.algo) ok = res;
+          }
+          if (ok) {
+            p.state = "admit";
+          } else {
+            fx(p, "429");
+            c.r429++;
+            if (p.mal) g.score += 5;
+            else c.legitLost++;
+            g.events.push("429");
+          }
+        }
+
+        function arrive(g, p) {
+          var c = g.c;
+          if (g.queue.length >= CFG.queuePerServer * g.servers.length) {
+            c.r503++;
+            if (!p.mal) c.legitLost++;
+            g.health -= CFG.dmg503;
+            g.score = Math.max(0, g.score - 15);
+            g.events.push("503");
+            return false;
+          }
+          g.queue.push({ mal: p.mal, cost: p.mal ? CFG.malCost : 1, enq: g.t });
+          return true;
+        }
+
+        function serve(g, t0, t1) {
+          var srv = g.servers;
+          while (g.queue.length) {
+            var k = 0;
+            for (var i = 1; i < srv.length; i++) if (srv[i] < srv[k]) k = i;
+            var job = g.queue[0];
+            var start = Math.max(srv[k], t0, job.enq);
+            if (start >= t1) break;
+            g.queue.shift();
+            var end = start + job.cost / CFG.serverRate;
+            srv[k] = end;
+            if (job.mal) {
+              g.c.breach++;
+              g.health -= CFG.dmgMal;
+              g.score = Math.max(0, g.score - 20);
+              g.events.push("breach");
+            } else {
+              g.c.ok200++;
+              g.c.legitOk++;
+              g.credits += CFG.payPerOk;
+              g.score += 10;
+              g.servedLog.push(t1);
+              g.latency.push((end - job.enq) * 1000);
+              if (g.latency.length > 40) g.latency.shift();
+              g.events.push("ok");
+            }
+          }
+        }
+
+        function sla(g) {
+          return g.c.legitOffered > 0 ? g.c.legitOk / g.c.legitOffered : 1;
+        }
+
+        function fail(g, reason) {
+          g.failReason = reason;
+          g.phase = g.rollbacks > 0 ? "failed" : "over";
+          g.events.push("fail");
+        }
+
+        function step(g, dt) {
+          if (g.phase !== "running") return;
+          var w = WAVES[g.waveIdx];
+          var t0 = g.t;
+          g.t += dt;
+          var r = g.rng;
+          if (g.waveT < w.duration) {
+            g.waveT += dt;
+            if (g.burstLeft > 0) g.burstLeft -= dt;
+            else if (r() < dt / CFG.burstEvery) g.burstLeft = CFG.burstLen;
+            g.spawnAcc += w.rate * (g.burstLeft > 0 ? w.burstMult : 1) * dt;
+            while (g.spawnAcc >= 1) {
+              g.spawnAcc -= 1;
+              spawn(g, w);
+            }
+          } else {
+            g.drainT += dt;
+          }
+
+          var live = 0;
+          for (var i = g.packets.length - 1; i >= 0; i--) {
+            var p = g.packets[i];
+            if (p.state === "fly" || p.state === "admit") {
+              p.x += p.v * dt;
+              if (p.state === "fly") {
+                // WAF rolls exactly once per packet, when it enters the filter
+                if (!p.wafChecked && p.x >= CFG.x.waf) {
+                  p.wafChecked = true;
+                  if (g.hasWaf && p.mal && r() < CFG.wafBlock) {
+                    fx(p, "waf");
+                    g.c.waf++;
+                    g.score += 5;
+                    g.events.push("waf");
+                    continue;
+                  }
+                }
+                if (!p.gated && p.x >= CFG.x.gate) {
+                  p.gated = true;
+                  gate(g, p);
+                }
+              } else if (p.x >= CFG.x.server) {
+                if (arrive(g, p)) {
+                  g.packets.splice(i, 1);
+                  continue;
+                }
+                fx(p, "503");
+              }
+              if (p.state === "fly" || p.state === "admit") live++;
+            } else {
+              p.ttl -= dt;
+              p.x += p.v * 0.25 * dt;
+              p.y += (p.state === "waf" ? -150 : p.state === "cache" ? 150 : p.y > 240 ? 130 : -130) * dt;
+              if (p.ttl <= 0) g.packets.splice(i, 1);
+            }
+          }
+
+          serve(g, t0, g.t);
+          while (g.servedLog.length && g.servedLog[0] <= g.t - 1) g.servedLog.shift();
+
+          if (g.health <= 0) {
+            g.health = 0;
+            fail(g, "crash");
+            return;
+          }
+          if (g.waveT >= w.duration && ((live === 0 && g.queue.length === 0) || g.drainT > 8)) {
+            if (sla(g) < CFG.sla) {
+              fail(g, "sla");
+            } else if (g.waveIdx + 1 >= WAVES.length) {
+              g.phase = "victory";
+              g.events.push("victory");
+            } else {
+              g.phase = "passed";
+              g.events.push("pass");
+            }
+          }
+        }
+
+        function nextWave(g) {
+          if (g.phase !== "passed") return false;
+          g.waveIdx++;
+          prepareWave(g);
+          return true;
+        }
+
+        function retry(g) {
+          if (g.phase !== "failed") return false;
+          g.rollbacks--;
+          g.credits = g.snap.credits;
+          g.score = g.snap.score;
+          g.hasWaf = g.snap.hasWaf;
+          g.hasCache = g.snap.hasCache;
+          g.hasLb = g.snap.hasLb;
+          prepareWave(g);
+          return true;
+        }
+
+        function restart(g) {
+          var fresh = create(g.rng);
+          for (var k in fresh) g[k] = fresh[k];
+        }
+
+        return {
+          WAVES: WAVES,
+          CFG: CFG,
+          ALGOS: ALGOS,
+          create: create,
+          startWave: startWave,
+          step: step,
+          buy: buy,
+          canBuy: canBuy,
+          nextWave: nextWave,
+          retry: retry,
+          restart: restart,
+          sla: sla,
+          serverCount: serverCount,
+          limiterLevel: limiterLevel
+        };
+      })();
+      // ==ENGINE END==
+
+      /* =====================================================================
+       Audio: one shared AudioContext, created/resumed on a user gesture
+       ===================================================================== */
+      let audioCtx = null;
+      let soundEnabled = true;
+
+      function ensureAudio() {
+        if (!soundEnabled) return;
+        try {
+          if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          if (audioCtx.state === "suspended") audioCtx.resume();
+        } catch (e) {
+          audioCtx = null;
+        }
+      }
+
+      function playTone(freq, type, duration, gainVal) {
+        if (!soundEnabled || !audioCtx || audioCtx.state !== "running") return;
+        try {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          const now = audioCtx.currentTime;
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, now);
+          gain.gain.setValueAtTime(gainVal || 0.05, now);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now);
+          osc.stop(now + duration);
+        } catch (e) {}
+      }
+
+      /* =====================================================================
+       Theme
+       ===================================================================== */
+      const themeToggle = document.getElementById("theme-toggle");
+      function currentTheme() {
+        return document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+      }
+      function syncThemeButton() {
+        const light = currentTheme() === "light";
+        themeToggle.textContent = light ? "🌙" : "☀️";
+        themeToggle.setAttribute("aria-label", light ? "Switch to dark theme" : "Switch to light theme");
+      }
+      themeToggle.addEventListener("click", () => {
+        const next = currentTheme() === "light" ? "dark" : "light";
+        document.documentElement.setAttribute("data-theme", next);
+        try {
+          localStorage.setItem("ratelimiter_theme", next);
+        } catch (e) {}
+        syncThemeButton();
+      });
+      syncThemeButton();
+
+      const btnSound = document.getElementById("btn-sound");
+      btnSound.addEventListener("click", () => {
+        soundEnabled = !soundEnabled;
+        btnSound.textContent = soundEnabled ? "🔊" : "🔇";
+        btnSound.setAttribute("aria-pressed", String(!soundEnabled));
+        btnSound.setAttribute("aria-label", soundEnabled ? "Mute sound" : "Unmute sound");
+        ensureAudio();
+      });
+
+      /* =====================================================================
+       Game wiring
+       ===================================================================== */
+      const game = RL.create(Math.random);
+      const CFG = RL.CFG;
+      let paused = false;
+
+      const $ = (id) => document.getElementById(id);
+      const canvas = $("sim-canvas");
+      const ctx = canvas.getContext("2d");
+      const btnStart = $("btn-start-wave");
+      const btnPause = $("btn-pause");
+      const sliderRate = $("slider-rate");
+      const sliderBurst = $("slider-burst");
+      const modal = $("modal");
+      const modalTitle = $("modal-title");
+      const modalDesc = $("modal-desc");
+      const modalBtn = $("modal-btn");
+      const upgradeButtons = { waf: $("btn-upgrade-waf"), cache: $("btn-upgrade-cache"), lb: $("btn-upgrade-lb") };
+      const ALGO_LABELS = {
+        "token-bucket": "Token Bucket",
+        "sliding-counter": "Sliding Counter",
+        "sliding-log": "Sliding Log",
+        "fixed-window": "Fixed Window"
+      };
+
+      $("desc-waf").textContent = `Drops ${Math.round(CFG.wafBlock * 100)}% of bot requests (one roll per request) before the gateway.`;
+      $("desc-cache").textContent = `Serves ${Math.round(CFG.cacheHit * 100)}% of legit GETs at the edge. Hits skip the limiter and origin.`;
+      $("desc-lb").textContent = `Adds a second origin server: ${CFG.serverRate} → ${CFG.serverRate * 2} work units/s and double queue.`;
+      $("sla-target-label").textContent = Math.round(CFG.sla * 100);
+      $("sla-target").style.left = `${CFG.sla * 100}%`;
+
+      // Comparison table rows built once with DOM APIs
+      const compareRows = {};
+      RL.ALGOS.forEach((a) => {
+        const tr = document.createElement("tr");
+        const cells = [ALGO_LABELS[a], "0", "0", "0"].map((txt) => {
+          const td = document.createElement("td");
+          td.textContent = txt;
+          tr.appendChild(td);
+          return td;
+        });
+        $("compare-body").appendChild(tr);
+        compareRows[a] = { tr, cells };
+      });
+
+      sliderRate.addEventListener("input", () => {
+        game.rate = parseInt(sliderRate.value, 10);
+        $("label-rate").textContent = `${game.rate} req/s`;
+      });
+      sliderBurst.addEventListener("input", () => {
+        game.burst = parseInt(sliderBurst.value, 10);
+        $("label-burst").textContent = `${game.burst} tokens`;
+      });
+
+      document.querySelectorAll(".algo-card").forEach((card) => {
+        card.addEventListener("click", () => {
+          if (isLocked()) return;
+          game.algo = card.dataset.algo;
+          syncControls();
+        });
+      });
+
+      Object.keys(upgradeButtons).forEach((kind) => {
+        upgradeButtons[kind].addEventListener("click", () => {
+          ensureAudio();
+          if (RL.buy(game, kind)) {
+            playTone(660, "sine", 0.2, 0.06);
+            syncControls();
+          }
+        });
+      });
+
+      function isLocked() {
+        return game.phase !== "ready" && game.phase !== "running";
+      }
+
+      function syncControls() {
+        const locked = isLocked();
+        document.querySelectorAll(".algo-card").forEach((c) => {
+          c.setAttribute("aria-pressed", String(c.dataset.algo === game.algo));
+          c.disabled = locked;
+        });
+        const isBucket = game.algo === "token-bucket";
+        sliderRate.disabled = locked;
+        sliderBurst.disabled = locked || !isBucket;
+        $("burst-group").classList.toggle("is-disabled", !isBucket);
+        sliderRate.value = game.rate;
+        sliderBurst.value = game.burst;
+        $("label-rate").textContent = `${game.rate} req/s`;
+        $("label-burst").textContent = isBucket ? `${game.burst} tokens` : "n/a (window)";
+
+        const owned = { waf: game.hasWaf, cache: game.hasCache, lb: game.hasLb };
+        Object.keys(upgradeButtons).forEach((kind) => {
+          const b = upgradeButtons[kind];
+          b.disabled = !RL.canBuy(game, kind);
+          b.textContent = owned[kind] ? "Active ✓" : `Deploy ($${CFG.prices[kind]})`;
+        });
+
+        btnStart.disabled = game.phase !== "ready";
+        btnPause.disabled = game.phase !== "running";
+        btnPause.textContent = paused ? "▶ Resume" : "⏸ Pause";
+
+        const cap = RL.serverCount(game) * CFG.serverRate;
+        $("capacity-hint").textContent = `Origin capacity: ${cap} work units/s (legit request = 1 unit, bot = ${CFG.malCost}). Requests beyond the queue get 503 and damage the server; requests the limiter rejects get 429 and only cost SLA.`;
+
+        const w = RL.WAVES[game.waveIdx];
+        $("stat-wave").textContent = `${game.waveIdx + 1} / ${RL.WAVES.length}`;
+        $("wave-name").textContent = w.name;
+        $("wave-brief").textContent = w.desc;
+        $("wave-meta").textContent = `${w.rate} req/s base · bursts ×${w.burstMult} · ${Math.round(w.mal * 100)}% bots · ${w.duration}s`;
+        $("stat-rollbacks").textContent = game.rollbacks;
+      }
+
+      btnStart.addEventListener("click", () => {
+        ensureAudio();
+        paused = false;
+        if (RL.startWave(game)) syncControls();
+      });
+
+      btnPause.addEventListener("click", () => {
+        if (game.phase !== "running") return;
+        paused = !paused;
+        syncControls();
+      });
+
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden && game.phase === "running" && !paused) {
+          paused = true;
+          syncControls();
+        }
+      });
+
+      modalBtn.addEventListener("click", () => {
+        ensureAudio();
+        if (game.phase === "passed") RL.nextWave(game);
+        else if (game.phase === "failed") RL.retry(game);
+        else if (game.phase === "over" || game.phase === "victory") RL.restart(game);
+        paused = false;
+        modal.hidden = true;
+        syncControls();
+        btnStart.focus();
+      });
+
+      function showModal() {
+        const c = game.c;
+        const slaPct = Math.round(RL.sla(game) * 100);
+        const summary = `Health ${Math.round(game.health)}% · SLA ${slaPct}% · 200 OK ${c.ok200} · cache ${c.cached} · 429 ${c.r429} · 503 ${c.r503} · WAF ${c.waf} · bot breaches ${c.breach}.`;
+        let title, color, desc, label;
+        if (game.phase === "passed") {
+          title = "🎉 Wave Defended";
+          color = "var(--accent-green)";
+          desc = `${summary} Click Next Wave, then buy infrastructure before you press Start.`;
+          label = "Next Wave ➔";
+        } else if (game.phase === "victory") {
+          title = "🏆 Infrastructure Architect";
+          color = "var(--accent-cyan)";
+          desc = `All 10 waves survived. Final score ${game.score}. ${summary}`;
+          label = "Play Again";
+        } else {
+          const why = game.failReason === "crash" ? "The origin crashed: 503 overloads and bot breaches drained its health." : `Too many legit users were turned away: SLA ${slaPct}% is below the ${Math.round(CFG.sla * 100)}% target.`;
+          title = game.failReason === "crash" ? "💥 Origin Crashed" : "📉 SLA Breached";
+          color = "var(--accent-red)";
+          if (game.phase === "failed") {
+            desc = `${why} ${summary} Credits roll back to the start of this wave.`;
+            label = `↺ Retry Wave (${game.rollbacks} rollback${game.rollbacks === 1 ? "" : "s"} left)`;
+          } else {
+            desc = `${why} No rollbacks left. ${summary}`;
+            label = "Restart Run";
+          }
+        }
+        modalTitle.textContent = title;
+        modalTitle.style.color = color;
+        modalDesc.textContent = desc;
+        modalBtn.textContent = label;
+        modal.hidden = false;
+        modalBtn.focus();
+      }
+
+      function updateStats() {
+        const c = game.c;
+        $("stat-credits").textContent = `$${game.credits}`;
+        $("stat-score").textContent = game.score;
+        $("count-200").textContent = c.ok200;
+        $("count-cached").textContent = c.cached;
+        $("count-429").textContent = c.r429;
+        $("count-503").textContent = c.r503;
+        $("count-waf").textContent = c.waf;
+        $("count-breach").textContent = c.breach;
+        $("stat-throughput").textContent = `${game.servedLog.length}`;
+        $("stat-queue").textContent = `${game.queue.length}/${CFG.queuePerServer * Math.max(1, game.servers.length || RL.serverCount(game))}`;
+        if (game.latency.length) {
+          const avg = game.latency.reduce((a, b) => a + b, 0) / game.latency.length;
+          $("stat-latency").textContent = `${Math.round(avg)} ms`;
+        } else {
+          $("stat-latency").textContent = "—";
+        }
+        const resolved = c.ok200 + c.cached + c.r429 + c.r503 + c.waf + c.breach;
+        const rejected = c.r429 + c.r503 + c.waf;
+        $("stat-rejection").textContent = `${resolved ? ((rejected / resolved) * 100).toFixed(1) : "0.0"}%`;
+
+        const h = Math.max(0, game.health);
+        $("health-bar").style.width = `${h}%`;
+        $("health-bar").style.background = h > 50 ? "var(--server-healthy)" : h > 25 ? "var(--server-warning)" : "var(--server-danger)";
+        $("health-val").textContent = `${Math.round(h)}%`;
+        const s = RL.sla(game);
+        $("sla-bar").style.width = `${s * 100}%`;
+        $("sla-bar").style.background = s >= CFG.sla ? "var(--server-healthy)" : "var(--server-danger)";
+        $("sla-val").textContent = `${(s * 100).toFixed(1)}%`;
+
+        RL.ALGOS.forEach((a) => {
+          const L = game.limiters[a];
+          const row = compareRows[a];
+          row.tr.classList.toggle("is-active", a === game.algo);
+          row.cells[1].textContent = L.admitted;
+          row.cells[2].textContent = L.rejected;
+          row.cells[3].textContent = L.peak;
+        });
+      }
+
+      /* =====================================================================
+       Rendering (logical 900x480 space, scaled for devicePixelRatio)
+       ===================================================================== */
+      let dpr = 0;
+      function setupCanvas() {
+        const next = window.devicePixelRatio || 1;
+        if (next === dpr) return;
+        dpr = next;
+        canvas.width = 900 * dpr;
+        canvas.height = 480 * dpr;
+      }
+      window.addEventListener("resize", setupCanvas);
+      setupCanvas();
+
+      const MONO = '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+      function palette() {
+        const light = currentTheme() === "light";
+        return {
+          text: light ? "#334155" : "#94a3b8",
+          box: light ? "rgba(255,255,255,0.8)" : "rgba(30,41,59,0.55)",
+          boxLine: light ? "#94a3b8" : "#334155",
+          pipe: light ? "rgba(15,23,42,0.12)" : "rgba(255,255,255,0.07)",
+          legit: light ? "#059669" : "#10b981",
+          bot: light ? "#dc2626" : "#ef4444",
+          waf: light ? "#7c3aed" : "#a855f7",
+          cache: light ? "#0e7490" : "#22d3ee",
+          limited: light ? "#b45309" : "#f59e0b",
+          gate: light ? "#0e7490" : "#06b6d4"
+        };
+      }
+
+      function render() {
+        const P = palette();
+        const X = CFG.x;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, 900, 480);
+        ctx.font = `600 12px ${MONO}`;
+        ctx.textBaseline = "alphabetic";
+
+        // Pipes
+        ctx.strokeStyle = P.pipe;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(100, 240);
+        ctx.lineTo(X.server, 240);
+        ctx.stroke();
+
+        // Clients
+        ctx.fillStyle = P.text;
+        ctx.fillText("CLIENTS", 32, 40);
+        ctx.fillStyle = P.box;
+        ctx.strokeStyle = P.boxLine;
+        ctx.lineWidth = 2;
+        ctx.fillRect(20, 60, 80, 360);
+        ctx.strokeRect(20, 60, 80, 360);
+
+        // WAF
+        ctx.fillStyle = game.hasWaf ? P.waf : P.text;
+        ctx.fillText(game.hasWaf ? "WAF ACTIVE" : "WAF (none)", X.waf - 38, 40);
+        ctx.strokeStyle = game.hasWaf ? P.waf : P.boxLine;
+        ctx.fillStyle = game.hasWaf ? "rgba(168,85,247,0.12)" : P.box;
+        ctx.fillRect(X.waf - 30, 90, 60, 300);
+        ctx.strokeRect(X.waf - 30, 90, 60, 300);
+
+        // Gateway with limiter gauge
+        const L = game.limiters[game.algo];
+        const lvl = RL.limiterLevel(L, game.t, game.rate, game.burst);
+        ctx.fillStyle = P.gate;
+        ctx.fillText(`LIMITER: ${ALGO_LABELS[game.algo].toUpperCase()}`, X.gate - 80, 40);
+        ctx.strokeStyle = P.gate;
+        ctx.fillStyle = "rgba(6,182,212,0.08)";
+        ctx.fillRect(X.gate - 40, 80, 80, 320);
+        ctx.strokeRect(X.gate - 40, 80, 80, 320);
+        const ratio = lvl.max > 0 ? Math.max(0, Math.min(1, lvl.used / lvl.max)) : 0;
+        ctx.fillStyle = P.box;
+        ctx.fillRect(X.gate + 46, 100, 10, 280);
+        ctx.fillStyle = ratio < 0.6 ? P.gate : ratio < 0.9 ? P.limited : P.bot;
+        ctx.fillRect(X.gate + 46, 380 - 280 * ratio, 10, 280 * ratio);
+        ctx.fillStyle = P.text;
+        ctx.font = `600 11px ${MONO}`;
+        ctx.fillText(lvl.label, X.gate - 40, 420);
+        if (game.hasCache) {
+          ctx.fillStyle = P.cache;
+          ctx.fillText("⚡ EDGE CACHE", X.gate - 40, 70);
+        }
+
+        // Origin servers + queue
+        const n = RL.serverCount(game);
+        const hColor = game.health > 50 ? P.legit : game.health > 25 ? P.limited : P.bot;
+        ctx.font = `600 12px ${MONO}`;
+        ctx.fillStyle = hColor;
+        ctx.fillText(n > 1 ? "ORIGIN ×2 (LB)" : "ORIGIN SERVER", X.server - 10, 40);
+        const boxH = n > 1 ? 160 : 330;
+        for (let i = 0; i < n; i++) {
+          const y = 70 + i * (boxH + 20);
+          ctx.fillStyle = P.box;
+          ctx.strokeStyle = hColor;
+          ctx.fillRect(X.server + 40, y, 120, boxH);
+          ctx.strokeRect(X.server + 40, y, 120, boxH);
+          const busy = game.phase === "running" && game.servers[i] > game.t;
+          ctx.fillStyle = busy ? hColor : P.text;
+          ctx.fillText(busy ? "BUSY" : "IDLE", X.server + 76, y + boxH / 2 + 4);
+        }
+        const qCap = CFG.queuePerServer * n;
+        ctx.fillStyle = P.text;
+        ctx.font = `600 10px ${MONO}`;
+        ctx.fillText(`QUEUE ${game.queue.length}/${qCap}`, X.server - 12, 445);
+        for (let i = 0; i < qCap; i++) {
+          const job = game.queue[i];
+          ctx.fillStyle = job ? (job.mal ? P.bot : P.legit) : P.box;
+          ctx.fillRect(X.server + 6, 380 - i * 26, 22, 20);
+        }
+
+        // Packets
+        for (const p of game.packets) {
+          let color;
+          if (p.state === "waf") color = P.waf;
+          else if (p.state === "cache") color = P.cache;
+          else if (p.state === "429") color = P.limited;
+          else if (p.state === "503") color = P.bot;
+          else color = p.mal ? P.bot : P.legit;
+          ctx.globalAlpha = p.state === "fly" || p.state === "admit" ? 1 : Math.max(0, p.ttl / 0.9);
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.mal ? 6 : 4, 0, Math.PI * 2);
+          ctx.fill();
+          if (p.state === "503") {
+            ctx.fillText("503", p.x + 8, p.y + 4);
+          }
+        }
+        ctx.globalAlpha = 1;
+
+        if (paused && game.phase === "running") {
+          ctx.fillStyle = P.text;
+          ctx.font = `700 22px ${MONO}`;
+          ctx.fillText("PAUSED", 400, 250);
+        }
+      }
+
+      /* =====================================================================
+       Audio from simulation events (at most one tone per kind per frame)
+       ===================================================================== */
+      const TONES = {
+        ok: [440, "triangle", 0.05, 0.02],
+        cache: [820, "sine", 0.05, 0.02],
+        waf: [920, "sine", 0.04, 0.02],
+        429: [220, "square", 0.04, 0.015],
+        503: [150, "sawtooth", 0.12, 0.05],
+        breach: [120, "sawtooth", 0.1, 0.05],
+        pass: [523, "sine", 0.3, 0.1],
+        victory: [784, "sine", 0.5, 0.1],
+        fail: [110, "sawtooth", 0.5, 0.1]
+      };
+      function drainEvents() {
+        const seen = new Set(game.events);
+        game.events.length = 0;
+        seen.forEach((e) => {
+          const t = TONES[e];
+          if (t) playTone(t[0], t[1], t[2], t[3]);
+        });
+      }
+
+      /* =====================================================================
+       Single rAF loop: always renders; steps the simulation only while running
+       ===================================================================== */
+      let lastTs = performance.now();
+      let lastPhase = game.phase;
+      let uiTimer = 0;
+      function frame(ts) {
+        const dt = Math.min(0.1, Math.max(0, (ts - lastTs) / 1000));
+        lastTs = ts;
+        if (game.phase === "running" && !paused) {
+          let rem = dt;
+          while (rem > 1e-6) {
+            const h = Math.min(rem, 1 / 60);
+            RL.step(game, h);
+            rem -= h;
+            if (game.phase !== "running") break;
+          }
+        }
+        drainEvents();
+        if (game.phase !== lastPhase) {
+          lastPhase = game.phase;
+          syncControls();
+          if (game.phase === "passed" || game.phase === "failed" || game.phase === "over" || game.phase === "victory") showModal();
+        }
+        uiTimer -= dt;
+        if (uiTimer <= 0) {
+          uiTimer = 0.1;
+          updateStats();
+        }
+        render();
+        requestAnimationFrame(frame);
+      }
+
+      syncControls();
+      updateStats();
+      requestAnimationFrame(frame);
+    </script>
+  </body>
+</html>

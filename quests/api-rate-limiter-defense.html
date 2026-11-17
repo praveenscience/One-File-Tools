@@ -1,0 +1,1455 @@
+<!doctype html>
+<!--
+API Rate Limiter Defense Arcade
+Single-file traffic defense arcade game. Built for One File Tools.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>API Rate Limiter Defense Arcade — One File Tools</title>
+    <meta name="description" content="A real-time traffic defense arcade game: tune a rate limiter, scale nodes, and buy a WAF, cache, load balancer and circuit breaker to survive 10 waves of floods and bots." />
+
+    <script>
+      (function () {
+        var theme;
+        try {
+          var stored = localStorage.getItem("oft_rate_defense_theme");
+          if (stored === "dark" || stored === "light") theme = stored;
+        } catch (e) {}
+        if (!theme) {
+          theme = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+        }
+        document.documentElement.setAttribute("data-theme", theme);
+      })();
+    </script>
+
+    <style>
+      :root {
+        --bg: #05070e;
+        --grid-line: #0f1523;
+        --panel: rgba(13, 19, 33, 0.88);
+        --panel-border: #1e293b;
+        --accent: #38bdf8;
+        --accent-hover: #0284c7;
+        --accent-glow: rgba(56, 189, 248, 0.2);
+        --text: #f8fafc;
+        --text-muted: #94a3b8;
+        --text-dim: #8391a7;
+        --success: #10b981;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+        --purple: #a855f7;
+        --canvas-bg: rgba(0, 0, 0, 0.45);
+        --track: rgba(255, 255, 255, 0.08);
+        --control-bg: rgba(0, 0, 0, 0.25);
+        --overlay: rgba(5, 7, 14, 0.88);
+        --radius-sm: 8px;
+        --radius-md: 14px;
+        --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      }
+
+      [data-theme="light"] {
+        --bg: #f8fafc;
+        --grid-line: #e2e8f0;
+        --panel: rgba(255, 255, 255, 0.96);
+        --panel-border: #cbd5e1;
+        --accent: #0369a1;
+        --accent-hover: #075985;
+        --accent-glow: rgba(2, 132, 199, 0.15);
+        --text: #0f172a;
+        --text-muted: #475569;
+        --text-dim: #5b6b80;
+        --success: #047857;
+        --warning: #b45309;
+        --danger: #b91c1c;
+        --purple: #7e22ce;
+        --canvas-bg: #ffffff;
+        --track: rgba(0, 0, 0, 0.08);
+        --control-bg: #ffffff;
+        --overlay: rgba(248, 250, 252, 0.93);
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg);
+        background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+        background-size: 28px 28px;
+        color: var(--text);
+        padding: 20px 16px 48px;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      :focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      .app {
+        width: 100%;
+        max-width: 1060px;
+      }
+
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .title-group h1 {
+        font-size: 1.7rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        color: var(--text);
+      }
+
+      .title-group h1 span {
+        color: var(--accent);
+      }
+
+      .title-group p {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+      }
+
+      .title-group a {
+        color: var(--text-muted);
+        font-size: 0.8rem;
+      }
+
+      .header-actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        color: var(--text);
+        padding: 8px 14px;
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-family: var(--font-sans);
+        font-size: 0.85rem;
+        font-weight: 600;
+      }
+
+      .btn:hover:not(:disabled) {
+        border-color: var(--accent);
+      }
+
+      .btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      .btn-primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #ffffff;
+      }
+
+      [data-theme="dark"] .btn-primary {
+        color: #030712;
+      }
+
+      .btn-primary:hover:not(:disabled) {
+        background: var(--accent-hover);
+        color: #ffffff;
+      }
+
+      .stats-bar {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 8px;
+        margin-bottom: 14px;
+      }
+
+      @media (max-width: 900px) {
+        .stats-bar {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 520px) {
+        .stats-bar {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      .stat-pill {
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 8px 10px;
+        min-width: 0;
+      }
+
+      .stat-pill .label {
+        font-size: 0.63rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-dim);
+        font-weight: 700;
+      }
+
+      .stat-pill .val {
+        font-family: var(--font-mono);
+        font-size: 1rem;
+        font-weight: 700;
+        margin-top: 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .canvas-container {
+        position: relative;
+        background: var(--canvas-bg);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-md);
+        overflow: hidden;
+        margin-bottom: 18px;
+        width: 100%;
+      }
+
+      canvas {
+        display: block;
+        width: 100%;
+        height: auto;
+        aspect-ratio: 1000 / 560;
+      }
+
+      .overlay-screen {
+        position: absolute;
+        inset: 0;
+        background: var(--overlay);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 10;
+        text-align: center;
+        padding: 20px;
+        overflow-y: auto;
+      }
+
+      .overlay-screen[hidden] {
+        display: none;
+      }
+
+      .overlay-screen h2 {
+        font-size: 1.9rem;
+        font-weight: 700;
+        margin-bottom: 8px;
+      }
+
+      .overlay-screen p {
+        color: var(--text-muted);
+        max-width: 560px;
+        margin-bottom: 16px;
+        font-size: 0.92rem;
+        line-height: 1.5;
+      }
+
+      @media (max-width: 600px) {
+        .overlay-screen {
+          position: static;
+          border-top: 1px solid var(--panel-border);
+        }
+
+        .overlay-screen h2 {
+          font-size: 1.25rem;
+        }
+
+        .overlay-screen p {
+          font-size: 0.82rem;
+        }
+      }
+
+      .dashboard {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-bottom: 22px;
+      }
+
+      @media (max-width: 768px) {
+        .dashboard {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .panel-card {
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-md);
+        padding: 16px 18px;
+        min-width: 0;
+      }
+
+      .panel-card h2 {
+        font-size: 0.95rem;
+        font-weight: 700;
+        margin-bottom: 12px;
+      }
+
+      .field-label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        color: var(--text-dim);
+        font-weight: 700;
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      .param-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 12px;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .param-row label {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        font-weight: 600;
+        min-width: 9.5rem;
+      }
+
+      .param-row .num {
+        font-family: var(--font-mono);
+        color: var(--accent);
+        font-weight: 700;
+      }
+
+      .param-row.is-disabled {
+        opacity: 0.4;
+      }
+
+      .param-slider {
+        flex: 1;
+        min-width: 8rem;
+        accent-color: var(--accent);
+        cursor: pointer;
+      }
+
+      select {
+        background: var(--control-bg);
+        border: 1px solid var(--panel-border);
+        color: var(--text);
+        padding: 8px 10px;
+        border-radius: var(--radius-sm);
+        font-family: var(--font-sans);
+        font-size: 0.85rem;
+        cursor: pointer;
+        width: 100%;
+      }
+
+      .tip {
+        font-size: 0.76rem;
+        color: var(--text-muted);
+        line-height: 1.45;
+        margin-top: 12px;
+      }
+
+      .upgrades-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      @media (max-width: 420px) {
+        .upgrades-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .upgrade-btn {
+        background: var(--control-bg);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-sm);
+        padding: 10px 12px;
+        cursor: pointer;
+        text-align: left;
+        color: var(--text);
+        font-family: var(--font-sans);
+      }
+
+      .upgrade-btn:hover:not(:disabled) {
+        border-color: var(--accent);
+      }
+
+      .upgrade-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .upgrade-title {
+        font-size: 0.82rem;
+        font-weight: 700;
+        display: flex;
+        justify-content: space-between;
+        gap: 6px;
+        margin-bottom: 4px;
+      }
+
+      .upgrade-cost {
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+        color: var(--warning);
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .upgrade-desc {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        line-height: 1.3;
+        display: block;
+      }
+
+      .capacity-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.78rem;
+        margin: 12px 0 4px;
+        color: var(--text-muted);
+      }
+
+      .track-bg {
+        height: 6px;
+        border-radius: 4px;
+        overflow: hidden;
+        background: var(--track);
+      }
+
+      footer {
+        text-align: center;
+        font-size: 0.85rem;
+        color: var(--text-dim);
+      }
+
+      footer a {
+        color: var(--text-muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <div class="title-group">
+          <h1>API Rate Limiter <span>Defense Arcade</span></h1>
+          <p>Hold the gateway. Keep users served. Keep bots out.</p>
+          <a href="../index.html">← One File Tools</a>
+        </div>
+        <div class="header-actions">
+          <button class="btn" id="themeToggle" type="button" aria-label="Switch to light theme">
+            <span id="themeIcon" aria-hidden="true">☀️</span>
+            <span id="themeText">Light</span>
+          </button>
+          <button class="btn" id="btnPause" type="button" disabled>
+            <span id="pauseIcon" aria-hidden="true">⏸️</span>
+            <span id="pauseText">Pause</span>
+          </button>
+          <button class="btn btn-primary" id="btnRestart" type="button">
+            <span aria-hidden="true">▶</span>
+            <span id="gameBtnText">Start Game</span>
+          </button>
+        </div>
+      </header>
+
+      <section class="stats-bar" aria-label="Live telemetry">
+        <div class="stat-pill">
+          <div class="label">Server Health</div>
+          <div class="val" id="statHealth">100%</div>
+        </div>
+        <div class="stat-pill">
+          <div class="label">Wave</div>
+          <div class="val" id="statWave">1 / 10</div>
+        </div>
+        <div class="stat-pill" title="Legit requests served over the last 8 s. Below the target, health drains.">
+          <div class="label">User SLA (target 85%)</div>
+          <div class="val" id="statSla">100%</div>
+        </div>
+        <div class="stat-pill">
+          <div class="label">Budget</div>
+          <div class="val" id="statBudget" style="color: var(--warning)">$80</div>
+        </div>
+        <div class="stat-pill">
+          <div class="label">Score</div>
+          <div class="val" id="statScore">0</div>
+        </div>
+        <div class="stat-pill">
+          <div class="label">429 Limited</div>
+          <div class="val" id="stat429" style="color: var(--warning)">0</div>
+        </div>
+        <div class="stat-pill">
+          <div class="label">403 WAF Blocked</div>
+          <div class="val" id="stat403" style="color: var(--purple)">0</div>
+        </div>
+        <div class="stat-pill" title="503 = a node's queue overflowed (damages health). Shed = circuit breaker failed fast instead (no damage).">
+          <div class="label">503 / Shed</div>
+          <div class="val" id="stat503" style="color: var(--danger)">0 / 0</div>
+        </div>
+        <div class="stat-pill">
+          <div class="label">Served / s</div>
+          <div class="val" id="statThroughput" style="color: var(--accent)">0</div>
+        </div>
+        <div class="stat-pill" title="Simulated: leaky-bucket wait + node queue wait + service time">
+          <div class="label">Avg Latency</div>
+          <div class="val" id="statLatency">—</div>
+        </div>
+      </section>
+
+      <div class="canvas-container">
+        <canvas id="simCanvas" role="img" aria-label="Requests flying from clients to the API gateway and on to the backend nodes"></canvas>
+        <div class="overlay-screen" id="overlay">
+          <h2 id="overlayTitle">API Traffic Defense</h2>
+          <p id="overlayDesc">Ten waves of traffic are coming. Your rate limiter can't tell bots from users, the nodes have a hard capacity, and dropped users drain health through the SLA. Earn budget by serving real users, and spend it live on nodes, cache, a WAF, a load balancer and a circuit breaker.</p>
+          <button class="btn btn-primary" id="btnOverlayStart" type="button">Deploy Rate Limiter</button>
+        </div>
+      </div>
+
+      <div class="dashboard">
+        <section class="panel-card" aria-labelledby="limiterTitle">
+          <h2 id="limiterTitle">🎛️ Rate Limiter</h2>
+          <label for="algoSelect" class="field-label">Algorithm</label>
+          <select id="algoSelect">
+            <option value="token_bucket">Token Bucket (bursts up to capacity)</option>
+            <option value="leaky_bucket">Leaky Bucket (FIFO queue, constant drain)</option>
+            <option value="fixed_window">Fixed Window Counter (resets every 1 s)</option>
+            <option value="sliding_window">Weighted Sliding Window Counter</option>
+          </select>
+
+          <div class="param-row">
+            <label for="sliderCap" id="capLabel">Capacity / Quota: <span class="num" id="capVal">20</span></label>
+            <input type="range" class="param-slider" id="sliderCap" min="5" max="80" value="20" />
+          </div>
+
+          <div class="param-row" id="refillRow">
+            <label for="sliderRefill" id="refillLabel">Refill / Leak Rate: <span class="num" id="refillVal">14</span> /s</label>
+            <input type="range" class="param-slider" id="sliderRefill" min="2" max="60" value="14" />
+          </div>
+
+          <p class="tip" id="algoTip"></p>
+        </section>
+
+        <section class="panel-card" aria-labelledby="upgradeTitle">
+          <h2 id="upgradeTitle">🏗️ Infrastructure (buy any time during a run)</h2>
+          <div class="upgrades-grid">
+            <button class="upgrade-btn" id="btnUpgradeNode" type="button" data-kind="node">
+              <span class="upgrade-title"><span>Scale Node</span><span class="upgrade-cost" id="costNode"></span></span>
+              <span class="upgrade-desc" id="descNode"></span>
+            </button>
+            <button class="upgrade-btn" id="btnUpgradeCache" type="button" data-kind="cache">
+              <span class="upgrade-title"><span>Redis Cache</span><span class="upgrade-cost" id="costCache"></span></span>
+              <span class="upgrade-desc" id="descCache"></span>
+            </button>
+            <button class="upgrade-btn" id="btnUpgradeWaf" type="button" data-kind="waf">
+              <span class="upgrade-title"><span>WAF Bot Shield</span><span class="upgrade-cost" id="costWaf"></span></span>
+              <span class="upgrade-desc" id="descWaf"></span>
+            </button>
+            <button class="upgrade-btn" id="btnUpgradeBreaker" type="button" data-kind="breaker">
+              <span class="upgrade-title"><span>Circuit Breaker</span><span class="upgrade-cost" id="costBreaker"></span></span>
+              <span class="upgrade-desc" id="descBreaker"></span>
+            </button>
+            <button class="upgrade-btn" id="btnUpgradeLb" type="button" data-kind="lb">
+              <span class="upgrade-title"><span>Smart Balancer</span><span class="upgrade-cost" id="costLb"></span></span>
+              <span class="upgrade-desc" id="descLb"></span>
+            </button>
+          </div>
+
+          <div class="capacity-row">
+            <span>Cluster capacity</span>
+            <span class="num" id="maxCapacity"></span>
+          </div>
+          <div class="track-bg"><div id="capacityBar" style="height: 100%; width: 25%; background: var(--accent)"></div></div>
+        </section>
+      </div>
+
+      <footer>
+        <p>Part of <a href="https://github.com/praveenscience/One-File-Tools" target="_blank" rel="noopener noreferrer">One File Tools</a></p>
+      </footer>
+    </div>
+
+    <script>
+      // ==ENGINE START==
+      /* Pure game rules (no DOM). Logical world is 1000 x 560; time is simulated
+         seconds advanced only by step(dt), so pause / hidden tab freezes the game. */
+      var RD = (function () {
+        var WAVES = [
+          { name: "Wave 1: Steady Organic Traffic", rps: 10, mal: 0.05, duration: 15, burst: false },
+          { name: "Wave 2: Morning Login Surge", rps: 16, mal: 0.08, duration: 16, burst: false },
+          { name: "Wave 3: Search Engine Crawlers", rps: 22, mal: 0.1, duration: 18, burst: true },
+          { name: "Wave 4: Flash Sale Spike", rps: 28, mal: 0.14, duration: 18, burst: true },
+          { name: "Wave 5: Distributed Micro-bursts", rps: 36, mal: 0.2, duration: 20, burst: true },
+          { name: "Wave 6: Ticket Drop Stampede", rps: 46, mal: 0.24, duration: 20, burst: true },
+          { name: "Wave 7: Credential Stuffing Bots", rps: 58, mal: 0.28, duration: 22, burst: true },
+          { name: "Wave 8: Black Friday Flood", rps: 72, mal: 0.3, duration: 22, burst: false },
+          { name: "Wave 9: Amplified Bot Flood", rps: 88, mal: 0.33, duration: 24, burst: true },
+          { name: "Wave 10: Coordinated DDoS Assault", rps: 106, mal: 0.36, duration: 26, burst: true }
+        ];
+
+        var CFG = {
+          startBudget: 80,
+          payPerOk: 0.35, // $ per legit request served (origin or cache)
+          waveBonus: 20,
+          maxNodes: 4,
+          nodeSlots: 2, // concurrent requests per node
+          nodeQueue: 5, // waiting room per node; a full node answers 503
+          svcLegit: 0.12, // seconds of node time per legit request
+          svcBot: 0.24, // bot requests are heavier
+          dmgBot: 0.6, // HP per bot request a node completes
+          dmg503: 1.2, // HP per 503
+          regen: 1.5, // HP per second
+          slaTarget: 0.85, // rolling availability target for legit users
+          slaWindow: 8, // seconds
+          slaDrain: 40, // HP/s per 1.0 of availability below target
+          wafBlock: [0, 0.7, 0.92],
+          cachePerLevel: 0.2, // share of legit GETs served at the edge, per level
+          getShare: 0.65,
+          burstMult: 1.5,
+          breakerTrip: 3, // 503s within 1 s that trip the breaker
+          breakerOpen: 3, // seconds it stays open, shedding requests bound for full nodes
+          x: { spawn: 15, gate: 450, server: 820 },
+          prices: {
+            node: [140, 220, 320],
+            cache: [100, 160, 240],
+            waf: [160, 300],
+            breaker: 150,
+            lb: 200
+          },
+          wafUnlock: [3, 6]
+        };
+
+        var ALGOS = ["token_bucket", "leaky_bucket", "fixed_window", "sliding_window"];
+
+        function create(rng) {
+          var g = { rng: rng, algo: "token_bucket", capacity: 20, refill: 14 };
+          reset(g);
+          g.phase = "idle";
+          return g;
+        }
+
+        function reset(g) {
+          g.phase = "running";
+          g.wave = 1;
+          g.t = 0;
+          g.waveT = 0;
+          g.spawnAcc = 0;
+          g.health = 100;
+          g.budget = CFG.startBudget;
+          g.score = 0;
+          g.nodes = [];
+          addNode(g);
+          g.cacheLevel = 0;
+          g.wafLevel = 0;
+          g.hasBreaker = false;
+          g.hasLb = false;
+          g.breaker = "closed";
+          g.breakerT = 0;
+          g.packets = [];
+          g.tokens = g.capacity;
+          g.leakQueue = [];
+          g.leakAcc = 0;
+          g.winStart = 0;
+          g.winCount = 0;
+          g.prevCount = 0;
+          g.okLog = [];
+          g.dropLog = [];
+          g.log503 = [];
+          g.servedLog = [];
+          g.latency = [];
+          g.rr = 0;
+          g.c = { served: 0, cached: 0, r429: 0, r403: 0, r503: 0, shed: 0, breach: 0, legitDropped: 0 };
+          g.events = [];
+        }
+
+        function addNode(g) {
+          var slots = [];
+          for (var i = 0; i < CFG.nodeSlots; i++) slots.push(0);
+          g.nodes.push({ slots: slots, queue: [], active: [] });
+        }
+
+        function price(g, kind) {
+          if (kind === "node") return g.nodes.length < CFG.maxNodes ? CFG.prices.node[g.nodes.length - 1] : null;
+          if (kind === "cache") return g.cacheLevel < 3 ? CFG.prices.cache[g.cacheLevel] : null;
+          if (kind === "waf") return g.wafLevel < 2 ? CFG.prices.waf[g.wafLevel] : null;
+          if (kind === "breaker") return g.hasBreaker ? null : CFG.prices.breaker;
+          if (kind === "lb") return g.hasLb ? null : CFG.prices.lb;
+          return null;
+        }
+
+        function canBuy(g, kind) {
+          if (g.phase !== "running") return false;
+          var p = price(g, kind);
+          if (p === null || g.budget < p) return false;
+          if (kind === "waf" && g.wave < CFG.wafUnlock[g.wafLevel]) return false;
+          return true;
+        }
+
+        function buy(g, kind) {
+          if (!canBuy(g, kind)) return false;
+          g.budget -= price(g, kind);
+          if (kind === "node") addNode(g);
+          else if (kind === "cache") g.cacheLevel++;
+          else if (kind === "waf") g.wafLevel++;
+          else if (kind === "breaker") g.hasBreaker = true;
+          else g.hasLb = true;
+          g.events.push("buy");
+          return true;
+        }
+
+        // Switching algorithm releases anything waiting in the leaky queue to the servers.
+        function setAlgo(g, algo) {
+          if (ALGOS.indexOf(algo) < 0) return;
+          for (var i = 0; i < g.leakQueue.length; i++) sendToServer(g, g.leakQueue[i]);
+          g.leakQueue = [];
+          g.leakAcc = 0;
+          g.algo = algo;
+          g.tokens = Math.min(g.tokens, g.capacity);
+          g.winStart = g.t;
+          g.winCount = 0;
+          g.prevCount = 0;
+        }
+
+        // Weighted count over the last 1 s; read-only, so it is also safe for the gauge
+        // between requests (never negative, even if several windows passed).
+        function slidingEstimate(g) {
+          var span = Math.max(0, g.t - g.winStart);
+          var gap = Math.floor(span);
+          var prev = gap === 0 ? g.prevCount : gap === 1 ? g.winCount : 0;
+          var cur = gap === 0 ? g.winCount : 0;
+          return Math.max(0, prev * (1 - (span - gap)) + cur);
+        }
+
+        function windowCount(g) {
+          return g.t - g.winStart < 1 ? g.winCount : 0;
+        }
+
+        function rollWindow(g) {
+          if (g.t - g.winStart >= 1) {
+            var gap = Math.floor(g.t - g.winStart);
+            g.prevCount = gap === 1 ? g.winCount : 0;
+            g.winCount = 0;
+            g.winStart += gap;
+          }
+        }
+
+        // Returns true (admit), "queue" (leaky bucket) or false (429)
+        function limiter(g) {
+          if (g.algo === "token_bucket") {
+            if (g.tokens >= 1) {
+              g.tokens -= 1;
+              return true;
+            }
+            return false;
+          }
+          if (g.algo === "leaky_bucket") return g.leakQueue.length < g.capacity ? "queue" : false;
+          rollWindow(g);
+          if (g.algo === "fixed_window") {
+            if (g.winCount < g.capacity) {
+              g.winCount++;
+              return true;
+            }
+            return false;
+          }
+          if (slidingEstimate(g) + 1 <= g.capacity) {
+            g.winCount++;
+            return true;
+          }
+          return false;
+        }
+
+        function nodeY(g, i) {
+          var n = g.nodes.length;
+          var h = (560 - 100) / n;
+          return 70 + i * h + h / 2;
+        }
+
+        function pickNode(g) {
+          var n = g.nodes.length;
+          if (!g.hasLb) return Math.floor(g.rng() * n); // hash routing: hotspots under load
+          var best = 0;
+          var bestLoad = Infinity;
+          for (var i = 0; i < n; i++) {
+            var nd = g.nodes[i];
+            var load = nd.queue.length + nd.active.length + countHeading(g, i);
+            if (load < bestLoad) {
+              bestLoad = load;
+              best = i;
+            }
+          }
+          return best;
+        }
+
+        function countHeading(g, i) {
+          var k = 0;
+          for (var j = 0; j < g.packets.length; j++) if (g.packets[j].state === "to_server" && g.packets[j].node === i) k++;
+          return k;
+        }
+
+        function sendToServer(g, p) {
+          var node = pickNode(g);
+          p.state = "to_server";
+          p.node = node;
+          p.ty = nodeY(g, node);
+        }
+
+        function dropLegit(g) {
+          g.c.legitDropped++;
+          g.dropLog.push(g.t);
+        }
+
+        function fx(p, state) {
+          p.state = state;
+          p.ttl = 0.8;
+        }
+
+        function gate(g, p) {
+          var c = g.c;
+          var r = g.rng;
+          if (p.mal && g.wafLevel > 0 && r() < CFG.wafBlock[g.wafLevel]) {
+            fx(p, "blocked");
+            c.r403++;
+            g.score += 5;
+            g.events.push("waf");
+            return;
+          }
+          if (!p.mal && p.get && g.cacheLevel > 0 && r() < g.cacheLevel * CFG.cachePerLevel) {
+            fx(p, "cached");
+            c.cached++;
+            served(g, 2);
+            g.events.push("cache");
+            return;
+          }
+          var d = limiter(g);
+          if (d === true) {
+            sendToServer(g, p);
+          } else if (d === "queue") {
+            p.state = "queued";
+            p.qStart = g.t;
+            g.leakQueue.push(p);
+          } else {
+            fx(p, "throttled");
+            c.r429++;
+            if (p.mal) g.score += 5;
+            else dropLegit(g);
+            g.events.push("429");
+          }
+        }
+
+        function served(g, latencyMs) {
+          g.c.served++;
+          g.budget += CFG.payPerOk;
+          g.score += 10;
+          g.okLog.push(g.t);
+          g.servedLog.push(g.t);
+          g.latency.push(latencyMs);
+          if (g.latency.length > 30) g.latency.shift();
+        }
+
+        function arriveAtNode(g, p) {
+          var nd = g.nodes[p.node];
+          if (nd.queue.length >= CFG.nodeQueue) {
+            // An open breaker fails fast in front of the full node: the request is shed
+            // (the user still loses it) but the node never melts down, so no health damage.
+            if (g.breaker === "open") {
+              g.c.shed++;
+              if (!p.mal) dropLegit(g);
+              g.events.push("shed");
+              return false;
+            }
+            g.c.r503++;
+            g.health -= CFG.dmg503;
+            g.log503.push(g.t);
+            if (!p.mal) dropLegit(g);
+            g.events.push("503");
+            return false;
+          }
+          nd.queue.push({ mal: p.mal, svc: p.mal ? CFG.svcBot : CFG.svcLegit, enq: g.t, wait: p.gateWait || 0 });
+          return true;
+        }
+
+        function runNode(g, nd, t0, t1) {
+          var s = nd.slots;
+          while (nd.queue.length) {
+            var k = 0;
+            for (var i = 1; i < s.length; i++) if (s[i] < s[k]) k = i;
+            var job = nd.queue[0];
+            var start = Math.max(s[k], t0, job.enq);
+            if (start >= t1) break;
+            nd.queue.shift();
+            job.end = start + job.svc;
+            s[k] = job.end;
+            nd.active.push(job);
+          }
+          for (var j = nd.active.length - 1; j >= 0; j--) {
+            var a = nd.active[j];
+            if (a.end > t1) continue;
+            nd.active.splice(j, 1);
+            if (a.mal) {
+              g.c.breach++;
+              g.health -= CFG.dmgBot;
+              g.score = Math.max(0, g.score - 15);
+              g.events.push("breach");
+            } else {
+              served(g, Math.round((a.end - a.enq + a.wait) * 1000));
+            }
+          }
+        }
+
+        function trim(arr, cutoff) {
+          var i = 0;
+          while (i < arr.length && arr[i] <= cutoff) i++;
+          if (i) arr.splice(0, i);
+        }
+
+        function availability(g) {
+          var ok = g.okLog.length;
+          var bad = g.dropLog.length;
+          return ok + bad >= 15 ? ok / (ok + bad) : 1;
+        }
+
+        function spawn(g, w) {
+          var r = g.rng;
+          g.packets.push({
+            x: CFG.x.spawn,
+            y: 60 + r() * 440,
+            ty: 0,
+            speed: 230 + r() * 80,
+            mal: r() < w.mal,
+            get: r() < CFG.getShare,
+            state: "to_gate",
+            node: 0,
+            qStart: 0,
+            gateWait: 0,
+            ttl: 0
+          });
+        }
+
+        function step(g, dt) {
+          if (g.phase !== "running") return;
+          var t0 = g.t;
+          g.t += dt;
+          var w = WAVES[g.wave - 1];
+
+          // Limiter refill / leak
+          if (g.algo === "token_bucket") g.tokens = Math.min(g.capacity, g.tokens + g.refill * dt);
+          if (g.algo === "leaky_bucket") {
+            if (!g.leakQueue.length) g.leakAcc = 0;
+            else {
+              g.leakAcc += g.refill * dt;
+              while (g.leakAcc >= 1 && g.leakQueue.length) {
+                g.leakAcc -= 1;
+                var q = g.leakQueue.shift();
+                q.gateWait = g.t - q.qStart;
+                sendToServer(g, q);
+              }
+            }
+          }
+
+          // Circuit breaker state machine
+          trim(g.log503, g.t - 1);
+          if (g.hasBreaker) {
+            if (g.breaker === "closed" && g.log503.length >= CFG.breakerTrip) {
+              g.breaker = "open";
+              g.breakerT = CFG.breakerOpen;
+              g.events.push("trip");
+            } else if (g.breaker === "open") {
+              g.breakerT -= dt;
+              if (g.breakerT <= 0) g.breaker = "closed";
+            }
+          }
+
+          // Spawning (burst waves pulse at 1.5x on a sine of wave time)
+          var rate = w.rps;
+          if (w.burst && Math.sin(g.waveT * 1.7) > 0.35) rate *= CFG.burstMult;
+          g.spawnAcc += rate * dt;
+          while (g.spawnAcc >= 1) {
+            g.spawnAcc -= 1;
+            spawn(g, w);
+          }
+
+          for (var i = g.packets.length - 1; i >= 0; i--) {
+            var p = g.packets[i];
+            if (p.state === "to_gate") {
+              p.x += p.speed * dt;
+              if (p.x >= CFG.x.gate) {
+                p.x = CFG.x.gate;
+                gate(g, p);
+              }
+            } else if (p.state === "queued") {
+              // waits at the gateway; position is drawn by the renderer
+            } else if (p.state === "to_server") {
+              p.x += p.speed * dt;
+              p.y += (p.ty - p.y) * Math.min(1, dt * 6);
+              if (p.x >= CFG.x.server) {
+                if (arriveAtNode(g, p)) {
+                  g.packets.splice(i, 1);
+                  continue;
+                }
+                fx(p, "dropped");
+              }
+            } else {
+              p.ttl -= dt;
+              p.x += p.speed * 0.4 * dt;
+              p.y += (p.state === "cached" ? -150 : 150) * dt;
+              if (p.ttl <= 0) g.packets.splice(i, 1);
+            }
+          }
+
+          for (var n = 0; n < g.nodes.length; n++) runNode(g, g.nodes[n], t0, g.t);
+
+          // SLA: rolling availability for legit users drains health below target
+          trim(g.okLog, g.t - CFG.slaWindow);
+          trim(g.dropLog, g.t - CFG.slaWindow);
+          trim(g.servedLog, g.t - 1);
+          var av = availability(g);
+          if (av < CFG.slaTarget) g.health -= (CFG.slaTarget - av) * CFG.slaDrain * dt;
+          else g.health = Math.min(100, g.health + CFG.regen * dt);
+
+          if (g.health <= 0) {
+            g.health = 0;
+            g.phase = "over";
+            g.events.push("over");
+            return;
+          }
+
+          g.waveT += dt;
+          if (g.waveT >= w.duration) {
+            if (g.wave >= WAVES.length) {
+              g.phase = "victory";
+              g.events.push("victory");
+              return;
+            }
+            g.wave++;
+            g.waveT = 0;
+            g.budget += CFG.waveBonus;
+            g.score += 100;
+            g.events.push("wave");
+          }
+        }
+
+        return {
+          WAVES: WAVES,
+          CFG: CFG,
+          ALGOS: ALGOS,
+          create: create,
+          reset: reset,
+          step: step,
+          buy: buy,
+          canBuy: canBuy,
+          price: price,
+          setAlgo: setAlgo,
+          availability: availability,
+          slidingEstimate: slidingEstimate,
+          windowCount: windowCount,
+          nodeY: nodeY
+        };
+      })();
+      // ==ENGINE END==
+
+      const $ = (id) => document.getElementById(id);
+      const game = RD.create(Math.random);
+      const CFG = RD.CFG;
+      let paused = false;
+
+      /* ---------- Theme ---------- */
+      function currentTheme() {
+        return document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+      }
+      function updateThemeUI() {
+        const dark = currentTheme() === "dark";
+        $("themeIcon").textContent = dark ? "☀️" : "🌙";
+        $("themeText").textContent = dark ? "Light" : "Dark";
+        $("themeToggle").setAttribute("aria-label", dark ? "Switch to light theme" : "Switch to dark theme");
+      }
+      $("themeToggle").addEventListener("click", () => {
+        const next = currentTheme() === "dark" ? "light" : "dark";
+        document.documentElement.setAttribute("data-theme", next);
+        try {
+          localStorage.setItem("oft_rate_defense_theme", next);
+        } catch (e) {}
+        updateThemeUI();
+      });
+      updateThemeUI();
+
+      /* ---------- Limiter controls ---------- */
+      const ALGO_TIPS = {
+        token_bucket: ["Token Bucket: ", "tokens refill at the refill rate up to capacity. Each request spends one, so a full bucket lets a burst through at once."],
+        leaky_bucket: ["Leaky Bucket: ", "requests wait in a FIFO queue (size = capacity) and leave at the leak rate. Smooth output, but queued requests wait longer."],
+        fixed_window: ["Fixed Window: ", "up to capacity requests per 1 s window, then 429 until the window resets. Up to 2× capacity can slip through around a reset."],
+        sliding_window: ["Sliding Window Counter: ", "this window's count plus the previous window's count weighted by how much of it still overlaps the last second. No edge bursts."]
+      };
+      const algoSelect = $("algoSelect");
+      const sliderCap = $("sliderCap");
+      const sliderRefill = $("sliderRefill");
+
+      function setTip(algo) {
+        const tip = $("algoTip");
+        tip.textContent = "";
+        const strong = document.createElement("strong");
+        strong.textContent = ALGO_TIPS[algo][0];
+        tip.appendChild(strong);
+        tip.appendChild(document.createTextNode(ALGO_TIPS[algo][1]));
+      }
+
+      algoSelect.addEventListener("change", () => {
+        RD.setAlgo(game, algoSelect.value);
+        syncControls();
+      });
+      sliderCap.addEventListener("input", () => {
+        game.capacity = parseInt(sliderCap.value, 10);
+        game.tokens = Math.min(game.tokens, game.capacity);
+        syncControls();
+      });
+      sliderRefill.addEventListener("input", () => {
+        game.refill = parseInt(sliderRefill.value, 10);
+        syncControls();
+      });
+
+      /* ---------- Upgrades ---------- */
+      const UPGRADE_IDS = { node: "Node", cache: "Cache", waf: "Waf", breaker: "Breaker", lb: "Lb" };
+      Object.keys(UPGRADE_IDS).forEach((kind) => {
+        $(`btnUpgrade${UPGRADE_IDS[kind]}`).addEventListener("click", () => {
+          if (RD.buy(game, kind)) syncControls();
+        });
+      });
+
+      function nodeRate(n) {
+        return Math.round(n * (CFG.nodeSlots / CFG.svcLegit));
+      }
+
+      function upgradeText(kind) {
+        const p = RD.price(game, kind);
+        const n = game.nodes.length;
+        if (kind === "node") return [p === null ? "MAX" : `$${p}`, `${n}/${CFG.maxNodes} nodes · +${nodeRate(1)} req/s each`];
+        if (kind === "cache") return [p === null ? "MAX" : `$${p}`, `Lvl ${game.cacheLevel}/3 · edge serves ${Math.round(game.cacheLevel * CFG.cachePerLevel * 100)}% of legit GETs`];
+        if (kind === "waf") {
+          if (p === null) return ["MAX", `L2 · blocks ${Math.round(CFG.wafBlock[2] * 100)}% of bots`];
+          const unlock = CFG.wafUnlock[game.wafLevel];
+          const label = game.wave < unlock ? `W${unlock} · $${p}` : `$${p}`;
+          const now = game.wafLevel ? `L1 blocks ${Math.round(CFG.wafBlock[1] * 100)}%` : "Off";
+          return [label, `${now} · next level blocks ${Math.round(CFG.wafBlock[game.wafLevel + 1] * 100)}% of bots`];
+        }
+        if (kind === "breaker") return [p === null ? "OWNED" : `$${p}`, game.hasBreaker ? `Status: ${game.breaker.toUpperCase()} · trips on ${CFG.breakerTrip} 503s/s` : `Trips on ${CFG.breakerTrip} 503s in 1 s, then sheds instead of overflowing for ${CFG.breakerOpen} s`];
+        return [p === null ? "OWNED" : `$${p}`, game.hasLb ? "Routing to least-loaded node" : "Off: requests hash to random nodes (hotspots)"];
+      }
+
+      let shownTip = "";
+
+      function locked() {
+        return game.phase === "over" || game.phase === "victory";
+      }
+
+      function syncControls() {
+        const isLocked = locked();
+        algoSelect.value = game.algo;
+        algoSelect.disabled = isLocked;
+        sliderCap.disabled = isLocked;
+        sliderCap.value = game.capacity;
+        sliderRefill.value = game.refill;
+        $("capVal").textContent = game.capacity;
+        const windowAlgo = game.algo === "fixed_window" || game.algo === "sliding_window";
+        sliderRefill.disabled = isLocked || windowAlgo;
+        $("refillRow").classList.toggle("is-disabled", windowAlgo);
+        $("refillVal").textContent = windowAlgo ? "n/a (1 s window)" : game.refill;
+        if (shownTip !== game.algo) {
+          shownTip = game.algo;
+          setTip(game.algo);
+        }
+
+        Object.keys(UPGRADE_IDS).forEach((kind) => {
+          const id = UPGRADE_IDS[kind];
+          const [cost, desc] = upgradeText(kind);
+          $(`cost${id}`).textContent = cost;
+          $(`desc${id}`).textContent = desc;
+          $(`btnUpgrade${id}`).disabled = !RD.canBuy(game, kind);
+        });
+        const n = game.nodes.length;
+        $("maxCapacity").textContent = `${n} node${n === 1 ? "" : "s"} · ~${nodeRate(n)} legit req/s`;
+        $("capacityBar").style.width = `${(n / CFG.maxNodes) * 100}%`;
+
+        $("btnPause").disabled = game.phase !== "running";
+        $("pauseText").textContent = paused ? "Resume" : "Pause";
+        $("pauseIcon").textContent = paused ? "▶️" : "⏸️";
+        $("gameBtnText").textContent = game.phase === "idle" ? "Start Game" : "Restart";
+      }
+
+      /* ---------- Game flow ---------- */
+      function startGame() {
+        game.algo = "token_bucket";
+        game.capacity = 20;
+        game.refill = 14;
+        RD.reset(game);
+        paused = false;
+        $("overlay").hidden = true;
+        syncControls();
+        updateStats();
+      }
+
+      function endGame() {
+        const overlay = $("overlay");
+        const title = $("overlayTitle");
+        if (game.phase === "victory") {
+          title.textContent = "Cluster Defended! 🏆";
+          title.style.color = "var(--success)";
+          $("overlayDesc").textContent = `You held all 10 waves with ${Math.round(game.health)}% health, ${game.score} pts and $${Math.floor(game.budget)} left.`;
+        } else {
+          title.textContent = "Cluster Down";
+          title.style.color = "var(--danger)";
+          const c = game.c;
+          $("overlayDesc").textContent = `Health hit 0 in wave ${game.wave}. Bot requests served: ${c.breach}, 503 overloads: ${c.r503}, legit users dropped: ${c.legitDropped}. Bots need the WAF, overloads need nodes or a tighter limiter, and dropped users drain the SLA.`;
+        }
+        $("btnOverlayStart").textContent = "Play Again";
+        overlay.hidden = false;
+        $("btnOverlayStart").focus();
+        syncControls();
+      }
+
+      $("btnRestart").addEventListener("click", startGame);
+      $("btnOverlayStart").addEventListener("click", startGame);
+      $("btnPause").addEventListener("click", () => {
+        if (game.phase !== "running") return;
+        paused = !paused;
+        syncControls();
+      });
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden && game.phase === "running" && !paused) {
+          paused = true;
+          syncControls();
+        }
+      });
+
+      function updateStats() {
+        const c = game.c;
+        const h = $("statHealth");
+        h.textContent = `${Math.max(0, Math.round(game.health))}%`;
+        h.style.color = game.health > 60 ? "var(--success)" : game.health > 30 ? "var(--warning)" : "var(--danger)";
+        $("statWave").textContent = `${game.wave} / ${RD.WAVES.length}`;
+        const av = RD.availability(game);
+        const sla = $("statSla");
+        sla.textContent = `${(av * 100).toFixed(1)}%`;
+        sla.style.color = av >= CFG.slaTarget ? "var(--success)" : "var(--danger)";
+        $("statBudget").textContent = `$${Math.floor(game.budget)}`;
+        $("statScore").textContent = game.score;
+        $("stat429").textContent = c.r429;
+        $("stat403").textContent = c.r403;
+        $("stat503").textContent = `${c.r503} / ${c.shed}`;
+        $("statThroughput").textContent = game.servedLog.length;
+        $("statLatency").textContent = game.latency.length ? `${Math.round(game.latency.reduce((a, b) => a + b, 0) / game.latency.length)} ms` : "—";
+      }
+
+      /* ---------- Rendering (logical 1000 x 560) ---------- */
+      const canvas = $("simCanvas");
+      const ctx = canvas.getContext("2d");
+      let scale = 1;
+      function resizeCanvas() {
+        const rect = canvas.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        const w = Math.max(1, Math.round(rect.width * dpr));
+        if (canvas.width !== w) {
+          canvas.width = w;
+          canvas.height = Math.round((w * 560) / 1000);
+        }
+        scale = canvas.width / 1000;
+      }
+      window.addEventListener("resize", resizeCanvas);
+      resizeCanvas();
+
+      const SANS = "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+      const MONO = "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace";
+      const ALGO_NAMES = { token_bucket: "TOKEN BUCKET", leaky_bucket: "LEAKY BUCKET", fixed_window: "FIXED WINDOW", sliding_window: "SLIDING WINDOW" };
+
+      function render() {
+        const dark = currentTheme() === "dark";
+        const W = 1000;
+        const H = 560;
+        const gx = CFG.x.gate;
+        const sx = CFG.x.server;
+        ctx.setTransform(scale, 0, 0, scale, 0, 0);
+        ctx.clearRect(0, 0, W, H);
+        const label = dark ? "rgba(148,163,184,0.85)" : "rgba(51,65,85,0.9)";
+
+        ctx.fillStyle = dark ? "rgba(56,189,248,0.03)" : "rgba(2,132,199,0.04)";
+        ctx.fillRect(0, 0, gx, H);
+        ctx.fillStyle = dark ? "rgba(245,158,11,0.03)" : "rgba(217,119,6,0.04)";
+        ctx.fillRect(gx, 0, sx - gx, H);
+        ctx.fillStyle = dark ? "rgba(16,185,129,0.04)" : "rgba(5,150,105,0.05)";
+        ctx.fillRect(sx, 0, W - sx, H);
+
+        ctx.fillStyle = label;
+        ctx.font = `600 13px ${SANS}`;
+        ctx.fillText("CLIENT NETWORK", 16, 28);
+        ctx.fillText(`GATEWAY · ${ALGO_NAMES[game.algo]}`, gx + 14, 28);
+        ctx.fillText("BACKEND CLUSTER", sx + 12, 28);
+
+        // Gateway line (red while the breaker is open)
+        ctx.strokeStyle = game.breaker === "open" ? "#ef4444" : dark ? "rgba(56,189,248,0.45)" : "rgba(2,132,199,0.5)";
+        ctx.lineWidth = game.breaker === "open" ? 3 : 1.5;
+        ctx.setLineDash([6, 6]);
+        ctx.beginPath();
+        ctx.moveTo(gx, 40);
+        ctx.lineTo(gx, H);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Limiter gauge
+        let ratio;
+        let gaugeLabel;
+        if (game.algo === "token_bucket") {
+          ratio = game.tokens / game.capacity;
+          gaugeLabel = `${Math.floor(game.tokens)}/${game.capacity} tokens`;
+        } else if (game.algo === "leaky_bucket") {
+          ratio = 1 - game.leakQueue.length / game.capacity;
+          gaugeLabel = `queue ${game.leakQueue.length}/${game.capacity}`;
+        } else if (game.algo === "sliding_window") {
+          const est = RD.slidingEstimate(game);
+          ratio = 1 - est / game.capacity;
+          gaugeLabel = `${Math.round(est)}/${game.capacity} weighted`;
+        } else {
+          const cnt = RD.windowCount(game);
+          ratio = 1 - cnt / game.capacity;
+          gaugeLabel = `${cnt}/${game.capacity} this window`;
+        }
+        ratio = Math.max(0, Math.min(1, ratio));
+        ctx.fillStyle = dark ? "rgba(15,23,42,0.85)" : "rgba(226,232,240,0.9)";
+        ctx.fillRect(gx - 7, H / 2 - 60, 14, 120);
+        ctx.fillStyle = ratio > 0.4 ? "#38bdf8" : ratio > 0.15 ? "#f59e0b" : "#ef4444";
+        ctx.fillRect(gx - 7, H / 2 + 60 - 120 * ratio, 14, 120 * ratio);
+        ctx.fillStyle = label;
+        ctx.font = `600 11px ${MONO}`;
+        ctx.fillText(gaugeLabel, gx + 12, H / 2 + 4);
+
+        // WAF + cache badges
+        function badge(x, y, w, color, text) {
+          ctx.fillStyle = dark ? "rgba(15,23,42,0.85)" : "rgba(255,255,255,0.95)";
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          if (ctx.roundRect) ctx.roundRect(x, y, w, 30, 6);
+          else ctx.rect(x, y, w, 30);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = color;
+          ctx.font = `700 11px ${SANS}`;
+          ctx.fillText(text, x + 8, y + 19);
+        }
+        if (game.wafLevel > 0) badge(gx - 96, H - 44, 84, dark ? "#a855f7" : "#7e22ce", `WAF L${game.wafLevel}`);
+        if (game.cacheLevel > 0) badge(gx + 14, H - 44, 84, dark ? "#22d3ee" : "#0e7490", `CACHE L${game.cacheLevel}`);
+        if (game.hasBreaker) badge(gx + 108, H - 44, 130, game.breaker === "open" ? "#ef4444" : dark ? "#10b981" : "#047857", `BREAKER ${game.breaker.toUpperCase()}`);
+        if (game.hasLb) badge(sx - 120, H - 44, 108, dark ? "#38bdf8" : "#0369a1", "LB: LEAST-LOAD");
+
+        // Nodes: slot and queue occupancy
+        const n = game.nodes.length;
+        const rowH = (H - 100) / n;
+        for (let i = 0; i < n; i++) {
+          const nd = game.nodes[i];
+          const cy = RD.nodeY(game, i);
+          const bh = Math.min(64, rowH - 14);
+          const top = cy - bh / 2;
+          const full = nd.queue.length >= CFG.nodeQueue;
+          ctx.fillStyle = dark ? "rgba(15,23,42,0.9)" : "rgba(255,255,255,0.97)";
+          ctx.strokeStyle = full ? "#ef4444" : dark ? "rgba(16,185,129,0.6)" : "rgba(4,120,87,0.7)";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          if (ctx.roundRect) ctx.roundRect(sx + 10, top, W - sx - 20, bh, 6);
+          else ctx.rect(sx + 10, top, W - sx - 20, bh);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = dark ? "#f8fafc" : "#0f172a";
+          ctx.font = `700 11px ${MONO}`;
+          ctx.fillText(`NODE-${i + 1}`, sx + 18, top + 16);
+          for (let k = 0; k < CFG.nodeSlots + CFG.nodeQueue; k++) {
+            const isSlot = k < CFG.nodeSlots;
+            const filled = isSlot ? k < nd.active.length : k - CFG.nodeSlots < nd.queue.length;
+            ctx.fillStyle = filled ? (isSlot ? "#10b981" : full ? "#ef4444" : "#f59e0b") : dark ? "rgba(148,163,184,0.18)" : "rgba(100,116,139,0.18)";
+            ctx.fillRect(sx + 18 + k * 21, top + bh - 18, 17, 10);
+          }
+        }
+
+        // Packets
+        for (const p of game.packets) {
+          let color;
+          if (p.state === "throttled") color = "#f59e0b";
+          else if (p.state === "blocked") color = "#a855f7";
+          else if (p.state === "cached") color = "#22d3ee";
+          else if (p.state === "shed") color = "#94a3b8";
+          else if (p.state === "dropped") color = "#ef4444";
+          else color = p.mal ? "#ef4444" : dark ? "#38bdf8" : "#0284c7";
+          let x = p.x;
+          let y = p.y;
+          if (p.state === "queued") {
+            const idx = game.leakQueue.indexOf(p);
+            x = gx - 14 - (idx % 12) * 9;
+            y = H / 2 + 80 + Math.floor(idx / 12) * 9;
+          }
+          ctx.globalAlpha = p.ttl > 0 ? Math.max(0, p.ttl / 0.8) : 1;
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(x, y, p.mal ? 5 : 4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+
+        if (paused && game.phase === "running") {
+          ctx.fillStyle = label;
+          ctx.font = `700 28px ${SANS}`;
+          ctx.fillText("PAUSED", 440, 280);
+        }
+      }
+
+      /* ---------- Single rAF loop ---------- */
+      let lastTs = performance.now();
+      let uiTimer = 0;
+      function frame(ts) {
+        const dt = Math.min(0.1, Math.max(0, (ts - lastTs) / 1000));
+        lastTs = ts;
+        if (game.phase === "running" && !paused) {
+          let rem = dt;
+          while (rem > 1e-6 && game.phase === "running") {
+            const h = Math.min(rem, 1 / 60);
+            RD.step(game, h);
+            rem -= h;
+          }
+          if (game.phase !== "running") endGame();
+        }
+        game.events.length = 0;
+        uiTimer -= dt;
+        if (uiTimer <= 0) {
+          uiTimer = 0.1;
+          updateStats();
+          syncControls();
+        }
+        render();
+        requestAnimationFrame(frame);
+      }
+
+      syncControls();
+      updateStats();
+      requestAnimationFrame(frame);
+    </script>
+  </body>
+</html>
