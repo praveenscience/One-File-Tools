@@ -1216,7 +1216,7 @@
           topic: 'Email Sanitization',
           pattern: '/^[a-z0-9._%+-]+@(?!tempmail\\.com|dispostable\\.com)[a-z0-9.-]+\\.[a-z]{2,}$/i',
           regex: /^[a-z0-9._%+-]+@(?!tempmail\.com|dispostable\.com)[a-z0-9.-]+\.[a-z]{2,}$/i,
-          targetString: 'alex.dev+work@company.io',
+          targetString: 'user@example.com',
           title: 'Email Address Sanitization & Disposable Domain Filter',
           desc: 'An email sanitization filter validates standard email format while using a negative lookahead to block disposable email domains (<code>tempmail.com</code> and <code>dispostable.com</code>). Which address successfully passes this sanitization filter?',
           options: [
@@ -1229,7 +1229,7 @@
           hint: 'The negative lookahead (?!tempmail\\.com|dispostable\\.com) positioned right after the @ rejects blocked domain names before matching the domain tokens.',
           explainer: {
             title: 'Negative Lookahead for Domain Filtering',
-            diagram: '/^[a-z0-9._%+-]+@(?!tempmail\\.com|dispostable\\.com)[a-z0-9.-]+\\.[a-z]{2,}$/i\n"alex.dev@company.io" ──> [user: "alex.dev"] + [@: "@"] + [Lookahead: NOT tempmail] + [domain: "company.io"] ✓\n"bot@tempmail.com"    ──> [user: "bot"]      + [@: "@"] + [Lookahead FAILS: tempmail.com detected] ──> REJECTED ✗',
+            diagram: '/^[a-z0-9._%+-]+@(?!tempmail\\.com|dispostable\\.com)[a-z0-9.-]+\\.[a-z]{2,}$/i\n"user@example.com" ──> [user: "user"] + [@: "@"] + [Lookahead: NOT tempmail] + [domain: "example.com"] ✓\n"bot@tempmail.com"    ──> [user: "bot"]      + [@: "@"] + [Lookahead FAILS: tempmail.com detected] ──> REJECTED ✗',
             body: '<code>(?!tempmail\\.com|dispostable\\.com)</code> acts as a negative lookahead assertion right after the <code>@</code> symbol. It inspects the upcoming domain characters without consuming them. If either blacklisted domain matches, the assertion immediately fails, cleanly rejecting disposable inboxes.'
           }
         },
@@ -1518,25 +1518,20 @@
           var savedStateStr = localStorage.getItem(STORAGE_KEY_STATE);
           if (savedStateStr) {
             var parsed = JSON.parse(savedStateStr);
-            if (parsed && typeof parsed === 'object') {
-              if (Number.isInteger(parsed.levelIndex) && parsed.levelIndex >= 0 && parsed.levelIndex < QUESTIONS.length) {
-                state.levelIndex = parsed.levelIndex;
-              }
-              if (typeof parsed.score === 'number' && Number.isFinite(parsed.score)) {
-                state.score = Math.max(0, parsed.score);
-              }
-              if (typeof parsed.streak === 'number' && Number.isFinite(parsed.streak)) {
-                state.streak = Math.max(0, parsed.streak);
-              }
-              if (typeof parsed.maxStreak === 'number' && Number.isFinite(parsed.maxStreak)) {
-                state.maxStreak = Math.max(0, parsed.maxStreak);
-              }
-              if (typeof parsed.correctAnswers === 'number' && Number.isFinite(parsed.correctAnswers)) {
-                state.correctAnswers = Math.max(0, parsed.correctAnswers);
-              }
-              if (typeof parsed.totalAnswered === 'number' && Number.isFinite(parsed.totalAnswered)) {
-                state.totalAnswered = Math.max(0, parsed.totalAnswered);
-              }
+            if (parsed && Number.isInteger(parsed.levelIndex) && parsed.levelIndex >= 0 && parsed.levelIndex < QUESTIONS.length) {
+              state.levelIndex = parsed.levelIndex;
+              state.score = (Number.isInteger(parsed.score) && parsed.score >= 0) ? parsed.score : 0;
+              state.streak = (Number.isInteger(parsed.streak) && parsed.streak >= 0) ? parsed.streak : 0;
+              state.maxStreak = (Number.isInteger(parsed.maxStreak) && parsed.maxStreak >= 0) ? parsed.maxStreak : 0;
+              state.correctAnswers = (Number.isInteger(parsed.correctAnswers) && parsed.correctAnswers >= 0) ? parsed.correctAnswers : 0;
+              state.totalAnswered = (Number.isInteger(parsed.totalAnswered) && parsed.totalAnswered >= 0) ? parsed.totalAnswered : 0;
+            } else if (parsed && Number.isInteger(parsed.levelIndex) && parsed.levelIndex >= QUESTIONS.length) {
+              state.levelIndex = QUESTIONS.length;
+              state.score = (Number.isInteger(parsed.score) && parsed.score >= 0) ? parsed.score : 0;
+              state.streak = (Number.isInteger(parsed.streak) && parsed.streak >= 0) ? parsed.streak : 0;
+              state.maxStreak = (Number.isInteger(parsed.maxStreak) && parsed.maxStreak >= 0) ? parsed.maxStreak : 0;
+              state.correctAnswers = (Number.isInteger(parsed.correctAnswers) && parsed.correctAnswers >= 0) ? parsed.correctAnswers : 0;
+              state.totalAnswered = (Number.isInteger(parsed.totalAnswered) && parsed.totalAnswered >= 0) ? parsed.totalAnswered : 0;
             }
           }
         } catch (e) { }
@@ -1789,6 +1784,17 @@
         }
       }
 
+      function renderTargetPlain(str) {
+        while (targetStringStage.firstChild) {
+          targetStringStage.removeChild(targetStringStage.firstChild);
+        }
+        while (captureGroupsContainer.firstChild) {
+          captureGroupsContainer.removeChild(captureGroupsContainer.firstChild);
+        }
+        targetStringStage.textContent = str || '(empty string)';
+        matchCountBadge.textContent = 'Matches hidden';
+      }
+
       // --- Render Level ---
       function renderLevel() {
         if (state.levelIndex >= QUESTIONS.length) {
@@ -1824,9 +1830,9 @@
         actionBtn.disabled = true;
         actionBtn.innerHTML = '<span>Submit Answer</span> <span aria-hidden="true">→</span>';
 
-        // Render Test String
+        // Render Test String (Plain text without highlights or badges until submitted)
         customTestInput.value = q.targetString;
-        highlightTargetString(q.targetString, q.regex, q);
+        renderTargetPlain(q.targetString);
 
         // Render Options
         while (optionsPanel.firstChild) {
@@ -1880,7 +1886,10 @@
       // --- Live Custom Playground Testing ---
       customTestInput.addEventListener('input', function () {
         var q = QUESTIONS[state.levelIndex];
-        if (q && q.regex) {
+        if (!q) return;
+        if (!state.isAnswered) {
+          renderTargetPlain(customTestInput.value);
+        } else if (q.regex) {
           highlightTargetString(customTestInput.value, q.regex, q);
         }
       });
@@ -1906,6 +1915,9 @@
 
         var q = QUESTIONS[state.levelIndex];
         var isCorrect = (state.selectedOption === q.correct);
+
+        // Run match evaluation and live highlights now that answer is submitted
+        highlightTargetString(customTestInput.value || q.targetString, q.regex, q);
 
         state.totalAnswered++;
 
