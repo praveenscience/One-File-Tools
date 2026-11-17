@@ -1,0 +1,2503 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Git Rebase &amp; Reset Rodeo — 12 questions on soft/mixed/hard resets, interactive rebase, ORIG_HEAD and reflog recovery, cherry-pick, revert, restore, rebase --onto and force-with-lease." />
+    <title>Git Rebase &amp; Reset Rodeo — One File Tools</title>
+    <script>
+      (function () {
+        try {
+          var saved = null;
+          try {
+            saved = localStorage.getItem("git_rodeo_theme");
+          } catch (e) {}
+          var theme = saved === "dark" || saved === "light" ? saved : window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+          document.documentElement.setAttribute("data-theme", theme);
+        } catch (e) {
+          document.documentElement.setAttribute("data-theme", "dark");
+        }
+      })();
+    </script>
+    <style>
+      [hidden] {
+        display: none !important;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --bg: #090d16;
+        --bg-card: #111827;
+        --bg-card-hover: #172033;
+        --border: #1f293d;
+        --border-focus: #f97316;
+        --text: #f3f4f6;
+        --text-muted: #9ca3af;
+        --accent: #f97316;
+        --accent-hover: #ea580c;
+        --accent-glow: rgba(249, 115, 22, 0.25);
+        --success: #10b981;
+        --success-bg: rgba(16, 185, 129, 0.15);
+        --danger: #ef4444;
+        --danger-bg: rgba(239, 68, 68, 0.15);
+        --warning: #f59e0b;
+        --warning-bg: rgba(245, 158, 11, 0.15);
+        --cyan: #06b6d4;
+        --purple: #a855f7;
+        --blue: #3b82f6;
+        --radius-sm: 6px;
+        --radius-md: 10px;
+        --radius-lg: 16px;
+        --font-mono: "JetBrains Mono", "Fira Code", "Consolas", "Courier New", monospace;
+        --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        --shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+      }
+
+      [data-theme="light"] {
+        --bg: #f8fafc;
+        --bg-card: #ffffff;
+        --bg-card-hover: #f1f5f9;
+        --border: #e2e8f0;
+        --border-focus: #ea580c;
+        --text: #0f172a;
+        --text-muted: #64748b;
+        --accent: #ea580c;
+        --accent-hover: #c2410c;
+        --accent-glow: rgba(234, 88, 12, 0.2);
+        --success: #059669;
+        --success-bg: rgba(5, 150, 105, 0.1);
+        --danger: #dc2626;
+        --danger-bg: rgba(220, 38, 38, 0.1);
+        --warning: #d97706;
+        --warning-bg: rgba(217, 119, 6, 0.1);
+        --cyan: #0891b2;
+        --purple: #9333ea;
+        --blue: #2563eb;
+        --shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+      }
+
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg);
+        color: var(--text);
+        line-height: 1.6;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        transition:
+          background-color 0.2s ease,
+          color 0.2s ease;
+      }
+
+      .app-container {
+        max-width: 980px;
+        width: 100%;
+        margin: 0 auto;
+        padding: 1.5rem 1rem 3rem;
+        flex: 1;
+      }
+
+      /* Top Navigation Header */
+      .top-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-bottom: 1.25rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+
+      .brand-icon {
+        font-size: 1.85rem;
+        line-height: 1;
+      }
+
+      .brand-text h1 {
+        font-size: 1.35rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        line-height: 1.2;
+      }
+
+      .brand-text p {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+      }
+
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .icon-btn {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: 0.45rem 0.75rem;
+        border-radius: var(--radius-sm);
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.35rem;
+        min-height: 38px;
+        min-width: 38px;
+        transition: all 0.15s ease;
+      }
+
+      .icon-btn:hover {
+        background: var(--bg-card-hover);
+        border-color: var(--accent);
+      }
+
+      .icon-btn:focus-visible {
+        outline: 2px solid var(--border-focus);
+        outline-offset: 2px;
+      }
+
+      button:focus-visible,
+      a:focus-visible,
+      [tabindex]:focus-visible {
+        outline: 2px solid var(--border-focus);
+        outline-offset: 2px;
+      }
+
+      .icon-btn.confirming {
+        width: auto;
+        padding: 0 0.6rem;
+        font-size: 0.75rem;
+        border-color: var(--danger);
+        color: var(--danger);
+      }
+
+      .action-btn-secondary[hidden],
+      .action-btn-main[hidden] {
+        display: none !important;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+      }
+
+      .terminal-body .cmd-out {
+        white-space: pre-wrap;
+        margin-bottom: 0.4rem;
+      }
+
+      /* Stats Bar */
+      .stats-bar {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+      }
+
+      .stat-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: 0.65rem 0.85rem;
+        box-shadow: var(--shadow);
+      }
+
+      .stat-label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+        font-weight: 600;
+        margin-bottom: 0.2rem;
+      }
+
+      .stat-value {
+        font-size: 1.25rem;
+        font-weight: 800;
+        display: flex;
+        align-items: baseline;
+        gap: 0.35rem;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .multiplier-badge {
+        font-size: 0.72rem;
+        padding: 0.15rem 0.4rem;
+        background: var(--warning-bg);
+        color: var(--warning);
+        border: 1px solid var(--warning);
+        border-radius: var(--radius-sm);
+        font-weight: 700;
+      }
+
+      .progress-track {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 9999px;
+        height: 7px;
+        overflow: hidden;
+        margin-bottom: 1.25rem;
+      }
+
+      .progress-fill {
+        background: linear-gradient(90deg, var(--accent), var(--purple));
+        height: 100%;
+        width: 0%;
+        transition: width 0.3s ease;
+      }
+
+      /* Pool Banner (Retry Mode) */
+      .pool-banner {
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        background: var(--warning-bg);
+        border: 1px solid var(--warning);
+        color: var(--warning);
+        padding: 0.5rem 0.85rem;
+        border-radius: var(--radius-md);
+        margin-bottom: 1rem;
+        font-size: 0.82rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .pool-banner button {
+        background: var(--warning);
+        color: #000;
+        border: none;
+        padding: 0.25rem 0.65rem;
+        border-radius: var(--radius-sm);
+        font-size: 0.75rem;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      /* Main Quiz Card */
+      .quiz-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 1.5rem;
+        box-shadow: var(--shadow);
+        margin-bottom: 1.5rem;
+        position: relative;
+      }
+
+      .card-meta {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        margin-bottom: 0.85rem;
+      }
+
+      .pill {
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 0.25rem 0.65rem;
+        border-radius: 9999px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      .pill-accent {
+        background: var(--accent-glow);
+        color: var(--accent);
+        border: 1px solid var(--accent);
+      }
+
+      .pill-topic {
+        background: var(--bg-card-hover);
+        color: var(--text-muted);
+        border: 1px solid var(--border);
+      }
+
+      .pill-difficulty {
+        background: var(--warning-bg);
+        color: var(--warning);
+        border: 1px solid var(--warning);
+      }
+
+      .question-title {
+        font-size: 1.25rem;
+        font-weight: 800;
+        margin-bottom: 0.4rem;
+        line-height: 1.3;
+      }
+
+      .question-desc code {
+        font-family: var(--font-mono);
+        font-size: 0.85em;
+        background: var(--bg-card-hover);
+        padding: 0.1rem 0.35rem;
+        border-radius: 4px;
+        border: 1px solid var(--border);
+      }
+
+      .question-desc {
+        font-size: 0.92rem;
+        color: var(--text-muted);
+        margin-bottom: 1rem;
+        line-height: 1.5;
+      }
+
+      /* Terminal Command Box */
+      .terminal-box {
+        background: #090e17;
+        border: 1px solid #1f293d;
+        border-radius: var(--radius-md);
+        margin-bottom: 1.25rem;
+        overflow: hidden;
+        font-family: var(--font-mono);
+        font-size: 0.84rem;
+      }
+
+      [data-theme="light"] .terminal-box {
+        background: #0f172a;
+        border-color: #334155;
+      }
+
+      .terminal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.45rem 0.85rem;
+        background: rgba(255, 255, 255, 0.04);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        font-size: 0.75rem;
+        color: #94a3b8;
+      }
+
+      .terminal-dots {
+        display: flex;
+        gap: 5px;
+      }
+
+      .terminal-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: #334155;
+      }
+
+      .terminal-body {
+        padding: 1rem;
+        line-height: 1.55;
+        color: #e2e8f0;
+        overflow-x: auto;
+        white-space: pre-wrap;
+      }
+
+      .cmd-prompt {
+        color: #f97316;
+        font-weight: 700;
+      }
+      .cmd-text {
+        color: #38bdf8;
+        font-weight: 700;
+      }
+      .cmd-out {
+        color: #94a3b8;
+        margin-top: 0.25rem;
+      }
+
+      /* SVG Commit Tree Visualizer */
+      .tree-visualizer {
+        background: #090e17;
+        border: 1px solid #1f293d;
+        border-radius: var(--radius-md);
+        margin-bottom: 1.25rem;
+        overflow: hidden;
+      }
+
+      [data-theme="light"] .tree-visualizer {
+        background: #0f172a;
+        border-color: #334155;
+      }
+
+      .tree-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.5rem 0.85rem;
+        background: rgba(255, 255, 255, 0.04);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      .tree-view-toggle-btn {
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: 0.2rem 0.55rem;
+        border-radius: var(--radius-sm);
+        font-size: 0.72rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+
+      .tree-view-toggle-btn:hover {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: var(--accent);
+      }
+
+      .tree-svg-container {
+        padding: 0.75rem;
+        display: flex;
+        justify-content: center;
+        overflow-x: auto;
+      }
+
+      .tree-svg {
+        max-width: 100%;
+        height: auto;
+        display: block;
+      }
+
+      .tree-status-indicators {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 0.5rem;
+        padding: 0.75rem 1rem;
+        background: rgba(0, 0, 0, 0.2);
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+      }
+
+      .indicator-item {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+      }
+
+      .indicator-label {
+        color: var(--text-muted);
+      }
+
+      .indicator-val {
+        font-weight: 700;
+      }
+
+      /* Options Panel */
+      .options-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+        margin-bottom: 1.25rem;
+      }
+
+      .option-btn {
+        width: 100%;
+        text-align: left;
+        background: var(--bg);
+        border: 2px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: 0.85rem 1rem;
+        color: var(--text);
+        font-family: var(--font-sans);
+        font-size: 0.9rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.85rem;
+        transition: all 0.15s ease;
+        position: relative;
+      }
+
+      .option-btn:hover:not(:disabled) {
+        border-color: var(--accent);
+        background: var(--bg-card-hover);
+      }
+
+      .option-btn:focus-visible {
+        outline: 2px solid var(--border-focus);
+        outline-offset: 2px;
+      }
+
+      .option-btn.selected {
+        border-color: var(--accent);
+        background: var(--accent-glow);
+      }
+
+      .option-btn.correct {
+        border-color: var(--success);
+        background: var(--success-bg);
+        color: var(--success);
+        font-weight: 600;
+      }
+
+      .option-btn.wrong {
+        border-color: var(--danger);
+        background: var(--danger-bg);
+        color: var(--danger);
+        text-decoration: line-through;
+      }
+
+      .option-key {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 26px;
+        height: 26px;
+        border-radius: var(--radius-sm);
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        font-size: 0.75rem;
+        font-family: var(--font-mono);
+        font-weight: 700;
+        color: var(--text-muted);
+        flex-shrink: 0;
+      }
+
+      .option-btn.selected .option-key {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+      }
+
+      .option-text {
+        flex: 1;
+        word-break: break-word;
+        line-height: 1.45;
+      }
+
+      .option-text code {
+        font-family: var(--font-mono);
+        font-size: 0.82rem;
+        background: var(--bg-card);
+        padding: 0.15rem 0.35rem;
+        border-radius: 4px;
+        border: 1px solid var(--border);
+      }
+
+      /* Hint Box */
+      .hint-box {
+        display: none;
+        background: var(--warning-bg);
+        border: 1px solid var(--warning);
+        border-radius: var(--radius-md);
+        padding: 0.85rem 1rem;
+        margin-bottom: 1.25rem;
+        font-size: 0.85rem;
+        color: var(--text);
+      }
+
+      .hint-box.show {
+        display: block;
+        animation: fadeIn 0.25s ease;
+      }
+
+      /* Explainer Deep Dive Card */
+      .explainer-card {
+        display: none;
+        background: var(--bg-card-hover);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: 1.2rem;
+        margin-bottom: 1.25rem;
+      }
+
+      .explainer-card.show {
+        display: block;
+        animation: fadeIn 0.25s ease;
+      }
+
+      .explainer-badge {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--cyan);
+        margin-bottom: 0.35rem;
+        display: block;
+      }
+
+      .explainer-title {
+        font-size: 1.05rem;
+        font-weight: 800;
+        margin-bottom: 0.65rem;
+      }
+
+      .explainer-diagram {
+        margin: 0.85rem 0;
+        padding: 0.85rem;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        overflow-x: auto;
+        white-space: pre;
+        line-height: 1.45;
+        color: var(--cyan);
+      }
+
+      .explainer-body {
+        font-size: 0.88rem;
+        color: var(--text);
+        line-height: 1.6;
+      }
+
+      .explainer-body code {
+        font-family: var(--font-mono);
+        font-size: 0.82rem;
+        background: var(--bg);
+        padding: 0.15rem 0.4rem;
+        border-radius: 4px;
+        border: 1px solid var(--border);
+      }
+
+      /* Actions Bar */
+      .card-actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+
+      .secondary-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .action-btn-main {
+        background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+        color: #fff;
+        border: none;
+        padding: 0.75rem 1.6rem;
+        border-radius: var(--radius-md);
+        font-size: 0.95rem;
+        font-weight: 700;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 10px var(--accent-glow);
+      }
+
+      .action-btn-main:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 14px var(--accent-glow);
+      }
+
+      .action-btn-main:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+
+      .action-btn-secondary {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: 0.65rem 1rem;
+        border-radius: var(--radius-md);
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        transition: all 0.15s ease;
+      }
+
+      .action-btn-secondary:hover:not(:disabled) {
+        background: var(--bg-card-hover);
+        border-color: var(--accent);
+      }
+
+      .action-btn-secondary:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      /* Quick Reference Cheat Sheet Drawer */
+      .sheet-drawer {
+        display: none;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: var(--shadow);
+        animation: fadeIn 0.25s ease;
+      }
+
+      .sheet-drawer.show {
+        display: block;
+      }
+
+      .sheet-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .sheet-title {
+        font-size: 1.1rem;
+        font-weight: 800;
+        color: var(--accent);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .sheet-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1rem;
+        font-size: 0.82rem;
+      }
+
+      .sheet-card {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: 0.85rem;
+      }
+
+      .sheet-card h4 {
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: var(--cyan);
+        margin-bottom: 0.4rem;
+      }
+
+      .sheet-card table {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+        margin-top: 0.4rem;
+      }
+
+      .sheet-card th,
+      .sheet-card td {
+        padding: 0.35rem 0.5rem;
+        border: 1px solid var(--border);
+        text-align: left;
+      }
+
+      .sheet-card th {
+        background: var(--bg-card);
+        color: var(--text-muted);
+      }
+
+      /* Completion Scorecard Modal */
+      .modal-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(4px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        z-index: 100;
+      }
+
+      .modal-backdrop.show {
+        display: flex;
+        animation: fadeIn 0.2s ease;
+      }
+
+      .modal-content {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 2rem;
+        max-width: 520px;
+        width: 100%;
+        text-align: center;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+      }
+
+      .modal-trophy {
+        font-size: 3.5rem;
+        margin-bottom: 0.5rem;
+        line-height: 1;
+      }
+
+      .modal-title {
+        font-size: 1.5rem;
+        font-weight: 800;
+        margin-bottom: 0.25rem;
+      }
+
+      .modal-rank {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: var(--accent);
+        margin-bottom: 1.25rem;
+      }
+
+      .modal-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.75rem;
+        margin-bottom: 1.5rem;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: 1rem;
+      }
+
+      .modal-stat-val {
+        font-size: 1.35rem;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .modal-stat-lbl {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        font-weight: 600;
+      }
+
+      .modal-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+
+      /* Footer */
+      footer {
+        text-align: center;
+        padding: 1.5rem;
+        color: var(--text-muted);
+        font-size: 0.8rem;
+        border-top: 1px solid var(--border);
+        margin-top: auto;
+      }
+
+      footer a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+
+      footer a:hover {
+        text-decoration: underline;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(4px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @media (max-width: 640px) {
+        .app-container {
+          padding: 1rem 0.75rem 2rem;
+        }
+        .quiz-card {
+          padding: 1.2rem;
+        }
+        .card-actions {
+          flex-direction: column-reverse;
+          align-items: stretch;
+        }
+        .secondary-actions {
+          justify-content: space-between;
+        }
+        .action-btn-main {
+          justify-content: center;
+        }
+      }
+
+      @media (max-width: 420px) {
+        .stats-bar {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .modal-content {
+          padding: 1.25rem;
+        }
+        .modal-stats-grid {
+          gap: 0.4rem;
+          padding: 0.75rem 0.5rem;
+        }
+        .modal-stat-val {
+          font-size: 1.1rem;
+        }
+        .sheet-drawer {
+          padding: 1rem;
+        }
+        .sheet-grid {
+          grid-template-columns: 1fr;
+        }
+        .question-title {
+          font-size: 1.1rem;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation: none !important;
+          transition: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-container">
+      <!-- Top Header -->
+      <header class="top-header" role="banner">
+        <div class="brand">
+          <span class="brand-icon" aria-hidden="true">🤠</span>
+          <div class="brand-text">
+            <h1>Git Rebase &amp; Reset Rodeo</h1>
+            <p>Tree rewrites, reflog rescues &amp; HEAD manipulation mastery</p>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button type="button" class="icon-btn" id="audioToggleBtn" aria-label="Toggle Sound Effects" title="Toggle audio sound (M)">
+            <span id="audioIcon">🔊</span>
+          </button>
+          <button type="button" class="icon-btn" id="themeToggleBtn" aria-label="Toggle Dark / Light Theme" title="Toggle theme">
+            <span id="themeIcon">☀️</span>
+          </button>
+          <button type="button" class="icon-btn" id="resetBtn" aria-label="Reset quiz progress" title="Reset progress">↺</button>
+        </div>
+      </header>
+
+      <!-- Stats Bar -->
+      <div class="stats-bar" role="region" aria-label="Quiz Statistics">
+        <div class="stat-card">
+          <div class="stat-label">Rodeo Level</div>
+          <div class="stat-value">
+            <span id="levelDisplay">1</span><span style="font-size: 0.75rem; color: var(--text-muted)">/ <span id="totalLevelsDisplay">12</span></span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Score</div>
+          <div class="stat-value" id="scoreDisplay">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Streak</div>
+          <div class="stat-value">
+            <span id="streakDisplay">0</span>
+            <span class="multiplier-badge" id="multiplierBadge" hidden>1x</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Accuracy</div>
+          <div class="stat-value" id="accuracyDisplay">100%</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">High Score</div>
+          <div class="stat-value" id="highScoreDisplay">0</div>
+        </div>
+      </div>
+
+      <!-- Progress Track -->
+      <div class="progress-track" id="progressTrack" role="progressbar" aria-label="Quiz progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+
+      <!-- Pool Banner (when active) -->
+      <div class="pool-banner" id="poolBanner" hidden>
+        <span>🔁 Practice round (no points): <span id="poolRemainingCount">0</span> missed challenge(s) left</span>
+        <button type="button" id="exitRetryPoolBtn">Return to Full Rodeo</button>
+      </div>
+
+      <!-- Quick Reference Cheat Sheet Drawer -->
+      <section class="sheet-drawer" id="sheetDrawer" aria-label="Git Reset and Rebase Quick Reference Cheat Sheet">
+        <div class="sheet-header">
+          <div class="sheet-title"><span>📖</span> Git Reset, Rebase &amp; Recovery Cheat Sheet</div>
+          <button type="button" class="icon-btn" id="closeSheetBtn" aria-label="Close Cheat Sheet">✕</button>
+        </div>
+        <div class="sheet-grid">
+          <div class="sheet-card">
+            <h4>The Three Reset Modes</h4>
+            <div class="table-wrap">
+              <table>
+                <tr>
+                  <th>Mode</th>
+                  <th>Branch</th>
+                  <th>Index</th>
+                  <th>Working tree</th>
+                </tr>
+                <tr>
+                  <td><code>--soft</code></td>
+                  <td>Moved</td>
+                  <td>Kept</td>
+                  <td>Kept</td>
+                </tr>
+                <tr>
+                  <td><code>--mixed</code> (default)</td>
+                  <td>Moved</td>
+                  <td>Reset</td>
+                  <td>Kept</td>
+                </tr>
+                <tr>
+                  <td><code>--hard</code></td>
+                  <td>Moved</td>
+                  <td>Reset</td>
+                  <td>Tracked files reset; untracked kept</td>
+                </tr>
+              </table>
+            </div>
+          </div>
+          <div class="sheet-card">
+            <h4>Interactive Rebase Verbs</h4>
+            <div class="table-wrap">
+              <table>
+                <tr>
+                  <th>Verb</th>
+                  <th>Action</th>
+                </tr>
+                <tr>
+                  <td><code>pick</code></td>
+                  <td>Use commit</td>
+                </tr>
+                <tr>
+                  <td><code>reword</code></td>
+                  <td>Use commit, edit commit message</td>
+                </tr>
+                <tr>
+                  <td><code>edit</code></td>
+                  <td>Use commit, then stop for amending</td>
+                </tr>
+                <tr>
+                  <td><code>squash</code></td>
+                  <td>Meld into previous commit; edit combined message</td>
+                </tr>
+                <tr>
+                  <td><code>fixup</code></td>
+                  <td>Meld into previous commit; discard this message</td>
+                </tr>
+                <tr>
+                  <td><code>drop</code></td>
+                  <td>Leave commit out of the rewritten branch</td>
+                </tr>
+              </table>
+            </div>
+          </div>
+          <div class="sheet-card">
+            <h4>Recovery &amp; Restoration</h4>
+            <div class="table-wrap">
+              <table>
+                <tr>
+                  <th>Task</th>
+                  <th>Command</th>
+                </tr>
+                <tr>
+                  <td>Find lost commit</td>
+                  <td><code>git reflog</code></td>
+                </tr>
+                <tr>
+                  <td>Undo last reset</td>
+                  <td><code>git reset --hard ORIG_HEAD</code></td>
+                </tr>
+                <tr>
+                  <td>Rescue to a branch</td>
+                  <td><code>git branch rescue &lt;sha&gt;</code></td>
+                </tr>
+                <tr>
+                  <td>Unstage file</td>
+                  <td><code>git restore --staged &lt;file&gt;</code></td>
+                </tr>
+                <tr>
+                  <td>Undo a pushed commit</td>
+                  <td><code>git revert &lt;sha&gt;</code></td>
+                </tr>
+                <tr>
+                  <td>Transplant range</td>
+                  <td><code>git rebase --onto &lt;new&gt; &lt;upstream&gt; &lt;branch&gt;</code></td>
+                </tr>
+                <tr>
+                  <td>Safer force-push</td>
+                  <td><code>git push --force-with-lease</code></td>
+                </tr>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Main Quiz Card -->
+      <main class="quiz-card" role="main">
+        <div class="card-meta">
+          <span class="pill pill-accent" id="levelPill">Level 1</span>
+          <span class="pill pill-topic" id="topicPill">Reset Commands</span>
+          <span class="pill pill-difficulty" id="difficultyPill">Medium</span>
+        </div>
+
+        <h2 class="question-title" id="questionTitle">Loading challenge...</h2>
+        <p class="question-desc" id="questionDesc">Scenario description goes here.</p>
+
+        <!-- Terminal Command Display Box -->
+        <div class="terminal-box" id="terminalBox" role="region" aria-label="Starting state in the terminal">
+          <div class="terminal-header">
+            <div class="terminal-dots">
+              <div class="terminal-dot"></div>
+              <div class="terminal-dot"></div>
+              <div class="terminal-dot"></div>
+            </div>
+            <span>starting state</span>
+          </div>
+          <div class="terminal-body" id="terminalBody"></div>
+        </div>
+
+        <!-- Dynamic SVG Commit Tree Visualizer -->
+        <section class="tree-visualizer" id="treeVisualizer" aria-label="Commit graph">
+          <div class="tree-header">
+            <span id="treeHeaderTitle">Commit graph (before)</span>
+            <button type="button" class="tree-view-toggle-btn" id="treeViewToggleBtn" hidden>Show after</button>
+          </div>
+          <div class="tree-svg-container" id="treeSvgContainer">
+            <!-- Injected dynamically via JS -->
+          </div>
+          <div class="tree-status-indicators">
+            <div class="indicator-item">
+              <span class="indicator-label">HEAD:</span>
+              <span class="indicator-val" id="treeHeadVal" style="color: var(--accent)"></span>
+            </div>
+            <div class="indicator-item">
+              <span class="indicator-label">Staging Index:</span>
+              <span class="indicator-val" id="treeStagingVal" style="color: var(--cyan)"></span>
+            </div>
+            <div class="indicator-item">
+              <span class="indicator-label">Working Tree:</span>
+              <span class="indicator-val" id="treeWorkingVal" style="color: var(--success)"></span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Options Radio Group -->
+        <div class="options-panel" id="optionsPanel" role="radiogroup" aria-label="Answer Choices">
+          <!-- Injected dynamically -->
+        </div>
+
+        <!-- Hint Box -->
+        <div class="hint-box" id="hintBox" role="region" aria-live="polite"><strong>💡 Rodeo Hint:</strong> <span id="hintText"></span></div>
+
+        <!-- Deep Dive Explainer Card -->
+        <section class="explainer-card" id="explainerCard" role="region" aria-label="Git Tree Mechanics Explainer">
+          <span class="explainer-badge">Verified in a scratch repo (Git 2.50)</span>
+          <h3 class="explainer-title" id="explainerTitle">Tree Diagnostic</h3>
+          <div class="explainer-diagram" id="explainerDiagram"></div>
+          <div class="explainer-body" id="explainerBody"></div>
+        </section>
+
+        <!-- Bottom Action Controls -->
+        <div class="card-actions">
+          <div class="secondary-actions">
+            <button type="button" class="action-btn-secondary" id="hintBtn"><span>💡</span> Hint</button>
+            <button type="button" class="action-btn-secondary" id="toggleSheetBtn" aria-controls="sheetDrawer" aria-expanded="false" disabled><span>📖</span> Cheat Sheet</button>
+          </div>
+          <button type="button" class="action-btn-main" id="actionBtn" disabled><span>Submit Decision</span> <span aria-hidden="true">→</span></button>
+        </div>
+      </main>
+
+      <!-- Completion Scorecard Modal -->
+      <div class="modal-backdrop" id="summaryModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="modal-content">
+          <div class="modal-trophy" id="summaryTrophy">🤠</div>
+          <h2 class="modal-title" id="modalTitle">Rodeo Completed!</h2>
+          <div class="modal-rank" id="summaryRank">Git Wrangler Supreme</div>
+
+          <div class="modal-stats-grid">
+            <div>
+              <div class="modal-stat-val" id="summaryScore">0</div>
+              <div class="modal-stat-lbl">Final Score</div>
+            </div>
+            <div>
+              <div class="modal-stat-val" id="summaryAccuracy">100%</div>
+              <div class="modal-stat-lbl">Accuracy</div>
+            </div>
+            <div>
+              <div class="modal-stat-val" id="summaryStreak">0</div>
+              <div class="modal-stat-lbl">Max Streak</div>
+            </div>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="action-btn-main" id="retryMissedBtn" style="justify-content: center" hidden><span>🔁</span> Practise Missed Questions (<span id="missedCountSummary">0</span>)</button>
+            <button type="button" class="action-btn-secondary" id="restartAllBtn" style="justify-content: center"><span>↺</span> Ride Again (Full Rodeo)</button>
+            <button type="button" class="action-btn-secondary" id="closeSummaryBtn" style="justify-content: center">Close</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <footer>
+        <p>Git Rebase &amp; Reset Rodeo &bull; Part of <a href="https://github.com/praveenscience/One-File-Tools">One File Tools</a> &bull; Git &amp; Version Control Mastery</p>
+      </footer>
+    </div>
+
+    <script>
+      (function () {
+        "use strict";
+
+        // --- Web Audio: one shared AudioContext, created/resumed on a user gesture ---
+        var audioCtx = null;
+        var isMuted = false;
+
+        function unlockAudio() {
+          try {
+            if (!audioCtx) {
+              var Ctx = window.AudioContext || window.webkitAudioContext;
+              if (!Ctx) return;
+              audioCtx = new Ctx();
+            }
+            if (audioCtx.state === "suspended") audioCtx.resume();
+          } catch (e) {}
+        }
+        document.addEventListener("pointerdown", unlockAudio, true);
+        document.addEventListener("keydown", unlockAudio, true);
+
+        function playTone(freq, type, duration, gainVal, delay) {
+          if (isMuted || !audioCtx || audioCtx.state !== "running") return;
+          try {
+            var startTime = audioCtx.currentTime + (delay || 0);
+            var osc = audioCtx.createOscillator();
+            var gain = audioCtx.createGain();
+            osc.type = type || "sine";
+            osc.frequency.setValueAtTime(freq, startTime);
+            gain.gain.setValueAtTime(gainVal || 0.15, startTime);
+            gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(startTime);
+            osc.stop(startTime + duration);
+          } catch (e) {}
+        }
+
+        function soundClick() {
+          playTone(600, "sine", 0.04, 0.05);
+        }
+        function soundCorrect() {
+          playTone(523.25, "sine", 0.12, 0.15, 0);
+          playTone(659.25, "sine", 0.12, 0.15, 0.08);
+          playTone(783.99, "sine", 0.25, 0.18, 0.16);
+        }
+        function soundWrong() {
+          playTone(220, "sawtooth", 0.15, 0.14, 0);
+          playTone(160, "sawtooth", 0.22, 0.16, 0.08);
+        }
+        function soundStreak() {
+          playTone(440, "triangle", 0.1, 0.12, 0);
+          playTone(554.37, "triangle", 0.1, 0.12, 0.07);
+          playTone(659.25, "triangle", 0.1, 0.12, 0.14);
+          playTone(880, "triangle", 0.22, 0.15, 0.21);
+        }
+        function soundVictory() {
+          [523.25, 659.25, 783.99, 1046.5].forEach(function (freq, i) {
+            playTone(freq, "triangle", 0.25, 0.16, i * 0.12);
+          });
+        }
+
+        // --- Questions ---
+        // Every terminal transcript, SHA and outcome below was produced by running the
+        // scenario in a scratch repo with Git 2.50. Text wrapped in `backticks` renders as code.
+        // `answer` is the index of the correct option in the authored order; options are
+        // shuffled at render time and the correct one is tracked by content.
+        var QUESTIONS = [
+          {
+            id: 1,
+            topic: "Soft Reset",
+            difficulty: "Medium",
+            title: "Uncommit, but keep it ready to recommit",
+            desc: "You just committed C3, then realised it should also include a test file. You run `git reset --soft HEAD~1`. What state are HEAD, the index and the working tree in afterwards?",
+            term: [
+              ["git log --oneline --decorate", "0dc1343 (HEAD -> main) C3 fix: auth header syntax\n03c0c90 C2 add login\n6e03951 C1 init"],
+              ["git status --short", "(no output: working tree clean)"]
+            ],
+            tree: {
+              before: [
+                { id: "c1", label: "C1", sha: "6e03", x: 60, y: 70 },
+                { id: "c2", label: "C2", sha: "03c0", x: 190, y: 70, parent: "c1" },
+                { id: "c3", label: "C3 (main)", sha: "0dc1", x: 320, y: 70, parent: "c2", isHead: true }
+              ],
+              after: [
+                { id: "c1", label: "C1", sha: "6e03", x: 60, y: 70 },
+                { id: "c2", label: "C2 (main)", sha: "03c0", x: 190, y: 70, parent: "c1", isHead: true },
+                { id: "c3", label: "C3 (ORIG_HEAD)", sha: "0dc1", x: 320, y: 70, parent: "c2", isDangling: true }
+              ],
+              beforeStatus: { head: "main → C3 (0dc1343)", staging: "Matches C3", working: "Clean" },
+              afterStatus: { head: "main → C2 (03c0c90)", staging: "auth.js staged (A)", working: "Unchanged" }
+            },
+            options: ["main moves back to C2; the changes C3 introduced stay staged in the index; the working tree is untouched.", "main moves back to C2; the changes C3 introduced are kept in the working tree but are no longer staged.", "main moves back to C2; the index and working tree are reset to C2, but C3 stays reachable from the reflog.", "main moves back to C2; the changes C3 introduced are saved as a new entry in `git stash list`."],
+            answer: 0,
+            hint: "Of the three reset modes, --soft touches the fewest things.",
+            explainer: {
+              title: "git reset --soft moves only the branch",
+              diagram: "$ git reset --soft HEAD~1\n(no output)\n$ git log --oneline --decorate\n03c0c90 (HEAD -> main) C2 add login\n6e03951 C1 init\n$ git status --short\nA  auth.js",
+              body: "`--soft` moves the current branch (and HEAD with it) to the target commit and leaves the index and working tree alone. Because the index still holds C3's content, the change shows as staged (`A  auth.js`): add the forgotten file and commit again. The old C3 is still reachable as `ORIG_HEAD` and in the reflog."
+            }
+          },
+          {
+            id: 2,
+            topic: "Mixed Reset",
+            difficulty: "Medium",
+            title: "The default reset mode",
+            desc: "C3 changed three files. You want those changes back as unstaged edits so you can split them into smaller commits, so you run `git reset HEAD~1` with no mode flag. What happens?",
+            term: [["git log --oneline --decorate", "2222009 (HEAD -> main) C3 feat: tokens\ned3edcd C2 docs\n28dafe2 C1 init"]],
+            tree: {
+              before: [
+                { id: "c1", label: "C1", sha: "28da", x: 60, y: 70 },
+                { id: "c2", label: "C2", sha: "ed3e", x: 190, y: 70, parent: "c1" },
+                { id: "c3", label: "C3 (main)", sha: "2222", x: 320, y: 70, parent: "c2", isHead: true }
+              ],
+              after: [
+                { id: "c1", label: "C1", sha: "28da", x: 60, y: 70 },
+                { id: "c2", label: "C2 (main)", sha: "ed3e", x: 190, y: 70, parent: "c1", isHead: true },
+                { id: "c3", label: "C3 (ORIG_HEAD)", sha: "2222", x: 320, y: 70, parent: "c2", isDangling: true }
+              ],
+              beforeStatus: { head: "main → C3 (2222009)", staging: "Matches C3", working: "Clean" },
+              afterStatus: { head: "main → C2 (ed3edcd)", staging: "Matches C2", working: "3 files modified (unstaged)" }
+            },
+            options: ["main moves back to C2 and the index is reset to C2, so the three files show as modified but unstaged; your edits stay on disk.", "main moves back to C2 and the index is left alone, so the three files show as staged and ready to commit again.", "main moves back to C2 and both the index and the working tree are reset to C2, so the edits to the three files are discarded for good.", "main stays on C3 and only the index is refreshed from C3, so nothing visible changes in `git status`."],
+            answer: 0,
+            hint: "The default mode sits between --soft and --hard.",
+            explainer: {
+              title: "git reset defaults to --mixed",
+              diagram: "$ git reset HEAD~1\nUnstaged changes after reset:\nM\tsrc/api.js\nM\tsrc/auth.js\nM\tsrc/routes.js\n$ git status --short\n M src/api.js\n M src/auth.js\n M src/routes.js",
+              body: "With no flag, `git reset <commit>` runs in `--mixed` mode: it moves the branch and resets the index to match the target, but leaves the working tree alone. The changes from C3 are now unstaged modifications that you can `git add -p` into smaller commits. (If C3 had added brand-new files, they would show as untracked `??` instead.)"
+            }
+          },
+          {
+            id: 3,
+            topic: "Hard Reset",
+            difficulty: "Medium",
+            title: "What a hard reset can and cannot take back",
+            desc: "main is at C3. app.js has an edit you never ran `git add` on, and notes.txt is a brand-new untracked file. You run `git reset --hard HEAD~1`. Which statement is accurate?",
+            term: [
+              ["git log --oneline --decorate", "2208502 (HEAD -> main) C3 tune backoff\ncc05fa3 C2 add retry\n53e2d48 C1 init"],
+              ["git status --short", " M app.js\n?? notes.txt"]
+            ],
+            tree: {
+              before: [
+                { id: "c1", label: "C1", sha: "53e2", x: 60, y: 70 },
+                { id: "c2", label: "C2", sha: "cc05", x: 190, y: 70, parent: "c1" },
+                { id: "c3", label: "C3 (main)", sha: "2208", x: 320, y: 70, parent: "c2", isHead: true }
+              ],
+              after: [
+                { id: "c1", label: "C1", sha: "53e2", x: 60, y: 70 },
+                { id: "c2", label: "C2 (main)", sha: "cc05", x: 190, y: 70, parent: "c1", isHead: true },
+                { id: "c3", label: "C3 (ORIG_HEAD)", sha: "2208", x: 320, y: 70, parent: "c2", isDangling: true }
+              ],
+              beforeStatus: { head: "main → C3 (2208502)", staging: "Matches C3", working: "app.js modified, notes.txt untracked" },
+              afterStatus: { head: "main → C2 (cc05fa3)", staging: "Matches C2", working: "app.js = C2 version, notes.txt untracked" }
+            },
+            options: ["C3 can still be recovered (`ORIG_HEAD`, reflog); the unstaged app.js edit is lost; notes.txt is left alone.", "C3 is lost for good, but the unstaged app.js edit is recorded in the reflog and can be restored from there later.", "C3 and the app.js edit can both be recovered, but untracked notes.txt is deleted along with them.", "C3 can still be recovered, and Git automatically stashes the app.js edit before resetting the working tree."],
+            answer: 0,
+            hint: "The reflog records where refs pointed. Ask which of these three things Git ever stored as an object.",
+            explainer: {
+              title: "--hard resets tracked files, not untracked ones",
+              diagram: "$ git reset --hard HEAD~1\nHEAD is now at cc05fa3 C2 add retry\n$ git status --short\n?? notes.txt\n$ git log --oneline -1 ORIG_HEAD\n2208502 C3 tune backoff",
+              body: "`--hard` moves the branch and makes both the index and the tracked files in the working tree match the target. C3 is still an object in the repository, reachable through `ORIG_HEAD` and the reflog. The app.js edit was never added, so Git never stored it and it is gone. Untracked files are not touched (removing them is `git clean`'s job). In the test repo, content that had been staged and then wiped by `--hard` did turn up again as a dangling blob in `git fsck --lost-found`; content that was never staged did not."
+            }
+          },
+          {
+            id: 4,
+            topic: "Interactive Rebase",
+            difficulty: "Medium",
+            title: "Two ways to fold a commit into the one above",
+            desc: "You run `git rebase -i HEAD~3` to tidy three commits before opening a PR, and change the second line to squash and the third to fixup. What is the difference between those two verbs?",
+            term: [
+              ["git log --oneline --decorate", "f495832 (HEAD -> main) typo fix\nccd901c more tests\n10438f9 WIP: login form\na517cf3 Initial"],
+              ["git rebase -i HEAD~3   # todo list as edited", "pick 10438f9 # WIP: login form\nsquash ccd901c # more tests\nfixup f495832 # typo fix"]
+            ],
+            tree: {
+              before: [
+                { id: "c0", label: "Initial", sha: "a517", x: 50, y: 70 },
+                { id: "c1", label: "WIP", sha: "1043", x: 150, y: 70, parent: "c0" },
+                { id: "c2", label: "more tests", sha: "ccd9", x: 250, y: 70, parent: "c1" },
+                { id: "c3", label: "typo fix (main)", sha: "f495", x: 350, y: 70, parent: "c2", isHead: true }
+              ],
+              after: [
+                { id: "c0", label: "Initial", sha: "a517", x: 50, y: 45 },
+                { id: "n1", label: "WIP: login form (main)", sha: "09bc", x: 170, y: 45, parent: "c0", isHead: true },
+                { id: "c1", label: "WIP", sha: "1043", x: 170, y: 115, parent: "c0", isDangling: true },
+                { id: "c2", label: "more tests", sha: "ccd9", x: 265, y: 115, parent: "c1", isDangling: true },
+                { id: "c3", label: "typo fix", sha: "f495", x: 360, y: 115, parent: "c2", isDangling: true }
+              ],
+              beforeStatus: { head: "main → typo fix (f495832)", staging: "Clean", working: "Clean" },
+              afterStatus: { head: "main → 09bc6e1 (one commit)", staging: "Clean", working: "Clean" }
+            },
+            options: ["Both fold the commit into the one above it; `squash` opens the editor with the messages combined, `fixup` throws its own message away.", "Both fold the commit into the one above it; `fixup` opens the editor with the messages combined, `squash` throws its own message away.", "`squash` folds the commit into the one above it in the todo list, while `fixup` folds it into the one below it.", "`squash` records a merge commit that joins the two commits, while `fixup` rewrites them into a single linear commit."],
+            answer: 0,
+            hint: "Both verbs produce the same code change. Compare what happens to the commit messages.",
+            explainer: {
+              title: "squash keeps the message, fixup discards it",
+              diagram: "# Editor opened once, for the squash (excerpt):\n# This is a combination of 3 commits.\n# This is the 1st commit message:\nWIP: login form\n# This is the commit message #2:\nmore tests\n# The commit message #3 will be skipped:\n# typo fix\n\n$ git log --format='%h %s%n%n%b' -1\n09bc6e1 WIP: login form\n\nmore tests",
+              body: 'Both verbs meld a commit into the commit above it in the todo list. `squash` opens your editor with all the messages so you can write a combined one. `fixup` drops that commit\'s message (the "typo fix" line above is commented out as skipped). With only `fixup` lines, no editor opens at all; that was checked in the test repo too. Either way the three originals are replaced by one new commit with a new SHA.'
+            }
+          },
+          {
+            id: 5,
+            topic: "Interactive Rebase",
+            difficulty: "Medium",
+            title: "Pause mid-rebase to amend a commit",
+            desc: "During `git rebase -i HEAD~3` you want the rebase to stop right after C2 is applied, so you can add a forgotten test file to C2 with `git commit --amend` and then continue. Which verb do you put in front of C2 in the todo list?",
+            term: [
+              ["git log --oneline --decorate", "9fc9632 (HEAD -> main) C3 wire up CLI\n20d5466 C2 add validator\n32a404f C1 add parser\n98bc8d8 C0 base"],
+              ["git rebase -i HEAD~3   # default todo list", "pick 32a404f # C1 add parser\npick 20d5466 # C2 add validator\npick 9fc9632 # C3 wire up CLI"]
+            ],
+            tree: {
+              before: [
+                { id: "c0", label: "C0", sha: "98bc", x: 50, y: 70 },
+                { id: "c1", label: "C1", sha: "32a4", x: 150, y: 70, parent: "c0" },
+                { id: "c2", label: "C2", sha: "20d5", x: 250, y: 70, parent: "c1" },
+                { id: "c3", label: "C3 (main)", sha: "9fc9", x: 350, y: 70, parent: "c2", isHead: true }
+              ],
+              after: [
+                { id: "c0", label: "C0", sha: "98bc", x: 50, y: 45 },
+                { id: "c1", label: "C1", sha: "32a4", x: 150, y: 45, parent: "c0" },
+                { id: "n2", label: "C2'", sha: "5138", x: 250, y: 45, parent: "c1" },
+                { id: "n3", label: "C3' (main)", sha: "0097", x: 350, y: 45, parent: "n2", isHead: true },
+                { id: "c2", label: "C2", sha: "20d5", x: 250, y: 115, parent: "c1", isDangling: true },
+                { id: "c3", label: "C3", sha: "9fc9", x: 350, y: 115, parent: "c2", isDangling: true }
+              ],
+              beforeStatus: { head: "main → C3 (9fc9632)", staging: "Clean", working: "Clean" },
+              afterStatus: { head: "main → C3' (0097f6b)", staging: "Clean", working: "Clean" }
+            },
+            options: ["`edit`", "`reword`", "`squash`", "`fixup`"],
+            answer: 0,
+            hint: "One verb only lets you change the message and carries on by itself. You need the one that hands the shell back to you.",
+            explainer: {
+              title: "edit stops the rebase; reword does not",
+              diagram: '$ git rebase -i HEAD~3      # with "edit" on C2\nStopped at 20d5466...  # C2 add validator\nYou can amend the commit now, with\n\n  git commit --amend\n\nOnce you are satisfied with your changes, run\n\n  git rebase --continue\n\n# after adding b.test.js, amending and continuing:\n0097f6b (HEAD -> main) C3 wire up CLI\n5138547 C2 add validator\n32a404f C1 add parser\n98bc8d8 C0 base',
+              body: "`edit` applies the commit and then stops, giving you the working tree so you can change files, `git commit --amend`, even split the commit, then `git rebase --continue`. `reword` only opens the editor for the message and keeps going. `squash` and `fixup` fold C2 into C1. C1 kept its SHA (32a404f) because it was replayed onto the same parent unchanged; C2 and every commit after it got new SHAs."
+            }
+          },
+          {
+            id: 6,
+            topic: "Interactive Rebase",
+            difficulty: "Medium",
+            title: "Where does a dropped commit go?",
+            desc: 'You run `git rebase -i HEAD~3` and change C2 ("debug logging") from pick to drop. After the rebase finishes, what is true about the original C2 commit?',
+            term: [
+              ["git log --oneline --decorate", "6734829 (HEAD -> main) C3 wire up CLI\n3f6e65d C2 debug logging\n32a404f C1 add parser\n98bc8d8 C0 base"],
+              ["git rebase -i HEAD~3   # todo list as edited", "pick 32a404f # C1 add parser\ndrop 3f6e65d # C2 debug logging\npick 6734829 # C3 wire up CLI"]
+            ],
+            tree: {
+              before: [
+                { id: "c0", label: "C0", sha: "98bc", x: 50, y: 70 },
+                { id: "c1", label: "C1", sha: "32a4", x: 150, y: 70, parent: "c0" },
+                { id: "c2", label: "C2", sha: "3f6e", x: 250, y: 70, parent: "c1" },
+                { id: "c3", label: "C3 (main)", sha: "6734", x: 350, y: 70, parent: "c2", isHead: true }
+              ],
+              after: [
+                { id: "c0", label: "C0", sha: "98bc", x: 50, y: 45 },
+                { id: "c1", label: "C1", sha: "32a4", x: 150, y: 45, parent: "c0" },
+                { id: "n3", label: "C3' (main)", sha: "b1c8", x: 260, y: 45, parent: "c1", isHead: true },
+                { id: "c2", label: "C2 (reflog only)", sha: "3f6e", x: 250, y: 115, parent: "c1", isDangling: true },
+                { id: "c3", label: "C3", sha: "6734", x: 350, y: 115, parent: "c2", isDangling: true }
+              ],
+              beforeStatus: { head: "main → C3 (6734829)", staging: "Clean", working: "Clean" },
+              afterStatus: { head: "main → C3' (b1c80f1)", staging: "Clean", working: "Clean (debug.log gone)" }
+            },
+            options: ["No branch contains it now, but the object still exists and the reflog can reach it until gc eventually prunes it.", "The rebase deletes the commit object from `.git/objects` straight away, so it can no longer be found by its SHA.", "Its changes are folded into the replayed C3, so the debug logging is still in the code, just without its own commit.", "The rebase saves it under a `refs/dropped/` ref, so `git log --all` keeps listing it until you delete that ref yourself."],
+            answer: 0,
+            hint: "Rewriting history creates new commits; it does not rush to delete old ones.",
+            explainer: {
+              title: "Dropped means unreachable, not deleted",
+              diagram: "$ git log --oneline --decorate\nb1c80f1 (HEAD -> main) C3 wire up CLI\n32a404f C1 add parser\n98bc8d8 C0 base\n$ git cat-file -t 3f6e65d\ncommit\n$ git branch --contains 3f6e65d | wc -l\n       0\n$ git reflog | grep 3f6e65d\n3f6e65d HEAD@{4}: commit: C2 debug logging",
+              body: "`drop` leaves the commit out of the rewritten branch, so C3 is replayed directly onto C1 as a new commit. The old C2 object is untouched: you can still `git branch rescue 3f6e65d`. In the test repo it even survived an explicit `git gc`, because the reflog still referenced it. By default, reflog entries that are not reachable from the branch tip expire after 30 days (`gc.reflogExpireUnreachable`), and `git gc` then prunes unreachable loose objects older than two weeks (`gc.pruneExpire`)."
+            }
+          },
+          {
+            id: 7,
+            topic: "Undoing a Reset",
+            difficulty: "Medium",
+            title: "Undo the undo",
+            desc: "You meant to drop one commit but ran `git reset --hard HEAD~2` on main, losing C2 and C3. You have run nothing else since. Which single command puts main back on C3?",
+            term: [
+              ["git reset --hard HEAD~2", "HEAD is now at 257bc06 C1 checkout page"],
+              ["git log --oneline --decorate", "257bc06 (HEAD -> main) C1 checkout page"]
+            ],
+            tree: {
+              before: [
+                { id: "c1", label: "C1 (main)", sha: "257b", x: 60, y: 70, isHead: true },
+                { id: "c2", label: "C2", sha: "f52c", x: 190, y: 70, parent: "c1", isDangling: true },
+                { id: "c3", label: "C3", sha: "fe6b", x: 320, y: 70, parent: "c2", isDangling: true }
+              ],
+              after: [
+                { id: "c1", label: "C1", sha: "257b", x: 60, y: 70 },
+                { id: "c2", label: "C2", sha: "f52c", x: 190, y: 70, parent: "c1" },
+                { id: "c3", label: "C3 (main)", sha: "fe6b", x: 320, y: 70, parent: "c2", isHead: true }
+              ],
+              beforeStatus: { head: "main → C1 (257bc06)", staging: "Clean", working: "Clean" },
+              afterStatus: { head: "main → C3 (fe6b799)", staging: "Clean", working: "Clean" }
+            },
+            options: ["`git reset --hard ORIG_HEAD`", "`git reset --hard HEAD@{0}`", "`git checkout ORIG_HEAD`", "`git restore --source=ORIG_HEAD .`"],
+            answer: 0,
+            hint: "Reset leaves a note of where HEAD was before it moved. You need a command that moves the branch, not just HEAD or the files.",
+            explainer: {
+              title: "ORIG_HEAD: the previous position, one step back",
+              diagram: "$ git rev-parse --short ORIG_HEAD\nfe6b799\n$ git reset --hard ORIG_HEAD\nHEAD is now at fe6b799 C3 add payment webhook\n$ git log --oneline --decorate\nfe6b799 (HEAD -> main) C3 add payment webhook\nf52ce65 C2 implement stripe client\n257bc06 C1 checkout page",
+              body: "`git reset` (like merge and rebase) saves the previous HEAD in `ORIG_HEAD`, so `git reset --hard ORIG_HEAD` moves main back. The other options, as run in the test repo: `HEAD@{0}` is where you are now, so that reset changes nothing. `git checkout ORIG_HEAD` detaches HEAD at C3 but leaves main on C1. `git restore --source=ORIG_HEAD .` brings the files back as untracked changes while main stays on C1. Right after the mistake, `git reset --hard @{1}` (main's previous reflog entry) also works. A later reset, merge or rebase overwrites `ORIG_HEAD`, so for older mistakes use `git reflog`."
+            }
+          },
+          {
+            id: 8,
+            topic: "Cherry-Pick",
+            difficulty: "Medium",
+            title: "Taking one commit from another branch",
+            desc: "You are on main. Commit C3 on feature-x fixes a bug you need now, but its parent FX1 is unfinished experimental work. You run `git cherry-pick de87941`. What happens?",
+            term: [["git log --graph --oneline --decorate --all", "* 89e58f7 (HEAD -> main) C2 main work\n| * de87941 (feature-x) C3 fix: sanitize user query param\n| * 518a3b6 FX1 experimental search\n|/\n* fbef22e C1 base"]],
+            tree: {
+              before: [
+                { id: "c1", label: "C1", sha: "fbef", x: 50, y: 75 },
+                { id: "c2", label: "C2 (main)", sha: "89e5", x: 180, y: 40, parent: "c1", isHead: true },
+                { id: "fx1", label: "FX1", sha: "518a", x: 180, y: 110, parent: "c1" },
+                { id: "c3", label: "C3 (feature-x)", sha: "de87", x: 310, y: 110, parent: "fx1" }
+              ],
+              after: [
+                { id: "c1", label: "C1", sha: "fbef", x: 50, y: 75 },
+                { id: "c2", label: "C2", sha: "89e5", x: 180, y: 40, parent: "c1" },
+                { id: "n3", label: "C3' (main)", sha: "e4f0", x: 310, y: 40, parent: "c2", isHead: true },
+                { id: "fx1", label: "FX1", sha: "518a", x: 180, y: 110, parent: "c1" },
+                { id: "c3", label: "C3 (feature-x)", sha: "de87", x: 310, y: 110, parent: "fx1" }
+              ],
+              beforeStatus: { head: "main → C2 (89e58f7)", staging: "Clean", working: "Clean" },
+              afterStatus: { head: "main → C3' (e4f0fdf)", staging: "Clean", working: "query.js added; no exp.js" }
+            },
+            options: ["A new commit with only C3's changes lands on main (new SHA, original author kept); feature-x is unchanged.", "C3 is moved onto main and removed from feature-x, so the fix exists on exactly one branch and keeps its original SHA.", "C3 and its parent FX1 both land on main, because a commit carries the full history that leads up to it.", "A merge commit is created on main whose second parent is C3, so the fix keeps its SHA and feature-x is not touched."],
+            answer: 0,
+            hint: "Cherry-pick replays a diff: the difference between one commit and its parent.",
+            explainer: {
+              title: "cherry-pick copies one commit's diff",
+              diagram: "$ git cherry-pick de87941\n[main e4f0fdf] C3 fix: sanitize user query param\n Author: Colleague <c@example.com>\n Date: Tue Nov 10 09:00:00 2026 +0000\n 1 file changed, 1 insertion(+)\n create mode 100644 query.js\n\n* e4f0fdf (HEAD -> main) C3 fix: sanitize user query param\n* 89e58f7 C2 main work\n| * de87941 (feature-x) C3 fix: sanitize user query param\n| * 518a3b6 FX1 experimental search\n|/\n* fbef22e C1 base",
+              body: "`git cherry-pick` takes the change C3 made relative to its parent and commits it on top of your current branch. The new commit has a different parent, so it gets a new SHA (e4f0fdf vs de87941). It keeps the original author and author date; only the committer and commit date are new. FX1's file (exp.js) did not come along, and feature-x was left exactly as it was."
+            }
+          },
+          {
+            id: 9,
+            topic: "Revert vs Reset",
+            difficulty: "Medium",
+            title: "Undoing a commit that is already shared",
+            desc: "Bad commit C3 is already on origin/main and teammates have pulled it. Why is `git revert HEAD` the safer fix here than `git reset --hard HEAD~1` followed by a push?",
+            term: [["git log --oneline --decorate", "510a71e (HEAD -> main, origin/main) C3 feat: breaking payment update\n5b6e72f C2 service\n0d70d1a C1 base"]],
+            tree: {
+              before: [
+                { id: "c1", label: "C1", sha: "0d70", x: 60, y: 70 },
+                { id: "c2", label: "C2", sha: "5b6e", x: 190, y: 70, parent: "c1" },
+                { id: "c3", label: "C3 (main, origin)", sha: "510a", x: 320, y: 70, parent: "c2", isHead: true }
+              ],
+              after: [
+                { id: "c1", label: "C1", sha: "0d70", x: 50, y: 70 },
+                { id: "c2", label: "C2", sha: "5b6e", x: 150, y: 70, parent: "c1" },
+                { id: "c3", label: "C3", sha: "510a", x: 250, y: 70, parent: "c2" },
+                { id: "c4", label: "Revert C3 (main)", sha: "b810", x: 350, y: 70, parent: "c3", isHead: true }
+              ],
+              beforeStatus: { head: "main → C3 (510a71e)", staging: "Clean", working: "Clean" },
+              afterStatus: { head: "main → b810702 (revert)", staging: "Clean", working: "Clean" }
+            },
+            options: ["Revert adds a new commit that undoes C3, so history only moves forward and a normal push fast-forwards for everyone.", "Revert removes C3 from origin/main's history, so teammates who pull afterwards never see the bad commit again.", "After the reset a plain `git push` succeeds anyway, because C2 is already on origin; revert just leaves a clearer log.", "Revert edits C3 in place to remove the bad lines and keeps its SHA, so teammates do not need to pull anything."],
+            answer: 0,
+            hint: "Which of the two keeps origin/main an ancestor of your new main?",
+            explainer: {
+              title: "Don't rewrite history other people have",
+              diagram: '$ git revert --no-edit HEAD\n[main b810702] Revert "C3 feat: breaking payment update"\n Date: Tue Nov 17 14:21:24 2026 +0000\n 2 files changed, 2 deletions(-)\n delete mode 100644 bad.js\n$ git push origin main\nTo ../origin.git\n   510a71e..b810702  main -> main\n\n# the alternative, from the same starting point:\n$ git reset --hard HEAD~1\nHEAD is now at 5b6e72f C2 service\n$ git push origin main\nTo ../origin.git\n ! [rejected]        main -> main (non-fast-forward)',
+              body: "`git revert` creates a new commit that applies the inverse of C3, so the push is an ordinary fast-forward and teammates simply pull it. Resetting main to C2 makes your branch behind origin/main: a plain push is rejected as non-fast-forward, and forcing it rewrites shared history, so everyone who already has C3 has to repair their own clones."
+            }
+          },
+          {
+            id: 10,
+            topic: "Unstaging",
+            difficulty: "Medium",
+            title: "Unstage one file, keep the edit",
+            desc: "You edited and staged both config.json and schema.sql. You want to unstage only config.json and keep your edit to it on disk. Which command does exactly that?",
+            term: [["git status --short", "M  config.json\nM  schema.sql"]],
+            tree: {
+              before: [{ id: "c1", label: "C1 (main)", sha: "c4ec", x: 200, y: 70, isHead: true }],
+              after: [{ id: "c1", label: "C1 (main)", sha: "c4ec", x: 200, y: 70, isHead: true }],
+              beforeStatus: { head: "main → C1", staging: "config.json + schema.sql staged", working: "Matches index" },
+              afterStatus: { head: "main → C1", staging: "schema.sql staged", working: "config.json modified (unstaged)" }
+            },
+            options: ["`git restore --staged config.json`", "`git restore config.json`", "`git checkout HEAD -- config.json`", "`git rm --cached config.json`"],
+            answer: 0,
+            hint: "You want to change the index only, copying the HEAD version of the file into it.",
+            explainer: {
+              title: "restore --staged touches only the index",
+              diagram: '$ git restore --staged config.json\n$ git status --short\n M config.json\nM  schema.sql\n\n# the other options, each run from the same starting point (summarised):\ngit restore config.json          -> no change (worktree already matches index)\ngit checkout HEAD -- config.json -> unstaged AND edit discarded ({"v":1} on disk)\ngit rm --cached config.json      -> "D  config.json" + "?? config.json"',
+              body: "`git restore --staged <file>` (added in Git 2.23) copies the HEAD version of the file into the index and leaves the working tree alone, so the edit becomes an unstaged change. Without `--staged`, `git restore` restores the working tree from the index, which here changes nothing. `git checkout HEAD -- <file>` overwrites both index and working tree. `git rm --cached` stages a deletion and leaves the file untracked. The older form `git reset config.json` also unstages without touching the file."
+            }
+          },
+          {
+            id: 11,
+            topic: "Rebase --onto",
+            difficulty: "Hard",
+            title: "Transplant a stacked branch",
+            desc: "feature-b was branched from feature-a. feature-a is on hold, but feature-b's single commit FB1 has to ship now on top of main, without FA1. Which command does that?",
+            term: [["git log --graph --oneline --decorate --all", "* 311632d (HEAD -> feature-b) FB1 search box\n* b872c30 (feature-a) FA1 slow migration\n| * b614246 (main) M2 hotfix\n|/\n* 8031320 M1 init"]],
+            tree: {
+              before: [
+                { id: "m1", label: "M1", sha: "8031", x: 50, y: 75 },
+                { id: "m2", label: "M2 (main)", sha: "b614", x: 175, y: 40, parent: "m1" },
+                { id: "fa1", label: "FA1 (feature-a)", sha: "b872", x: 175, y: 110, parent: "m1" },
+                { id: "fb1", label: "FB1 (feature-b)", sha: "3116", x: 315, y: 110, parent: "fa1", isHead: true }
+              ],
+              after: [
+                { id: "m1", label: "M1", sha: "8031", x: 50, y: 75 },
+                { id: "m2", label: "M2 (main)", sha: "b614", x: 175, y: 40, parent: "m1" },
+                { id: "nb1", label: "FB1' (feature-b)", sha: "20bb", x: 315, y: 40, parent: "m2", isHead: true },
+                { id: "fa1", label: "FA1 (feature-a)", sha: "b872", x: 175, y: 110, parent: "m1" },
+                { id: "fb1", label: "FB1", sha: "3116", x: 315, y: 110, parent: "fa1", isDangling: true }
+              ],
+              beforeStatus: { head: "feature-b → FB1 (311632d)", staging: "Clean", working: "Clean" },
+              afterStatus: { head: "feature-b → FB1' (20bb1c2)", staging: "Clean", working: "Clean" }
+            },
+            options: ["`git rebase --onto main feature-a feature-b`", "`git rebase main feature-b`", "`git rebase --onto feature-a main feature-b`", "`git rebase --onto main feature-b feature-a`"],
+            answer: 0,
+            hint: "The form is: git rebase --onto <new-base> <upstream> <branch>. Commits in <upstream>..<branch> are the ones that move.",
+            explainer: {
+              title: "rebase --onto moves just a range",
+              diagram: "$ git rebase --onto main feature-a feature-b\nSuccessfully rebased and updated refs/heads/feature-b.\n$ git log --graph --oneline --decorate --all\n* b872c30 (feature-a) FA1 slow migration\n| * 20bb1c2 (HEAD -> feature-b) FB1 search box\n| * b614246 (main) M2 hotfix\n|/\n* 8031320 M1 init",
+              body: "`git rebase --onto main feature-a feature-b` replays the commits in `feature-a..feature-b` (just FB1) onto main and moves feature-b there. What the other options did in the test repo: `git rebase main feature-b` replayed FA1 and FB1, dragging the unfinished FA1 along. `--onto feature-a main feature-b` left feature-b sitting on FA1 (it reported FA1 as already upstream). `--onto main feature-b feature-a` moved feature-a instead, resetting it to main and dropping FA1 from that branch."
+            }
+          },
+          {
+            id: 12,
+            topic: "Force-Push Safety",
+            difficulty: "Hard",
+            title: "Force-pushing after a rebase",
+            desc: "You pushed feature, then squashed it locally with `git rebase -i`. Meanwhile a teammate pushed T1 to origin's feature branch. You have not fetched since. You run `git push --force-with-lease`. What happens?",
+            term: [
+              ["git log --oneline --decorate --all", "28b8b87 (HEAD -> feature) F1 search form\n3155cb6 (origin/main, main) C1 base\n609b84e (origin/feature) F2 fix typo\ndd906a7 F1 search form"],
+              ["# on the remote, unknown to you", "refs/heads/feature -> eb06143 T1 teammate: add tests (child of 609b84e)"]
+            ],
+            tree: {
+              before: [
+                { id: "c1", label: "C1 (main)", sha: "3155", x: 50, y: 75 },
+                { id: "n1", label: "F1' (feature)", sha: "28b8", x: 160, y: 35, parent: "c1", isHead: true },
+                { id: "f1", label: "F1", sha: "dd90", x: 150, y: 115, parent: "c1" },
+                { id: "f2", label: "F2 (origin/feature)", sha: "609b", x: 255, y: 115, parent: "f1" },
+                { id: "t1", label: "T1 (remote only)", sha: "eb06", x: 360, y: 115, parent: "f2", isDangling: true }
+              ],
+              after: [
+                { id: "c1", label: "C1 (main)", sha: "3155", x: 50, y: 75 },
+                { id: "n1", label: "F1' (not pushed)", sha: "28b8", x: 160, y: 35, parent: "c1", isHead: true },
+                { id: "f1", label: "F1", sha: "dd90", x: 150, y: 115, parent: "c1" },
+                { id: "f2", label: "F2", sha: "609b", x: 255, y: 115, parent: "f1" },
+                { id: "t1", label: "T1 (remote feature)", sha: "eb06", x: 360, y: 115, parent: "f2" }
+              ],
+              beforeStatus: { head: "feature → F1' (28b8b87)", staging: "Clean", working: "Clean" },
+              afterStatus: { head: "feature → F1' (push rejected)", staging: "Clean", working: "Clean" }
+            },
+            options: ['It is rejected as "stale info": the remote branch no longer matches your origin/feature, because T1 moved it.', "It succeeds and replaces T1 exactly like `--force`, because the lease only checks that you created the branch.", "It succeeds after Git fetches T1 and rebases your squashed commit on top of it, so nothing is lost.", "It is rejected because `--force-with-lease` refuses every push that is not a fast-forward, stale or not."],
+            answer: 0,
+            hint: 'The "lease" is the value of your remote-tracking ref. Compare it with what the remote has now.',
+            explainer: {
+              title: "--force-with-lease checks your last-known remote value",
+              diagram: "$ git push --force-with-lease\nTo ../origin.git\n ! [rejected]        feature -> feature (stale info)\nerror: failed to push some refs to '../origin.git'\n\n# same setup, but run \"git fetch\" first, then push:\n + eb06143...28b8b87 feature -> feature (forced update)   <- T1 overwritten\n\n# same setup with fetch, using --force-with-lease --force-if-includes:\n ! [rejected]        feature -> feature (remote ref updated since checkout)",
+              body: "Without an explicit value, `--force-with-lease` only overwrites the remote branch if it still points where your remote-tracking ref `origin/feature` says it does. T1 moved it, so the push is refused as stale. It is not a fast-forward rule: when the remote matches, a non-fast-forward push goes through. The caveat: a plain `git fetch` (including a background fetch by an IDE) updates `origin/feature` without you looking at T1, and the same command then overwrote T1 in the test repo. Adding `--force-if-includes` (Git 2.30+) also requires that the remote tip was integrated into your local branch; it rejected that case."
+            }
+          }
+        ];
+
+        var QUESTION_IDS = QUESTIONS.map(function (q) {
+          return q.id;
+        });
+
+        function findQuestion(id) {
+          for (var i = 0; i < QUESTIONS.length; i++) {
+            if (QUESTIONS[i].id === id) return QUESTIONS[i];
+          }
+          return null;
+        }
+
+        // --- Option shuffling (Fisher-Yates; correct option tracked by content) ---
+        function shuffleQuestion(q) {
+          var correctText = q.options[q.answer];
+          var shuffled = q.options.slice();
+          for (var i = shuffled.length - 1; i > 0; i--) {
+            var j = Math.floor(Math.random() * (i + 1));
+            var tmp = shuffled[i];
+            shuffled[i] = shuffled[j];
+            shuffled[j] = tmp;
+          }
+          q.shuffled = shuffled;
+          q.correctIndex = shuffled.indexOf(correctText);
+        }
+
+        // --- Safe rich text: `code` spans rendered with textContent only ---
+        function renderRich(el, text) {
+          while (el.firstChild) el.removeChild(el.firstChild);
+          String(text)
+            .split("`")
+            .forEach(function (part, i) {
+              if (!part) return;
+              if (i % 2 === 1) {
+                var code = document.createElement("code");
+                code.textContent = part;
+                el.appendChild(code);
+              } else {
+                el.appendChild(document.createTextNode(part));
+              }
+            });
+        }
+
+        function setButtonLabel(btn, label, icon) {
+          while (btn.firstChild) btn.removeChild(btn.firstChild);
+          var s = document.createElement("span");
+          s.textContent = label;
+          btn.appendChild(s);
+          if (icon) {
+            btn.appendChild(document.createTextNode(" "));
+            var i = document.createElement("span");
+            i.setAttribute("aria-hidden", "true");
+            i.textContent = icon;
+            btn.appendChild(i);
+          }
+        }
+
+        // --- State ---
+        var STORAGE_KEY_STATE = "git_rodeo_state_v2";
+        var STORAGE_KEY_HIGH = "git_rodeo_highscore";
+        var STORAGE_KEY_AUDIO = "git_rodeo_muted";
+        var MAX_SCORE = QUESTIONS.length * 300;
+
+        function freshState() {
+          return {
+            pool: QUESTION_IDS.slice(),
+            poolIndex: 0,
+            score: 0,
+            streak: 0,
+            maxStreak: 0,
+            correctAnswers: 0,
+            totalAnswered: 0,
+            missedQuestionIds: [],
+            isRetryMode: false,
+            selectedOption: null,
+            isAnswered: false,
+            hintRevealed: false,
+            treeViewMode: "before"
+          };
+        }
+
+        var state = freshState();
+        var highScore = 0;
+
+        function isInt(v, min, max) {
+          return Number.isInteger(v) && v >= min && v <= max;
+        }
+
+        function validIdList(arr, allowEmpty) {
+          if (!Array.isArray(arr)) return null;
+          if (!allowEmpty && arr.length === 0) return null;
+          var seen = {};
+          for (var i = 0; i < arr.length; i++) {
+            if (!Number.isInteger(arr[i]) || QUESTION_IDS.indexOf(arr[i]) === -1 || seen[arr[i]]) return null;
+            seen[arr[i]] = true;
+          }
+          return arr.slice();
+        }
+
+        function loadSavedState() {
+          try {
+            isMuted = localStorage.getItem(STORAGE_KEY_AUDIO) === "true";
+            var h = parseInt(localStorage.getItem(STORAGE_KEY_HIGH), 10);
+            if (isInt(h, 0, MAX_SCORE)) highScore = h;
+
+            var raw = localStorage.getItem(STORAGE_KEY_STATE);
+            if (!raw) return;
+            var p = JSON.parse(raw);
+            if (!p || typeof p !== "object") return;
+
+            var pool = validIdList(p.pool, false);
+            var missed = validIdList(p.missedQuestionIds, true);
+            if (!pool || !missed || typeof p.isRetryMode !== "boolean") return;
+            if (!p.isRetryMode && pool.length !== QUESTIONS.length) return;
+            if (!isInt(p.poolIndex, 0, pool.length)) return;
+            if (!isInt(p.totalAnswered, 0, 10000)) return;
+            if (!isInt(p.correctAnswers, 0, p.totalAnswered)) return;
+            if (!isInt(p.maxStreak, 0, QUESTIONS.length)) return;
+            if (!isInt(p.streak, 0, p.maxStreak)) return;
+            if (!isInt(p.score, 0, MAX_SCORE)) return;
+
+            state.pool = pool;
+            state.poolIndex = p.poolIndex;
+            state.score = p.score;
+            state.streak = p.streak;
+            state.maxStreak = p.maxStreak;
+            state.correctAnswers = p.correctAnswers;
+            state.totalAnswered = p.totalAnswered;
+            state.missedQuestionIds = missed;
+            state.isRetryMode = p.isRetryMode;
+          } catch (e) {
+            state = freshState();
+          }
+        }
+
+        function persistState() {
+          try {
+            // An answered question is saved as done, so a reload cannot re-answer it.
+            var idx = state.isAnswered ? Math.min(state.poolIndex + 1, state.pool.length) : state.poolIndex;
+            localStorage.setItem(
+              STORAGE_KEY_STATE,
+              JSON.stringify({
+                pool: state.pool,
+                poolIndex: idx,
+                score: state.score,
+                streak: state.streak,
+                maxStreak: state.maxStreak,
+                correctAnswers: state.correctAnswers,
+                totalAnswered: state.totalAnswered,
+                missedQuestionIds: state.missedQuestionIds,
+                isRetryMode: state.isRetryMode
+              })
+            );
+          } catch (e) {}
+          if (state.score > highScore) {
+            highScore = state.score;
+            try {
+              localStorage.setItem(STORAGE_KEY_HIGH, String(highScore));
+            } catch (e) {}
+          }
+          highScoreDisplay.textContent = highScore.toLocaleString();
+        }
+
+        // --- UI Elements ---
+        function $(id) {
+          return document.getElementById(id);
+        }
+        var levelDisplay = $("levelDisplay");
+        var totalLevelsDisplay = $("totalLevelsDisplay");
+        var scoreDisplay = $("scoreDisplay");
+        var streakDisplay = $("streakDisplay");
+        var multiplierBadge = $("multiplierBadge");
+        var accuracyDisplay = $("accuracyDisplay");
+        var highScoreDisplay = $("highScoreDisplay");
+        var progressTrack = $("progressTrack");
+        var progressFill = $("progressFill");
+        var poolBanner = $("poolBanner");
+        var poolRemainingCount = $("poolRemainingCount");
+        var exitRetryPoolBtn = $("exitRetryPoolBtn");
+        var levelPill = $("levelPill");
+        var topicPill = $("topicPill");
+        var difficultyPill = $("difficultyPill");
+        var questionTitle = $("questionTitle");
+        var questionDesc = $("questionDesc");
+        var terminalBox = $("terminalBox");
+        var terminalBody = $("terminalBody");
+        var treeVisualizer = $("treeVisualizer");
+        var treeHeaderTitle = $("treeHeaderTitle");
+        var treeViewToggleBtn = $("treeViewToggleBtn");
+        var treeSvgContainer = $("treeSvgContainer");
+        var treeHeadVal = $("treeHeadVal");
+        var treeStagingVal = $("treeStagingVal");
+        var treeWorkingVal = $("treeWorkingVal");
+        var optionsPanel = $("optionsPanel");
+        var hintBox = $("hintBox");
+        var hintText = $("hintText");
+        var hintBtn = $("hintBtn");
+        var toggleSheetBtn = $("toggleSheetBtn");
+        var actionBtn = $("actionBtn");
+        var sheetDrawer = $("sheetDrawer");
+        var closeSheetBtn = $("closeSheetBtn");
+        var explainerCard = $("explainerCard");
+        var explainerTitle = $("explainerTitle");
+        var explainerDiagram = $("explainerDiagram");
+        var explainerBody = $("explainerBody");
+        var summaryModal = $("summaryModal");
+        var summaryTrophy = $("summaryTrophy");
+        var summaryRank = $("summaryRank");
+        var summaryScore = $("summaryScore");
+        var summaryAccuracy = $("summaryAccuracy");
+        var summaryStreak = $("summaryStreak");
+        var retryMissedBtn = $("retryMissedBtn");
+        var restartAllBtn = $("restartAllBtn");
+        var closeSummaryBtn = $("closeSummaryBtn");
+        var missedCountSummary = $("missedCountSummary");
+        var resetBtn = $("resetBtn");
+
+        function isComplete() {
+          return state.poolIndex >= state.pool.length;
+        }
+
+        function getCurrentQuestion() {
+          if (isComplete()) return null;
+          return findQuestion(state.pool[state.poolIndex]);
+        }
+
+        function getStreakMultiplier() {
+          if (state.streak >= 8) return 3.0;
+          if (state.streak >= 5) return 2.5;
+          if (state.streak >= 3) return 2.0;
+          if (state.streak >= 2) return 1.5;
+          return 1.0;
+        }
+
+        function accuracyPct() {
+          return state.totalAnswered > 0 ? Math.round((state.correctAnswers / state.totalAnswered) * 100) : 100;
+        }
+
+        function updateStatsUI() {
+          var shownLevel = Math.min(state.poolIndex + 1, state.pool.length);
+          levelDisplay.textContent = shownLevel;
+          totalLevelsDisplay.textContent = state.pool.length;
+          scoreDisplay.textContent = state.score.toLocaleString();
+          streakDisplay.textContent = state.streak;
+          highScoreDisplay.textContent = highScore.toLocaleString();
+
+          var mult = getStreakMultiplier();
+          multiplierBadge.textContent = mult + "x";
+          multiplierBadge.hidden = !(mult > 1 && !state.isRetryMode);
+
+          accuracyDisplay.textContent = accuracyPct() + "%";
+
+          var done = state.poolIndex + (state.isAnswered ? 1 : 0);
+          var pct = Math.round((Math.min(done, state.pool.length) / state.pool.length) * 100);
+          progressFill.style.width = pct + "%";
+          progressTrack.setAttribute("aria-valuenow", String(pct));
+
+          poolBanner.hidden = !state.isRetryMode;
+          if (state.isRetryMode) {
+            poolRemainingCount.textContent = Math.max(0, state.pool.length - state.poolIndex);
+          }
+        }
+
+        // --- Commit graph (built with DOM APIs; "after" view only once answered) ---
+        var SVG_NS = "http://www.w3.org/2000/svg";
+        function svgEl(tag, attrs, text) {
+          var el = document.createElementNS(SVG_NS, tag);
+          Object.keys(attrs).forEach(function (k) {
+            el.setAttribute(k, attrs[k]);
+          });
+          if (text !== undefined) el.textContent = text;
+          return el;
+        }
+
+        function renderCommitTree(showAfter) {
+          var q = getCurrentQuestion();
+          if (!q) return;
+          var after = showAfter && state.isAnswered;
+          var nodes = after ? q.tree.after : q.tree.before;
+          var status = after ? q.tree.afterStatus : q.tree.beforeStatus;
+
+          treeHeaderTitle.textContent = "Commit graph (" + (after ? "after" : "before") + ")";
+          treeViewToggleBtn.hidden = !state.isAnswered;
+          treeViewToggleBtn.textContent = after ? "Show before" : "Show after";
+          treeHeadVal.textContent = status.head;
+          treeStagingVal.textContent = status.staging;
+          treeWorkingVal.textContent = status.working;
+
+          var svg = svgEl("svg", {
+            class: "tree-svg",
+            viewBox: "0 0 420 145",
+            width: "420",
+            height: "145",
+            role: "img",
+            "aria-label": "Commit graph, " + (after ? "after" : "before") + " the operation"
+          });
+          var defs = svgEl("defs", {});
+          var marker = svgEl("marker", { id: "arrow", viewBox: "0 0 10 10", refX: "22", refY: "5", markerWidth: "6", markerHeight: "6", orient: "auto-start-reverse" });
+          marker.appendChild(svgEl("path", { d: "M 0 1 L 10 5 L 0 9 z", fill: "#64748b" }));
+          defs.appendChild(marker);
+          svg.appendChild(defs);
+
+          var byId = {};
+          nodes.forEach(function (n) {
+            byId[n.id] = n;
+          });
+          nodes.forEach(function (n) {
+            var p = n.parent ? byId[n.parent] : null;
+            if (!p) return;
+            var attrs = { x1: p.x, y1: p.y, x2: n.x, y2: n.y, stroke: n.isDangling ? "#475569" : "#64748b", "stroke-width": "2.5", "marker-end": "url(#arrow)" };
+            if (n.isDangling) attrs["stroke-dasharray"] = "4,4";
+            svg.appendChild(svgEl("line", attrs));
+          });
+          nodes.forEach(function (n) {
+            var fill = n.isHead ? "#f97316" : n.isDangling ? "#1e293b" : "#3b82f6";
+            var stroke = n.isHead ? "#ea580c" : n.isDangling ? "#64748b" : "#2563eb";
+            svg.appendChild(svgEl("circle", { cx: n.x, cy: n.y, r: "16", fill: fill, stroke: stroke, "stroke-width": n.isHead ? "3" : "2" }));
+            svg.appendChild(svgEl("text", { x: n.x, y: n.y + 4, fill: "#ffffff", "font-family": "monospace", "font-size": "10", "font-weight": "bold", "text-anchor": "middle" }, n.sha));
+            svg.appendChild(svgEl("text", { x: n.x, y: n.y - 21, fill: n.isHead ? "#fb923c" : "#cbd5e1", "font-family": "sans-serif", "font-size": "10", "font-weight": n.isHead ? "bold" : "normal", "text-anchor": "middle" }, n.label));
+            if (n.isHead) {
+              svg.appendChild(svgEl("rect", { x: n.x - 20, y: n.y + 19, width: "40", height: "13", rx: "3", fill: "#f97316" }));
+              svg.appendChild(svgEl("text", { x: n.x, y: n.y + 29, fill: "#000000", "font-family": "sans-serif", "font-size": "8", "font-weight": "bold", "text-anchor": "middle" }, "HEAD"));
+            }
+          });
+
+          while (treeSvgContainer.firstChild) treeSvgContainer.removeChild(treeSvgContainer.firstChild);
+          treeSvgContainer.appendChild(svg);
+        }
+
+        treeViewToggleBtn.addEventListener("click", function () {
+          if (!state.isAnswered) return;
+          state.treeViewMode = state.treeViewMode === "after" ? "before" : "after";
+          renderCommitTree(state.treeViewMode === "after");
+          soundClick();
+        });
+
+        function renderTerminal(q) {
+          while (terminalBody.firstChild) terminalBody.removeChild(terminalBody.firstChild);
+          q.term.forEach(function (pair) {
+            var line = document.createElement("div");
+            var prompt = document.createElement("span");
+            prompt.className = "cmd-prompt";
+            prompt.textContent = "$ ";
+            var cmd = document.createElement("span");
+            cmd.className = "cmd-text";
+            cmd.textContent = pair[0];
+            line.appendChild(prompt);
+            line.appendChild(cmd);
+            terminalBody.appendChild(line);
+            if (pair[1]) {
+              var out = document.createElement("div");
+              out.className = "cmd-out";
+              out.textContent = pair[1];
+              terminalBody.appendChild(out);
+            }
+          });
+        }
+
+        // --- Cheat sheet: a reference for reviewing answers, so it opens only after submitting ---
+        function setSheet(open) {
+          sheetDrawer.classList.toggle("show", open);
+          toggleSheetBtn.setAttribute("aria-expanded", open ? "true" : "false");
+        }
+        function updateSheetAvailability() {
+          var allowed = state.isAnswered || isComplete();
+          toggleSheetBtn.disabled = !allowed;
+          toggleSheetBtn.title = allowed ? "Cheat sheet (C)" : "Available after you submit an answer";
+          if (!allowed) setSheet(false);
+        }
+        toggleSheetBtn.addEventListener("click", function () {
+          if (toggleSheetBtn.disabled) return;
+          setSheet(!sheetDrawer.classList.contains("show"));
+          soundClick();
+        });
+        closeSheetBtn.addEventListener("click", function () {
+          setSheet(false);
+          toggleSheetBtn.focus();
+          soundClick();
+        });
+
+        // --- Render ---
+        function renderLevel() {
+          if (isComplete()) {
+            renderCompletedCard();
+            return;
+          }
+          var q = getCurrentQuestion();
+          shuffleQuestion(q);
+          state.selectedOption = null;
+          state.isAnswered = false;
+          state.hintRevealed = false;
+          state.treeViewMode = "before";
+
+          terminalBox.hidden = false;
+          treeVisualizer.hidden = false;
+          optionsPanel.hidden = false;
+          hintBtn.hidden = false;
+
+          updateStatsUI();
+          updateSheetAvailability();
+
+          levelPill.textContent = "Level " + (state.poolIndex + 1);
+          topicPill.textContent = q.topic;
+          difficultyPill.textContent = q.difficulty;
+          questionTitle.textContent = q.title;
+          renderRich(questionDesc, q.desc);
+          renderTerminal(q);
+          renderCommitTree(false);
+
+          hintBox.classList.remove("show");
+          hintBtn.disabled = false;
+          explainerCard.classList.remove("show");
+
+          actionBtn.disabled = true;
+          setButtonLabel(actionBtn, "Submit Decision", "→");
+
+          while (optionsPanel.firstChild) optionsPanel.removeChild(optionsPanel.firstChild);
+          q.shuffled.forEach(function (optText, idx) {
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "option-btn";
+            btn.setAttribute("role", "radio");
+            btn.setAttribute("aria-checked", "false");
+
+            var keyBadge = document.createElement("span");
+            keyBadge.className = "option-key";
+            keyBadge.textContent = idx + 1;
+            btn.appendChild(keyBadge);
+
+            var textSpan = document.createElement("span");
+            textSpan.className = "option-text";
+            renderRich(textSpan, optText);
+            btn.appendChild(textSpan);
+
+            btn.addEventListener("click", function () {
+              if (state.isAnswered) return;
+              selectOption(idx);
+            });
+            optionsPanel.appendChild(btn);
+          });
+        }
+
+        function renderCompletedCard() {
+          state.isAnswered = false;
+          updateStatsUI();
+          updateSheetAvailability();
+          levelPill.textContent = "Complete";
+          topicPill.textContent = state.isRetryMode ? "Practice round" : "Full rodeo";
+          difficultyPill.textContent = state.score.toLocaleString() + " pts";
+          questionTitle.textContent = "Rodeo complete";
+          questionDesc.textContent = "Open the scorecard to ride again or practise the questions you missed.";
+          terminalBox.hidden = true;
+          treeVisualizer.hidden = true;
+          optionsPanel.hidden = true;
+          hintBtn.hidden = true;
+          hintBox.classList.remove("show");
+          explainerCard.classList.remove("show");
+          setButtonLabel(actionBtn, "View Scorecard", "🏆");
+          actionBtn.disabled = false;
+        }
+
+        function selectOption(index) {
+          if (state.isAnswered || isComplete()) return;
+          state.selectedOption = index;
+          var buttons = optionsPanel.querySelectorAll(".option-btn");
+          buttons.forEach(function (btn, idx) {
+            var on = idx === index;
+            btn.classList.toggle("selected", on);
+            btn.setAttribute("aria-checked", on ? "true" : "false");
+          });
+          actionBtn.disabled = false;
+          soundClick();
+        }
+
+        hintBtn.addEventListener("click", function () {
+          if (state.hintRevealed || state.isAnswered || isComplete()) return;
+          var q = getCurrentQuestion();
+          if (!q) return;
+          state.hintRevealed = true;
+          hintText.textContent = q.hint + (state.isRetryMode ? "" : " (costs 25 points)");
+          hintBox.classList.add("show");
+          hintBtn.disabled = true;
+          soundClick();
+        });
+
+        function submitAnswer() {
+          if (state.isAnswered || isComplete() || state.selectedOption === null) return;
+          var q = getCurrentQuestion();
+          var isCorrect = state.selectedOption === q.correctIndex;
+          state.isAnswered = true;
+
+          optionsPanel.querySelectorAll(".option-btn").forEach(function (btn, idx) {
+            btn.disabled = true;
+            if (idx === q.correctIndex) btn.classList.add("correct");
+            else if (idx === state.selectedOption) btn.classList.add("wrong");
+          });
+
+          var missedIdx = state.missedQuestionIds.indexOf(q.id);
+          if (state.isRetryMode) {
+            // Practice round: no points or accuracy changes, just clears what you now get right.
+            if (isCorrect && missedIdx !== -1) state.missedQuestionIds.splice(missedIdx, 1);
+            if (isCorrect) soundCorrect();
+            else soundWrong();
+          } else {
+            state.totalAnswered++;
+            if (isCorrect) {
+              state.correctAnswers++;
+              state.streak++;
+              if (state.streak > state.maxStreak) state.maxStreak = state.streak;
+              var points = Math.max(25, Math.round(100 * getStreakMultiplier()) - (state.hintRevealed ? 25 : 0));
+              state.score += points;
+              if (missedIdx !== -1) state.missedQuestionIds.splice(missedIdx, 1);
+              if (state.streak % 3 === 0) soundStreak();
+              else soundCorrect();
+            } else {
+              state.streak = 0;
+              if (missedIdx === -1) state.missedQuestionIds.push(q.id);
+              soundWrong();
+            }
+          }
+
+          state.treeViewMode = "after";
+          renderCommitTree(true);
+
+          explainerTitle.textContent = q.explainer.title;
+          explainerDiagram.textContent = q.explainer.diagram;
+          renderRich(explainerBody, q.explainer.body);
+          explainerCard.classList.add("show");
+
+          if (state.poolIndex + 1 < state.pool.length) setButtonLabel(actionBtn, "Next Challenge", "→");
+          else setButtonLabel(actionBtn, "View Rodeo Scorecard", "🏆");
+          actionBtn.disabled = false;
+          hintBtn.disabled = true;
+
+          updateStatsUI();
+          updateSheetAvailability();
+          persistState();
+        }
+
+        function advanceToNextLevel() {
+          if (!state.isAnswered || isComplete()) return;
+          state.poolIndex++;
+          state.isAnswered = false;
+          persistState();
+          if (isComplete()) {
+            renderCompletedCard();
+            showCompletionSummary(true);
+          } else {
+            renderLevel();
+          }
+        }
+
+        actionBtn.addEventListener("click", function () {
+          if (isComplete()) {
+            showCompletionSummary(false);
+            return;
+          }
+          if (!state.isAnswered) submitAnswer();
+          else advanceToNextLevel();
+        });
+
+        // --- Scorecard modal ---
+        var lastFocus = null;
+        function showCompletionSummary(withSound) {
+          if (withSound) soundVictory();
+          var accuracy = accuracyPct();
+          summaryScore.textContent = state.score.toLocaleString();
+          summaryAccuracy.textContent = accuracy + "%";
+          summaryStreak.textContent = state.maxStreak;
+
+          var rank = "Git Greenhorn (Branch Novice)";
+          var trophy = "🥉";
+          if (accuracy >= 90 && state.score >= 1200) {
+            rank = "Git Wrangler Supreme";
+            trophy = "👑";
+          } else if (accuracy >= 75) {
+            rank = "Seasoned Tree Architect";
+            trophy = "🥈";
+          } else if (accuracy >= 60) {
+            rank = "Reflog Trail Boss";
+            trophy = "🤠";
+          }
+          summaryRank.textContent = rank;
+          summaryTrophy.textContent = trophy;
+
+          retryMissedBtn.hidden = state.missedQuestionIds.length === 0;
+          missedCountSummary.textContent = state.missedQuestionIds.length;
+
+          lastFocus = document.activeElement;
+          summaryModal.classList.add("show");
+          (retryMissedBtn.hidden ? restartAllBtn : retryMissedBtn).focus();
+        }
+
+        function closeSummaryModal() {
+          if (!summaryModal.classList.contains("show")) return;
+          summaryModal.classList.remove("show");
+          if (lastFocus && lastFocus.focus && document.contains(lastFocus)) lastFocus.focus();
+          else actionBtn.focus();
+        }
+
+        closeSummaryBtn.addEventListener("click", closeSummaryModal);
+        summaryModal.addEventListener("click", function (e) {
+          if (e.target === summaryModal) closeSummaryModal();
+        });
+
+        function startFull() {
+          var hs = highScore;
+          state = freshState();
+          highScore = hs;
+          persistState();
+          renderLevel();
+        }
+
+        retryMissedBtn.addEventListener("click", function () {
+          if (state.missedQuestionIds.length === 0) return;
+          closeSummaryModal();
+          state.pool = state.missedQuestionIds.slice();
+          state.poolIndex = 0;
+          state.isRetryMode = true;
+          state.isAnswered = false;
+          persistState();
+          renderLevel();
+          soundClick();
+        });
+
+        restartAllBtn.addEventListener("click", function () {
+          closeSummaryModal();
+          startFull();
+          soundClick();
+        });
+
+        // Leaving a practice round returns to the finished scorecard (no score farming).
+        exitRetryPoolBtn.addEventListener("click", function () {
+          state.isRetryMode = false;
+          state.pool = QUESTION_IDS.slice();
+          state.poolIndex = state.pool.length;
+          state.isAnswered = false;
+          persistState();
+          renderCompletedCard();
+          showCompletionSummary(false);
+          soundClick();
+        });
+
+        // Inline two-step reset (no confirm())
+        var resetConfirmTimeout = null;
+        function revertResetButton() {
+          if (resetConfirmTimeout) {
+            clearTimeout(resetConfirmTimeout);
+            resetConfirmTimeout = null;
+          }
+          resetBtn.textContent = "↺";
+          resetBtn.classList.remove("confirming");
+          resetBtn.setAttribute("aria-label", "Reset quiz progress");
+          resetBtn.title = "Reset progress";
+        }
+        resetBtn.addEventListener("click", function () {
+          if (!resetConfirmTimeout) {
+            resetBtn.textContent = "Reset?";
+            resetBtn.classList.add("confirming");
+            resetBtn.setAttribute("aria-label", "Click again to confirm reset");
+            resetBtn.title = "Click again to confirm reset";
+            resetConfirmTimeout = setTimeout(revertResetButton, 3500);
+            return;
+          }
+          revertResetButton();
+          closeSummaryModal();
+          startFull();
+          soundClick();
+        });
+
+        // --- Keyboard shortcuts ---
+        document.addEventListener("keydown", function (e) {
+          if (e.ctrlKey || e.metaKey || e.altKey) return;
+          var t = e.target;
+          var tag = t && t.tagName;
+          if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (t && t.isContentEditable)) return;
+
+          if (summaryModal.classList.contains("show")) {
+            if (e.key === "Escape") {
+              e.preventDefault();
+              closeSummaryModal();
+            }
+            return;
+          }
+          if (e.key === "Escape" && sheetDrawer.classList.contains("show")) {
+            setSheet(false);
+            return;
+          }
+
+          if (/^[1-4]$/.test(e.key)) {
+            var q = getCurrentQuestion();
+            var idx = parseInt(e.key, 10) - 1;
+            if (q && !state.isAnswered && idx < q.shuffled.length) {
+              e.preventDefault();
+              selectOption(idx);
+            }
+            return;
+          }
+
+          if (e.key === "Enter") {
+            // Let buttons/links handle their own Enter so one key press never fires twice.
+            // An Enter on an answer option submits it (option clicks only select).
+            var onOption = t && t.classList && t.classList.contains("option-btn");
+            if ((tag === "BUTTON" || tag === "A") && !onOption) return;
+            if (!actionBtn.disabled) {
+              e.preventDefault();
+              actionBtn.click();
+            }
+            return;
+          }
+
+          var k = e.key.toLowerCase();
+          if (k === "h") {
+            if (!hintBtn.disabled && !hintBtn.hidden) hintBtn.click();
+          } else if (k === "c") {
+            if (!toggleSheetBtn.disabled) toggleSheetBtn.click();
+          } else if (k === "m") {
+            toggleAudio();
+          } else if (k === "t") {
+            if (state.isAnswered && !treeViewToggleBtn.hidden) treeViewToggleBtn.click();
+          }
+        });
+
+        // --- Audio & theme controls ---
+        var audioToggleBtn = $("audioToggleBtn");
+        var audioIcon = $("audioIcon");
+        function updateAudioButtonUI() {
+          audioIcon.textContent = isMuted ? "🔇" : "🔊";
+          audioToggleBtn.setAttribute("aria-label", isMuted ? "Unmute sound effects" : "Mute sound effects");
+          audioToggleBtn.setAttribute("aria-pressed", isMuted ? "true" : "false");
+        }
+        function toggleAudio() {
+          isMuted = !isMuted;
+          updateAudioButtonUI();
+          try {
+            localStorage.setItem(STORAGE_KEY_AUDIO, isMuted ? "true" : "false");
+          } catch (e) {}
+          if (!isMuted) soundClick();
+        }
+        audioToggleBtn.addEventListener("click", toggleAudio);
+
+        var themeToggleBtn = $("themeToggleBtn");
+        var themeIcon = $("themeIcon");
+        function currentTheme() {
+          return document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+        }
+        function updateThemeIcon() {
+          var dark = currentTheme() === "dark";
+          themeIcon.textContent = dark ? "☀️" : "🌙";
+          themeToggleBtn.setAttribute("aria-label", dark ? "Switch to light theme" : "Switch to dark theme");
+        }
+        themeToggleBtn.addEventListener("click", function () {
+          var next = currentTheme() === "dark" ? "light" : "dark";
+          document.documentElement.setAttribute("data-theme", next);
+          updateThemeIcon();
+          try {
+            localStorage.setItem("git_rodeo_theme", next);
+          } catch (e) {}
+          soundClick();
+        });
+
+        // --- Init ---
+        loadSavedState();
+        updateAudioButtonUI();
+        updateThemeIcon();
+        renderLevel();
+        if (isComplete()) showCompletionSummary(false);
+      })();
+    </script>
+  </body>
+</html>
