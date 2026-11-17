@@ -15,7 +15,7 @@ Built for One File Tools.
       (function () {
         try {
           var stored = localStorage.getItem("oft_rate_defense_theme");
-          var theme = stored || (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+          var theme = (stored === "dark" || stored === "light") ? stored : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
           document.documentElement.setAttribute("data-theme", theme);
         } catch (e) {
           var fallback = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
@@ -455,8 +455,8 @@ Built for One File Tools.
           <div class="val" id="statWave">Wave 1 / 10</div>
         </div>
         <div class="stat-pill">
-          <div class="label">Throttled (429)</div>
-          <div class="val" id="statThrottled" style="color: var(--warning)">0</div>
+          <div class="label">429 Limit / 403 WAF</div>
+          <div class="val" id="statThrottled" style="color: var(--warning)">0 / 0</div>
         </div>
         <div class="stat-pill">
           <div class="label">Throughput</div>
@@ -468,7 +468,7 @@ Built for One File Tools.
         </div>
         <div class="stat-pill">
           <div class="label">Budget & Score</div>
-          <div class="val" id="statScore"><span style="color: var(--warning)">$120</span> • 0 pts</div>
+          <div class="val" id="statScore"><span style="color: var(--warning)">$100</span> • 0 pts</div>
         </div>
       </section>
 
@@ -540,7 +540,7 @@ Built for One File Tools.
                 <span>Scale Node</span>
                 <span class="upgrade-cost" id="costServer">$110</span>
               </div>
-              <div class="upgrade-desc" id="serverCount">1 Node (+8 req/s capacity)</div>
+              <div class="upgrade-desc" id="serverCount">1 Node (5 req concurrent cap)</div>
             </button>
 
             <button class="upgrade-btn" id="btnUpgradeCache" aria-label="Upgrade Redis Edge Cache">
@@ -548,38 +548,38 @@ Built for One File Tools.
                 <span>Redis Cache</span>
                 <span class="upgrade-cost" id="costCache">$80</span>
               </div>
-              <div class="upgrade-desc" id="cacheLevel">Lvl 0 (Absorbs read GETs)</div>
+              <div class="upgrade-desc" id="cacheLevel">Lvl 0 (Edge-absorbs GETs)</div>
             </button>
 
             <button class="upgrade-btn" id="btnUpgradeWaf" aria-label="Deploy WAF Bot Shield">
               <div class="upgrade-title">
                 <span>WAF Bot Shield</span>
-                <span class="upgrade-cost" id="costWaf">$110</span>
+                <span class="upgrade-cost" id="costWaf">W3 ($250)</span>
               </div>
-              <div class="upgrade-desc" id="wafStatus">Lvl 0 (Filters DDoS traffic)</div>
+              <div class="upgrade-desc" id="wafStatus">Unlocks Wave 3</div>
             </button>
 
             <button class="upgrade-btn" id="btnUpgradeCircuit" aria-label="Deploy Circuit Breaker">
               <div class="upgrade-title">
                 <span>Circuit Breaker</span>
-                <span class="upgrade-cost" id="costCircuit">$120</span>
+                <span class="upgrade-cost" id="costCircuit">$130</span>
               </div>
-              <div class="upgrade-desc" id="circuitStatus">Locked (Auto-sheds on crisis)</div>
+              <div class="upgrade-desc" id="circuitStatus">Locked (Sheds during crisis)</div>
             </button>
 
             <button class="upgrade-btn" id="btnUpgradeLoadBalancer" aria-label="Deploy Smart Load Balancer">
               <div class="upgrade-title">
                 <span>Smart Balancer</span>
-                <span class="upgrade-cost" id="costBalancer">$90</span>
+                <span class="upgrade-cost" id="costBalancer">$140</span>
               </div>
-              <div class="upgrade-desc" id="balancerStatus">Locked (-35% latency)</div>
+              <div class="upgrade-desc" id="balancerStatus">Locked (Prevents hotspotting)</div>
             </button>
           </div>
 
           <div style="margin-top: 12px">
             <div style="display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 4px">
               <span style="color: var(--text-muted)">Cluster Processing Ceiling</span>
-              <span class="num" id="maxCapacity">18 req/sec concurrent</span>
+              <span class="num" id="maxCapacity">5 req concurrent</span>
             </div>
             <div style="height: 6px; border-radius: 4px; overflow: hidden" class="track-bg">
               <div id="capacityBar" style="height: 100%; width: 25%; background: var(--accent); transition: width 0.3s ease"></div>
@@ -677,7 +677,7 @@ Built for One File Tools.
 
       let wave = 1;
       let score = 0;
-      let budget = 120;
+      let budget = 100;
       let health = 100;
       let serverNodes = 1;
       let cacheLevel = 0;
@@ -703,10 +703,12 @@ Built for One File Tools.
       let totalClientRequests = 0;
       let totalLegitServed = 0;
       let totalCacheHits = 0;
-      let totalThrottled = 0;
+      let totalThrottled429 = 0;
+      let totalWafBlocked403 = 0;
       let totalDroppedLegit = 0;
       let totalDroppedMalicious = 0;
       let totalMaliciousBreached = 0;
+      let totalCircuitShed = 0;
       let throughputHistory = [];
       let recentLatencies = [];
 
@@ -883,43 +885,60 @@ Built for One File Tools.
               p.x = limiterX;
               totalClientRequests++;
 
-              // 1. Check WAF Bot Filter
-              if (p.isMalicious && wafLevel > 0 && Math.random() < (wafLevel === 1 ? 0.75 : 0.94)) {
+              // 1. Check WAF Bot Filter (L1: 65% bot detection, L2: 88% bot detection)
+              if (p.isMalicious && wafLevel > 0 && Math.random() < (wafLevel === 1 ? 0.65 : 0.88)) {
                 p.state = "throttled";
-                totalThrottled++;
+                totalWafBlocked403++;
                 totalDroppedMalicious++;
                 budget += 1;
-                score += 20;
+                score += 15;
                 continue;
               }
 
-              // 2. Check Redis Edge Cache (absorbs GET requests)
+              // 2. Check Redis Edge Cache (legit GETs served at edge, bypassing limiter & server!)
               if (cacheLevel > 0 && p.method === "GET" && !p.isMalicious && Math.random() < cacheLevel * 0.25) {
                 p.state = "cached";
                 newlyServed++;
                 totalCacheHits++;
+                totalLegitServed++;
                 budget += 1;
                 score += 12;
-                recentLatencies.push(hasLoadBalancer ? 12 : 20);
+                recentLatencies.push(10);
+                continue;
+              }
+
+              // 3. Circuit Breaker: sheds excess requests before servers when cluster is overwhelmed
+              const clusterCapacity = serverNodes * 5;
+              if (hasCircuitBreaker && circuitBreakerActive && activeOnServer >= serverNodes * 3) {
+                p.state = "throttled";
+                totalCircuitShed++;
+                continue;
+              }
+
+              const decision = evaluateRateLimiter(algo, time);
+              if (decision === true) {
+                p.state = "to_server";
+              } else if (decision === "queue") {
+                p.state = "queued";
+                p.queueStartTime = time;
+                leakyQueue.push(p);
               } else {
-                const decision = evaluateRateLimiter(algo, time);
-                if (decision === true) {
-                  p.state = "to_server";
-                } else if (decision === "queue") {
-                  p.state = "queued";
-                  p.queueStartTime = time;
-                  leakyQueue.push(p);
+                // Throttled 429
+                p.state = "throttled";
+                totalThrottled429++;
+                if (p.isMalicious) {
+                  totalDroppedMalicious++;
+                  budget += 1;
+                  score += 10;
                 } else {
-                  // Throttled 429
-                  p.state = "throttled";
-                  totalThrottled++;
-                  if (p.isMalicious) {
-                    totalDroppedMalicious++;
-                    budget += 1; // Controlled bounty
-                    score += 15;
-                  } else {
-                    totalDroppedLegit++;
-                    score = Math.max(0, score - 15); // Penalty for dropping legitimate user traffic
+                  totalDroppedLegit++;
+                  score = Math.max(0, score - 20);
+                  // SLA breach penalty: dropping legitimate customers damages service health
+                  health = Math.max(0, health - 1.2);
+                  if (health <= 0) {
+                    health = 0;
+                    endGame(false);
+                    return;
                   }
                 }
               }
@@ -932,28 +951,31 @@ Built for One File Tools.
             if (p.x >= serverX) {
               p.x = serverX;
               p.state = "processing";
-              if (hasLoadBalancer) {
-                // Intelligent load balancing: route to least-congested node
-                const nodeLoads = new Array(serverNodes).fill(0);
-                for (let k = 0; k < packets.length; k++) {
-                  if (packets[k].state === "processing") {
-                    nodeLoads[packets[k].assignedNode % serverNodes]++;
-                  }
+              const nodeLoads = new Array(serverNodes).fill(0);
+              for (let k = 0; k < packets.length; k++) {
+                if (packets[k].state === "processing") {
+                  nodeLoads[packets[k].assignedNode % serverNodes]++;
                 }
+              }
+              if (hasLoadBalancer) {
+                // Smart Load Balancer: route to least-congested node
                 let bestNode = 0;
                 for (let n = 1; n < serverNodes; n++) {
                   if (nodeLoads[n] < nodeLoads[bestNode]) bestNode = n;
                 }
                 p.assignedNode = bestNode;
               } else {
+                // Round-robin / hash: susceptible to hotspotting on high traffic
                 p.assignedNode = (totalLegitServed + totalMaliciousBreached) % serverNodes;
               }
             }
           } else if (p.state === "processing") {
             activeOnServer++;
-            const nodeCeiling = 10 + serverNodes * 8;
-            const overloadFactor = activeOnServer > nodeCeiling ? (activeOnServer - nodeCeiling) / nodeCeiling : 0;
-            const speedModifier = 1 + overloadFactor * 1.5;
+            // Per-node capacity limit: each node can handle up to 5 concurrent in-flight requests
+            const maxNodeCap = 5;
+            const clusterCeiling = serverNodes * maxNodeCap;
+            const overloadFactor = activeOnServer > clusterCeiling ? (activeOnServer - clusterCeiling) / clusterCeiling : 0;
+            const speedModifier = 1 + overloadFactor * 1.8;
 
             p.processProgress += dt / (hasLoadBalancer ? p.processDuration * 0.65 : p.processDuration) / speedModifier;
 
@@ -968,10 +990,10 @@ Built for One File Tools.
               recentLatencies.push(calculatedLatency);
 
               if (p.isMalicious) {
-                // Malicious request slips in and damages server
+                // Malicious request breaches backend and deals heavy damage
                 totalMaliciousBreached++;
                 score = Math.max(0, score - 25);
-                health = Math.max(0, health - 2.0);
+                health = Math.max(0, health - 2.5);
                 if (health <= 0) {
                   health = 0;
                   endGame(false);
@@ -1005,19 +1027,28 @@ Built for One File Tools.
         if (recentLatencies.length > 25) recentLatencies = recentLatencies.slice(-25);
         const avgLat = recentLatencies.length > 0 ? Math.round(recentLatencies.reduce((a, b) => a + b, 0) / recentLatencies.length) : 40;
 
-        // Cluster Overload & Health Mechanics
-        const clusterCeiling = 10 + serverNodes * 8;
+        // Cluster Overload & Health Mechanics:
+        // Capacity binds: each node can handle up to 5 concurrent in-flight requests
+        const clusterCeiling = serverNodes * 5;
+        if (hasCircuitBreaker) {
+          if (activeOnServer >= clusterCeiling * 0.85 || health < 45) {
+            circuitBreakerActive = true;
+          } else if (activeOnServer < clusterCeiling * 0.5 && health >= 60) {
+            circuitBreakerActive = false;
+          }
+        }
+
         if (activeOnServer > clusterCeiling) {
           const overloadFactor = (activeOnServer - clusterCeiling) / clusterCeiling;
-          health = Math.max(0, health - overloadFactor * dt * 25);
+          health = Math.max(0, health - overloadFactor * dt * 26);
           if (health <= 0) {
             health = 0;
             endGame(false);
             return;
           }
         } else if (health > 0) {
-          // Regenerate only if alive
-          health = Math.min(100, health + dt * 3.2);
+          // Regenerate only if healthy
+          health = Math.min(100, health + dt * 2.8);
         }
 
         if (health <= 0) {
@@ -1057,9 +1088,12 @@ Built for One File Tools.
 
         btnS.disabled = serverNodes >= 4 || budget < 110;
         btnC.disabled = cacheLevel >= 3 || budget < 80;
-        btnW.disabled = wafLevel >= 2 || (wafLevel === 0 ? budget < 110 : budget < 170);
-        btnB.disabled = hasCircuitBreaker || budget < 120;
-        btnL.disabled = hasLoadBalancer || budget < 90;
+        btnW.disabled = wafLevel >= 2 || (wafLevel === 0 ? (wave < 3 || budget < 250) : (wave < 6 || budget < 420));
+        btnB.disabled = hasCircuitBreaker || budget < 130;
+        btnL.disabled = hasLoadBalancer || budget < 140;
+
+        document.getElementById("costWaf").textContent = wafLevel === 0 ? (wave < 3 ? "W3 ($250)" : "$250") : (wafLevel === 1 ? (wave < 6 ? "W6 ($420)" : "$420") : "MAX");
+        document.getElementById("wafStatus").textContent = wafLevel === 0 ? (wave < 3 ? "Unlocks Wave 3" : "Ready to deploy") : (wafLevel === 1 ? (wave < 6 ? "Lvl 1 (W6 for L2)" : "Lvl 1 (Upgrade L2)") : "Lvl 2 (Max)");
       }
 
       function render(width, height, limiterX, serverX, algo, time) {
@@ -1070,7 +1104,7 @@ Built for One File Tools.
         ctx.fillStyle = isDark ? "rgba(56, 189, 248, 0.03)" : "rgba(2, 132, 199, 0.04)";
         ctx.fillRect(0, 0, limiterX, height);
         ctx.fillStyle = isDark ? "rgba(148, 163, 184, 0.5)" : "rgba(71, 85, 105, 0.6)";
-        ctx.font = "600 11px Inter";
+        ctx.font = "600 11px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
         ctx.fillText("CLIENT NETWORK", 16, 26);
 
         // Zone 2: API Gateway
@@ -1099,9 +1133,9 @@ Built for One File Tools.
           gaugeLabel = `${leakyQueue.length}/${capacity} Q`;
         } else if (algo === "sliding_window") {
           const elapsed = (time - currentWindowTimestamp) / 1000;
-          const weightedCount = prevWindowCount * (1 - elapsed) + currentWindowCount;
+          const weightedCount = prevWindowCount * Math.max(0, 1 - elapsed) + currentWindowCount;
           ratio = Math.max(0, Math.min(1, 1 - weightedCount / capacity));
-          gaugeLabel = `${Math.round(weightedCount)}/${capacity}`;
+          gaugeLabel = `${Math.max(0, Math.round(weightedCount))}/${capacity}`;
         } else {
           ratio = Math.max(0, Math.min(1, 1 - currentWindowCount / capacity));
           gaugeLabel = `${currentWindowCount}/${capacity}`;
@@ -1113,7 +1147,7 @@ Built for One File Tools.
         ctx.fillRect(limiterX - 6, height / 2 + 50 - 100 * ratio, 12, 100 * ratio);
 
         ctx.fillStyle = isDark ? "#94a3b8" : "#475569";
-        ctx.font = "600 9px JetBrains Mono";
+        ctx.font = "600 9px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace";
         ctx.fillText(gaugeLabel, limiterX - 18, height / 2 + 66);
 
         // Zone 3: Backend Cluster
@@ -1134,7 +1168,7 @@ Built for One File Tools.
           ctx.stroke();
 
           ctx.fillStyle = isDark ? "#f8fafc" : "#0f172a";
-          ctx.font = "700 9px JetBrains Mono";
+          ctx.font = "700 9px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace";
           ctx.fillText(`NODE-${i + 1}`, serverX + 20, ny + nodeHeight / 2 + 4);
         }
 
@@ -1149,7 +1183,7 @@ Built for One File Tools.
           ctx.stroke();
 
           ctx.fillStyle = "#a855f7";
-          ctx.font = "700 9px Inter";
+          ctx.font = "700 9px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
           ctx.fillText(`REDIS L${cacheLevel}`, limiterX + 26, height - 32);
         }
 
@@ -1164,7 +1198,7 @@ Built for One File Tools.
           ctx.stroke();
 
           ctx.fillStyle = "#f59e0b";
-          ctx.font = "700 9px Inter";
+          ctx.font = "700 9px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
           ctx.fillText(`WAF L${wafLevel}`, limiterX - 74, height - 32);
         }
 
@@ -1198,7 +1232,7 @@ Built for One File Tools.
         isPaused = false;
         wave = 1;
         score = 0;
-        budget = 120;
+        budget = 100;
         health = 100;
         serverNodes = 1;
         cacheLevel = 0;
@@ -1206,6 +1240,9 @@ Built for One File Tools.
         hasCircuitBreaker = false;
         circuitBreakerActive = false;
         hasLoadBalancer = false;
+        totalThrottled429 = 0;
+        totalWafBlocked403 = 0;
+        totalCircuitShed = 0;
 
         tokens = capacity;
         leakAccumulator = 0;
@@ -1308,8 +1345,8 @@ Built for One File Tools.
         if (budget >= 110 && serverNodes < 4) {
           budget -= 110;
           serverNodes++;
-          document.getElementById("serverCount").textContent = `${serverNodes} Nodes (+${serverNodes * 8} req/s)`;
-          document.getElementById("maxCapacity").textContent = `${10 + serverNodes * 8} req/sec concurrent`;
+          document.getElementById("serverCount").textContent = `${serverNodes} Nodes (${serverNodes * 5} req cap)`;
+          document.getElementById("maxCapacity").textContent = `${serverNodes * 5} req concurrent`;
           document.getElementById("capacityBar").style.width = `${(serverNodes / 4) * 100}%`;
           updateUpgradesUI();
         }
@@ -1325,36 +1362,36 @@ Built for One File Tools.
       });
 
       document.getElementById("btnUpgradeWaf").addEventListener("click", () => {
-        if (wafLevel === 0 && budget >= 110) {
-          budget -= 110;
+        if (wafLevel === 0 && wave >= 3 && budget >= 250) {
+          budget -= 250;
           wafLevel = 1;
-          document.getElementById("wafStatus").textContent = "Lvl 1 (Blocks 75% bots)";
-          document.getElementById("costWaf").textContent = "$170";
+          document.getElementById("wafStatus").textContent = "Lvl 1 (Blocks 65% bots)";
+          document.getElementById("costWaf").textContent = "W6 ($420)";
           updateUpgradesUI();
-        } else if (wafLevel === 1 && budget >= 170) {
-          budget -= 170;
+        } else if (wafLevel === 1 && wave >= 6 && budget >= 420) {
+          budget -= 420;
           wafLevel = 2;
-          document.getElementById("wafStatus").textContent = "Lvl 2 (Blocks 94% bots)";
+          document.getElementById("wafStatus").textContent = "Lvl 2 (Blocks 88% bots)";
           document.getElementById("costWaf").textContent = "MAX";
           updateUpgradesUI();
         }
       });
 
       document.getElementById("btnUpgradeCircuit").addEventListener("click", () => {
-        if (budget >= 120 && !hasCircuitBreaker) {
-          budget -= 120;
+        if (budget >= 130 && !hasCircuitBreaker) {
+          budget -= 130;
           hasCircuitBreaker = true;
-          document.getElementById("circuitStatus").textContent = "Active (Protects at <40% HP)";
+          document.getElementById("circuitStatus").textContent = "Active (Protects at <45% HP)";
           document.getElementById("costCircuit").textContent = "OWNED";
           updateUpgradesUI();
         }
       });
 
       document.getElementById("btnUpgradeLoadBalancer").addEventListener("click", () => {
-        if (budget >= 90 && !hasLoadBalancer) {
-          budget -= 90;
+        if (budget >= 140 && !hasLoadBalancer) {
+          budget -= 140;
           hasLoadBalancer = true;
-          document.getElementById("balancerStatus").textContent = "Active (-35% Latency)";
+          document.getElementById("balancerStatus").textContent = "Active (Smart Routing)";
           document.getElementById("costBalancer").textContent = "OWNED";
           updateUpgradesUI();
         }
