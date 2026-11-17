@@ -1,0 +1,1172 @@
+<!doctype html>
+<!--
+Theremin Synth & Visualizer
+Single-file interactive dual-antenna theremin synthesizer studio with a real-time oscilloscope visualizer.
+Built for One File Tools.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Theremin Synth & Visualizer — One File Tools</title>
+    <meta name="description" content="An expressive in-browser theremin synthesizer featuring 2D touch/mouse pitch-volume field, multi-wave oscillators, scale quantization, analog delay, and real-time phosphor oscilloscope." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+    <script>
+      (function () {
+        var oftThereminTheme = null;
+        try {
+          oftThereminTheme = localStorage.getItem("oft_theremin_theme");
+        } catch (e) {
+          oftThereminTheme = null;
+        }
+        if (oftThereminTheme !== "dark" && oftThereminTheme !== "light") {
+          oftThereminTheme = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        }
+        document.documentElement.setAttribute("data-theme", oftThereminTheme);
+      })();
+    </script>
+
+    <style>
+      :root {
+        --bg: #06080e;
+        --grid-line: #0f1422;
+        --panel: rgba(13, 17, 28, 0.9);
+        --panel-border: #1e263c;
+        --accent: #06b6d4;
+        --accent-hover: #0891b2;
+        --accent-glow: rgba(6, 182, 212, 0.28);
+        --text: #f8fafc;
+        --text-muted: #94a3b8;
+        --text-dim: #64748b;
+        --field-bg: #090d16;
+        --crosshair: #38bdf8;
+        --beam-color: #22d3ee;
+        --scope-glow: #06b6d4;
+        --scope-bg: #030712;
+        --prompt-bg: rgba(10, 15, 26, 0.85);
+      }
+
+      [data-theme="light"] {
+        --scope-bg: #e2e8f0;
+        --prompt-bg: rgba(255, 255, 255, 0.9);
+        --bg: #f8fafc;
+        --grid-line: #e2e8f0;
+        --panel: rgba(255, 255, 255, 0.95);
+        --panel-border: #cbd5e1;
+        --accent: #0284c7;
+        --accent-hover: #0369a1;
+        --accent-glow: rgba(2, 132, 199, 0.18);
+        --text: #0f172a;
+        --text-muted: #475569;
+        --text-dim: #94a3b8;
+        --field-bg: #f1f5f9;
+        --crosshair: #0284c7;
+        --beam-color: #0369a1;
+        --scope-glow: #0284c7;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        user-select: none;
+      }
+
+      body {
+        font-family:
+          "Inter",
+          system-ui,
+          -apple-system,
+          sans-serif;
+        background-color: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        overflow-x: hidden;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 24px;
+        background: var(--panel);
+        border-bottom: 1px solid var(--panel-border);
+        backdrop-filter: blur(12px);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .brand-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, var(--accent), #8b5cf6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        box-shadow: 0 0 16px var(--accent-glow);
+      }
+
+      .brand h1 {
+        font-family:
+          "Space Grotesk",
+          system-ui,
+          -apple-system,
+          sans-serif;
+        font-size: 1.25rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+
+      .brand span {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        font-weight: 500;
+      }
+
+      .header-controls {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .btn {
+        padding: 8px 14px;
+        border-radius: 6px;
+        border: 1px solid var(--panel-border);
+        background: var(--panel);
+        color: var(--text);
+        font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+        font-size: 0.82rem;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.15s ease;
+      }
+
+      .btn:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .btn-primary {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+      }
+
+      .btn-primary:hover {
+        background: var(--accent-hover);
+        color: #fff;
+      }
+
+      .main-layout {
+        display: grid;
+        grid-template-columns: 1fr 340px;
+        flex: 1;
+        gap: 16px;
+        padding: 16px;
+        max-width: 1600px;
+        margin: 0 auto;
+        width: 100%;
+      }
+
+      @media (max-width: 1024px) {
+        .main-layout {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+
+      @media (max-width: 520px) {
+        header {
+          flex-wrap: wrap;
+          gap: 10px;
+          padding: 12px 16px;
+        }
+
+        .brand h1 {
+          font-size: 1.05rem;
+        }
+
+        .main-layout {
+          padding: 12px;
+        }
+
+        .playfield-wrapper {
+          min-height: 340px;
+        }
+      }
+
+      /* Playfield Area */
+      .stage-card {
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: 12px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .playfield-wrapper {
+        position: relative;
+        flex: 1;
+        min-height: 440px;
+        background: var(--field-bg);
+        border-bottom: 1px solid var(--panel-border);
+        cursor: crosshair;
+        overflow: hidden;
+        touch-action: none;
+        -webkit-touch-callout: none;
+      }
+
+      .playfield-wrapper:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: -2px;
+      }
+
+      .btn:focus-visible,
+      .wave-btn:focus-visible,
+      .key-btn:focus-visible,
+      .select-input:focus-visible,
+      input[type="range"]:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      canvas#playfield-canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
+      .playfield-overlay {
+        position: absolute;
+        top: 14px;
+        left: 16px;
+        pointer-events: none;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+      }
+
+      .badge-note {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: var(--crosshair);
+        text-shadow: 0 0 12px var(--accent-glow);
+      }
+
+      .badge-stats {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+      }
+
+      .playfield-prompt {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+      }
+
+      .playfield-prompt.hidden {
+        opacity: 0;
+      }
+
+      .prompt-box {
+        background: var(--prompt-bg);
+        border: 1px solid var(--panel-border);
+        padding: 18px 24px;
+        border-radius: 10px;
+        backdrop-filter: blur(8px);
+      }
+
+      .prompt-box h3 {
+        font-size: 1.1rem;
+        margin-bottom: 6px;
+        color: var(--text);
+      }
+
+      .prompt-box p {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+      }
+
+      /* Visualizer Section */
+      .visualizer-strip {
+        height: 140px;
+        background: var(--scope-bg);
+        display: flex;
+        position: relative;
+      }
+
+      canvas#scope-canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
+      /* Control Deck Sidebar */
+      .control-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .panel-section {
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: 10px;
+        padding: 16px;
+      }
+
+      .section-title {
+        font-family:
+          "Space Grotesk",
+          system-ui,
+          -apple-system,
+          sans-serif;
+        font-size: 0.9rem;
+        font-weight: 600;
+        margin-bottom: 12px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .control-group {
+        margin-bottom: 12px;
+      }
+
+      .control-group:last-child {
+        margin-bottom: 0;
+      }
+
+      .control-header {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.82rem;
+        margin-bottom: 6px;
+        color: var(--text-muted);
+        font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+      }
+
+      .control-value {
+        color: var(--accent);
+        font-weight: 600;
+      }
+
+      .wave-selector {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+      }
+
+      .wave-btn {
+        padding: 8px 4px;
+        border-radius: 6px;
+        border: 1px solid var(--panel-border);
+        background: var(--bg);
+        color: var(--text-muted);
+        font-size: 0.75rem;
+        font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+        cursor: pointer;
+        text-align: center;
+        transition: all 0.15s ease;
+      }
+
+      .wave-btn:hover {
+        border-color: var(--accent);
+        color: var(--text);
+      }
+
+      .wave-btn.active {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+        box-shadow: 0 0 10px var(--accent-glow);
+      }
+
+      .select-input {
+        width: 100%;
+        padding: 8px 10px;
+        background: var(--bg);
+        border: 1px solid var(--panel-border);
+        border-radius: 6px;
+        color: var(--text);
+        font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+        font-size: 0.85rem;
+        outline: none;
+      }
+
+      .select-input:focus {
+        border-color: var(--accent);
+      }
+
+      input[type="range"] {
+        width: 100%;
+        accent-color: var(--accent);
+        cursor: pointer;
+      }
+
+      .key-grid {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 4px;
+        margin-top: 6px;
+      }
+
+      .key-btn {
+        padding: 6px 2px;
+        text-align: center;
+        font-size: 0.75rem;
+        font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+        border: 1px solid var(--panel-border);
+        border-radius: 4px;
+        background: var(--bg);
+        color: var(--text-muted);
+        cursor: pointer;
+      }
+
+      .key-btn.active {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+      }
+
+      footer {
+        padding: 12px 24px;
+        text-align: center;
+        font-size: 0.8rem;
+        color: var(--text-dim);
+        border-top: 1px solid var(--panel-border);
+        background: var(--panel);
+        margin-top: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="brand">
+        <div class="brand-icon">⚡</div>
+        <div>
+          <h1>Theremin Synth & Visualizer</h1>
+          <span>Interactive 2D Ether-Wave Synthesizer Studio</span>
+        </div>
+      </div>
+      <div class="header-controls">
+        <button id="mute-btn" class="btn" aria-label="Toggle mute" aria-pressed="false"><span id="mute-icon" aria-hidden="true">🔊</span> <span id="mute-label">Live</span></button>
+        <button id="theme-btn" class="btn" aria-label="Toggle dark/light theme"><span id="theme-icon" aria-hidden="true">☀️</span> Theme</button>
+      </div>
+    </header>
+
+    <div class="main-layout">
+      <!-- Theremin 2D Touch & Oscilloscope Arena -->
+      <section class="stage-card">
+        <div class="playfield-wrapper" id="playfield-box" role="region" aria-label="Theremin playfield: press and drag. Horizontal position sets pitch, vertical position sets volume.">
+          <canvas id="playfield-canvas" aria-hidden="true"></canvas>
+
+          <div class="playfield-overlay">
+            <div class="badge-note" id="note-display" aria-live="off">--</div>
+            <div class="badge-stats" id="stats-display">Press and drag to play (X: Pitch, Y: Volume)</div>
+          </div>
+
+          <div class="playfield-prompt" id="start-prompt">
+            <div class="prompt-box">
+              <h3>Press &amp; Drag Inside the Field</h3>
+              <p>Horizontal axis governs frequency • Vertical axis controls volume</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="visualizer-strip">
+          <canvas id="scope-canvas" role="img" aria-label="Live oscilloscope of the audio output"></canvas>
+        </div>
+      </section>
+
+      <!-- Sidebar Controls -->
+      <aside class="control-panel">
+        <!-- Oscillator Settings -->
+        <div class="panel-section">
+          <div class="section-title" id="wave-title">Oscillator Waveform</div>
+          <div class="wave-selector" role="group" aria-labelledby="wave-title">
+            <button class="wave-btn active" data-wave="sine" aria-pressed="true">Sine</button>
+            <button class="wave-btn" data-wave="triangle" aria-pressed="false" aria-label="Triangle">Tri</button>
+            <button class="wave-btn" data-wave="sawtooth" aria-pressed="false" aria-label="Sawtooth">Saw</button>
+            <button class="wave-btn" data-wave="square" aria-pressed="false">Square</button>
+          </div>
+        </div>
+
+        <!-- Scale Quantization -->
+        <div class="panel-section">
+          <div class="section-title">Scale Quantization</div>
+          <div class="control-group">
+            <div class="control-header">
+              <label for="scale-select">Musical Scale</label>
+            </div>
+            <select id="scale-select" class="select-input">
+              <option value="chromatic">Chromatic (All Notes)</option>
+              <option value="major">Major Diatonic</option>
+              <option value="minor">Natural Minor</option>
+              <option value="pentatonic">Minor Pentatonic</option>
+              <option value="blues">Blues Scale</option>
+              <option value="continuous">Continuous Free (No Snapping)</option>
+            </select>
+          </div>
+
+          <div class="control-group">
+            <div class="control-header">
+              <span id="root-title">Root Key</span>
+            </div>
+            <div class="key-grid" id="key-picker" role="group" aria-labelledby="root-title">
+              <button class="key-btn active" data-root="C" aria-pressed="true">C</button>
+              <button class="key-btn" data-root="C#" aria-pressed="false">C#</button>
+              <button class="key-btn" data-root="D" aria-pressed="false">D</button>
+              <button class="key-btn" data-root="D#" aria-pressed="false">D#</button>
+              <button class="key-btn" data-root="E" aria-pressed="false">E</button>
+              <button class="key-btn" data-root="F" aria-pressed="false">F</button>
+              <button class="key-btn" data-root="F#" aria-pressed="false">F#</button>
+              <button class="key-btn" data-root="G" aria-pressed="false">G</button>
+              <button class="key-btn" data-root="G#" aria-pressed="false">G#</button>
+              <button class="key-btn" data-root="A" aria-pressed="false">A</button>
+              <button class="key-btn" data-root="A#" aria-pressed="false">A#</button>
+              <button class="key-btn" data-root="B" aria-pressed="false">B</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Expression & Vibrato -->
+        <div class="panel-section">
+          <div class="section-title">Expression & Vibrato LFO</div>
+          <div class="control-group">
+            <div class="control-header">
+              <label for="vib-depth">Vibrato Depth</label>
+              <span class="control-value" id="vib-depth-val">25 cents</span>
+            </div>
+            <input type="range" id="vib-depth" min="0" max="100" value="25" step="1" />
+          </div>
+
+          <div class="control-group">
+            <div class="control-header">
+              <label for="vib-rate">Vibrato Speed</label>
+              <span class="control-value" id="vib-rate-val">5.5 Hz</span>
+            </div>
+            <input type="range" id="vib-rate" min="1" max="15" value="5.5" step="0.5" />
+          </div>
+        </div>
+
+        <!-- Space Delay Effect -->
+        <div class="panel-section">
+          <div class="section-title">Analog Echo Delay</div>
+          <div class="control-group">
+            <div class="control-header">
+              <label for="delay-time">Delay Time</label>
+              <span class="control-value" id="delay-time-val">280 ms</span>
+            </div>
+            <input type="range" id="delay-time" min="0.05" max="0.8" value="0.28" step="0.01" />
+          </div>
+
+          <div class="control-group">
+            <div class="control-header">
+              <label for="delay-feedback">Feedback &amp; Wet Mix</label>
+              <span class="control-value" id="delay-feed-val">35%</span>
+            </div>
+            <input type="range" id="delay-feedback" min="0" max="0.85" value="0.35" step="0.05" />
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <footer>Single-File Interactive Theremin Synthesizer & Phosphor Visualizer • Built for One-File-Tools • 100% Client-Side Web Audio API</footer>
+
+    <script>
+      (function () {
+        "use strict";
+
+        // ---- Audio Engine ----
+        // One shared AudioContext, created lazily on the first user gesture.
+        // Oscillators are persistent and gated by gainNode, so nothing leaks.
+        var audioCtx = null;
+        var osc = null;
+        var subOsc = null;
+        var gainNode = null;
+        var lfo = null;
+        var lfoGain = null;
+        var delayNode = null;
+        var delayFeedback = null;
+        var delayGain = null;
+        var limiter = null;
+        var analyser = null;
+        var isPlaying = false;
+        var isMuted = false;
+
+        var currentWave = "sine";
+        var currentScale = "chromatic";
+        var currentRoot = "C";
+        var minFreq = 110; // A2
+        var maxFreq = 1760; // A6
+        var MAX_GAIN = 0.45;
+
+        var notesList = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+        var scaleIntervals = {
+          chromatic: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+          major: [0, 2, 4, 5, 7, 9, 11],
+          minor: [0, 2, 3, 5, 7, 8, 10],
+          pentatonic: [0, 3, 5, 7, 10],
+          blues: [0, 3, 5, 6, 7, 10],
+          continuous: null
+        };
+
+        var vibDepth = document.getElementById("vib-depth");
+        var vibRate = document.getElementById("vib-rate");
+        var delayTime = document.getElementById("delay-time");
+        var delayFeed = document.getElementById("delay-feedback");
+
+        function readSlider(input, fallback) {
+          var v = parseFloat(input.value);
+          var min = parseFloat(input.min);
+          var max = parseFloat(input.max);
+          if (!isFinite(v)) return fallback;
+          return Math.max(min, Math.min(max, v));
+        }
+
+        // Wet level scales with feedback so the "Feedback & Wet Mix" slider controls both.
+        function wetForFeedback(fb) {
+          return 0.15 + fb * 0.35;
+        }
+
+        function initAudio() {
+          if (audioCtx) return true;
+          var AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (!AudioContextClass) {
+            statsDisplay.textContent = "Web Audio API is not supported in this browser.";
+            return false;
+          }
+          audioCtx = new AudioContextClass();
+          var now = audioCtx.currentTime;
+
+          // Main Oscillator
+          osc = audioCtx.createOscillator();
+          osc.type = currentWave;
+          osc.frequency.setValueAtTime(440, now);
+
+          // Sub Oscillator (-1 octave)
+          subOsc = audioCtx.createOscillator();
+          subOsc.type = "sine";
+          subOsc.frequency.setValueAtTime(220, now);
+
+          // Voice Gain (pitch/volume field + mute)
+          gainNode = audioCtx.createGain();
+          gainNode.gain.setValueAtTime(0, now);
+
+          // Sub Gain
+          var subGain = audioCtx.createGain();
+          subGain.gain.setValueAtTime(0.2, now);
+          subOsc.connect(subGain);
+          subGain.connect(gainNode);
+
+          // Vibrato LFO (depth in cents, applied to both oscillators via detune so it
+          // is musically even across the whole range and the sub follows the vibrato)
+          lfo = audioCtx.createOscillator();
+          lfo.frequency.setValueAtTime(readSlider(vibRate, 5.5), now);
+          lfoGain = audioCtx.createGain();
+          lfoGain.gain.setValueAtTime(readSlider(vibDepth, 25), now);
+          lfo.connect(lfoGain);
+          lfoGain.connect(osc.detune);
+          lfoGain.connect(subOsc.detune);
+
+          // Echo Delay (feedback slider max is 0.85, so the loop gain stays < 1)
+          var fb = Math.min(0.85, readSlider(delayFeed, 0.35));
+          delayNode = audioCtx.createDelay(1.0);
+          delayNode.delayTime.setValueAtTime(readSlider(delayTime, 0.28), now);
+          delayFeedback = audioCtx.createGain();
+          delayFeedback.gain.setValueAtTime(fb, now);
+          delayGain = audioCtx.createGain();
+          delayGain.gain.setValueAtTime(wetForFeedback(fb), now);
+
+          gainNode.connect(delayNode);
+          delayNode.connect(delayFeedback);
+          delayFeedback.connect(delayNode);
+          delayNode.connect(delayGain);
+
+          // Master limiter: dry + wet sum can exceed 0 dBFS with high feedback on a square wave
+          limiter = audioCtx.createDynamicsCompressor();
+          limiter.threshold.setValueAtTime(-10, now);
+          limiter.knee.setValueAtTime(6, now);
+          limiter.ratio.setValueAtTime(12, now);
+          limiter.attack.setValueAtTime(0.003, now);
+          limiter.release.setValueAtTime(0.25, now);
+
+          // Analyser
+          analyser = audioCtx.createAnalyser();
+          analyser.fftSize = 1024;
+          analyser.smoothingTimeConstant = 0.85;
+
+          gainNode.connect(limiter);
+          delayGain.connect(limiter);
+          limiter.connect(analyser);
+          analyser.connect(audioCtx.destination);
+
+          osc.connect(gainNode);
+
+          osc.start();
+          subOsc.start();
+          lfo.start();
+          return true;
+        }
+
+        function resumeAudio() {
+          if (audioCtx && audioCtx.state === "suspended") {
+            var p = audioCtx.resume();
+            if (p && typeof p.catch === "function") p.catch(function () {});
+          }
+        }
+
+        // Musical note frequency calculation
+        function freqToNoteInfo(freq) {
+          var noteNum = 12 * (Math.log(freq / 440) / Math.log(2)) + 69;
+          var roundNote = Math.round(noteNum);
+          var noteName = notesList[roundNote % 12];
+          var octave = Math.floor(roundNote / 12) - 1;
+          return { note: noteName + octave, midi: roundNote, semitone: roundNote % 12 };
+        }
+
+        function quantizeFreq(rawFreq) {
+          var intervals = scaleIntervals[currentScale];
+          if (!intervals) return rawFreq;
+          var rootIdx = notesList.indexOf(currentRoot);
+          if (rootIdx < 0) rootIdx = 0;
+
+          var rawNoteNum = 12 * (Math.log(rawFreq / 440) / Math.log(2)) + 69;
+          var baseMidi = Math.round(rawNoteNum);
+
+          var bestMidi = baseMidi;
+          var bestDiff = 999;
+
+          for (var testMidi = baseMidi - 6; testMidi <= baseMidi + 6; testMidi++) {
+            var semitone = (testMidi - rootIdx + 1200) % 12;
+            if (intervals.indexOf(semitone) !== -1) {
+              var diff = Math.abs(testMidi - rawNoteNum);
+              if (diff < bestDiff) {
+                bestDiff = diff;
+                bestMidi = testMidi;
+              }
+            }
+          }
+
+          return 440 * Math.pow(2, (bestMidi - 69) / 12);
+        }
+
+        // UI & Canvas Management
+        var playfieldBox = document.getElementById("playfield-box");
+        var fieldCanvas = document.getElementById("playfield-canvas");
+        var scopeCanvas = document.getElementById("scope-canvas");
+        var fieldCtx = fieldCanvas.getContext("2d");
+        var scopeCtx = scopeCanvas.getContext("2d");
+
+        var noteDisplay = document.getElementById("note-display");
+        var statsDisplay = document.getElementById("stats-display");
+        var startPrompt = document.getElementById("start-prompt");
+
+        var currentX = 0.5;
+        var currentY = 0.0;
+        var isPointerActive = false;
+        var activePointerId = null;
+
+        // CSS-pixel sizes of the canvases (backing stores are scaled by devicePixelRatio)
+        var fieldW = 0;
+        var fieldH = 0;
+        var scopeW = 0;
+        var scopeH = 0;
+
+        // Theme-aware canvas palette, refreshed whenever the theme changes
+        var colors = {};
+        function readThemeColors() {
+          var cs = getComputedStyle(document.documentElement);
+          function v(name, fallback) {
+            var val = cs.getPropertyValue(name).trim();
+            return val || fallback;
+          }
+          colors.grid = v("--grid-line", "#0f1422");
+          colors.crosshair = v("--crosshair", "#38bdf8");
+          colors.beam = v("--beam-color", "#22d3ee");
+          colors.glow = v("--scope-glow", "#06b6d4");
+          colors.scopeBg = v("--scope-bg", "#030712");
+        }
+        readThemeColors();
+
+        function sizeCanvas(canvas, ctx, cssW, cssH) {
+          var dpr = window.devicePixelRatio || 1;
+          var bw = Math.max(1, Math.round(cssW * dpr));
+          var bh = Math.max(1, Math.round(cssH * dpr));
+          if (canvas.width !== bw || canvas.height !== bh) {
+            canvas.width = bw;
+            canvas.height = bh;
+          }
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        }
+
+        function resizeCanvases() {
+          fieldW = playfieldBox.clientWidth;
+          fieldH = playfieldBox.clientHeight;
+          scopeW = scopeCanvas.parentElement.clientWidth;
+          scopeH = scopeCanvas.parentElement.clientHeight;
+          sizeCanvas(fieldCanvas, fieldCtx, fieldW, fieldH);
+          sizeCanvas(scopeCanvas, scopeCtx, scopeW, scopeH);
+        }
+
+        window.addEventListener("resize", resizeCanvases);
+        if (typeof ResizeObserver === "function") {
+          var ro = new ResizeObserver(resizeCanvases);
+          ro.observe(playfieldBox);
+          ro.observe(scopeCanvas.parentElement);
+        }
+        resizeCanvases();
+
+        function targetGain() {
+          return isMuted || !isPointerActive ? 0 : Math.pow(currentY, 1.8) * MAX_GAIN;
+        }
+
+        // Apply the current X/Y position to the synth (also used when scale/root/mute change)
+        function applyVoice() {
+          if (!audioCtx || !isPointerActive) return;
+
+          // Frequency mapping (exponential)
+          var rawFreq = minFreq * Math.pow(maxFreq / minFreq, currentX);
+          var activeFreq = quantizeFreq(rawFreq);
+          var now = audioCtx.currentTime;
+
+          var noteInfo = freqToNoteInfo(activeFreq);
+          noteDisplay.textContent = noteInfo.note;
+          statsDisplay.textContent = Math.round(activeFreq) + " Hz • Volume: " + Math.round(currentY * 100) + "%" + (isMuted ? " (muted)" : "");
+
+          osc.frequency.setTargetAtTime(activeFreq, now, 0.025);
+          subOsc.frequency.setTargetAtTime(activeFreq / 2, now, 0.025);
+          gainNode.gain.setTargetAtTime(targetGain(), now, 0.02);
+        }
+
+        // Pointer event handling
+        function updateThereminPosition(clientX, clientY) {
+          var rect = playfieldBox.getBoundingClientRect();
+          if (rect.width <= 0 || rect.height <= 0) return;
+          currentX = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+          currentY = Math.max(0, Math.min(1, 1 - (clientY - rect.top) / rect.height));
+          applyVoice();
+        }
+
+        playfieldBox.addEventListener("pointerdown", function (e) {
+          if (e.pointerType === "mouse" && e.button !== 0) return;
+          // Monophonic: the first finger owns the voice; extra touches are ignored
+          if (activePointerId !== null && activePointerId !== e.pointerId) return;
+          e.preventDefault();
+
+          if (!initAudio()) return;
+          resumeAudio();
+
+          activePointerId = e.pointerId;
+          isPointerActive = true;
+          try {
+            playfieldBox.setPointerCapture(e.pointerId);
+          } catch (err) {
+            /* ignore */
+          }
+
+          if (!isPlaying) {
+            isPlaying = true;
+            startPrompt.classList.add("hidden");
+          }
+          updateThereminPosition(e.clientX, e.clientY);
+        });
+
+        playfieldBox.addEventListener("pointermove", function (e) {
+          if (isPointerActive && e.pointerId === activePointerId) {
+            updateThereminPosition(e.clientX, e.clientY);
+          }
+        });
+
+        function stopPlayback() {
+          var hadPointer = activePointerId;
+          isPointerActive = false;
+          activePointerId = null;
+          if (hadPointer !== null) {
+            try {
+              if (playfieldBox.hasPointerCapture && playfieldBox.hasPointerCapture(hadPointer)) {
+                playfieldBox.releasePointerCapture(hadPointer);
+              }
+            } catch (err) {
+              /* ignore */
+            }
+          }
+          if (gainNode && audioCtx) {
+            var now = audioCtx.currentTime;
+            gainNode.gain.cancelScheduledValues(now);
+            gainNode.gain.setTargetAtTime(0, now, 0.05);
+          }
+          noteDisplay.textContent = "--";
+          if (isPlaying) statsDisplay.textContent = "Press and drag inside the field to resume";
+        }
+
+        function onPointerEnd(e) {
+          if (e.pointerId === activePointerId) stopPlayback();
+        }
+
+        playfieldBox.addEventListener("pointerup", onPointerEnd);
+        playfieldBox.addEventListener("pointercancel", onPointerEnd);
+        playfieldBox.addEventListener("pointerleave", onPointerEnd);
+        playfieldBox.addEventListener("lostpointercapture", onPointerEnd);
+        playfieldBox.addEventListener("contextmenu", function (e) {
+          e.preventDefault();
+        });
+        window.addEventListener("blur", stopPlayback);
+        document.addEventListener("visibilitychange", function () {
+          if (document.hidden) stopPlayback();
+        });
+
+        // Animation Loop: Playfield Beam & Oscilloscope (single rAF chain; the browser
+        // pauses rAF while the tab is hidden)
+        function renderPlayfield() {
+          var w = fieldW;
+          var h = fieldH;
+          fieldCtx.clearRect(0, 0, w, h);
+
+          // Draw grid lines
+          fieldCtx.strokeStyle = colors.grid;
+          fieldCtx.lineWidth = 1;
+
+          for (var gx = 0; gx < w; gx += 40) {
+            fieldCtx.beginPath();
+            fieldCtx.moveTo(gx + 0.5, 0);
+            fieldCtx.lineTo(gx + 0.5, h);
+            fieldCtx.stroke();
+          }
+
+          for (var gy = 0; gy < h; gy += 40) {
+            fieldCtx.beginPath();
+            fieldCtx.moveTo(0, gy + 0.5);
+            fieldCtx.lineTo(w, gy + 0.5);
+            fieldCtx.stroke();
+          }
+
+          // Draw Crosshair and Energy Beam if active
+          if (isPointerActive) {
+            var px = currentX * w;
+            var py = (1 - currentY) * h;
+
+            // Horizontal & vertical indicator lines
+            fieldCtx.strokeStyle = colors.crosshair;
+            fieldCtx.globalAlpha = 0.45;
+            fieldCtx.setLineDash([4, 4]);
+
+            fieldCtx.beginPath();
+            fieldCtx.moveTo(0, py);
+            fieldCtx.lineTo(w, py);
+            fieldCtx.stroke();
+
+            fieldCtx.beginPath();
+            fieldCtx.moveTo(px, 0);
+            fieldCtx.lineTo(px, h);
+            fieldCtx.stroke();
+            fieldCtx.setLineDash([]);
+            fieldCtx.globalAlpha = 1;
+
+            // Glowing Plasma Orb
+            var rad = 14 + currentY * 18;
+            var grad = fieldCtx.createRadialGradient(px, py, 2, px, py, rad);
+            grad.addColorStop(0, "rgba(255, 255, 255, 0.95)");
+            grad.addColorStop(0.3, "rgba(34, 211, 238, 0.85)");
+            grad.addColorStop(0.7, "rgba(6, 182, 212, 0.3)");
+            grad.addColorStop(1, "rgba(6, 182, 212, 0)");
+
+            fieldCtx.fillStyle = grad;
+            fieldCtx.beginPath();
+            fieldCtx.arc(px, py, rad, 0, Math.PI * 2);
+            fieldCtx.fill();
+          }
+        }
+
+        var scopeBuffer = new Uint8Array(1024);
+
+        function renderOscilloscope() {
+          var w = scopeW;
+          var h = scopeH;
+          scopeCtx.fillStyle = colors.scopeBg;
+          scopeCtx.fillRect(0, 0, w, h);
+
+          if (analyser && isPlaying) {
+            if (scopeBuffer.length !== analyser.fftSize) scopeBuffer = new Uint8Array(analyser.fftSize);
+            analyser.getByteTimeDomainData(scopeBuffer);
+            var len = scopeBuffer.length;
+
+            scopeCtx.lineWidth = 2;
+            scopeCtx.strokeStyle = colors.beam;
+            scopeCtx.shadowBlur = 8;
+            scopeCtx.shadowColor = colors.glow;
+
+            scopeCtx.beginPath();
+            var sliceWidth = w / (len - 1);
+            var x = 0;
+
+            for (var i = 0; i < len; i++) {
+              var v = scopeBuffer[i] / 128.0;
+              var y = (v * h) / 2;
+
+              if (i === 0) scopeCtx.moveTo(x, y);
+              else scopeCtx.lineTo(x, y);
+
+              x += sliceWidth;
+            }
+
+            scopeCtx.stroke();
+            scopeCtx.shadowBlur = 0;
+          } else {
+            // Flat baseline when idle
+            scopeCtx.lineWidth = 1;
+            scopeCtx.strokeStyle = colors.beam;
+            scopeCtx.globalAlpha = 0.35;
+            scopeCtx.beginPath();
+            scopeCtx.moveTo(0, h / 2);
+            scopeCtx.lineTo(w, h / 2);
+            scopeCtx.stroke();
+            scopeCtx.globalAlpha = 1;
+          }
+        }
+
+        function frame() {
+          renderPlayfield();
+          renderOscilloscope();
+          requestAnimationFrame(frame);
+        }
+        requestAnimationFrame(frame);
+
+        // Control Binding
+        function setPressed(selector, activeBtn) {
+          document.querySelectorAll(selector).forEach(function (b) {
+            var on = b === activeBtn;
+            b.classList.toggle("active", on);
+            b.setAttribute("aria-pressed", on ? "true" : "false");
+          });
+        }
+
+        // Wave buttons
+        document.querySelectorAll(".wave-btn").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            var wave = btn.getAttribute("data-wave");
+            if (["sine", "triangle", "sawtooth", "square"].indexOf(wave) === -1) return;
+            setPressed(".wave-btn", btn);
+            currentWave = wave;
+            if (osc) osc.type = currentWave;
+          });
+        });
+
+        // Scales & Root Keys
+        var scaleSelect = document.getElementById("scale-select");
+        scaleSelect.addEventListener("change", function () {
+          if (Object.prototype.hasOwnProperty.call(scaleIntervals, scaleSelect.value)) {
+            currentScale = scaleSelect.value;
+            applyVoice();
+          }
+        });
+
+        document.querySelectorAll(".key-btn").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            var root = btn.getAttribute("data-root");
+            if (notesList.indexOf(root) === -1) return;
+            setPressed(".key-btn", btn);
+            currentRoot = root;
+            applyVoice();
+          });
+        });
+
+        // Vibrato sliders
+        var vibDepthVal = document.getElementById("vib-depth-val");
+        vibDepth.addEventListener("input", function () {
+          var depth = readSlider(vibDepth, 25);
+          vibDepthVal.textContent = depth + " cents";
+          if (lfoGain && audioCtx) lfoGain.gain.setTargetAtTime(depth, audioCtx.currentTime, 0.03);
+        });
+
+        var vibRateVal = document.getElementById("vib-rate-val");
+        vibRate.addEventListener("input", function () {
+          var rate = readSlider(vibRate, 5.5);
+          vibRateVal.textContent = rate + " Hz";
+          if (lfo && audioCtx) lfo.frequency.setTargetAtTime(rate, audioCtx.currentTime, 0.03);
+        });
+
+        // Delay sliders
+        var delayTimeVal = document.getElementById("delay-time-val");
+        delayTime.addEventListener("input", function () {
+          var t = readSlider(delayTime, 0.28);
+          delayTimeVal.textContent = Math.round(t * 1000) + " ms";
+          if (delayNode && audioCtx) delayNode.delayTime.setTargetAtTime(t, audioCtx.currentTime, 0.05);
+        });
+
+        var delayFeedVal = document.getElementById("delay-feed-val");
+        delayFeed.addEventListener("input", function () {
+          var fb = Math.min(0.85, readSlider(delayFeed, 0.35));
+          delayFeedVal.textContent = Math.round(fb * 100) + "%";
+          if (delayFeedback && audioCtx) {
+            delayFeedback.gain.setTargetAtTime(fb, audioCtx.currentTime, 0.03);
+            delayGain.gain.setTargetAtTime(wetForFeedback(fb), audioCtx.currentTime, 0.03);
+          }
+        });
+
+        // Mute & Theme Controls
+        var muteBtn = document.getElementById("mute-btn");
+        var muteIcon = document.getElementById("mute-icon");
+        var muteLabel = document.getElementById("mute-label");
+        muteBtn.addEventListener("click", function () {
+          isMuted = !isMuted;
+          muteIcon.textContent = isMuted ? "🔇" : "🔊";
+          muteLabel.textContent = isMuted ? "Muted" : "Live";
+          muteBtn.setAttribute("aria-pressed", isMuted ? "true" : "false");
+          muteBtn.classList.toggle("btn-primary", isMuted);
+          if (gainNode && audioCtx) {
+            // Only ever ramps to 0 when no pointer is down, so unmuting can't start a stuck note
+            gainNode.gain.setTargetAtTime(targetGain(), audioCtx.currentTime, 0.02);
+          }
+          applyVoice();
+        });
+
+        var themeBtn = document.getElementById("theme-btn");
+        var themeIcon = document.getElementById("theme-icon");
+        function syncThemeIcon() {
+          var curr = document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+          themeIcon.textContent = curr === "dark" ? "☀️" : "🌙";
+        }
+        syncThemeIcon();
+        themeBtn.addEventListener("click", function () {
+          var curr = document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+          var next = curr === "dark" ? "light" : "dark";
+          document.documentElement.setAttribute("data-theme", next);
+          try {
+            localStorage.setItem("oft_theremin_theme", next);
+          } catch (e) {
+            /* storage unavailable */
+          }
+          syncThemeIcon();
+          readThemeColors();
+        });
+      })();
+    </script>
+  </body>
+</html>
