@@ -948,17 +948,16 @@ Built for One File Tools.
             p.x = limiterX - 10 - (leakyQueue.indexOf(p) % 5) * 8;
           } else if (p.state === "to_server") {
             p.x += p.speed * dt;
-            if (p.x >= serverX) {
-              p.x = serverX;
-              p.state = "processing";
-              const nodeLoads = new Array(serverNodes).fill(0);
-              for (let k = 0; k < packets.length; k++) {
-                if (packets[k].state === "processing") {
-                  nodeLoads[packets[k].assignedNode % serverNodes]++;
-                }
-              }
+            const nodeHeight = Math.min(48, (height - 80) / serverNodes - 10);
+            if (p.assignedTargetY === undefined) {
               if (hasLoadBalancer) {
                 // Smart Load Balancer: route to least-congested node
+                const nodeLoads = new Array(serverNodes).fill(0);
+                for (let k = 0; k < packets.length; k++) {
+                  if (packets[k].state === "processing") {
+                    nodeLoads[packets[k].assignedNode % serverNodes]++;
+                  }
+                }
                 let bestNode = 0;
                 for (let n = 1; n < serverNodes; n++) {
                   if (nodeLoads[n] < nodeLoads[bestNode]) bestNode = n;
@@ -968,6 +967,15 @@ Built for One File Tools.
                 // Round-robin / hash: susceptible to hotspotting on high traffic
                 p.assignedNode = (totalLegitServed + totalMaliciousBreached) % serverNodes;
               }
+              const ny = 55 + p.assignedNode * (nodeHeight + 12);
+              p.assignedTargetY = ny + nodeHeight / 2;
+            }
+            // Animate smooth vertical glide towards assigned node row
+            p.y += (p.assignedTargetY - p.y) * dt * 7;
+            if (p.x >= serverX) {
+              p.x = serverX;
+              p.y = p.assignedTargetY;
+              p.state = "processing";
             }
           } else if (p.state === "processing") {
             activeOnServer++;
@@ -1205,12 +1213,7 @@ Built for One File Tools.
         // Draw Packets
         packets.forEach((p) => {
           ctx.beginPath();
-          let targetY = p.y;
-          if (p.state === "processing") {
-            const ny = 55 + p.assignedNode * (nodeHeight + 12);
-            targetY = ny + nodeHeight / 2;
-          }
-          ctx.arc(p.x, targetY, p.radius, 0, Math.PI * 2);
+          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
 
           if (p.state === "to_gateway" || p.state === "queued") {
             ctx.fillStyle = p.isMalicious ? "#ef4444" : "#38bdf8";
@@ -1272,19 +1275,20 @@ Built for One File Tools.
         document.getElementById("pauseIcon").textContent = "⏸️";
         document.getElementById("statWave").textContent = `Wave 1 / ${waveConfigs.length}`;
 
-        document.getElementById("serverCount").textContent = "1 Node (+8 req/s capacity)";
-        document.getElementById("cacheLevel").textContent = "Lvl 0 (Absorbs read GETs)";
-        document.getElementById("wafStatus").textContent = "Lvl 0 (Filters DDoS traffic)";
-        document.getElementById("circuitStatus").textContent = "Locked (Auto-sheds on crisis)";
-        document.getElementById("balancerStatus").textContent = "Locked (-35% latency)";
+        document.getElementById("serverCount").textContent = "1 Node (5 req/s capacity)";
+        document.getElementById("cacheLevel").textContent = "Lvl 0 (Edge-absorbs GETs)";
+        document.getElementById("wafStatus").textContent = "Unlocks Wave 3";
+        document.getElementById("circuitStatus").textContent = "Locked (Sheds during crisis)";
+        document.getElementById("balancerStatus").textContent = "Locked (Prevents hotspotting)";
 
         document.getElementById("costServer").textContent = "$110";
         document.getElementById("costCache").textContent = "$80";
-        document.getElementById("costWaf").textContent = "$110";
-        document.getElementById("costCircuit").textContent = "$120";
-        document.getElementById("costBalancer").textContent = "$90";
+        document.getElementById("costWaf").textContent = "W3 ($250)";
+        document.getElementById("costCircuit").textContent = "$130";
+        document.getElementById("costBalancer").textContent = "$140";
 
-        document.getElementById("maxCapacity").textContent = "18 req/sec concurrent";
+        document.getElementById("maxCapacity").textContent = "5 req concurrent";
+        document.getElementById("capacityBar").style.width = "25%";
         document.getElementById("capacityBar").style.width = "25%";
 
         animFrameId = requestAnimationFrame(updateSimulation);
