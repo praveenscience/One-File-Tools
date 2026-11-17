@@ -1,0 +1,1463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>API Rate Limiter Simulator — One File Tools</title>
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("ratelimiter_theme");
+        if (t) {
+          document.documentElement.setAttribute("data-theme", t);
+        } else if (window.matchMedia("(prefers-color-scheme: light)").matches) {
+          document.documentElement.setAttribute("data-theme", "light");
+        }
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Nunito:wght@400;600;700;800&family=Oxanium:wght@600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-primary: #0b0f19;
+      --bg-secondary: #131b2e;
+      --bg-tertiary: #1f2a44;
+      --border-color: #2e3e60;
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --accent-cyan: #06b6d4;
+      --accent-green: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-red: #ef4444;
+      --accent-purple: #8b5cf6;
+      --server-healthy: #10b981;
+      --server-warning: #f59e0b;
+      --server-danger: #ef4444;
+      --font-sans: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-mono: "JetBrains Mono", monospace;
+      --font-heading: "Oxanium", sans-serif;
+    }
+
+    [data-theme="light"] {
+      --bg-primary: #f8fafc;
+      --bg-secondary: #ffffff;
+      --bg-tertiary: #f1f5f9;
+      --border-color: #cbd5e1;
+      --text-primary: #0f172a;
+      --text-secondary: #64748b;
+      --accent-cyan: #0891b2;
+      --accent-green: #059669;
+      --accent-amber: #d97706;
+      --accent-red: #dc2626;
+      --accent-purple: #7c3aed;
+      --server-healthy: #059669;
+      --server-warning: #d97706;
+      --server-danger: #dc2626;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      line-height: 1.5;
+    }
+
+    header {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+      padding: 0.75rem 1.5rem;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      backdrop-filter: blur(8px);
+    }
+
+    .header-container {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .logo-area {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .logo-badge {
+      font-family: var(--font-heading);
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .logo-badge span {
+      color: var(--accent-cyan);
+    }
+
+    .hud-stats {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      flex-wrap: wrap;
+    }
+
+    .stat-pill {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      padding: 0.35rem 0.65rem;
+      border-radius: 9999px;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .stat-label {
+      color: var(--text-secondary);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+    }
+
+    .stat-val {
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .icon-btn {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      width: 2.25rem;
+      height: 2.25rem;
+      border-radius: 0.5rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: all 0.2s ease;
+    }
+
+    .icon-btn:hover {
+      border-color: var(--accent-cyan);
+    }
+
+    main {
+      flex: 1;
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 1rem 1rem 2rem;
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 1rem;
+    }
+
+    @media (max-width: 1024px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .arena-section {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .canvas-container {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+      width: 100%;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 900 / 480;
+      background: #070a13;
+    }
+
+    [data-theme="light"] canvas {
+      background: #f1f5f9;
+    }
+
+    .arena-controls {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      padding: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .wave-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .wave-title {
+      font-family: var(--font-heading);
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+    }
+
+    .wave-desc {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+
+    .action-group {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .btn {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      font-family: var(--font-sans);
+      font-weight: 700;
+      font-size: 0.875rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: all 0.2s ease;
+    }
+
+    .btn:hover {
+      background: var(--border-color);
+    }
+
+    .btn-primary {
+      background: var(--accent-green);
+      border-color: var(--accent-green);
+      color: #ffffff;
+    }
+
+    .btn-primary:hover {
+      background: #059669;
+    }
+
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .panel-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      padding: 1.25rem;
+    }
+
+    .panel-title {
+      font-family: var(--font-heading);
+      font-size: 1rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .health-bar-wrapper {
+      margin-bottom: 1rem;
+    }
+
+    .health-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      font-family: var(--font-mono);
+      margin-bottom: 0.35rem;
+    }
+
+    .progress-bar-bg {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      height: 1.25rem;
+      border-radius: 9999px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .health-bar-fill {
+      height: 100%;
+      background: var(--server-healthy);
+      width: 100%;
+      transition: width 0.2s ease, background 0.3s ease;
+    }
+
+    .algo-picker {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .algo-card {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 0.5rem;
+      padding: 0.75rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .algo-card:hover {
+      border-color: var(--accent-cyan);
+    }
+
+    .algo-card.active {
+      border-color: var(--accent-cyan);
+      background: rgba(6, 182, 212, 0.1);
+    }
+
+    .algo-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.25rem;
+    }
+
+    .algo-name {
+      font-weight: 700;
+      font-size: 0.875rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .algo-badge {
+      font-size: 0.7rem;
+      font-family: var(--font-mono);
+      background: var(--bg-secondary);
+      padding: 0.1rem 0.4rem;
+      border-radius: 0.25rem;
+      color: var(--accent-cyan);
+    }
+
+    .algo-desc {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      line-height: 1.3;
+    }
+
+    .slider-group {
+      margin-top: 0.75rem;
+    }
+
+    .slider-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      font-family: var(--font-mono);
+      margin-bottom: 0.25rem;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent-cyan);
+    }
+
+    .upgrade-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .upgrade-item {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 0.5rem;
+      padding: 0.65rem 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+
+    .upgrade-info h4 {
+      font-size: 0.825rem;
+      margin-bottom: 0.1rem;
+    }
+
+    .upgrade-info p {
+      font-size: 0.725rem;
+      color: var(--text-secondary);
+    }
+
+    .upgrade-btn {
+      padding: 0.35rem 0.65rem;
+      font-size: 0.75rem;
+      white-space: nowrap;
+    }
+
+    .overlay-modal {
+      position: absolute;
+      inset: 0;
+      background: rgba(11, 15, 25, 0.85);
+      backdrop-filter: blur(4px);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      text-align: center;
+      z-index: 10;
+    }
+
+    .overlay-modal.active {
+      display: flex;
+    }
+
+    .overlay-title {
+      font-family: var(--font-heading);
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .overlay-desc {
+      color: var(--text-secondary);
+      max-width: 480px;
+      margin-bottom: 1.5rem;
+      font-size: 0.95rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-container">
+      <a href="../index.html" class="logo-area">
+        <div class="logo-badge">🛡️ <span>API RATE LIMITER SIMULATOR</span></div>
+      </a>
+      <div class="hud-stats">
+        <div class="stat-pill">
+          <span class="stat-label">Wave</span>
+          <span class="stat-val" id="stat-wave">1 / 10</span>
+        </div>
+        <div class="stat-pill">
+          <span class="stat-label">Bandwidth $</span>
+          <span class="stat-val" style="color:var(--accent-amber);" id="stat-credits">$100</span>
+        </div>
+        <div class="stat-pill">
+          <span class="stat-label">Score</span>
+          <span class="stat-val" id="stat-score">0</span>
+        </div>
+        <div class="stat-pill">
+          <span class="stat-label">Throughput</span>
+          <span class="stat-val" id="stat-throughput">0 req/s</span>
+        </div>
+        <div class="stat-pill">
+          <span class="stat-label">Avg Latency</span>
+          <span class="stat-val" id="stat-latency">24 ms</span>
+        </div>
+        <div class="stat-pill">
+          <span class="stat-label">Rejection %</span>
+          <span class="stat-val" id="stat-rejection">0.0%</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="icon-btn" id="btn-sound" title="Toggle Sound">🔊</button>
+        <button class="icon-btn" id="theme-toggle" title="Toggle Theme">☀️</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="arena-section">
+      <div class="canvas-container">
+        <canvas id="sim-canvas" width="900" height="480"></canvas>
+        
+        <div class="overlay-modal" id="game-over-modal" role="dialog" aria-modal="true">
+          <div class="overlay-title" style="color:var(--accent-red);">💥 SERVER OVERLOAD CRASH!</div>
+          <p class="overlay-desc">Unmitigated malicious traffic exhausted backend threads, triggering HTTP 503 Service Unavailable. Deploy WAF and Rate Limiters to defend the origin!</p>
+          <button class="btn btn-primary" id="btn-retry-wave">↺ Retry Wave</button>
+        </div>
+
+        <div class="overlay-modal" id="wave-complete-modal" role="dialog" aria-modal="true">
+          <div class="overlay-title" style="color:var(--accent-green);">🎉 WAVE DEFENDED!</div>
+          <p class="overlay-desc" id="wave-complete-stats">You kept the origin server healthy while maximizing valid request throughput.</p>
+          <button class="btn btn-primary" id="btn-next-wave">Proceed to Next Wave ➔</button>
+        </div>
+
+        <div class="overlay-modal" id="victory-modal" role="dialog" aria-modal="true">
+          <div class="overlay-title" style="color:var(--accent-cyan);">🏆 MASTER INFRASTRUCTURE ARCHITECT!</div>
+          <p class="overlay-desc">You successfully routed and defended the backend infrastructure across all 10 severe traffic spikes, crawler assaults, and DDoS storms!</p>
+          <button class="btn btn-primary" id="btn-restart-game">Play Again ➔</button>
+        </div>
+      </div>
+
+      <div class="arena-controls">
+        <div class="wave-info">
+          <div class="wave-title" id="wave-name">Wave 1: Gentle Morning API Calls</div>
+          <div class="wave-desc" id="wave-brief">Steady low-frequency client calls. Get familiar with Token Bucket configuration.</div>
+        </div>
+        <div class="action-group">
+          <button class="btn btn-primary" id="btn-start-wave">▶ Start Wave</button>
+          <button class="btn" id="btn-pause" disabled>⏸ Pause</button>
+        </div>
+      </div>
+    </section>
+
+    <aside class="sidebar">
+      <div class="panel-card">
+        <div class="panel-title">🖥️ Origin Server Telemetry</div>
+        <div class="health-bar-wrapper">
+          <div class="health-header">
+            <span>Server Health</span>
+            <span id="health-val">100%</span>
+          </div>
+          <div class="progress-bar-bg">
+            <div class="health-bar-fill" id="health-bar"></div>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; font-family:var(--font-mono); font-size:0.75rem;">
+          <div class="stat-pill" style="justify-content:space-between;">
+            <span class="stat-label">200 OK</span>
+            <span class="stat-val" style="color:var(--accent-green);" id="count-200">0</span>
+          </div>
+          <div class="stat-pill" style="justify-content:space-between;">
+            <span class="stat-label">429 Limited</span>
+            <span class="stat-val" style="color:var(--accent-amber);" id="count-429">0</span>
+          </div>
+          <div class="stat-pill" style="justify-content:space-between;">
+            <span class="stat-label">Cached</span>
+            <span class="stat-val" style="color:var(--accent-cyan);" id="count-cached">0</span>
+          </div>
+          <div class="stat-pill" style="justify-content:space-between;">
+            <span class="stat-label">WAF Blocked</span>
+            <span class="stat-val" style="color:var(--accent-purple);" id="count-waf">0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-card">
+        <div class="panel-title">⚙️ Rate Limiter Gateway</div>
+        <div class="algo-picker">
+          <div class="algo-card active" data-algo="token-bucket">
+            <div class="algo-header">
+              <span class="algo-name">🪣 Token Bucket</span>
+              <span class="algo-badge">Smooth Bursts</span>
+            </div>
+            <p class="algo-desc">Tokens refill at steady rate. Handles temporary spikes gracefully.</p>
+          </div>
+
+          <div class="algo-card" data-algo="sliding-window">
+            <div class="algo-header">
+              <span class="algo-name">⏱️ Sliding Window</span>
+              <span class="algo-badge">High Precision</span>
+            </div>
+            <p class="algo-desc">Rolling timestamp counter. Eliminates boundary reset traffic surges.</p>
+          </div>
+
+          <div class="algo-card" data-algo="fixed-window">
+            <div class="algo-header">
+              <span class="algo-name">📊 Fixed Window</span>
+              <span class="algo-badge">Simple Counter</span>
+            </div>
+            <p class="algo-desc">Counter resets every window interval. Vulnerable at edges.</p>
+          </div>
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Rate Limit Capacity</span>
+            <span id="label-capacity">18 req/s</span>
+          </div>
+          <input type="range" id="slider-capacity" min="5" max="60" value="18" />
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Bucket Burst Depth</span>
+            <span id="label-burst">12 burst</span>
+          </div>
+          <input type="range" id="slider-burst" min="5" max="40" value="12" />
+        </div>
+      </div>
+
+      <div class="panel-card">
+        <div class="panel-title">🏰 Defensive Tower Infrastructure</div>
+        <div class="upgrade-list">
+          <div class="upgrade-item">
+            <div class="upgrade-info">
+              <h4>🛡️ WAF & Bot-Filter Tower</h4>
+              <p>Drops 85% of malicious DDoS packets before the limiter.</p>
+            </div>
+            <button class="btn upgrade-btn" id="btn-upgrade-waf" data-cost="180">Deploy ($180)</button>
+          </div>
+
+          <div class="upgrade-item">
+            <div class="upgrade-info">
+              <h4>⚡ Redis Edge Cache</h4>
+              <p>Absorbs 40% of GET requests with 0ms server load.</p>
+            </div>
+            <button class="btn upgrade-btn" id="btn-upgrade-cache" data-cost="150">Deploy ($150)</button>
+          </div>
+
+          <div class="upgrade-item">
+            <div class="upgrade-info">
+              <h4>⚖️ Cluster Load Balancer</h4>
+              <p>Dual server instances: +100% capacity (22 → 44 req/s), -50% overload damage.</p>
+            </div>
+            <button class="btn upgrade-btn" id="btn-upgrade-lb" data-cost="260">Deploy ($260)</button>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    /* =====================================================================
+       Audio Synthesizer (Web Audio API - Single Shared Context & Resumed)
+       ===================================================================== */
+    let audioCtx = null;
+    let soundEnabled = true;
+
+    function getAudioContext() {
+      if (!soundEnabled) return null;
+      try {
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        return audioCtx;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function playTone(freq, type, duration, gainVal = 0.08) {
+      const ctx = getAudioContext();
+      if (!ctx) return;
+      try {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, ctx.currentTime);
+        gain.gain.setValueAtTime(gainVal, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + duration);
+      } catch (e) {}
+    }
+
+    /* =====================================================================
+       Theme Management (Zero-FOUC & Synchronized)
+       ===================================================================== */
+    const themeToggle = document.getElementById('theme-toggle');
+    function syncThemeButton() {
+      const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+      themeToggle.textContent = currentTheme === 'light' ? '🌙' : '☀️';
+    }
+
+    themeToggle.addEventListener('click', () => {
+      const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+      const nextTheme = currentTheme === 'light' ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', nextTheme);
+      try {
+        localStorage.setItem('ratelimiter_theme', nextTheme);
+      } catch (e) {}
+      syncThemeButton();
+    });
+
+    syncThemeButton();
+
+    const btnSound = document.getElementById('btn-sound');
+    btnSound.addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      btnSound.textContent = soundEnabled ? '🔊' : '🔇';
+      if (soundEnabled) getAudioContext();
+    });
+
+    /* =====================================================================
+       10 Balanced Traffic Waves Curriculum
+       ===================================================================== */
+    const WAVES = [
+      {
+        id: 1,
+        name: "Wave 1: Gentle Morning API Calls",
+        desc: "Low-frequency steady traffic. Baseline verification.",
+        duration: 18,
+        rate: 8,
+        burstiness: 0.1,
+        maliciousRatio: 0
+      },
+      {
+        id: 2,
+        name: "Wave 2: Lunchtime Mobile Rush",
+        desc: "Moderate traffic with occasional small bursts.",
+        duration: 20,
+        rate: 14,
+        burstiness: 0.2,
+        maliciousRatio: 0.05
+      },
+      {
+        id: 3,
+        name: "Wave 3: Flash Sale Announcement",
+        desc: "Sudden sharp spikes in request volume. Token bucket recommended.",
+        duration: 22,
+        rate: 20,
+        burstiness: 0.4,
+        maliciousRatio: 0.1
+      },
+      {
+        id: 4,
+        name: "Wave 4: Aggressive Web Scraper",
+        desc: "Automated bots hammering API endpoints sequentially.",
+        duration: 24,
+        rate: 24,
+        burstiness: 0.3,
+        maliciousRatio: 0.2
+      },
+      {
+        id: 5,
+        name: "Wave 5: Microservice Cascade",
+        desc: "Heavy queries triggering internal retry storms.",
+        duration: 24,
+        rate: 28,
+        burstiness: 0.35,
+        maliciousRatio: 0.2
+      },
+      {
+        id: 6,
+        name: "Wave 6: Marketing Email Campaign",
+        desc: "High volume sustained concurrent traffic.",
+        duration: 25,
+        rate: 32,
+        burstiness: 0.4,
+        maliciousRatio: 0.25
+      },
+      {
+        id: 7,
+        name: "Wave 7: Credential Stuffing Attack",
+        desc: "Distributed bot network. WAF tower strongly recommended!",
+        duration: 26,
+        rate: 36,
+        burstiness: 0.5,
+        maliciousRatio: 0.3
+      },
+      {
+        id: 8,
+        name: "Wave 8: Black Friday Peak Load",
+        desc: "Critical peak volume across all channels simultaneously.",
+        duration: 28,
+        rate: 40,
+        burstiness: 0.55,
+        maliciousRatio: 0.3
+      },
+      {
+        id: 9,
+        name: "Wave 9: SYN & HTTP Flood Assault",
+        desc: "Hostile malicious flood. WAF & Load Balancer required.",
+        duration: 30,
+        rate: 45,
+        burstiness: 0.6,
+        maliciousRatio: 0.35
+      },
+      {
+        id: 10,
+        name: "Wave 10: The Apocalyptic DDoS Storm",
+        desc: "Maximum combined concurrent traffic! All defensive towers required.",
+        duration: 32,
+        rate: 50,
+        burstiness: 0.7,
+        maliciousRatio: 0.4
+      }
+    ];
+
+    /* =====================================================================
+       Simulation State & Responsive Retina Canvas Setup
+       ===================================================================== */
+    const canvas = document.getElementById('sim-canvas');
+    const ctx = canvas.getContext('2d');
+
+    function setupCanvasHiDPI() {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = 900 * dpr;
+      canvas.height = 480 * dpr;
+      ctx.resetTransform();
+      ctx.scale(dpr, dpr);
+    }
+    setupCanvasHiDPI();
+    window.addEventListener('resize', setupCanvasHiDPI);
+
+    let currentWaveIndex = 0;
+    let waveTime = 0;
+    let waveActive = false;
+    let animFrameId = null;
+    let waveIntervalId = null;
+    let lastAnimTimestamp = performance.now();
+
+    // Telemetry & Economy
+    const WAF_COST = 180;
+    const CACHE_COST = 150;
+    const LB_COST = 260;
+
+    let credits = 20;
+    let score = 0;
+    let serverHealth = 100;
+    let count200 = 0;
+    let count429 = 0;
+    let countCached = 0;
+    let countWaf = 0;
+    let count503 = 0;
+
+    // Measured Telemetry Rollers
+    let servedTimestamps = [];
+    let serverLoadTimestamps = [];
+    let latencySamples = [];
+
+    // Towers & Upgrades
+    let hasWaf = false;
+    let hasCache = false;
+    let hasLoadBalancer = false;
+
+    // Snapshot for wave retry
+    let waveStartCredits = 20;
+    let waveStartScore = 0;
+    let waveStartHasWaf = false;
+    let waveStartHasCache = false;
+    let waveStartHasLoadBalancer = false;
+
+    // Rate Limiter Parameters
+    let selectedAlgo = 'token-bucket';
+    let capacityLimit = 18;
+    let burstDepth = 12;
+    let currentTokens = 12;
+    let lastRefillTime = performance.now();
+
+    let windowTimestamps = [];
+    let fixedWindowCounter = 0;
+    let fixedWindowStart = performance.now();
+
+    let packets = [];
+    let particles = [];
+
+    // DOM Elements
+    const statWave = document.getElementById('stat-wave');
+    const statCredits = document.getElementById('stat-credits');
+    const statScore = document.getElementById('stat-score');
+    const statThroughput = document.getElementById('stat-throughput');
+    const statLatency = document.getElementById('stat-latency');
+    const statRejection = document.getElementById('stat-rejection');
+    const waveName = document.getElementById('wave-name');
+    const waveBrief = document.getElementById('wave-brief');
+    const btnStartWave = document.getElementById('btn-start-wave');
+    const btnPause = document.getElementById('btn-pause');
+    const healthBar = document.getElementById('health-bar');
+    const healthVal = document.getElementById('health-val');
+    const elCount200 = document.getElementById('count-200');
+    const elCount429 = document.getElementById('count-429');
+    const elCountCached = document.getElementById('count-cached');
+    const elCountWaf = document.getElementById('count-waf');
+    const sliderCapacity = document.getElementById('slider-capacity');
+    const sliderBurst = document.getElementById('slider-burst');
+    const labelCapacity = document.getElementById('label-capacity');
+    const labelBurst = document.getElementById('label-burst');
+    const btnUpgradeWaf = document.getElementById('btn-upgrade-waf');
+    const btnUpgradeCache = document.getElementById('btn-upgrade-cache');
+    const btnUpgradeLb = document.getElementById('btn-upgrade-lb');
+    const gameOverModal = document.getElementById('game-over-modal');
+    const waveCompleteModal = document.getElementById('wave-complete-modal');
+    const waveCompleteStats = document.getElementById('wave-complete-stats');
+    const victoryModal = document.getElementById('victory-modal');
+    const btnRetryWave = document.getElementById('btn-retry-wave');
+    const btnNextWave = document.getElementById('btn-next-wave');
+    const btnRestartGame = document.getElementById('btn-restart-game');
+
+    sliderCapacity.addEventListener('input', (e) => {
+      capacityLimit = parseInt(e.target.value, 10);
+      labelCapacity.textContent = `${capacityLimit} req/s`;
+    });
+
+    sliderBurst.addEventListener('input', (e) => {
+      burstDepth = parseInt(e.target.value, 10);
+      labelBurst.textContent = `${burstDepth} burst`;
+    });
+
+    document.querySelectorAll('.algo-card').forEach(card => {
+      card.addEventListener('click', () => {
+        document.querySelectorAll('.algo-card').forEach(c => c.classList.remove('active'));
+        card.classList.add('active');
+        selectedAlgo = card.dataset.algo;
+      });
+    });
+
+    function updateTowerButtons() {
+      btnUpgradeWaf.disabled = hasWaf;
+      btnUpgradeWaf.textContent = hasWaf ? 'Active ✓' : `Deploy ($${WAF_COST})`;
+      btnUpgradeCache.disabled = hasCache;
+      btnUpgradeCache.textContent = hasCache ? 'Active ✓' : `Deploy ($${CACHE_COST})`;
+      btnUpgradeLb.disabled = hasLoadBalancer;
+      btnUpgradeLb.textContent = hasLoadBalancer ? 'Active ✓' : `Deploy ($${LB_COST})`;
+    }
+
+    btnUpgradeWaf.addEventListener('click', () => {
+      if (credits >= WAF_COST && !hasWaf) {
+        credits -= WAF_COST;
+        hasWaf = true;
+        updateTowerButtons();
+        updateStatsUI();
+        playTone(650, 'sine', 0.2);
+      }
+    });
+
+    btnUpgradeCache.addEventListener('click', () => {
+      if (credits >= CACHE_COST && !hasCache) {
+        credits -= CACHE_COST;
+        hasCache = true;
+        updateTowerButtons();
+        updateStatsUI();
+        playTone(700, 'sine', 0.2);
+      }
+    });
+
+    btnUpgradeLb.addEventListener('click', () => {
+      if (credits >= LB_COST && !hasLoadBalancer) {
+        credits -= LB_COST;
+        hasLoadBalancer = true;
+        updateTowerButtons();
+        updateStatsUI();
+        playTone(750, 'sine', 0.2);
+      }
+    });
+
+    function updateStatsUI() {
+      statCredits.textContent = `$${credits}`;
+      statScore.textContent = score;
+      elCount200.textContent = count200;
+      elCount429.textContent = count429;
+      elCountCached.textContent = countCached;
+      elCountWaf.textContent = countWaf;
+
+      // Real measured throughput: only successful requests (200 OK + cache hits) in rolling 1s
+      const now = performance.now();
+      servedTimestamps = servedTimestamps.filter(t => now - t <= 1000);
+      statThroughput.textContent = `${servedTimestamps.length} req/s`;
+
+      // Real measured rejection rate: (429 throttled + WAF blocked) / total handled
+      const totalProcessed = count200 + countCached + count429 + countWaf + count503;
+      const totalRejected = count429 + countWaf;
+      const rejRate = totalProcessed > 0 ? ((totalRejected / totalProcessed) * 100).toFixed(1) : '0.0';
+      statRejection.textContent = `${rejRate}%`;
+
+      // Real measured latency: average of actual measured packet flight latencies
+      if (latencySamples.length > 0) {
+        const avgLat = Math.round(latencySamples.reduce((a, b) => a + b, 0) / latencySamples.length);
+        statLatency.textContent = `${avgLat} ms`;
+      }
+
+      // Health bar styling
+      healthBar.style.width = `${Math.max(0, serverHealth)}%`;
+      healthVal.textContent = `${Math.round(serverHealth)}%`;
+      if (serverHealth > 50) {
+        healthBar.style.background = 'var(--server-healthy)';
+      } else if (serverHealth > 25) {
+        healthBar.style.background = 'var(--server-warning)';
+      } else {
+        healthBar.style.background = 'var(--server-danger)';
+      }
+    }
+
+    /* =====================================================================
+       Rate Limiting Core Algorithms
+       ===================================================================== */
+    function checkRateLimit(now) {
+      if (selectedAlgo === 'token-bucket') {
+        const delta = (now - lastRefillTime) / 1000;
+        lastRefillTime = now;
+        currentTokens = Math.min(burstDepth, currentTokens + delta * capacityLimit);
+
+        if (currentTokens >= 1) {
+          currentTokens -= 1;
+          return true;
+        }
+        return false;
+      } else if (selectedAlgo === 'sliding-window') {
+        const windowSize = 1000;
+        windowTimestamps = windowTimestamps.filter(t => now - t < windowSize);
+        if (windowTimestamps.length < capacityLimit) {
+          windowTimestamps.push(now);
+          return true;
+        }
+        return false;
+      } else if (selectedAlgo === 'fixed-window') {
+        if (now - fixedWindowStart >= 1000) {
+          fixedWindowStart = now;
+          fixedWindowCounter = 0;
+        }
+        if (fixedWindowCounter < capacityLimit) {
+          fixedWindowCounter++;
+          return true;
+        }
+        return false;
+      }
+      return true;
+    }
+
+    /* =====================================================================
+       Particle-Based Pipeline Engine (Frame-Rate Independent with Delta Time)
+       ===================================================================== */
+    function spawnPacket() {
+      if (!waveActive) return;
+      const wave = WAVES[currentWaveIndex];
+      const isMalicious = Math.random() < wave.maliciousRatio;
+      const isGet = Math.random() < 0.65;
+      const isCacheable = !isMalicious && isGet && hasCache && Math.random() < 0.40;
+
+      const yOffset = 180 + (Math.random() - 0.5) * 140;
+
+      packets.push({
+        x: 40,
+        y: yOffset,
+        speed: 200 + Math.random() * 80, // pixels per second
+        isMalicious: isMalicious,
+        isCacheable: isCacheable,
+        status: 'in-flight', // in-flight, waf-blocked, limited, allowed, cached, 503-overloaded
+        size: isMalicious ? 6 : 4,
+        spawnTimestamp: performance.now()
+      });
+    }
+
+    function spawnDeflectionParticles(x, y, color) {
+      for (let i = 0; i < 6; i++) {
+        particles.push({
+          x: x,
+          y: y,
+          vx: (Math.random() - 0.5) * 150,
+          vy: (Math.random() - 0.5) * 150,
+          color: color,
+          alpha: 1,
+          decay: 2.5
+        });
+      }
+    }
+
+    function renderSimulation(timestamp) {
+      const dt = Math.min(0.1, (timestamp - lastAnimTimestamp) / 1000);
+      lastAnimTimestamp = timestamp;
+
+      ctx.clearRect(0, 0, 900, 480);
+
+      // 1. Client Traffic Box
+      ctx.fillStyle = '#64748b';
+      ctx.font = '600 12px "JetBrains Mono"';
+      ctx.fillText('🌐 CLIENT TRAFFIC', 25, 40);
+
+      ctx.fillStyle = '#1e293b';
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(20, 60, 80, 360);
+      ctx.fillRect(20, 60, 80, 360);
+
+      // 2. WAF Bot-Filter Tower Node
+      const wafX = 220;
+      ctx.fillStyle = hasWaf ? '#a855f7' : '#475569';
+      ctx.fillText(hasWaf ? '🛡️ WAF BOT-FILTER' : '🔒 WAF (OFFLINE)', wafX - 35, 40);
+      ctx.strokeStyle = hasWaf ? '#a855f7' : '#334155';
+      ctx.fillStyle = hasWaf ? 'rgba(168, 85, 247, 0.12)' : 'rgba(30, 41, 59, 0.5)';
+      ctx.strokeRect(wafX - 35, 90, 70, 300);
+      ctx.fillRect(wafX - 35, 90, 70, 300);
+
+      // 3. Rate Limiter Gateway Node
+      const gatewayX = 450;
+      ctx.fillStyle = '#06b6d4';
+      ctx.fillText('⚡ LIMITER GATEWAY', gatewayX - 45, 40);
+      ctx.strokeStyle = '#06b6d4';
+      ctx.fillStyle = 'rgba(6, 182, 212, 0.1)';
+      ctx.strokeRect(gatewayX - 40, 80, 80, 320);
+      ctx.fillRect(gatewayX - 40, 80, 80, 320);
+
+      // 4. Redis Cache indicator
+      if (hasCache) {
+        ctx.fillStyle = '#8b5cf6';
+        ctx.fillText('⚡ REDIS EDGE CACHE', gatewayX - 55, 435);
+      }
+
+      // 5. Origin Server on Right
+      const serverX = 760;
+      const isDual = hasLoadBalancer;
+      ctx.fillStyle = serverHealth > 30 ? '#10b981' : '#ef4444';
+      ctx.fillText(isDual ? '⚖️ CLUSTER (2X CORES)' : '🖥️ ORIGIN SERVER', serverX - 40, 40);
+      ctx.strokeStyle = serverHealth > 30 ? '#10b981' : '#ef4444';
+      ctx.fillStyle = 'rgba(16, 185, 129, 0.08)';
+      ctx.strokeRect(serverX - 40, 60, 110, 360);
+      ctx.fillRect(serverX - 40, 60, 110, 360);
+
+      // Connecting Pipes
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(100, 240);
+      ctx.lineTo(wafX - 35, 240);
+      ctx.moveTo(wafX + 35, 240);
+      ctx.lineTo(gatewayX - 40, 240);
+      ctx.moveTo(gatewayX + 40, 240);
+      ctx.lineTo(serverX - 40, 240);
+      ctx.stroke();
+
+      const now = performance.now();
+
+      // Update & Draw Packets with Delta Time
+      for (let i = packets.length - 1; i >= 0; i--) {
+        const p = packets[i];
+        p.x += p.speed * dt;
+
+        // Stage 1: Hit WAF Tower
+        if (hasWaf && p.isMalicious && p.x >= wafX - 35 && p.status === 'in-flight') {
+          if (Math.random() < 0.85) { // WAF drops 85% of malicious packets
+            p.status = 'waf-blocked';
+            countWaf++;
+            score += 25;
+            spawnDeflectionParticles(p.x, p.y, '#a855f7');
+            playTone(900, 'sine', 0.04, 0.03);
+            updateStatsUI();
+          }
+        }
+
+        // Stage 2: Hit Rate Limiter Gateway
+        if (p.x >= gatewayX - 40 && p.status === 'in-flight') {
+          if (p.isCacheable) {
+            p.status = 'cached';
+            countCached++;
+            credits += 1;
+            score += 15;
+            const measuredLat = Math.max(8, Math.round(performance.now() - p.spawnTimestamp));
+            latencySamples.push(measuredLat);
+            if (latencySamples.length > 30) latencySamples.shift();
+            servedTimestamps.push(performance.now());
+            spawnDeflectionParticles(p.x, p.y, '#8b5cf6');
+            playTone(800, 'sine', 0.05, 0.03);
+            updateStatsUI();
+          } else {
+            const allowed = checkRateLimit(now);
+            if (allowed) {
+              p.status = 'allowed';
+            } else {
+              p.status = 'limited';
+              count429++;
+              if (p.isMalicious) {
+                score += 20; // Good throttle on bot
+                credits += 1;
+              } else {
+                score = Math.max(0, score - 10); // SLA penalty for dropping legit user!
+              }
+              spawnDeflectionParticles(p.x, p.y, '#f59e0b');
+              playTone(220, 'square', 0.04, 0.03);
+              updateStatsUI();
+            }
+          }
+        }
+
+        // Draw Packet
+        ctx.beginPath();
+        if (p.status === 'waf-blocked') {
+          ctx.fillStyle = '#a855f7'; // Purple WAF drop
+          p.y -= 120 * dt;
+        } else if (p.status === 'limited') {
+          ctx.fillStyle = '#f59e0b'; // Amber 429
+          p.y += (p.y > 240 ? 120 : -120) * dt;
+        } else if (p.status === 'cached') {
+          ctx.fillStyle = '#8b5cf6'; // Purple cache hit
+          p.y += 140 * dt;
+        } else if (p.status === '503-overloaded') {
+          ctx.fillStyle = '#ef4444'; // Red 503 overload
+          p.y += 120 * dt;
+        } else if (p.isMalicious) {
+          ctx.fillStyle = '#ef4444'; // Red attack
+        } else {
+          ctx.fillStyle = '#10b981'; // Green valid
+        }
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Stage 3: Hit Origin Server
+        if (p.x >= serverX - 40) {
+          if (p.status === 'allowed') {
+            serverLoadTimestamps.push(now);
+            serverLoadTimestamps = serverLoadTimestamps.filter(t => now - t <= 1000);
+            const serverCapacity = hasLoadBalancer ? 44 : 22;
+
+            if (serverLoadTimestamps.length > serverCapacity) {
+              // 503 Overload Exhaustion
+              p.status = '503-overloaded';
+              count503++;
+              const overloadDamage = hasLoadBalancer ? 1.0 : 2.0;
+              serverHealth = Math.max(0, serverHealth - overloadDamage);
+              score = Math.max(0, score - 15);
+              const measuredLat = Math.round(performance.now() - p.spawnTimestamp + 100);
+              latencySamples.push(measuredLat);
+              if (latencySamples.length > 30) latencySamples.shift();
+              spawnDeflectionParticles(p.x, p.y, '#ef4444');
+              playTone(160, 'sawtooth', 0.12, 0.1);
+            } else if (p.isMalicious) {
+              const damage = hasLoadBalancer ? 0.75 : 1.5;
+              serverHealth = Math.max(0, serverHealth - damage);
+              score = Math.max(0, score - 20);
+              const measuredLat = Math.round(performance.now() - p.spawnTimestamp);
+              latencySamples.push(measuredLat);
+              if (latencySamples.length > 30) latencySamples.shift();
+              spawnDeflectionParticles(p.x, p.y, '#ef4444');
+              playTone(140, 'sawtooth', 0.1, 0.1);
+            } else {
+              count200++;
+              credits += 1; // +$1 per 200 OK
+              score += 20;
+              serverHealth = Math.min(100, serverHealth + 0.05); // Tiny recovery
+              const measuredLat = Math.round(performance.now() - p.spawnTimestamp);
+              latencySamples.push(measuredLat);
+              if (latencySamples.length > 30) latencySamples.shift();
+              servedTimestamps.push(performance.now());
+              spawnDeflectionParticles(p.x, p.y, '#10b981');
+              playTone(440, 'triangle', 0.05, 0.03);
+            }
+          }
+
+          packets.splice(i, 1);
+          updateStatsUI();
+
+          if (serverHealth <= 0) {
+            triggerGameOver();
+            return;
+          }
+        } else if (p.x > 950 || p.y < -20 || p.y > 500) {
+          packets.splice(i, 1);
+        }
+      }
+
+      // Update & Draw Particles with Delta Time
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const pt = particles[i];
+        pt.x += pt.vx * dt;
+        pt.y += pt.vy * dt;
+        pt.alpha -= pt.decay * dt;
+        if (pt.alpha <= 0) {
+          particles.splice(i, 1);
+        } else {
+          ctx.fillStyle = pt.color;
+          ctx.globalAlpha = Math.max(0, pt.alpha);
+          ctx.fillRect(pt.x, pt.y, 2, 2);
+          ctx.globalAlpha = 1.0;
+        }
+      }
+
+      if (waveActive) {
+        animFrameId = requestAnimationFrame(renderSimulation);
+      }
+    }
+
+    /* =====================================================================
+       Wave Progression & Control
+       ===================================================================== */
+    function startWave() {
+      if (waveActive) return;
+      waveActive = true;
+      btnStartWave.disabled = true;
+      btnPause.disabled = false;
+      getAudioContext();
+      lastAnimTimestamp = performance.now();
+      lastRefillTime = performance.now(); // Reset refill timestamp to prevent unearned burst refill after pause!
+
+      if (waveTime === 0) {
+        waveStartCredits = credits;
+        waveStartScore = score;
+        waveStartHasWaf = hasWaf;
+        waveStartHasCache = hasCache;
+        waveStartHasLoadBalancer = hasLoadBalancer;
+      }
+
+      const wave = WAVES[currentWaveIndex];
+      const intervalMs = Math.round(1000 / wave.rate);
+
+      if (waveIntervalId) clearInterval(waveIntervalId);
+
+      waveIntervalId = setInterval(() => {
+        if (!waveActive) return;
+        waveTime += (intervalMs / 1000);
+        spawnPacket();
+
+        if (Math.random() < wave.burstiness * 0.4) {
+          for (let b = 0; b < 3; b++) spawnPacket();
+        }
+
+        if (waveTime >= wave.duration) {
+          completeWave();
+        }
+      }, intervalMs);
+
+      animFrameId = requestAnimationFrame(renderSimulation);
+    }
+
+    function pauseWave() {
+      waveActive = false;
+      if (waveIntervalId) clearInterval(waveIntervalId);
+      if (animFrameId) cancelAnimationFrame(animFrameId);
+      const anyModalOpen = gameOverModal.classList.contains('active') || 
+                           waveCompleteModal.classList.contains('active') || 
+                           victoryModal.classList.contains('active');
+      btnStartWave.disabled = anyModalOpen;
+      btnPause.disabled = true;
+    }
+
+    // Tab visibility handling: pause simulation when tab hidden to prevent background setInterval flood
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && waveActive) {
+        pauseWave();
+      }
+    });
+
+    function completeWave() {
+      pauseWave();
+      btnStartWave.disabled = true; // Lock out Start button while wave modal is active
+      const wave = WAVES[currentWaveIndex];
+      playTone(523.25, 'sine', 0.2, 0.15);
+      setTimeout(() => playTone(659.25, 'sine', 0.3, 0.15), 150);
+
+      if (currentWaveIndex + 1 >= WAVES.length) {
+        victoryModal.classList.add('active');
+      } else {
+        waveCompleteStats.textContent = `Server survived Wave ${wave.id} with ${Math.round(serverHealth)}% health remaining! Total 200 OK: ${count200}, Cache: ${countCached}, WAF Blocked: ${countWaf}, 429 Throttled: ${count429}, 503 Overloads: ${count503}.`;
+        waveCompleteModal.classList.add('active');
+      }
+    }
+
+    function triggerGameOver() {
+      pauseWave();
+      btnStartWave.disabled = true; // Strictly lock out Start button so player cannot continue at 0 HP!
+      gameOverModal.classList.add('active');
+      playTone(120, 'sawtooth', 0.5, 0.2);
+    }
+
+    function resetWave(index, isRetry = false) {
+      currentWaveIndex = index;
+      waveTime = 0;
+      serverHealth = 100;
+      packets = [];
+      particles = [];
+      count200 = 0;
+      count429 = 0;
+      countCached = 0;
+      countWaf = 0;
+      count503 = 0;
+      servedTimestamps = [];
+      serverLoadTimestamps = [];
+      latencySamples = [24];
+
+      if (isRetry) {
+        // Restore credits AND all defensive tower flags on Retry!
+        credits = waveStartCredits;
+        score = waveStartScore;
+        hasWaf = waveStartHasWaf;
+        hasCache = waveStartHasCache;
+        hasLoadBalancer = waveStartHasLoadBalancer;
+        updateTowerButtons();
+      } else {
+        waveStartCredits = credits;
+        waveStartScore = score;
+        waveStartHasWaf = hasWaf;
+        waveStartHasCache = hasCache;
+        waveStartHasLoadBalancer = hasLoadBalancer;
+      }
+
+      const wave = WAVES[currentWaveIndex];
+      statWave.textContent = `${wave.id} / ${WAVES.length}`;
+      waveName.textContent = wave.name;
+      waveBrief.textContent = wave.desc;
+
+      gameOverModal.classList.remove('active');
+      waveCompleteModal.classList.remove('active');
+      victoryModal.classList.remove('active');
+
+      btnStartWave.disabled = false;
+      btnPause.disabled = true;
+
+      updateStatsUI();
+      renderSimulation(performance.now());
+    }
+
+    btnStartWave.addEventListener('click', startWave);
+    btnPause.addEventListener('click', pauseWave);
+
+    btnRetryWave.addEventListener('click', () => {
+      resetWave(currentWaveIndex, true);
+    });
+
+    btnNextWave.addEventListener('click', () => {
+      resetWave(currentWaveIndex + 1, false);
+    });
+
+    btnRestartGame.addEventListener('click', () => {
+      credits = 20;
+      score = 0;
+      hasWaf = false;
+      hasCache = false;
+      hasLoadBalancer = false;
+      updateTowerButtons();
+      resetWave(0, false);
+    });
+
+    // Initialize
+    resetWave(0, false);
+  </script>
+</body>
+</html>
