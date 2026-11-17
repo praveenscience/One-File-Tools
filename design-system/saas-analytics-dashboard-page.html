@@ -17,12 +17,22 @@
           document.documentElement.setAttribute('data-theme', 'light');
         } else if (t === 'dark') {
           document.documentElement.setAttribute('data-theme', 'dark');
-        } else if (window.matchMedia('(prefers-color-scheme: light)').matches) {
+        } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
           document.documentElement.setAttribute('data-theme', 'light');
         } else {
           document.documentElement.setAttribute('data-theme', 'dark');
         }
-      } catch (e) { }
+      } catch (e) {
+        try {
+          if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+            document.documentElement.setAttribute('data-theme', 'light');
+          } else {
+            document.documentElement.setAttribute('data-theme', 'dark');
+          }
+        } catch (e2) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      }
     })();
   </script>
 
@@ -1590,11 +1600,11 @@
           <div class="filter-group">
             <span class="filter-label">Period:</span>
             <div class="date-preset-pill-group" id="datePresetGroup" role="group" aria-label="Date range presets">
-              <button class="preset-btn" data-days="7">7D</button>
-              <button class="preset-btn active" data-days="30">30D</button>
-              <button class="preset-btn" data-days="90">90D</button>
-              <button class="preset-btn" data-days="365">1Y</button>
-              <button class="preset-btn" data-days="custom" id="customDateBtn">Custom</button>
+              <button class="preset-btn" data-days="7" aria-pressed="false">7D</button>
+              <button class="preset-btn active" data-days="30" aria-pressed="true">30D</button>
+              <button class="preset-btn" data-days="90" aria-pressed="false">90D</button>
+              <button class="preset-btn" data-days="365" aria-pressed="false">1Y</button>
+              <button class="preset-btn" data-days="custom" id="customDateBtn" aria-pressed="false">Custom</button>
             </div>
           </div>
 
@@ -1984,9 +1994,37 @@
       }
 
       document.addEventListener('keydown', function (e) {
+        var openModals = document.querySelectorAll('.modal-backdrop.show');
+        if (openModals.length === 0) return;
+
+        var activeModal = openModals[openModals.length - 1];
+
         if (e.key === 'Escape') {
-          var openModals = document.querySelectorAll('.modal-backdrop.show');
-          openModals.forEach(function (m) { closeModal(m); });
+          closeModal(activeModal);
+          return;
+        }
+
+        // Modal focus trap for keyboard navigation
+        if (e.key === 'Tab') {
+          var focusables = activeModal.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])');
+          if (focusables.length === 0) {
+            e.preventDefault();
+            return;
+          }
+          var firstFocusable = focusables[0];
+          var lastFocusable = focusables[focusables.length - 1];
+
+          if (e.shiftKey) {
+            if (document.activeElement === firstFocusable || !activeModal.contains(document.activeElement)) {
+              e.preventDefault();
+              lastFocusable.focus();
+            }
+          } else {
+            if (document.activeElement === lastFocusable || !activeModal.contains(document.activeElement)) {
+              e.preventDefault();
+              firstFocusable.focus();
+            }
+          }
         }
       });
 
@@ -2083,9 +2121,9 @@
       // Real Baseline Metrics per Period (Distinct values & trends)
       var PERIOD_METRICS = {
         7: {
-          mrr: 128450, prevMrr: 124200, trendMRR: '+3.4%', mrrDiff: '+$4,250 vs last week',
-          arr: 1541400, prevArr: 1490400, trendARR: '+3.4%', arrDiff: '+$51,000 vs last week',
-          subscribers: 3842, prevSubscribers: 3798, trendSubs: '+1.2%', subsDiff: '+44 net additions',
+          mrr: 128450, prevMrr: 124200, trendMRR: '+3.4%', periodLabel: 'vs last week',
+          arr: 1541400, prevArr: 1490400, trendARR: '+3.4%', arrPeriodLabel: 'vs last week',
+          subscribers: 3842, prevSubscribers: 3798, trendSubs: '+1.2%', subsPeriodLabel: 'net additions',
           churn: 1.08, prevChurn: 1.15, trendChurn: '▼ 0.07%', churnDiff: 'Down from 1.15% last week',
           sparkMRR: [124.2, 124.9, 125.8, 126.4, 127.1, 127.8, 128.5],
           sparkARR: [1.49, 1.50, 1.51, 1.52, 1.53, 1.53, 1.54],
@@ -2096,9 +2134,9 @@
           chartPrevious: [119800, 120400, 121100, 121900, 122600, 123400, 124200]
         },
         30: {
-          mrr: 124100, prevMrr: 108670, trendMRR: '+14.2%', mrrDiff: '+$15,430 vs prev month',
-          arr: 1489200, prevArr: 1304040, trendARR: '+14.2%', arrDiff: '+$185,160 vs prev month',
-          subscribers: 3710, prevSubscribers: 3422, trendSubs: '+8.4%', subsDiff: '+288 net additions',
+          mrr: 124100, prevMrr: 108670, trendMRR: '+14.2%', periodLabel: 'vs prev month',
+          arr: 1489200, prevArr: 1304040, trendARR: '+14.2%', arrPeriodLabel: 'vs prev month',
+          subscribers: 3710, prevSubscribers: 3422, trendSubs: '+8.4%', subsPeriodLabel: 'net additions',
           churn: 1.18, prevChurn: 1.60, trendChurn: '▼ 0.42%', churnDiff: 'Top 5% SaaS benchmark',
           sparkMRR: [108.6, 111.2, 113.8, 116.5, 119.2, 121.8, 124.1],
           sparkARR: [1.30, 1.33, 1.37, 1.40, 1.43, 1.46, 1.49],
@@ -2109,9 +2147,9 @@
           chartPrevious: [95100, 97400, 99800, 102100, 104500, 106800, 108670]
         },
         90: {
-          mrr: 112800, prevMrr: 88960, trendMRR: '+26.8%', mrrDiff: '+$23,840 vs prev quarter',
-          arr: 1353600, prevArr: 1067520, trendARR: '+26.8%', arrDiff: '+$286,080 vs prev quarter',
-          subscribers: 3380, prevSubscribers: 2944, trendSubs: '+14.8%', subsDiff: '+436 net additions',
+          mrr: 112800, prevMrr: 88960, trendMRR: '+26.8%', periodLabel: 'vs prev quarter',
+          arr: 1353600, prevArr: 1067520, trendARR: '+26.8%', arrPeriodLabel: 'vs prev quarter',
+          subscribers: 3380, prevSubscribers: 2944, trendSubs: '+14.8%', subsPeriodLabel: 'net additions',
           churn: 1.34, prevChurn: 1.99, trendChurn: '▼ 0.65%', churnDiff: 'Down from 1.99% prev quarter',
           sparkMRR: [88.9, 92.4, 96.8, 101.2, 105.4, 109.1, 112.8],
           sparkARR: [1.07, 1.11, 1.16, 1.21, 1.26, 1.31, 1.35],
@@ -2122,9 +2160,9 @@
           chartPrevious: [70100, 73200, 76500, 79800, 83100, 86200, 88960]
         },
         365: {
-          mrr: 89400, prevMrr: 53090, trendMRR: '+68.4%', mrrDiff: '+$36,310 vs prev year',
-          arr: 1072800, prevArr: 637080, trendARR: '+68.4%', arrDiff: '+$435,720 vs prev year',
-          subscribers: 2650, prevSubscribers: 1780, trendSubs: '+48.9%', subsDiff: '+870 net additions',
+          mrr: 89400, prevMrr: 53090, trendMRR: '+68.4%', periodLabel: 'vs prev year',
+          arr: 1072800, prevArr: 637080, trendARR: '+68.4%', arrPeriodLabel: 'vs prev year',
+          subscribers: 2650, prevSubscribers: 1780, trendSubs: '+48.9%', subsPeriodLabel: 'net additions',
           churn: 1.62, prevChurn: 2.72, trendChurn: '▼ 1.10%', churnDiff: 'Significant retention gain',
           sparkMRR: [53.1, 58.4, 64.2, 70.8, 77.1, 83.5, 89.4],
           sparkARR: [0.64, 0.70, 0.77, 0.85, 0.93, 1.00, 1.07],
@@ -2232,40 +2270,111 @@
 
       // --- Get Active Period Metrics (Plan-Weighted & Range-Adjusted) ---
       function getCurrentMetrics() {
+        // Check if there are customers in the active date range matching the selected plan
+        var matchingCustomers = RAW_CUSTOMERS.filter(function (c) {
+          var matchDate = c.date >= activeStartDate && c.date <= activeEndDate;
+          var matchPlan = selectedPlan === 'all' || c.plan === selectedPlan;
+          return matchDate && matchPlan;
+        });
+
+        // When the range has no customers, return zeroed metrics
+        if (matchingCustomers.length === 0) {
+          return {
+            mrr: 0,
+            prevMrr: 0,
+            trendMRR: '0.0%',
+            periodLabel: 'vs previous period',
+            arr: 0,
+            prevArr: 0,
+            trendARR: '0.0%',
+            arrPeriodLabel: 'vs previous period',
+            subscribers: 0,
+            prevSubscribers: 0,
+            trendSubs: '0.0%',
+            subsPeriodLabel: 'net additions',
+            churn: '0.00',
+            prevChurn: 0.0,
+            trendChurn: '0.00%',
+            churnDiff: 'No churn data',
+            sparkMRR: [0, 0, 0, 0],
+            sparkARR: [0, 0, 0, 0],
+            sparkSubs: [0, 0, 0, 0],
+            sparkChurn: [0, 0, 0, 0],
+            chartLabels: [activeStartDate, activeEndDate],
+            chartCurrent: [0, 0],
+            chartPrevious: [0, 0]
+          };
+        }
+
         var pData;
         if (activePeriodKey === 'custom') {
-          // Custom range interpolation
+          // Custom range interpolation with bounds
           var dStart = new Date(activeStartDate);
           var dEnd = new Date(activeEndDate);
           var days = Math.max(1, Math.round((dEnd - dStart) / (1000 * 60 * 60 * 24)));
 
-          // Pick closest baseline period and interpolate
+          // Clamped scaling factor (bounded between 0.85 and 1.15) to prevent 10-year ranges from blowing up
+          var rangeScaleFactor = Math.min(1.15, Math.max(0.85, 0.85 + (Math.min(days, 365) / 365) * 0.30));
+
           var refKey = days <= 14 ? '7' : (days <= 45 ? '30' : (days <= 180 ? '90' : '365'));
           var base = PERIOD_METRICS[refKey];
 
+          var customMrr = Math.round(base.mrr * rangeScaleFactor);
+          var customPrevMrr = Math.round(base.prevMrr * rangeScaleFactor);
+          var customArr = Math.round(base.arr * rangeScaleFactor);
+          var customPrevArr = Math.round(base.prevArr * rangeScaleFactor);
+          var customSubs = Math.round(base.subscribers * Math.min(1.1, Math.max(0.85, 0.9 + (Math.min(days, 365) / 365) * 0.2)));
+          var customPrevSubs = Math.round(base.prevSubscribers * Math.min(1.1, Math.max(0.85, 0.9 + (Math.min(days, 365) / 365) * 0.2)));
+
+          // Calculate trend percentages dynamically from custom values
+          var mrrTrendPct = customPrevMrr > 0 ? ((customMrr - customPrevMrr) / customPrevMrr * 100).toFixed(1) : '0.0';
+          var arrTrendPct = customPrevArr > 0 ? ((customArr - customPrevArr) / customPrevArr * 100).toFixed(1) : '0.0';
+          var subsTrendPct = customPrevSubs > 0 ? ((customSubs - customPrevSubs) / customPrevSubs * 100).toFixed(1) : '0.0';
+
+          // Generate dynamic date checkpoints across the custom range
+          var numPoints = Math.min(7, Math.max(3, Math.min(days, 7)));
+          var cLabels = [];
+          var cCurrent = [];
+          var cPrevious = [];
+          var startMs = dStart.getTime();
+          var endMs = dEnd.getTime();
+          var stepMs = numPoints > 1 ? (endMs - startMs) / (numPoints - 1) : 0;
+
+          for (var p = 0; p < numPoints; p++) {
+            var pDate = new Date(startMs + p * stepMs);
+            var lbl = (pDate.getMonth() + 1) + '/' + pDate.getDate();
+            cLabels.push(lbl);
+            var progress = numPoints > 1 ? p / (numPoints - 1) : 1;
+            var valCur = Math.round(customPrevMrr + (customMrr - customPrevMrr) * progress);
+            var valPrev = Math.round(valCur * 0.88);
+            cCurrent.push(valCur);
+            cPrevious.push(valPrev);
+          }
+
           pData = {
-            mrr: Math.round(base.mrr * (0.85 + (days / 100) * 0.15)),
-            prevMrr: Math.round(base.prevMrr * (0.85 + (days / 100) * 0.15)),
-            trendMRR: base.trendMRR,
-            mrrDiff: base.mrrDiff,
-            arr: Math.round(base.arr * (0.85 + (days / 100) * 0.15)),
-            prevArr: Math.round(base.prevArr * (0.85 + (days / 100) * 0.15)),
-            trendARR: base.trendARR,
-            arrDiff: base.arrDiff,
-            subscribers: Math.round(base.subscribers * (0.9 + (days / 200) * 0.1)),
-            prevSubscribers: base.prevSubscribers,
-            trendSubs: base.trendSubs,
-            subsDiff: base.subsDiff,
+            mrr: customMrr,
+            prevMrr: customPrevMrr,
+            trendMRR: (mrrTrendPct >= 0 ? '+' : '') + mrrTrendPct + '%',
+            periodLabel: 'vs prev period',
+            arr: customArr,
+            prevArr: customPrevArr,
+            trendARR: (arrTrendPct >= 0 ? '+' : '') + arrTrendPct + '%',
+            arrPeriodLabel: 'vs prev period',
+            subscribers: customSubs,
+            prevSubscribers: customPrevSubs,
+            trendSubs: (subsTrendPct >= 0 ? '+' : '') + subsTrendPct + '%',
+            subsPeriodLabel: 'net additions',
             churn: base.churn,
+            prevChurn: base.prevChurn,
             trendChurn: base.trendChurn,
             churnDiff: base.churnDiff,
             sparkMRR: base.sparkMRR,
             sparkARR: base.sparkARR,
             sparkSubs: base.sparkSubs,
             sparkChurn: base.sparkChurn,
-            chartLabels: ['Start', 'Mid 1', 'Mid 2', 'Mid 3', 'End'],
-            chartCurrent: base.chartCurrent.slice(0, 5),
-            chartPrevious: base.chartPrevious.slice(0, 5)
+            chartLabels: cLabels,
+            chartCurrent: cCurrent,
+            chartPrevious: cPrevious
           };
         } else {
           pData = PERIOD_METRICS[activePeriodKey] || PERIOD_METRICS['30'];
@@ -2277,15 +2386,15 @@
           mrr: Math.round(pData.mrr * weight.rev),
           prevMrr: Math.round(pData.prevMrr * weight.rev),
           trendMRR: pData.trendMRR,
-          mrrDiff: pData.mrrDiff,
+          periodLabel: pData.periodLabel,
           arr: Math.round(pData.arr * weight.rev),
           prevArr: Math.round(pData.prevArr * weight.rev),
           trendARR: pData.trendARR,
-          arrDiff: pData.arrDiff,
+          arrPeriodLabel: pData.arrPeriodLabel,
           subscribers: Math.round(pData.subscribers * weight.sub),
           prevSubscribers: Math.round(pData.prevSubscribers * weight.sub),
           trendSubs: pData.trendSubs,
-          subsDiff: pData.subsDiff,
+          subsPeriodLabel: pData.subsPeriodLabel,
           churn: (pData.churn * weight.churn).toFixed(2),
           trendChurn: pData.trendChurn,
           churnDiff: pData.churnDiff,
@@ -2305,20 +2414,38 @@
 
         // MRR
         document.getElementById('kpiMRRVal').textContent = formatMoney(m.mrr);
-        document.getElementById('kpiMRRTrend').textContent = (m.trendMRR.indexOf('▲') === -1 ? '▲ ' : '') + m.trendMRR;
-        document.getElementById('kpiMRRSub').textContent = m.mrrDiff;
+        document.getElementById('kpiMRRTrend').textContent = (m.trendMRR.indexOf('▲') === -1 && m.trendMRR.indexOf('▼') === -1 ? (m.trendMRR.charAt(0) === '-' ? '▼ ' : '▲ ') : '') + m.trendMRR;
+        if (m.mrr === 0 && m.prevMrr === 0) {
+          document.getElementById('kpiMRRSub').textContent = 'No records in range';
+        } else {
+          var mrrDelta = m.mrr - m.prevMrr;
+          var mrrSign = mrrDelta >= 0 ? '+' : '-';
+          document.getElementById('kpiMRRSub').textContent = mrrSign + formatMoney(Math.abs(mrrDelta)) + ' ' + (m.periodLabel || 'vs previous period');
+        }
         drawSparkline('sparklineMRR', m.sparkMRR, '#6366f1');
 
         // ARR
         document.getElementById('kpiARRVal').textContent = formatMoney(m.arr);
-        document.getElementById('kpiARRTrend').textContent = (m.trendARR.indexOf('▲') === -1 ? '▲ ' : '') + m.trendARR;
-        document.getElementById('kpiARRSub').textContent = m.arrDiff;
+        document.getElementById('kpiARRTrend').textContent = (m.trendARR.indexOf('▲') === -1 && m.trendARR.indexOf('▼') === -1 ? (m.trendARR.charAt(0) === '-' ? '▼ ' : '▲ ') : '') + m.trendARR;
+        if (m.arr === 0 && m.prevArr === 0) {
+          document.getElementById('kpiARRSub').textContent = 'No records in range';
+        } else {
+          var arrDelta = m.arr - m.prevArr;
+          var arrSign = arrDelta >= 0 ? '+' : '-';
+          document.getElementById('kpiARRSub').textContent = arrSign + formatMoney(Math.abs(arrDelta)) + ' ' + (m.arrPeriodLabel || m.periodLabel || 'vs previous period');
+        }
         drawSparkline('sparklineARR', m.sparkARR, '#06b6d4');
 
         // Active Subscribers
         document.getElementById('kpiSubsVal').textContent = m.subscribers.toLocaleString();
-        document.getElementById('kpiSubsTrend').textContent = (m.trendSubs.indexOf('▲') === -1 ? '▲ ' : '') + m.trendSubs;
-        document.getElementById('kpiSubsSub').textContent = m.subsDiff;
+        document.getElementById('kpiSubsTrend').textContent = (m.trendSubs.indexOf('▲') === -1 && m.trendSubs.indexOf('▼') === -1 ? (m.trendSubs.charAt(0) === '-' ? '▼ ' : '▲ ') : '') + m.trendSubs;
+        if (m.subscribers === 0 && m.prevSubscribers === 0) {
+          document.getElementById('kpiSubsSub').textContent = 'No records in range';
+        } else {
+          var subsDelta = m.subscribers - m.prevSubscribers;
+          var subsSign = subsDelta >= 0 ? '+' : '-';
+          document.getElementById('kpiSubsSub').textContent = subsSign + Math.abs(subsDelta).toLocaleString() + ' ' + (m.subsPeriodLabel || 'net additions');
+        }
         drawSparkline('sparklineSubs', m.sparkSubs, '#10b981');
 
         // Churn
@@ -2498,17 +2625,33 @@
           ctx.stroke();
           ctx.restore();
         }
+
+        // Empty state watermark when mrr is 0
+        if (m.mrr === 0) {
+          ctx.save();
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.font = '600 0.85rem "Plus Jakarta Sans", sans-serif';
+          ctx.fillStyle = isLight ? '#94a3b8' : '#64748b';
+          ctx.fillText('No subscription revenue recorded in selected period', paddingLeft + chartW / 2, paddingTop + chartH / 2);
+          ctx.restore();
+        }
       }
 
       // Chart Hover Tracking
       revenueCanvas.addEventListener('mousemove', function (e) {
+        var m = getCurrentMetrics();
+        if (m.mrr === 0) {
+          chartTooltip.style.display = 'none';
+          return;
+        }
+
         var rect = revenueCanvas.getBoundingClientRect();
         var mouseX = e.clientX - rect.left;
         var paddingLeft = 65;
         var paddingRight = 20;
         var chartW = rect.width - paddingLeft - paddingRight;
 
-        var m = getCurrentMetrics();
         var stepX = chartW / (m.chartLabels.length - 1);
 
         var nearestIdx = Math.round((mouseX - paddingLeft) / stepX);
@@ -2553,38 +2696,40 @@
           }
         });
 
-        var total = entMRR + growMRR + startMRR;
-        if (total === 0) {
-          // Fallback to overall dataset baseline if no customers joined in specific micro-window
-          entMRR = 61650; growMRR = 46240; startMRR = 20560;
-          total = entMRR + growMRR + startMRR;
-        }
-
-        // If specific plan filtered, that plan takes 100%
+        // If specific plan filtered, only return that slice if it has MRR > 0
         if (selectedPlan === 'Enterprise') {
           return {
             total: entMRR,
-            slices: [{ label: 'Enterprise', mrr: entMRR, percent: 1.0, color: '#a855f7' }]
+            slices: entMRR > 0 ? [{ label: 'Enterprise', mrr: entMRR, percent: 1.0, color: '#a855f7' }] : []
           };
         } else if (selectedPlan === 'Growth') {
           return {
             total: growMRR,
-            slices: [{ label: 'Growth', mrr: growMRR, percent: 1.0, color: '#6366f1' }]
+            slices: growMRR > 0 ? [{ label: 'Growth', mrr: growMRR, percent: 1.0, color: '#6366f1' }] : []
           };
         } else if (selectedPlan === 'Starter') {
           return {
             total: startMRR,
-            slices: [{ label: 'Starter', mrr: startMRR, percent: 1.0, color: '#06b6d4' }]
+            slices: startMRR > 0 ? [{ label: 'Starter', mrr: startMRR, percent: 1.0, color: '#06b6d4' }] : []
           };
         }
 
+        var total = entMRR + growMRR + startMRR;
+        if (total === 0) {
+          return {
+            total: 0,
+            slices: []
+          };
+        }
+
+        var slices = [];
+        if (entMRR > 0) slices.push({ label: 'Enterprise', mrr: entMRR, percent: entMRR / total, color: '#a855f7' });
+        if (growMRR > 0) slices.push({ label: 'Growth', mrr: growMRR, percent: growMRR / total, color: '#6366f1' });
+        if (startMRR > 0) slices.push({ label: 'Starter', mrr: startMRR, percent: startMRR / total, color: '#06b6d4' });
+
         return {
           total: total,
-          slices: [
-            { label: 'Enterprise', mrr: entMRR, percent: entMRR / total, color: '#a855f7' },
-            { label: 'Growth', mrr: growMRR, percent: growMRR / total, color: '#6366f1' },
-            { label: 'Starter', mrr: startMRR, percent: startMRR / total, color: '#06b6d4' }
-          ]
+          slices: slices
         };
       }
 
@@ -2604,6 +2749,35 @@
         var centerY = h / 2;
         var baseRadius = Math.min(centerX, centerY) - 18;
         var innerRadius = baseRadius * 0.62;
+
+        var entSpan = document.getElementById('legendEnterprise');
+        var growSpan = document.getElementById('legendGrowth');
+        var startSpan = document.getElementById('legendStarter');
+
+        // Empty state when total is 0 or no slices exist
+        if (data.total === 0 || data.slices.length === 0) {
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, baseRadius, 0, Math.PI * 2);
+          ctx.arc(centerX, centerY, innerRadius, Math.PI * 2, 0, true);
+          ctx.closePath();
+          ctx.fillStyle = isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.07)';
+          ctx.fill();
+
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.font = '800 1.15rem "Plus Jakarta Sans", sans-serif';
+          ctx.fillStyle = isLight ? '#64748b' : '#94a3b8';
+          ctx.fillText('No data', centerX, centerY - 6);
+
+          ctx.font = '600 0.72rem "Plus Jakarta Sans", sans-serif';
+          ctx.fillStyle = isLight ? '#94a3b8' : '#64748b';
+          ctx.fillText('Cohort MRR', centerX, centerY + 14);
+
+          if (entSpan) entSpan.textContent = 'Enterprise (0%)';
+          if (growSpan) growSpan.textContent = 'Growth (0%)';
+          if (startSpan) startSpan.textContent = 'Starter (0%)';
+          return;
+        }
 
         var startAngle = -Math.PI / 2;
         data.slices.forEach(function (slice, idx) {
@@ -2646,10 +2820,6 @@
         }
 
         // Update Legend Labels with Real Calculated Percentages
-        var entSpan = document.getElementById('legendEnterprise');
-        var growSpan = document.getElementById('legendGrowth');
-        var startSpan = document.getElementById('legendStarter');
-
         var entSlice = data.slices.find(function (s) { return s.label === 'Enterprise'; });
         var growSlice = data.slices.find(function (s) { return s.label === 'Growth'; });
         var startSlice = data.slices.find(function (s) { return s.label === 'Starter'; });
@@ -2658,6 +2828,60 @@
         if (growSpan) growSpan.textContent = 'Growth (' + (growSlice ? Math.round(growSlice.percent * 100) : 0) + '%)';
         if (startSpan) startSpan.textContent = 'Starter (' + (startSlice ? Math.round(startSlice.percent * 100) : 0) + '%)';
       }
+
+      // Donut Canvas Hover Tracking
+      donutCanvas.addEventListener('mousemove', function (e) {
+        var rect = donutCanvas.getBoundingClientRect();
+        var mouseX = e.clientX - rect.left;
+        var mouseY = e.clientY - rect.top;
+
+        var data = calculateDonutSlices();
+        if (data.total === 0 || data.slices.length === 0) {
+          if (donutHoverIndex !== -1) {
+            donutHoverIndex = -1;
+            drawDonutChart();
+          }
+          return;
+        }
+
+        var centerX = rect.width / 2;
+        var centerY = rect.height / 2;
+        var dx = mouseX - centerX;
+        var dy = mouseY - centerY;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+
+        var baseRadius = Math.min(centerX, centerY) - 18;
+        var innerRadius = baseRadius * 0.62;
+
+        var foundIdx = -1;
+        if (dist >= innerRadius && dist <= baseRadius + 8) {
+          var angle = Math.atan2(dy, dx);
+          var normAngle = angle - (-Math.PI / 2);
+          if (normAngle < 0) normAngle += Math.PI * 2;
+
+          var accumAngle = 0;
+          for (var i = 0; i < data.slices.length; i++) {
+            var sweep = data.slices[i].percent * Math.PI * 2;
+            if (normAngle >= accumAngle && normAngle < accumAngle + sweep) {
+              foundIdx = i;
+              break;
+            }
+            accumAngle += sweep;
+          }
+        }
+
+        if (foundIdx !== donutHoverIndex) {
+          donutHoverIndex = foundIdx;
+          drawDonutChart();
+        }
+      });
+
+      donutCanvas.addEventListener('mouseleave', function () {
+        if (donutHoverIndex !== -1) {
+          donutHoverIndex = -1;
+          drawDonutChart();
+        }
+      });
 
       // --- Render All Dashboard Visuals ---
       function renderAllCharts() {
@@ -2708,8 +2932,12 @@
             openModal(customDateModal, document.getElementById('customStartDate'));
             return;
           }
-          datePresetButtons.forEach(function (b) { b.classList.remove('active'); });
+          datePresetButtons.forEach(function (b) {
+            b.classList.remove('active');
+            b.setAttribute('aria-pressed', 'false');
+          });
           btn.classList.add('active');
+          btn.setAttribute('aria-pressed', 'true');
           activePeriodKey = days;
           activeStartDate = PRESET_RANGES[days].start;
           activeEndDate = PRESET_RANGES[days].end;
@@ -2741,8 +2969,12 @@
         activeEndDate = end;
 
         closeModal(customDateModal);
-        datePresetButtons.forEach(function (b) { b.classList.remove('active'); });
+        datePresetButtons.forEach(function (b) {
+          b.classList.remove('active');
+          b.setAttribute('aria-pressed', 'false');
+        });
         customDateBtn.classList.add('active');
+        customDateBtn.setAttribute('aria-pressed', 'true');
 
         applyAllFilters();
         showToast('Applied custom range: ' + start + ' → ' + end, '📅');
@@ -3079,14 +3311,18 @@
           ].join(',');
         });
 
-        var csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(',')].concat(rows).join('\n');
-        var encodedUri = encodeURI(csvContent);
+        var csvString = [headers.join(',')].concat(rows).join('\r\n');
+        var blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+        var url = URL.createObjectURL(blob);
         var link = document.createElement('a');
-        link.setAttribute('href', encodedUri);
+        link.setAttribute('href', url);
         link.setAttribute('download', 'saas_analytics_report.csv');
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        setTimeout(function () {
+          URL.revokeObjectURL(url);
+        }, 150);
 
         showToast('Exported ' + filteredCustomers.length + ' customer records to CSV', '📥');
       });
