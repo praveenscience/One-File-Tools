@@ -1,0 +1,2534 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Regex Escape Room — One File Tools</title>
+    <script>
+      (function () {
+        var t = null;
+        try {
+          t = localStorage.getItem("regex_escape_theme");
+        } catch (e) {}
+        if (t !== "dark" && t !== "light") {
+          t = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+        }
+        document.documentElement.setAttribute("data-theme", t);
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Nunito:wght@400;600;700;800&family=Oxanium:wght@600;700;800&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg-primary: #0a0f1d;
+        --bg-secondary: #111827;
+        --bg-tertiary: #1f2937;
+        --border-color: #374151;
+        --text-primary: #f9fafb;
+        --text-secondary: #9ca3af;
+        --accent-green: #10b981;
+        --accent-green-bg: rgba(16, 185, 129, 0.12);
+        --accent-red: #f87171;
+        --accent-red-bg: rgba(239, 68, 68, 0.12);
+        --accent-cyan: #06b6d4;
+        --accent-purple: #a78bfa;
+        --accent-amber: #f59e0b;
+        --door-locked: #ef4444;
+        --door-unlocked: #10b981;
+        --font-sans: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --font-heading: "Oxanium", "Nunito", system-ui, sans-serif;
+        color-scheme: dark;
+      }
+
+      [data-theme="light"] {
+        --bg-primary: #f8fafc;
+        --bg-secondary: #ffffff;
+        --bg-tertiary: #f1f5f9;
+        --border-color: #cbd5e1;
+        --text-primary: #0f172a;
+        --text-secondary: #526075;
+        --accent-green: #047857;
+        --accent-green-bg: rgba(5, 150, 105, 0.1);
+        --accent-red: #b91c1c;
+        --accent-red-bg: rgba(220, 38, 38, 0.1);
+        --accent-cyan: #0e7490;
+        --accent-purple: #6d28d9;
+        --accent-amber: #b45309;
+        --door-locked: #dc2626;
+        --door-unlocked: #047857;
+        color-scheme: light;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        font-family: var(--font-sans);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        line-height: 1.5;
+        background-image: radial-gradient(ellipse at top, rgba(139, 92, 246, 0.08) 0%, transparent 60%), radial-gradient(ellipse at bottom, rgba(6, 182, 212, 0.05) 0%, transparent 60%);
+      }
+
+      button:focus-visible,
+      a:focus-visible,
+      input:focus-visible {
+        outline: 3px solid var(--accent-cyan);
+        outline-offset: 2px;
+      }
+
+      .regex-input:focus-visible {
+        outline: none;
+      }
+
+      header {
+        background: var(--bg-secondary);
+        border-bottom: 1px solid var(--border-color);
+        padding: 0.75rem 1rem;
+        position: sticky;
+        top: 0;
+        z-index: 50;
+      }
+
+      .header-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+      }
+
+      .logo-area {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        text-decoration: none;
+        color: inherit;
+        border-radius: 0.375rem;
+      }
+
+      .logo-badge {
+        font-family: var(--font-heading);
+        font-size: 1.2rem;
+        font-weight: 800;
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .logo-badge span {
+        color: var(--accent-cyan);
+      }
+
+      .hud-stats {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-family: var(--font-mono);
+        font-size: 0.875rem;
+        flex-wrap: wrap;
+      }
+
+      .stat-pill {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        padding: 0.35rem 0.75rem;
+        border-radius: 9999px;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .stat-label {
+        color: var(--text-secondary);
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .stat-val {
+        font-weight: 700;
+        color: var(--text-primary);
+      }
+
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .icon-btn {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
+        width: 2.25rem;
+        height: 2.25rem;
+        border-radius: 0.5rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 1rem;
+        transition:
+          border-color 0.2s ease,
+          background 0.2s ease;
+      }
+
+      .icon-btn:hover {
+        border-color: var(--accent-cyan);
+        background: var(--bg-secondary);
+      }
+
+      main {
+        flex: 1;
+        max-width: 1200px;
+        width: 100%;
+        margin: 0 auto;
+        padding: 1.5rem 1rem 3rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+
+      .chamber-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 1rem;
+        padding: 1.5rem;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 1.5rem;
+        align-items: center;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+      }
+
+      .chamber-header h2 {
+        font-family: var(--font-heading);
+        font-size: 1.6rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 0.35rem;
+        flex-wrap: wrap;
+      }
+
+      .room-tag {
+        font-size: 0.8rem;
+        background: rgba(139, 92, 246, 0.15);
+        color: var(--accent-purple);
+        border: 1px solid rgba(139, 92, 246, 0.3);
+        padding: 0.2rem 0.6rem;
+        border-radius: 0.375rem;
+        font-family: var(--font-mono);
+        font-weight: 600;
+      }
+
+      .chamber-mission {
+        color: var(--text-secondary);
+        font-size: 0.95rem;
+      }
+
+      .door-indicator {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: var(--bg-tertiary);
+        border: 2px solid var(--border-color);
+        border-radius: 0.75rem;
+        padding: 1rem 1.5rem;
+        min-width: 140px;
+        transition:
+          border-color 0.3s ease,
+          box-shadow 0.3s ease;
+      }
+
+      .door-indicator.unlocked {
+        border-color: var(--door-unlocked);
+        box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+      }
+
+      .door-indicator.locked {
+        border-color: var(--door-locked);
+      }
+
+      .door-icon {
+        font-size: 2.25rem;
+        margin-bottom: 0.25rem;
+      }
+
+      .door-label {
+        font-family: var(--font-heading);
+        font-size: 0.875rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+      }
+
+      .door-indicator.locked .door-label {
+        color: var(--door-locked);
+      }
+
+      .door-indicator.unlocked .door-label {
+        color: var(--door-unlocked);
+      }
+
+      .concept-box {
+        background: var(--bg-tertiary);
+        border-left: 4px solid var(--accent-cyan);
+        border-radius: 0.5rem;
+        padding: 0.875rem 1.25rem;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+      }
+
+      .concept-icon {
+        font-size: 1.2rem;
+        line-height: 1;
+        margin-top: 0.1rem;
+      }
+
+      .concept-text code,
+      .hint-code {
+        font-family: var(--font-mono);
+        background: var(--bg-secondary);
+        padding: 0.15rem 0.4rem;
+        border-radius: 0.25rem;
+        color: var(--accent-cyan);
+        word-break: break-all;
+      }
+
+      .concept-rules {
+        margin-top: 0.5rem;
+        color: var(--text-secondary);
+        font-size: 0.85rem;
+      }
+
+      .editor-section {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 1rem;
+        padding: 1.5rem;
+      }
+
+      .regex-input-wrapper {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        row-gap: 0.5rem;
+        background: var(--bg-tertiary);
+        border: 2px solid var(--border-color);
+        border-radius: 0.75rem;
+        padding: 0.5rem 1rem;
+        font-family: var(--font-mono);
+        font-size: 1.25rem;
+        transition:
+          border-color 0.2s ease,
+          box-shadow 0.2s ease;
+      }
+
+      .regex-input-wrapper:focus-within {
+        border-color: var(--accent-cyan);
+        box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.25);
+      }
+
+      .regex-field {
+        display: flex;
+        align-items: center;
+        flex: 1 1 12rem;
+        min-width: 0;
+      }
+
+      .regex-delimiter {
+        color: var(--accent-cyan);
+        font-weight: 700;
+        user-select: none;
+      }
+
+      .regex-input {
+        flex: 1;
+        min-width: 0;
+        background: transparent;
+        border: none;
+        outline: none;
+        color: var(--text-primary);
+        font-family: var(--font-mono);
+        font-size: 1.15rem;
+        padding: 0.25rem 0.5rem;
+      }
+
+      .flags-container {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-left: 0.5rem;
+        border-left: 1px solid var(--border-color);
+        padding-left: 0.75rem;
+      }
+
+      .flag-toggle {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        color: var(--text-secondary);
+        padding: 0.2rem 0.55rem;
+        border-radius: 0.25rem;
+        font-size: 0.8rem;
+        font-family: var(--font-mono);
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .flag-toggle.active {
+        background: var(--accent-purple);
+        color: #ffffff;
+        border-color: var(--accent-purple);
+      }
+
+      [data-theme="dark"] .flag-toggle.active {
+        color: #0a0f1d;
+      }
+
+      .regex-status-row {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        margin-top: 0.75rem;
+        font-size: 0.85rem;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+      }
+
+      .regex-notice {
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        flex: 1 1 16rem;
+        min-height: 1.2em;
+        color: var(--text-secondary);
+      }
+
+      .regex-notice.error {
+        color: var(--accent-red);
+      }
+
+      .regex-notice.warn {
+        color: var(--accent-amber);
+      }
+
+      .regex-notice.ok {
+        color: var(--accent-green);
+      }
+
+      .editor-controls {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        font-family: var(--font-sans);
+        font-weight: 700;
+        font-size: 0.875rem;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+        transition:
+          background 0.2s ease,
+          border-color 0.2s ease;
+      }
+
+      .btn:hover {
+        background: var(--border-color);
+      }
+
+      .btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      .btn-primary {
+        background: var(--accent-green);
+        border-color: var(--accent-green);
+        color: #ffffff;
+      }
+
+      .btn-primary:hover:not(:disabled) {
+        background: #065f46;
+        border-color: #065f46;
+      }
+
+      .btn-hint {
+        color: var(--accent-amber);
+        border-color: rgba(245, 158, 11, 0.4);
+      }
+
+      .btn-hint:hover {
+        background: rgba(245, 158, 11, 0.1);
+      }
+
+      .btn-danger-armed {
+        background: var(--accent-red-bg);
+        border-color: var(--accent-red);
+        color: var(--accent-red);
+      }
+
+      .targets-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+        margin-top: 1.5rem;
+      }
+
+      .target-column {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        border-radius: 0.75rem;
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        min-width: 0;
+      }
+
+      .column-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      .column-title {
+        font-family: var(--font-heading);
+        font-size: 1rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+      }
+
+      .column-title.match-target {
+        color: var(--accent-green);
+      }
+
+      .column-title.decoy-target {
+        color: var(--accent-red);
+      }
+
+      .match-counter {
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        padding: 0.15rem 0.5rem;
+        border-radius: 9999px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .match-target + .match-counter {
+        background: var(--accent-green-bg);
+        color: var(--accent-green);
+      }
+
+      .decoy-target + .match-counter {
+        background: var(--accent-red-bg);
+        color: var(--accent-red);
+      }
+
+      .string-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        list-style: none;
+      }
+
+      .string-item {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        font-family: var(--font-mono);
+        font-size: 0.9rem;
+      }
+
+      .string-main {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+
+      .string-text {
+        word-break: break-all;
+        white-space: pre-wrap;
+      }
+
+      .string-expect {
+        font-size: 0.72rem;
+        color: var(--text-secondary);
+      }
+
+      .string-text mark {
+        background: rgba(6, 182, 212, 0.35);
+        color: inherit;
+        border-radius: 0.2rem;
+        padding: 0 0.1rem;
+      }
+
+      .string-badge {
+        font-size: 0.7rem;
+        padding: 0.1rem 0.4rem;
+        border-radius: 0.25rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+
+      .string-item.success {
+        border-color: var(--accent-green);
+        background: var(--accent-green-bg);
+      }
+
+      .string-item.failure {
+        border-color: var(--accent-red);
+        background: var(--accent-red-bg);
+      }
+
+      .hint-card {
+        margin-top: 1rem;
+        background: rgba(245, 158, 11, 0.08);
+        border: 1px solid rgba(245, 158, 11, 0.3);
+        border-radius: 0.5rem;
+        padding: 1rem;
+        font-size: 0.9rem;
+      }
+
+      .hint-title {
+        font-weight: 700;
+        color: var(--accent-amber);
+        margin-bottom: 0.25rem;
+      }
+
+      .penalty {
+        color: var(--accent-red);
+      }
+
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.75);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+        padding: 1rem;
+        overflow-y: auto;
+      }
+
+      .modal-overlay.active {
+        display: flex;
+      }
+
+      .modal-box {
+        background: var(--bg-secondary);
+        border: 2px solid var(--accent-cyan);
+        border-radius: 1rem;
+        padding: 1.5rem;
+        max-width: 500px;
+        width: 100%;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+        text-align: center;
+        margin: auto;
+      }
+
+      .modal-icon {
+        font-size: 3rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .modal-box h3 {
+        font-family: var(--font-heading);
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .modal-stats {
+        background: var(--bg-tertiary);
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin: 1rem 0;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+        font-family: var(--font-mono);
+        font-size: 0.9rem;
+      }
+
+      .modal-stat-label {
+        color: var(--text-secondary);
+        font-size: 0.75rem;
+      }
+
+      .modal-hidden {
+        text-align: left;
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        margin-bottom: 1rem;
+      }
+
+      .modal-hidden ul {
+        list-style: none;
+        font-family: var(--font-mono);
+        margin-top: 0.25rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+      }
+
+      .modal-hidden li {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        border-radius: 0.25rem;
+        padding: 0.05rem 0.4rem;
+        word-break: break-all;
+      }
+
+      .name-row {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        text-align: left;
+        margin-bottom: 1rem;
+        font-size: 0.85rem;
+      }
+
+      .name-row input {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
+        border-radius: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        font-family: var(--font-sans);
+        font-size: 0.95rem;
+      }
+
+      .modal-actions {
+        display: flex;
+        justify-content: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+      }
+
+      .modal-actions .btn {
+        flex: 1 1 10rem;
+      }
+
+      .save-status {
+        margin-top: 0.75rem;
+        font-size: 0.85rem;
+        color: var(--accent-green);
+        min-height: 1.2em;
+      }
+
+      .leaderboard-drawer {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 0.75rem;
+        padding: 1.25rem;
+      }
+
+      .leaderboard-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+      }
+
+      .leaderboard-head h3 {
+        font-family: var(--font-heading);
+        font-size: 1.1rem;
+      }
+
+      .table-scroll {
+        overflow-x: auto;
+      }
+
+      .leaderboard-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 0.75rem;
+        font-size: 0.875rem;
+        font-family: var(--font-mono);
+      }
+
+      .leaderboard-table th,
+      .leaderboard-table td {
+        padding: 0.5rem 0.75rem;
+        text-align: left;
+        border-bottom: 1px solid var(--border-color);
+        white-space: nowrap;
+      }
+
+      .leaderboard-table th {
+        color: var(--text-secondary);
+        font-size: 0.75rem;
+        text-transform: uppercase;
+      }
+
+      .leaderboard-table td.empty {
+        text-align: center;
+        color: var(--text-secondary);
+        white-space: normal;
+      }
+
+      .lb-time {
+        font-weight: 700;
+        color: var(--accent-green);
+      }
+
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+      }
+
+      @media (max-width: 768px) {
+        .chamber-card,
+        .targets-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 480px) {
+        main {
+          padding: 1rem 0.75rem 2rem;
+        }
+        .chamber-card,
+        .editor-section {
+          padding: 1rem;
+        }
+        .chamber-header h2 {
+          font-size: 1.25rem;
+        }
+        .logo-badge {
+          font-size: 1rem;
+        }
+        .flags-container {
+          margin-left: 0;
+          border-left: none;
+          padding-left: 0;
+        }
+        .target-column {
+          padding: 0.875rem;
+        }
+        .modal-stats {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="header-container">
+        <a href="../index.html" class="logo-area">
+          <div class="logo-badge">⚡ <span>REGEX ESCAPE ROOM</span></div>
+        </a>
+        <div class="hud-stats">
+          <div class="stat-pill">
+            <span class="stat-label">Room</span>
+            <span class="stat-val" id="stat-room">1 / 13</span>
+          </div>
+          <div class="stat-pill">
+            <span class="stat-label">Escape Time</span>
+            <span class="stat-val" id="stat-timer">00:00</span>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button class="icon-btn" id="btn-sound" type="button" title="Mute sound" aria-label="Mute sound">🔊</button>
+          <button class="icon-btn" id="btn-leaderboard-toggle" type="button" title="View escape records" aria-label="View escape records" aria-expanded="false" aria-controls="leaderboard-drawer">🏆</button>
+          <button class="icon-btn" id="theme-toggle" type="button" title="Toggle theme" aria-label="Toggle theme">☀️</button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="leaderboard-drawer" id="leaderboard-drawer" hidden>
+        <div class="leaderboard-head">
+          <h3>🏆 Hall of Fame (Fastest Escapes)</h3>
+          <button class="btn" id="btn-clear-leaderboard" type="button">Clear Records</button>
+        </div>
+        <div class="table-scroll">
+          <table class="leaderboard-table">
+            <thead>
+              <tr>
+                <th scope="col">Rank</th>
+                <th scope="col">Name</th>
+                <th scope="col">Time</th>
+                <th scope="col">Hints</th>
+                <th scope="col">Date</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboard-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="chamber-card">
+        <div class="chamber-header">
+          <h2>
+            <span id="room-title">Chamber 1</span>
+            <span class="room-tag" id="room-concept">Literals</span>
+          </h2>
+          <p class="chamber-mission" id="room-desc"></p>
+        </div>
+        <div class="door-indicator locked" id="door-indicator">
+          <div class="door-icon" id="door-icon" aria-hidden="true">🔒</div>
+          <div class="door-label" id="door-status">LOCKED</div>
+        </div>
+      </section>
+
+      <div class="concept-box">
+        <div class="concept-icon" aria-hidden="true">💡</div>
+        <div class="concept-text">
+          <div id="concept-explanation"></div>
+          <div class="concept-rules" id="concept-rules"></div>
+        </div>
+      </div>
+
+      <section class="editor-section">
+        <label class="sr-only" for="regex-input">Regular expression</label>
+        <div class="regex-input-wrapper">
+          <div class="regex-field">
+            <span class="regex-delimiter" aria-hidden="true">/</span>
+            <input type="text" id="regex-input" class="regex-input" placeholder="Type your regex..." autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="80" />
+            <span class="regex-delimiter" aria-hidden="true">/</span>
+          </div>
+          <div class="flags-container" role="group" aria-label="Regex flags">
+            <button class="flag-toggle" type="button" data-flag="g" title="Global match" aria-pressed="false">g</button>
+            <button class="flag-toggle" type="button" data-flag="i" title="Case insensitive" aria-pressed="false">i</button>
+            <button class="flag-toggle" type="button" data-flag="m" title="Multiline" aria-pressed="false">m</button>
+          </div>
+        </div>
+
+        <div class="regex-status-row">
+          <div class="regex-notice" id="regex-notice" role="status" aria-live="polite"></div>
+          <div class="editor-controls">
+            <button class="btn btn-hint" id="btn-hint" type="button">🔍 Hint (+15s)</button>
+            <button class="btn" id="btn-reset-room" type="button">↺ Reset</button>
+            <button class="btn btn-primary" id="btn-unlock" type="button" disabled>Unlock Chamber ➔</button>
+          </div>
+        </div>
+
+        <div class="hint-card" id="hint-card" hidden>
+          <div class="hint-title">💡 Progressive Hint</div>
+          <div id="hint-text"></div>
+        </div>
+
+        <div class="targets-grid">
+          <div class="target-column">
+            <div class="column-header">
+              <span class="column-title match-target"><span aria-hidden="true">🟢</span> Match Targets</span>
+              <span class="match-counter" id="targets-counter">0 / 0</span>
+            </div>
+            <ul class="string-list" id="targets-list"></ul>
+          </div>
+
+          <div class="target-column">
+            <div class="column-header">
+              <span class="column-title decoy-target"><span aria-hidden="true">🔴</span> Decoys (Must NOT Match)</span>
+              <span class="match-counter" id="decoys-counter">0 / 0</span>
+            </div>
+            <ul class="string-list" id="decoys-list"></ul>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div class="modal-overlay" id="victory-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-box">
+        <div class="modal-icon" aria-hidden="true">🎉</div>
+        <h3 id="modal-title">Chamber Cleared!</h3>
+        <p id="modal-desc" style="color: var(--text-secondary)"></p>
+        <div class="modal-stats">
+          <div>
+            <div class="modal-stat-label">Chamber Time</div>
+            <div style="font-weight: 700" id="modal-time">00:00</div>
+          </div>
+          <div>
+            <div class="modal-stat-label">Total Elapsed</div>
+            <div style="font-weight: 700; color: var(--accent-green)" id="modal-total-time">00:00</div>
+          </div>
+        </div>
+        <div class="modal-hidden" id="modal-hidden"></div>
+        <div class="name-row" id="name-row" hidden>
+          <label for="runner-name">Name for the leaderboard (optional)</label>
+          <input type="text" id="runner-name" maxlength="20" autocomplete="nickname" placeholder="Anonymous" />
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-primary" id="btn-save-run" type="button" hidden>💾 Save Run to Leaderboard</button>
+          <button class="btn btn-primary" id="btn-next-room" type="button">Proceed to Next Chamber ➔</button>
+        </div>
+        <div class="save-status" id="save-status" role="status" aria-live="polite"></div>
+      </div>
+    </div>
+
+    <script>
+      /* @@CORE-START@@ ======================================================
+       Pure game core: chamber data, regex-pattern parser, anti-cheat analysis,
+       matcher (runJob, also shipped into the Web Worker) and verdict logic.
+       No DOM access in this block.
+       ===================================================================== */
+      const NEVER = "[^\\s\\S]";
+
+      const CHAMBERS = [
+        {
+          title: "The Dust Archive",
+          concept: "Literals",
+          description: "Match every record that mentions the word 'access' while rejecting the other titles.",
+          explanation: "Plain characters match themselves. The literal <code>access</code> matches those six characters anywhere in the string.",
+          targets: ["access", "access protocol", "grant access"],
+          decoys: ["denied", "reject", "lockout", "accent"],
+          hiddenTargets: ["remote access log"],
+          hiddenDecoys: ["acess denied"],
+          solution: "access",
+          constructName: "the literal word access",
+          requires: [{ kind: "literal", word: "access", label: "literal access" }],
+          defaultFlags: "g"
+        },
+        {
+          title: "The Cipher Vault",
+          concept: "Digit Class \\d",
+          description: "Find passcodes that contain a run of three digits.",
+          explanation: "<code>\\d</code> (or <code>[0-9]</code>) matches one digit. Combine it with a count to require a run of digits.",
+          targets: ["pass_123", "code999", "room404"],
+          decoys: ["pass_ab", "code_x", "room_ten", "cipher", "pass_12", "code99"],
+          hiddenTargets: ["vault_555", "x2024y"],
+          hiddenDecoys: ["pin_4_5_6", "code_9a9"],
+          solution: "\\d{3}",
+          constructName: "a digit class (\\d or [0-9])",
+          requires: [{ kind: "digitClass", label: "digit class" }],
+          defaultFlags: "g"
+        },
+        {
+          title: "The Wire Conduit",
+          concept: "Inverted Sets [^...]",
+          description: "Match whole words that contain no vowels (a, e, i, o, u).",
+          explanation: "<code>[^aeiou]</code> matches any single character that is NOT a vowel. Anchor it and repeat it to cover the whole word.",
+          targets: ["sky", "crypt", "lynx", "dry"],
+          decoys: ["sea", "coast", "lake", "rain", "python", "crystal", "symbol", "syntax"],
+          hiddenTargets: ["psst", "nth", "glyph"],
+          hiddenDecoys: ["rhyme", "syrup"],
+          solution: "^[^aeiou]+$",
+          constructName: "an inverted character set [^...]",
+          requires: [{ kind: "negatedClass", label: "inverted set [^...]" }],
+          defaultFlags: ""
+        },
+        {
+          title: "The Steam Boiler",
+          concept: "Quantifiers ? * + {n,m}",
+          description: "Match both spellings, 'color' and 'colour', but nothing else that merely looks similar.",
+          explanation: "<code>?</code> makes the preceding token optional (zero or one). <code>colou?r</code> accepts both spellings.",
+          targets: ["color", "colour", "primary color", "vivid colour"],
+          decoys: ["column", "colon", "cooler", "collar", "colouur"],
+          hiddenTargets: ["watercolor", "colours"],
+          hiddenDecoys: ["colr", "coluor"],
+          solution: "colou?r",
+          constructName: "a quantifier that allows a varying count (?, *, + or {n,m})",
+          requires: [{ kind: "variableQuantifier", label: "quantifier" }],
+          defaultFlags: "g"
+        },
+        {
+          title: "The Perimeter Fence",
+          concept: "Anchors ^ and $",
+          description: "Accept only the exact keyword 'CONFIRM', from first character to last.",
+          explanation: "<code>^</code> asserts the start of the string and <code>$</code> asserts the end.",
+          targets: ["CONFIRM"],
+          decoys: ["UNCONFIRMED", "CONFIRMATION", "PLEASE CONFIRM", "CONFIRM_NOW"],
+          hiddenTargets: [],
+          hiddenDecoys: ["CONFIRM!", "XCONFIRM"],
+          solution: "^CONFIRM$",
+          constructName: "both a start anchor ^ and an end anchor $",
+          requires: [
+            { kind: "startAnchor", label: "start anchor ^" },
+            { kind: "endAnchor", label: "end anchor $" }
+          ],
+          defaultFlags: ""
+        },
+        {
+          title: "The Chamber of Alternations",
+          concept: "Alternation A|B",
+          description: "Unlock protocols that mention either 'alpha' or 'omega'.",
+          explanation: "The pipe <code>|</code> means OR: <code>cat|dog</code> matches either word.",
+          targets: ["sector alpha", "sector omega", "protocol-alpha", "protocol-omega"],
+          decoys: ["sector beta", "sector gamma", "protocol-delta", "protocol-zeta"],
+          hiddenTargets: ["omega gate", "alpha-7 relay"],
+          hiddenDecoys: ["mega sector", "graph data"],
+          solution: "alpha|omega",
+          constructName: "alternation (|) between real alternatives",
+          requires: [{ kind: "alternation", label: "alternation" }],
+          defaultFlags: "g"
+        },
+        {
+          title: "The Word Boundary Gate",
+          concept: "Word Boundaries \\b",
+          description: "Match the whole word 'cat', but not 'scatter', 'bobcat' or 'catlike'.",
+          explanation: "<code>\\b</code> matches the zero-width position between a word character and a non-word character (or the string edge). Inside <code>[...]</code>, <code>\\b</code> means backspace instead.",
+          targets: ["black cat sat", "a cat in a hat", "feed the cat"],
+          decoys: ["scattered files", "bobcat excavator", "a catlike animal", "a catalog item"],
+          hiddenTargets: ["cat", "pet:cat", "the cat."],
+          hiddenDecoys: ["concat()", "tomcat server"],
+          solution: "\\bcat\\b",
+          constructName: "a word boundary \\b (outside a character class)",
+          requires: [{ kind: "wordBoundary", label: "word boundary \\b" }],
+          defaultFlags: "g"
+        },
+        {
+          title: "The Anonymous Tunnel",
+          concept: "Non-Capturing Groups (?:...)",
+          description: "Match URLs that START with http://, https:// or ftp://. Capturing groups are rejected.",
+          explanation: "<code>(?:a|b)</code> groups alternatives (or a quantified sequence) without creating a numbered capture.",
+          targets: ["https://api.internal", "http://vault.io", "ftp://archive.net"],
+          decoys: ["smtp://mail.net", "file://local", "ssh://terminal", "gopher://host", "html://page", "httpd://daemon", "sftp://box"],
+          hiddenTargets: ["ftp://mirror.org/pub", "https://x.y"],
+          hiddenDecoys: ["htttp://typo.io", "ftps://legacy.net"],
+          solution: "^(?:https?|ftp)://",
+          constructName: "a non-capturing group (?:...) that groups alternatives or a quantified sequence",
+          requires: [{ kind: "nonCapturingGroup", label: "non-capturing group" }],
+          forbidCapture: true,
+          defaultFlags: ""
+        },
+        {
+          title: "The Lookahead Chamber",
+          concept: "Positive Lookahead (?=...)",
+          description: "Match ONLY the number that is immediately followed by 'px'. The 'px' must not be part of the match.",
+          explanation: "<code>X(?=Y)</code> matches X only if Y comes next, without consuming Y. Each target shows the exact text your match must be.",
+          targets: [
+            { text: "100px", match: "100" },
+            { text: "24px", match: "24" },
+            { text: "500px", match: "500" }
+          ],
+          decoys: ["100rem", "24em", "500vh", "px", "32pt"],
+          hiddenTargets: [
+            { text: "width: 8px", match: "8" },
+            { text: "1920px wide", match: "1920" }
+          ],
+          hiddenDecoys: ["px100", "12 px"],
+          solution: "\\d+(?=px)",
+          constructName: "a non-empty positive lookahead (?=...)",
+          requires: [{ kind: "lookahead", label: "lookahead" }],
+          defaultFlags: "g"
+        },
+        {
+          title: "The Negative Void",
+          concept: "Negative Lookahead (?!...)",
+          description: "Accept file names that do NOT end in '.exe'. Anything else, even 'exe.pdf', is safe.",
+          explanation: "<code>(?!Y)</code> asserts that Y does NOT come next. <code>^(?!.*\\.exe$)</code> checks the whole name before matching it.",
+          targets: ["document.pdf", "report.docx", "data.json"],
+          decoys: ["virus.exe", "payload.exe", "trojan.exe", "malware.exe", "archive.tar.exe"],
+          hiddenTargets: ["exe.pdf", "file.exe.bak", "photo.jpe"],
+          hiddenDecoys: ["game.exe", "a.b.c.exe"],
+          solution: "^(?!.*\\.exe$).+$",
+          constructName: "a non-empty negative lookahead (?!...)",
+          requires: [{ kind: "negativeLookahead", label: "negative lookahead" }],
+          defaultFlags: ""
+        },
+        {
+          title: "The Rear-View Mirror",
+          concept: "Positive Lookbehind (?<=...)",
+          description: "Match ONLY the amount that comes right after a '$' sign. The '$' must not be part of the match.",
+          explanation: "<code>(?<=Y)X</code> matches X only if Y comes just before it, without consuming Y. Remember to escape the dollar: <code>\\$</code>.",
+          targets: [
+            { text: "Total: $45", match: "45" },
+            { text: "$1200 due", match: "1200" },
+            { text: "fee $7", match: "7" }
+          ],
+          decoys: ["Qty: 45", "€300 paid", "45$", "ID 1200"],
+          hiddenTargets: [
+            { text: "pay $99 now", match: "99" },
+            { text: "$5 and $6", match: "5" }
+          ],
+          hiddenDecoys: ["USD 80", "price 7$"],
+          solution: "(?<=\\$)\\d+",
+          constructName: "a non-empty positive lookbehind (?<=...)",
+          requires: [{ kind: "lookbehind", label: "lookbehind" }],
+          defaultFlags: "g"
+        },
+        {
+          title: "The Echo Mirror",
+          concept: "Backreferences \\1",
+          description: "Detect values containing the same letter or digit twice in a row (e.g. 'aa', '77').",
+          explanation: "Capture one character with <code>(...)</code>, then <code>\\1</code> requires the exact same text again.",
+          targets: ["key: aa", "pin: 77", "ref: zz", "id: 99"],
+          decoys: ["key: ab", "pin: 78", "ref: zx", "id: 90", "lock: xy", "val: 12"],
+          hiddenTargets: ["abba", "tag: 55", "key: ab, qq"],
+          hiddenDecoys: ["key: aba", "pin: 1-1"],
+          solution: "([a-z0-9])\\1",
+          constructName: "a backreference (\\1 or \\k<name>) to an earlier, non-empty capturing group",
+          requires: [{ kind: "backreference", label: "backreference" }],
+          defaultFlags: "g"
+        },
+        {
+          title: "The Mainframe Core",
+          concept: "Master Validation",
+          description: "Validate tokens shaped exactly 'SEC-XXXX-YYYY': 4 uppercase letters, then 4 digits.",
+          explanation: "Combine anchors, a character range like <code>[A-Z]</code> and exact counts like <code>{4}</code>.",
+          targets: ["SEC-ABCD-1234", "SEC-WXYZ-9876", "SEC-KERN-4040"],
+          decoys: ["SEC-abc-1234", "SEC-ABCD-123", "AUTH-ABCD-1234", "SEC-ABCD-12345", "ABCD", "1234"],
+          hiddenTargets: ["SEC-QQQQ-0000"],
+          hiddenDecoys: ["SEC-AB12-1234", "SEC-abcd-1234", "XSEC-ABCD-1234", "SEC-ABCDE-1234"],
+          solution: "^SEC-[A-Z]{4}-\\d{4}$",
+          constructName: "anchors, a character range and a {n} count",
+          requires: [
+            { kind: "startAnchor", label: "start anchor ^" },
+            { kind: "endAnchor", label: "end anchor $" },
+            { kind: "rangeClass", label: "character range [A-Z]" },
+            { kind: "braceQuantifier", label: "{n} count" }
+          ],
+          defaultFlags: ""
+        }
+      ];
+
+      /* ---------- Regex pattern parser (JS syntax, non-unicode mode) ---------- */
+      function parseRegex(src) {
+        const n = src.length;
+        let total = 0;
+        let hasNamed = false;
+        // Pre-scan: count capturing groups (escapes and class contents skipped)
+        for (let i = 0, inClass = false; i < n; i++) {
+          const c = src[i];
+          if (c === "\\") {
+            i++;
+            continue;
+          }
+          if (inClass) {
+            if (c === "]") inClass = false;
+            continue;
+          }
+          if (c === "[") {
+            inClass = true;
+            continue;
+          }
+          if (c === "(") {
+            if (src[i + 1] !== "?") total++;
+            else if (src[i + 2] === "<" && src[i + 3] !== "=" && src[i + 3] !== "!") {
+              total++;
+              hasNamed = true;
+            }
+          }
+        }
+        let pos = 0;
+        let capCount = 0;
+        const captures = [];
+        const fail = (msg) => {
+          throw new Error(msg);
+        };
+        const CTRL = { n: "\n", r: "\r", t: "\t", f: "\f", v: "\v" };
+
+        function parseAlt() {
+          const start = pos;
+          const alts = [parseSeq()];
+          while (pos < n && src[pos] === "|") {
+            pos++;
+            alts.push(parseSeq());
+          }
+          return { type: "alt", alts, start, end: pos };
+        }
+        function parseSeq() {
+          const start = pos;
+          const items = [];
+          while (pos < n && src[pos] !== "|" && src[pos] !== ")") items.push(parseQuant(parseAtom()));
+          return { type: "seq", items, start, end: pos };
+        }
+        function parseQuant(atom) {
+          if (pos >= n) return atom;
+          const qStart = pos;
+          const c = src[pos];
+          let min,
+            max,
+            brace = false;
+          if (c === "*") {
+            min = 0;
+            max = Infinity;
+            pos++;
+          } else if (c === "+") {
+            min = 1;
+            max = Infinity;
+            pos++;
+          } else if (c === "?") {
+            min = 0;
+            max = 1;
+            pos++;
+          } else if (c === "{") {
+            const m = /^\{(\d+)(?:(,)(\d*))?\}/.exec(src.slice(pos));
+            if (!m) return atom;
+            min = Number(m[1]);
+            max = m[2] ? (m[3] === "" ? Infinity : Number(m[3])) : min;
+            brace = true;
+            pos += m[0].length;
+          } else return atom;
+          let lazy = false;
+          if (src[pos] === "?") {
+            lazy = true;
+            pos++;
+          }
+          return { type: "quant", atom, min, max, lazy, brace, start: atom.start, qStart, end: pos };
+        }
+        function readEscapeChar(c) {
+          // pos is just after the escape letter c; returns literal char
+          if (c === "x" && /^[0-9a-fA-F]{2}/.test(src.slice(pos))) {
+            const ch = String.fromCharCode(parseInt(src.substr(pos, 2), 16));
+            pos += 2;
+            return ch;
+          }
+          if (c === "u" && /^[0-9a-fA-F]{4}/.test(src.slice(pos))) {
+            const ch = String.fromCharCode(parseInt(src.substr(pos, 4), 16));
+            pos += 4;
+            return ch;
+          }
+          if (c === "c" && /^[A-Za-z]/.test(src.slice(pos))) {
+            const ch = String.fromCharCode(src.charCodeAt(pos) % 32);
+            pos++;
+            return ch;
+          }
+          if (c >= "0" && c <= "7") {
+            let k = 0;
+            while (k < 2 && pos < n && src[pos] >= "0" && src[pos] <= "7") {
+              pos++;
+              k++;
+            }
+            return "\u0000";
+          }
+          return CTRL[c] || c;
+        }
+        function parseEscape() {
+          const start = pos;
+          pos++;
+          if (pos >= n) fail("trailing backslash");
+          const c = src[pos];
+          pos++;
+          if (c === "b" || c === "B") return { type: "assert", kind: "\\" + c, start, end: pos };
+          if ("dDwWsS".indexOf(c) >= 0) return { type: "set", kind: c, start, end: pos };
+          if (c >= "1" && c <= "9") {
+            let j = pos;
+            while (j < n && src[j] >= "0" && src[j] <= "9") j++;
+            const num = parseInt(src.slice(pos - 1, j), 10);
+            if (num <= total) {
+              pos = j;
+              return { type: "backref", ref: num, start, end: pos };
+            }
+            // Not a backreference: legacy octal / identity escape
+            return { type: "char", ch: readEscapeChar(c), legacy: true, start, end: pos };
+          }
+          if (c === "k" && hasNamed) {
+            if (src[pos] !== "<") fail("bad named reference");
+            const close = src.indexOf(">", pos);
+            if (close < 0) fail("bad named reference");
+            const name = src.slice(pos + 1, close);
+            pos = close + 1;
+            return { type: "backref", ref: name, start, end: pos };
+          }
+          return { type: "char", ch: readEscapeChar(c), start, end: pos };
+        }
+        function classAtom() {
+          const c = src[pos];
+          if (c !== "\\") {
+            pos++;
+            return { kind: "char", ch: c };
+          }
+          pos++;
+          const e = src[pos];
+          pos++;
+          if ("dDwWsS".indexOf(e) >= 0) return { kind: "esc", e };
+          if (e === "b") return { kind: "char", ch: "\b" };
+          return { kind: "char", ch: readEscapeChar(e) };
+        }
+        function parseClass() {
+          const start = pos;
+          pos++;
+          let negated = false;
+          if (src[pos] === "^") {
+            negated = true;
+            pos++;
+          }
+          const items = [];
+          while (pos < n && src[pos] !== "]") {
+            const a = classAtom();
+            if (a.kind === "char" && src[pos] === "-" && pos + 1 < n && src[pos + 1] !== "]") {
+              pos++;
+              const b = classAtom();
+              if (b.kind === "char") {
+                items.push({ kind: "range", from: a.ch, to: b.ch });
+                continue;
+              }
+              items.push(a, { kind: "char", ch: "-" }, b);
+              continue;
+            }
+            items.push(a);
+          }
+          if (src[pos] !== "]") fail("unclosed character class");
+          pos++;
+          return { type: "class", negated, items, start, end: pos };
+        }
+        function parseAtom() {
+          const start = pos;
+          const c = src[pos];
+          if (c === "(") {
+            let kind = "capture",
+              name = null,
+              openLen = 1;
+            if (src[pos + 1] === "?") {
+              const two = src.slice(pos + 2, pos + 4);
+              if (src[pos + 2] === ":") {
+                kind = "noncap";
+                openLen = 3;
+              } else if (src[pos + 2] === "=") {
+                kind = "la";
+                openLen = 3;
+              } else if (src[pos + 2] === "!") {
+                kind = "nla";
+                openLen = 3;
+              } else if (two === "<=") {
+                kind = "lb";
+                openLen = 4;
+              } else if (two === "<!") {
+                kind = "nlb";
+                openLen = 4;
+              } else if (src[pos + 2] === "<") {
+                const close = src.indexOf(">", pos + 3);
+                if (close < 0) fail("bad group name");
+                name = src.slice(pos + 3, close);
+                openLen = close + 1 - pos;
+              } else fail("unsupported group syntax");
+            }
+            const node = { type: "group", kind, name, index: 0, start, openEnd: start + openLen, end: 0, body: null };
+            if (kind === "capture") {
+              node.index = ++capCount;
+              captures.push(node);
+            }
+            pos += openLen;
+            node.body = parseAlt();
+            if (src[pos] !== ")") fail("unclosed group");
+            pos++;
+            node.end = pos;
+            return node;
+          }
+          if (c === "[") return parseClass();
+          if (c === "\\") return parseEscape();
+          pos++;
+          if (c === "^" || c === "$") return { type: "assert", kind: c, start, end: pos };
+          if (c === ".") return { type: "set", kind: ".", start, end: pos };
+          if (c === "*" || c === "+" || c === "?") fail("nothing to repeat");
+          return { type: "char", ch: c, start, end: pos };
+        }
+
+        const root = parseAlt();
+        if (pos !== n) fail("unbalanced parenthesis");
+        const parents = new Map();
+        walk(root, (node, ps) => parents.set(node, ps));
+        return { root, captures, parents, src };
+      }
+
+      function walk(node, fn, parents) {
+        parents = parents || [];
+        fn(node, parents);
+        const next = parents.concat([node]);
+        if (node.type === "alt") node.alts.forEach((s) => walk(s, fn, next));
+        else if (node.type === "seq") node.items.forEach((it) => walk(it, fn, next));
+        else if (node.type === "group") walk(node.body, fn, next);
+        else if (node.type === "quant") walk(node.atom, fn, next);
+      }
+
+      function collect(info, pred) {
+        const out = [];
+        walk(info.root, (node, ps) => {
+          if (pred(node, ps)) out.push(node);
+        });
+        return out;
+      }
+
+      function applyEdits(src, edits) {
+        const sorted = edits.slice().sort((a, b) => a.start - b.start || b.end - b.start - (a.end - a.start));
+        const kept = [];
+        let lastEnd = -1;
+        for (const e of sorted) {
+          if (e.start < lastEnd) continue; // nested/overlapping edit: the outer one wins
+          kept.push(e);
+          lastEnd = Math.max(lastEnd, e.end);
+        }
+        let out = "";
+        let cur = 0;
+        for (const e of kept) {
+          out += src.slice(cur, e.start) + e.text;
+          cur = e.end;
+        }
+        return out + src.slice(cur);
+      }
+
+      function isEmptyAlt(alt) {
+        return alt.alts.every((s) => s.items.length === 0);
+      }
+
+      function classNeverMatches(node) {
+        if (!node.negated) return node.items.length === 0;
+        const esc = new Set(node.items.filter((x) => x.kind === "esc").map((x) => x.e));
+        if ((esc.has("d") && esc.has("D")) || (esc.has("w") && esc.has("W")) || (esc.has("s") && esc.has("S"))) return true;
+        return node.items.some((x) => x.kind === "range" && x.from <= "\u0000" && x.to >= "￿");
+      }
+
+      // Span to delete when removing a node (includes its quantifier, if any)
+      function removalSpan(info, node) {
+        const ps = info.parents.get(node);
+        const p = ps[ps.length - 1];
+        return p && p.type === "quant" ? { start: p.start, end: p.end } : { start: node.start, end: node.end };
+      }
+
+      // True when two nodes sit in different branches of the same alternation
+      function inDifferentBranches(pa, pb) {
+        for (let i = 0; i < pa.length - 1; i++) {
+          if (pa[i].type !== "alt") continue;
+          const j = pb.indexOf(pa[i]);
+          if (j >= 0 && j + 1 < pb.length && pb[j + 1] !== pa[i + 1]) return true;
+        }
+        return false;
+      }
+
+      function isLookaroundParent(p) {
+        return p.type === "group" && (p.kind === "la" || p.kind === "nla" || p.kind === "lb" || p.kind === "nlb");
+      }
+
+      function literalText(node) {
+        let s = "";
+        walk(node, (nd, ps) => {
+          if (nd.type === "char" && !ps.some(isLookaroundParent)) s += nd.ch;
+        });
+        return s;
+      }
+
+      function isSubsequence(a, b) {
+        let i = 0;
+        for (let j = 0; j < b.length && i < a.length; j++) if (a[i] === b[j]) i++;
+        return i === a.length;
+      }
+
+      const removeNode = (info) => (node) => [Object.assign(removalSpan(info, node), { text: "" })];
+      const neverNode = () => (node) => [{ start: node.start, end: node.end, text: NEVER }];
+
+      /* ---------- Room construct requirements: find meaningful instances + neutraliser ---------- */
+      const REQUIREMENTS = {
+        literal: {
+          find(info, req) {
+            const word = req.word.toLowerCase();
+            const out = [];
+            walk(info.root, (nd) => {
+              if (nd.type !== "seq") return;
+              const it = nd.items;
+              for (let i = 0; i + word.length <= it.length; i++) {
+                let ok = true;
+                for (let k = 0; k < word.length; k++) {
+                  const x = it[i + k];
+                  if (x.type !== "char" || x.ch.toLowerCase() !== word[k]) {
+                    ok = false;
+                    break;
+                  }
+                }
+                if (ok) out.push({ start: it[i].start, end: it[i + word.length - 1].end });
+              }
+            });
+            return out;
+          },
+          neutralize: () => (x) => [{ start: x.start, end: x.end, text: NEVER }]
+        },
+        digitClass: {
+          find: (info) => collect(info, (nd) => (nd.type === "set" && nd.kind === "d") || (nd.type === "class" && !nd.negated && nd.items.some((x) => (x.kind === "esc" && x.e === "d") || (x.kind === "range" && x.from <= "0" && x.to >= "9")))),
+          neutralize: neverNode
+        },
+        negatedClass: {
+          find: (info) => collect(info, (nd) => nd.type === "class" && nd.negated && nd.items.length > 0 && !classNeverMatches(nd)),
+          neutralize: neverNode
+        },
+        variableQuantifier: {
+          find: (info) => collect(info, (nd) => nd.type === "quant" && nd.max !== nd.min),
+          neutralize: () => (q) => [{ start: q.qStart, end: q.end, text: "{" + q.min + "}" }]
+        },
+        startAnchor: {
+          find: (info) => collect(info, (nd) => nd.type === "assert" && nd.kind === "^"),
+          neutralize: removeNode
+        },
+        endAnchor: {
+          find: (info) => collect(info, (nd) => nd.type === "assert" && nd.kind === "$"),
+          neutralize: removeNode
+        },
+        alternation: {
+          // every branch is separately proven necessary by the dead-branch check
+          find: (info) => collect(info, (nd) => nd.type === "alt" && nd.alts.filter((s) => s.items.length > 0).length >= 2),
+          neutralize: null
+        },
+        wordBoundary: {
+          find: (info) => collect(info, (nd) => nd.type === "assert" && nd.kind === "\\b"),
+          neutralize: removeNode
+        },
+        nonCapturingGroup: {
+          find: (info) =>
+            collect(info, (nd, ps) => {
+              if (nd.type !== "group" || nd.kind !== "noncap" || isEmptyAlt(nd.body)) return false;
+              const p = ps[ps.length - 1];
+              const quantified = p && p.type === "quant";
+              return quantified || nd.body.alts.filter((s) => s.items.length > 0).length >= 2;
+            }),
+          neutralize: () => (g) => [
+            { start: g.start, end: g.openEnd, text: "" },
+            { start: g.end - 1, end: g.end, text: "" }
+          ]
+        },
+        lookahead: {
+          find: (info) => collect(info, (nd) => nd.type === "group" && nd.kind === "la" && !isEmptyAlt(nd.body)),
+          neutralize: removeNode
+        },
+        negativeLookahead: {
+          find: (info) => collect(info, (nd) => nd.type === "group" && nd.kind === "nla" && !isEmptyAlt(nd.body)),
+          neutralize: removeNode
+        },
+        lookbehind: {
+          find: (info) => collect(info, (nd) => nd.type === "group" && nd.kind === "lb" && !isEmptyAlt(nd.body)),
+          neutralize: removeNode
+        },
+        backreference: {
+          find(info) {
+            const out = [];
+            walk(info.root, (nd, ps) => {
+              if (nd.type !== "backref") return;
+              const g = typeof nd.ref === "number" ? info.captures[nd.ref - 1] : info.captures.find((c) => c.name === nd.ref);
+              if (!g || isEmptyAlt(g.body)) return; // must refer to an existing, non-empty group
+              if (ps.indexOf(g) >= 0) return; // not from inside the group itself
+              if (g.end > nd.start) return; // group must come first
+              if (inDifferentBranches(info.parents.get(g), ps)) return; // same branch only
+              out.push({ node: nd, group: g });
+            });
+            return out;
+          },
+          // Replace \1 with a copy of the group's pattern: "same kind of text" instead of "the same text"
+          neutralize: (info) => (x) => {
+            const g = x.group;
+            const inner = info.captures.filter((c) => c.start >= g.body.start && c.end <= g.body.end).map((c) => ({ start: c.start - g.body.start, end: c.openEnd - g.body.start, text: "(?:" }));
+            const body = applyEdits(info.src.slice(g.body.start, g.body.end), inner);
+            return [{ start: x.node.start, end: x.node.end, text: "(?:" + body + ")" }];
+          }
+        },
+        rangeClass: {
+          find: (info) => collect(info, (nd) => nd.type === "class" && !nd.negated && nd.items.some((x) => x.kind === "range")),
+          neutralize: neverNode
+        },
+        braceQuantifier: {
+          find: (info) => collect(info, (nd) => nd.type === "quant" && nd.brace && nd.max >= 2),
+          neutralize: null
+        }
+      };
+
+      function buildStrings(room) {
+        const norm = (t) => (typeof t === "string" ? { text: t, expect: null } : { text: t.text, expect: t.match });
+        const out = [];
+        room.targets.forEach((t) => out.push(Object.assign(norm(t), { role: "target", hidden: false })));
+        room.decoys.forEach((d) => out.push({ text: d, expect: null, role: "decoy", hidden: false }));
+        (room.hiddenTargets || []).forEach((t) => out.push(Object.assign(norm(t), { role: "target", hidden: true })));
+        (room.hiddenDecoys || []).forEach((d) => out.push({ text: d, expect: null, role: "decoy", hidden: true }));
+        return out;
+      }
+
+      function shorten(s) {
+        return s.length > 28 ? s.slice(0, 27) + "…" : s;
+      }
+
+      /* Static analysis: syntax, structure, construct presence. Produces variant
+       patterns that the matcher runs to prove the construct is load-bearing and
+       that no alternation branch is filler. */
+      function analyzePattern(room, pattern, flags) {
+        const res = { strings: buildStrings(room), compileError: null, issue: null, variants: [] };
+        if (!pattern) return res;
+        try {
+          new RegExp(pattern, flags);
+        } catch (e) {
+          res.compileError = e.message;
+          return res;
+        }
+        let info;
+        try {
+          info = parseRegex(pattern);
+        } catch (e) {
+          res.issue = "This lock can't read that syntax (" + e.message + "). Stick to standard regex features.";
+          return res;
+        }
+
+        // 1. Structural junk anywhere in the pattern
+        let issue = null;
+        walk(info.root, (nd) => {
+          if (issue) return;
+          const txt = shorten(pattern.slice(nd.start, nd.end));
+          if (nd.type === "group" && isEmptyAlt(nd.body)) {
+            issue = 'Empty group "' + txt + '" does nothing. Groups and lookarounds must contain a real pattern.';
+          } else if (nd.type === "class" && classNeverMatches(nd)) {
+            issue = '"' + txt + '" can never match anything. Dummy branches are not allowed.';
+          } else if (room.forbidCapture && nd.type === "group" && nd.kind === "capture") {
+            issue = "Capturing groups are not allowed in this chamber. Use a non-capturing group (?:...).";
+          }
+        });
+        if (issue) {
+          res.issue = issue;
+          return res;
+        }
+
+        // 2. Required construct present in a meaningful form
+        for (const req of room.requires) {
+          const h = REQUIREMENTS[req.kind];
+          const inst = h.find(info, req);
+          if (!inst.length) {
+            res.issue = "This lock only opens for a pattern that genuinely uses " + room.constructName + ".";
+            return res;
+          }
+          if (h.neutralize) {
+            const fn = h.neutralize(info);
+            const edits = [];
+            inst.forEach((x) => fn(x).forEach((e) => edits.push(e)));
+            res.variants.push({ type: "req", label: req.label, pattern: applyEdits(pattern, edits) });
+          }
+        }
+
+        // 3. No alternation that lists targets (or near-copies of them)
+        const targetTexts = res.strings.filter((s) => s.role === "target").map((s) => s.text.toLowerCase());
+        const alts = collect(info, (nd) => nd.type === "alt" && nd.alts.length >= 2);
+        for (const alt of alts) {
+          for (const seq of alt.alts) {
+            const lit = literalText(seq).toLowerCase();
+            if (lit.length < 3) continue;
+            if (targetTexts.some((t) => lit.length >= t.length - 2 && isSubsequence(lit, t))) {
+              res.issue = 'Shortcut rejected: "' + shorten(pattern.slice(seq.start, seq.end)) + "\" just copies a target. Describe the pattern with the room's concept instead of listing strings.";
+              res.variants = [];
+              return res;
+            }
+          }
+        }
+
+        // 4. Every alternation branch must change at least one result (no dummy/never-matching branches)
+        for (const alt of alts) {
+          for (const seq of alt.alts) {
+            const caps = info.captures.filter((c) => c.start >= seq.start && c.end <= seq.end);
+            const placeholders = caps.map((c) => (c.name ? "(?<" + c.name + ">)" : "()")).join("");
+            res.variants.push({
+              type: "dead",
+              label: shorten(pattern.slice(seq.start, seq.end)) || "(empty)",
+              pattern: applyEdits(pattern, [{ start: seq.start, end: seq.end, text: NEVER + placeholders }])
+            });
+          }
+        }
+        return res;
+      }
+
+      /* Matcher. Self-contained (no outer references): its source is also
+       shipped into the Web Worker via Function.prototype.toString(). */
+      function runJob(job) {
+        var MAX_RANGES = 200;
+        function run(src, flags, texts, wantRanges) {
+          var re, reG;
+          try {
+            re = new RegExp(src, flags.replace(/g/g, ""));
+            reG = wantRanges ? new RegExp(src, re.flags + "g") : null;
+          } catch (e) {
+            return null;
+          }
+          return texts.map(function (t) {
+            var m = re.exec(t);
+            var out = { first: m ? m[0] : null, ranges: [] };
+            if (wantRanges && m) {
+              reG.lastIndex = 0;
+              var mm,
+                guard = 0;
+              while ((mm = reG.exec(t)) !== null && guard++ < MAX_RANGES) {
+                if (mm[0].length === 0) {
+                  reG.lastIndex++;
+                  continue;
+                }
+                out.ranges.push([mm.index, mm.index + mm[0].length]);
+              }
+            }
+            return out;
+          });
+        }
+        var main = run(job.pattern, job.flags, job.texts, true);
+        var variants = job.variants.map(function (v) {
+          var r = run(v, job.flags, job.texts, false);
+          return r
+            ? r.map(function (x) {
+                return x.first;
+              })
+            : null;
+        });
+        return { main: main, variants: variants };
+      }
+
+      function outcomeOk(s, first) {
+        if (s.role === "decoy") return first === null;
+        return s.expect !== null ? first === s.expect : first !== null;
+      }
+
+      function judge(room, analysis, result) {
+        const strings = analysis.strings;
+        const expectMode = strings.some((s) => s.expect !== null);
+        const sig = (first) => (expectMode ? (first === null ? "\u0000" : "=" + first) : first === null ? "0" : "1");
+        const firsts = result.main.map((r) => r.first);
+        const okv = strings.map((s, i) => outcomeOk(s, firsts[i]));
+        const visibleOk = strings.every((s, i) => s.hidden || okv[i]);
+        const hiddenFails = strings.filter((s, i) => s.hidden && !okv[i]).length;
+        let notice = analysis.issue;
+        let unlocked = false;
+        if (!notice && visibleOk) {
+          if (hiddenFails) {
+            notice = "Every visible string passes, but " + hiddenFails + " hidden test" + (hiddenFails > 1 ? "s" : "") + " fail" + (hiddenFails > 1 ? "" : "s") + ". Your pattern is fitted to these examples; generalise it.";
+          } else {
+            const mainSig = firsts.map(sig).join("\u0001");
+            for (let k = 0; k < analysis.variants.length && !notice; k++) {
+              const v = analysis.variants[k];
+              const vf = result.variants[k];
+              if (v.type === "req") {
+                if (vf === null || strings.every((s, i) => outcomeOk(s, vf[i]))) {
+                  notice = "Your " + v.label + " isn't doing any work: the pattern still passes every test without it. Make the concept essential.";
+                }
+              } else if (vf === null || vf.map(sig).join("\u0001") === mainSig) {
+                notice = 'The alternative "' + v.label + '" never changes a single result. Filler or dummy branches are not allowed.';
+              }
+            }
+            if (!notice) unlocked = true;
+          }
+        }
+        return { unlocked, notice, okv, visibleOk, hiddenFails };
+      }
+
+      // Synchronous helper (used by tests; the page runs runJob in a worker instead)
+      function evaluateSync(room, pattern, flags) {
+        const a = analyzePattern(room, pattern, flags);
+        if (!pattern || a.compileError) return { unlocked: false, notice: a.compileError };
+        const r = runJob({ pattern, flags, texts: a.strings.map((s) => s.text), variants: a.variants.map((v) => v.pattern) });
+        return judge(room, a, r);
+      }
+      /* @@CORE-END@@ */
+
+      /* =====================================================================
+       Audio (one shared AudioContext, created/resumed on a user gesture)
+       ===================================================================== */
+      let audioCtx = null;
+      let soundEnabled = true;
+
+      function getAudioContext() {
+        if (!soundEnabled) return null;
+        try {
+          if (!audioCtx) {
+            const Ctx = window.AudioContext || window.webkitAudioContext;
+            if (!Ctx) return null;
+            audioCtx = new Ctx();
+          }
+          if (audioCtx.state === "suspended") audioCtx.resume();
+          return audioCtx;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function unlockAudioOnGesture() {
+        if (soundEnabled) getAudioContext();
+      }
+      document.addEventListener("pointerdown", unlockAudioOnGesture, { once: true, capture: true });
+      document.addEventListener("keydown", unlockAudioOnGesture, { once: true, capture: true });
+
+      function playTone(freq, type, duration, gainVal) {
+        const ctx = getAudioContext();
+        if (!ctx) return;
+        try {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, ctx.currentTime);
+          gain.gain.setValueAtTime(gainVal || 0.1, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + duration);
+        } catch (e) {}
+      }
+
+      function playUnlockSound() {
+        playTone(523.25, "triangle", 0.12, 0.15);
+        setTimeout(() => playTone(659.25, "triangle", 0.15, 0.15), 100);
+        setTimeout(() => playTone(783.99, "triangle", 0.25, 0.2), 200);
+      }
+
+      function playBuzz() {
+        playTone(180, "sawtooth", 0.15, 0.08);
+      }
+
+      function playWinSound() {
+        [440, 554.37, 659.25, 880].forEach((f, i) => setTimeout(() => playTone(f, "sine", 0.3, 0.15), i * 120));
+      }
+
+      /* =====================================================================
+       Utilities
+       ===================================================================== */
+      function formatTime(total) {
+        const s = Math.max(0, Math.floor(Number(total) || 0));
+        return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+      }
+
+      function el(tag, className, text) {
+        const node = document.createElement(tag);
+        if (className) node.className = className;
+        if (text !== undefined) node.textContent = text;
+        return node;
+      }
+
+      /* =====================================================================
+       State & DOM
+       ===================================================================== */
+      let currentRoomIndex = 0;
+      let roomSeconds = 0;
+      let totalSeconds = 0;
+      let hintsUsed = 0;
+      let hintsRevealedInRoom = 0;
+      let timerInterval = null;
+      let activeFlags = new Set();
+      let currentDoorUnlocked = false;
+      let debounceTimer = null;
+      let roomStrings = [];
+      let visibleRows = [];
+      let runSaved = false;
+
+      const $ = (id) => document.getElementById(id);
+      const statRoom = $("stat-room");
+      const statTimer = $("stat-timer");
+      const roomTitle = $("room-title");
+      const roomConcept = $("room-concept");
+      const roomDesc = $("room-desc");
+      const conceptExplanation = $("concept-explanation");
+      const conceptRules = $("concept-rules");
+      const regexInput = $("regex-input");
+      const regexNotice = $("regex-notice");
+      const doorIndicator = $("door-indicator");
+      const doorIcon = $("door-icon");
+      const doorStatus = $("door-status");
+      const targetsCounter = $("targets-counter");
+      const decoysCounter = $("decoys-counter");
+      const targetsList = $("targets-list");
+      const decoysList = $("decoys-list");
+      const btnUnlock = $("btn-unlock");
+      const btnHint = $("btn-hint");
+      const hintCard = $("hint-card");
+      const hintText = $("hint-text");
+      const btnResetRoom = $("btn-reset-room");
+      const flagButtons = document.querySelectorAll(".flag-toggle");
+      const victoryModal = $("victory-modal");
+      const modalTitle = $("modal-title");
+      const modalDesc = $("modal-desc");
+      const modalTime = $("modal-time");
+      const modalTotalTime = $("modal-total-time");
+      const modalHidden = $("modal-hidden");
+      const nameRow = $("name-row");
+      const runnerName = $("runner-name");
+      const btnSaveRun = $("btn-save-run");
+      const btnNextRoom = $("btn-next-room");
+      const saveStatus = $("save-status");
+      const themeToggle = $("theme-toggle");
+      const btnSound = $("btn-sound");
+      const btnLeaderboardToggle = $("btn-leaderboard-toggle");
+      const leaderboardDrawer = $("leaderboard-drawer");
+      const leaderboardBody = $("leaderboard-body");
+      const btnClearLeaderboard = $("btn-clear-leaderboard");
+
+      /* =====================================================================
+       Theme
+       ===================================================================== */
+      function syncThemeButton() {
+        const light = document.documentElement.getAttribute("data-theme") === "light";
+        themeToggle.textContent = light ? "🌙" : "☀️";
+        themeToggle.title = light ? "Switch to dark theme" : "Switch to light theme";
+        themeToggle.setAttribute("aria-label", themeToggle.title);
+      }
+
+      themeToggle.addEventListener("click", () => {
+        const next = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";
+        document.documentElement.setAttribute("data-theme", next);
+        try {
+          localStorage.setItem("regex_escape_theme", next);
+        } catch (e) {}
+        syncThemeButton();
+      });
+      syncThemeButton();
+
+      btnSound.addEventListener("click", () => {
+        soundEnabled = !soundEnabled;
+        btnSound.textContent = soundEnabled ? "🔊" : "🔇";
+        btnSound.title = soundEnabled ? "Mute sound" : "Unmute sound";
+        btnSound.setAttribute("aria-label", btnSound.title);
+        if (soundEnabled) getAudioContext();
+      });
+
+      /* =====================================================================
+       Timer (paused while a popup is open)
+       ===================================================================== */
+      function startTimer() {
+        stopTimer();
+        timerInterval = setInterval(() => {
+          totalSeconds++;
+          roomSeconds++;
+          statTimer.textContent = formatTime(totalSeconds);
+        }, 1000);
+      }
+
+      function stopTimer() {
+        if (timerInterval) {
+          clearInterval(timerInterval);
+          timerInterval = null;
+        }
+      }
+
+      /* =====================================================================
+       Matcher worker (ReDoS guard): runs every match in an inline Blob worker
+       with a hard timeout; a runaway pattern gets the worker terminated.
+       ===================================================================== */
+      const MATCH_TIMEOUT_MS = 250;
+      const WORKER_SRC = '"use strict";\n' + runJob.toString() + "\nself.onmessage = function (e) { var out; try { out = { id: e.data.id, ok: true, result: runJob(e.data.job) }; } catch (err) { out = { id: e.data.id, ok: false, error: String((err && err.message) || err) }; } self.postMessage(out); };";
+      let workerUrl = null;
+      let worker = null;
+      let jobSeq = 0;
+      let inflight = null; // { id, timer, onDone }
+
+      function createWorker() {
+        try {
+          if (!workerUrl) workerUrl = URL.createObjectURL(new Blob([WORKER_SRC], { type: "text/javascript" }));
+          worker = new Worker(workerUrl);
+          worker.onmessage = (e) => {
+            const msg = e.data;
+            if (!inflight || msg.id !== inflight.id) return;
+            const job = inflight;
+            clearTimeout(job.timer);
+            inflight = null;
+            job.onDone(msg.ok ? msg.result : null, msg.ok ? null : msg.error);
+          };
+          worker.onerror = (ev) => {
+            ev.preventDefault();
+            if (!inflight) return;
+            const job = inflight;
+            clearTimeout(job.timer);
+            inflight = null;
+            resetWorker();
+            job.onDone(null, "matcher error");
+          };
+        } catch (e) {
+          worker = null;
+        }
+      }
+
+      function resetWorker() {
+        if (worker) worker.terminate();
+        worker = null;
+        createWorker();
+      }
+
+      function cancelInflight() {
+        if (!inflight) return;
+        clearTimeout(inflight.timer);
+        inflight = null;
+        resetWorker(); // the busy worker may be stuck on a slow pattern
+      }
+
+      function runInWorker(job, onDone, onTimeout) {
+        cancelInflight();
+        if (!worker) createWorker();
+        if (!worker) {
+          // Workers unavailable (very old browser): fall back to the main thread
+          let result = null,
+            err = null;
+          try {
+            result = runJob(job);
+          } catch (e) {
+            err = String(e.message || e);
+          }
+          onDone(result, err);
+          return;
+        }
+        const id = ++jobSeq;
+        inflight = {
+          id,
+          onDone,
+          timer: setTimeout(() => {
+            if (!inflight || inflight.id !== id) return;
+            inflight = null;
+            resetWorker();
+            onTimeout();
+          }, MATCH_TIMEOUT_MS)
+        };
+        worker.postMessage({ id, job });
+      }
+
+      /* =====================================================================
+       Chamber loading & rendering
+       ===================================================================== */
+      function setNotice(text, level) {
+        regexNotice.textContent = text || "";
+        regexNotice.className = "regex-notice" + (text && level ? " " + level : "");
+      }
+
+      function setDoor(unlocked) {
+        const changed = unlocked !== currentDoorUnlocked;
+        currentDoorUnlocked = unlocked;
+        doorIndicator.className = "door-indicator " + (unlocked ? "unlocked" : "locked");
+        doorIcon.textContent = unlocked ? "🔓" : "🔒";
+        doorStatus.textContent = unlocked ? "UNLOCKED" : "LOCKED";
+        btnUnlock.disabled = !unlocked;
+        if (changed && unlocked) playUnlockSound();
+      }
+
+      function syncFlagButtons() {
+        flagButtons.forEach((btn) => {
+          const on = activeFlags.has(btn.dataset.flag);
+          btn.classList.toggle("active", on);
+          btn.setAttribute("aria-pressed", on ? "true" : "false");
+        });
+      }
+
+      function resetHintUI() {
+        hintCard.hidden = true;
+        hintText.textContent = "";
+        btnHint.disabled = false;
+        btnHint.textContent = "🔍 Hint (+15s)";
+      }
+
+      function loadChamber(index) {
+        if (index < 0 || index >= CHAMBERS.length) index = 0;
+        cancelInflight();
+        clearTimeout(debounceTimer);
+        currentRoomIndex = index;
+        roomSeconds = 0;
+        hintsRevealedInRoom = 0;
+        currentDoorUnlocked = false;
+
+        const room = CHAMBERS[index];
+        statRoom.textContent = index + 1 + " / " + CHAMBERS.length;
+        statTimer.textContent = formatTime(totalSeconds);
+        roomTitle.textContent = "Chamber " + (index + 1) + ": " + room.title;
+        roomConcept.textContent = room.concept;
+        roomDesc.textContent = room.description;
+        conceptExplanation.innerHTML = room.explanation; // static, author-controlled markup only
+        const hiddenCount = (room.hiddenTargets || []).length + (room.hiddenDecoys || []).length;
+        conceptRules.textContent = "The lock also runs " + hiddenCount + " hidden test strings, rejects patterns that just list the targets, " + "and checks that " + room.constructName + " actually does the work.";
+
+        regexInput.value = "";
+        setNotice("", null);
+        activeFlags = new Set(room.defaultFlags ? room.defaultFlags.split("") : []);
+        syncFlagButtons();
+        resetHintUI();
+        setDoor(false);
+        renderStringsList(room);
+        regexInput.focus();
+      }
+
+      function buildRow(s) {
+        const li = el("li", "string-item");
+        const main = el("div", "string-main");
+        const text = el("span", "string-text", s.text);
+        main.appendChild(text);
+        if (s.expect !== null) main.appendChild(el("span", "string-expect", "must match exactly: " + s.expect));
+        const badge = el("span", "string-badge", s.role === "target" ? "PENDING" : "CLEAR");
+        li.appendChild(main);
+        li.appendChild(badge);
+        return { li, text, badge, s };
+      }
+
+      function renderStringsList(room) {
+        roomStrings = buildStrings(room);
+        visibleRows = [];
+        targetsList.replaceChildren();
+        decoysList.replaceChildren();
+        roomStrings.forEach((s) => {
+          if (s.hidden) {
+            visibleRows.push(null);
+            return;
+          }
+          const row = buildRow(s);
+          visibleRows.push(row);
+          (s.role === "target" ? targetsList : decoysList).appendChild(row.li);
+        });
+        resetRows();
+      }
+
+      function resetRows() {
+        let t = 0,
+          d = 0;
+        visibleRows.forEach((row) => {
+          if (!row) return;
+          row.li.className = "string-item";
+          row.text.textContent = row.s.text;
+          row.badge.textContent = row.s.role === "target" ? "PENDING" : "CLEAR";
+          if (row.s.role === "target") t++;
+          else d++;
+        });
+        targetsCounter.textContent = "0 / " + t;
+        decoysCounter.textContent = "0 / " + d;
+      }
+
+      // Highlight on the RAW text; every segment is inserted as a text node
+      function fillHighlighted(span, text, ranges) {
+        span.replaceChildren();
+        let last = 0;
+        ranges.forEach(([a, b]) => {
+          if (a > last) span.appendChild(document.createTextNode(text.slice(last, a)));
+          span.appendChild(el("mark", null, text.slice(a, b)));
+          last = b;
+        });
+        if (last < text.length) span.appendChild(document.createTextNode(text.slice(last)));
+      }
+
+      function renderResult(result, verdict) {
+        let tOk = 0,
+          tTotal = 0,
+          dHit = 0,
+          dTotal = 0;
+        visibleRows.forEach((row, i) => {
+          if (!row) return;
+          const r = result.main[i];
+          const matched = r.first !== null;
+          const ok = verdict.okv[i];
+          if (matched) fillHighlighted(row.text, row.s.text, r.ranges);
+          else row.text.textContent = row.s.text;
+          if (row.s.role === "target") {
+            tTotal++;
+            if (ok) tOk++;
+            row.li.className = "string-item" + (ok ? " success" : matched ? " failure" : "");
+            row.badge.textContent = ok ? "MATCHED" : matched ? "WRONG MATCH" : "MISSED";
+          } else {
+            dTotal++;
+            if (matched) dHit++;
+            row.li.className = "string-item" + (matched ? " failure" : "");
+            row.badge.textContent = matched ? "TRIGGERED!" : "SAFE";
+          }
+        });
+        targetsCounter.textContent = tOk + " / " + tTotal;
+        decoysCounter.textContent = dHit + " / " + dTotal;
+      }
+
+      /* =====================================================================
+       Evaluation pipeline: debounce -> static analysis -> worker -> verdict
+       ===================================================================== */
+      function scheduleEvaluate() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(evaluateNow, 150);
+      }
+
+      function evaluateNow() {
+        clearTimeout(debounceTimer);
+        const room = CHAMBERS[currentRoomIndex];
+        const roomIdx = currentRoomIndex;
+        const pattern = regexInput.value;
+        const flags = Array.from(activeFlags).sort().join("");
+        cancelInflight();
+
+        if (!pattern) {
+          setNotice("", null);
+          setDoor(false);
+          resetRows();
+          return;
+        }
+        const analysis = analyzePattern(room, pattern, flags);
+        if (analysis.compileError) {
+          setNotice("Syntax error: " + analysis.compileError, "error");
+          setDoor(false);
+          resetRows();
+          return;
+        }
+        setNotice("Testing…", null);
+        const job = {
+          pattern,
+          flags,
+          texts: analysis.strings.map((s) => s.text),
+          variants: analysis.variants.map((v) => v.pattern)
+        };
+        runInWorker(
+          job,
+          (result, err) => {
+            if (roomIdx !== currentRoomIndex || regexInput.value !== pattern) return;
+            if (!result || !result.main) {
+              setNotice("Could not run that pattern" + (err ? ": " + err : "."), "error");
+              setDoor(false);
+              resetRows();
+              return;
+            }
+            const verdict = judge(room, analysis, result);
+            renderResult(result, verdict);
+            if (verdict.unlocked) setNotice("All visible and hidden tests pass. The door is open!", "ok");
+            else setNotice(verdict.notice || "", verdict.notice ? "warn" : null);
+            setDoor(verdict.unlocked);
+          },
+          () => {
+            if (roomIdx !== currentRoomIndex) return;
+            setNotice("Pattern too slow (catastrophic backtracking): matching was stopped after " + MATCH_TIMEOUT_MS + " ms. Simplify nested quantifiers like (a+)+ or (.*)*.", "error");
+            setDoor(false);
+            resetRows();
+            playBuzz();
+          }
+        );
+      }
+
+      regexInput.addEventListener("input", scheduleEvaluate);
+
+      flagButtons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const f = btn.dataset.flag;
+          if (activeFlags.has(f)) activeFlags.delete(f);
+          else activeFlags.add(f);
+          syncFlagButtons();
+          scheduleEvaluate();
+        });
+      });
+
+      /* =====================================================================
+       Progressive hints: one character of the solution per click, +15 s each
+       ===================================================================== */
+      btnHint.addEventListener("click", () => {
+        const room = CHAMBERS[currentRoomIndex];
+        if (hintsRevealedInRoom >= room.solution.length) return;
+        hintsUsed++;
+        hintsRevealedInRoom++;
+        roomSeconds += 15;
+        totalSeconds += 15;
+        statTimer.textContent = formatTime(totalSeconds);
+
+        const partial = room.solution.slice(0, hintsRevealedInRoom);
+        hintCard.hidden = false;
+        hintText.replaceChildren(document.createTextNode("Solution so far: "), el("code", "hint-code", partial), document.createTextNode(" (" + hintsRevealedInRoom + " of " + room.solution.length + " characters) "), el("span", "penalty", "+15s penalty"));
+        if (hintsRevealedInRoom >= room.solution.length) {
+          btnHint.disabled = true;
+          btnHint.textContent = "Solution fully revealed";
+        } else {
+          btnHint.textContent = "🔍 Next character (+15s)";
+        }
+        playBuzz();
+      });
+
+      btnResetRoom.addEventListener("click", () => {
+        regexInput.value = "";
+        evaluateNow();
+        regexInput.focus();
+      });
+
+      /* =====================================================================
+       Clearing a chamber / finishing the run
+       ===================================================================== */
+      function isFinalRoom() {
+        return currentRoomIndex + 1 >= CHAMBERS.length;
+      }
+
+      function renderHiddenList(room) {
+        modalHidden.replaceChildren();
+        const hidden = buildStrings(room).filter((s) => s.hidden);
+        if (!hidden.length) return;
+        modalHidden.appendChild(el("div", null, "Hidden tests your pattern also passed:"));
+        const ul = el("ul");
+        hidden.forEach((s) => ul.appendChild(el("li", null, (s.role === "target" ? "✓ " : "✗ ") + s.text)));
+        modalHidden.appendChild(ul);
+      }
+
+      btnUnlock.addEventListener("click", () => {
+        if (!currentDoorUnlocked) return;
+        stopTimer();
+        const room = CHAMBERS[currentRoomIndex];
+        modalTime.textContent = formatTime(roomSeconds);
+        modalTotalTime.textContent = formatTime(totalSeconds);
+        renderHiddenList(room);
+        saveStatus.textContent = "";
+
+        if (isFinalRoom()) {
+          modalTitle.textContent = "Escape Room Conquered!";
+          modalDesc.textContent = "You cracked all " + CHAMBERS.length + " chambers in " + formatTime(totalSeconds) + " using " + hintsUsed + " hint character" + (hintsUsed === 1 ? "" : "s") + ".";
+          nameRow.hidden = false;
+          btnSaveRun.hidden = false;
+          btnSaveRun.disabled = runSaved;
+          btnNextRoom.textContent = "Play Again ↺";
+          playWinSound();
+        } else {
+          modalTitle.textContent = room.title + " cleared!";
+          modalDesc.textContent = "Vault door open. The timer is paused while this message is shown.";
+          nameRow.hidden = true;
+          btnSaveRun.hidden = true;
+          btnNextRoom.textContent = "Proceed to Next Chamber ➔";
+        }
+        victoryModal.classList.add("active");
+        (isFinalRoom() ? runnerName : btnNextRoom).focus();
+      });
+
+      btnSaveRun.addEventListener("click", () => {
+        if (runSaved) return;
+        const ok = saveRun(runnerName.value, totalSeconds, hintsUsed);
+        if (ok) {
+          runSaved = true;
+          btnSaveRun.disabled = true;
+          saveStatus.textContent = "Run saved to the leaderboard.";
+        } else {
+          saveStatus.textContent = "Could not save (storage unavailable).";
+        }
+      });
+
+      btnNextRoom.addEventListener("click", () => {
+        victoryModal.classList.remove("active");
+        if (isFinalRoom()) {
+          totalSeconds = 0;
+          hintsUsed = 0;
+          runSaved = false;
+          runnerName.value = "";
+          loadChamber(0);
+        } else {
+          loadChamber(currentRoomIndex + 1);
+        }
+        startTimer();
+      });
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && victoryModal.classList.contains("active") && !isFinalRoom()) {
+          btnNextRoom.click();
+        }
+      });
+
+      /* =====================================================================
+       Leaderboard (fastest escape time first; saved only on explicit click)
+       ===================================================================== */
+      const LB_KEY = "regex_escape_leaderboard";
+
+      function loadRecords() {
+        let raw;
+        try {
+          raw = JSON.parse(localStorage.getItem(LB_KEY) || "[]");
+        } catch (e) {
+          return [];
+        }
+        if (!Array.isArray(raw)) return [];
+        return raw
+          .filter((r) => r && typeof r === "object" && typeof r.timeSecs === "number" && Number.isFinite(r.timeSecs) && r.timeSecs >= 0)
+          .map((r) => ({
+            name: typeof r.name === "string" && r.name.trim() ? r.name.trim().slice(0, 20) : "Anonymous",
+            timeSecs: Math.floor(r.timeSecs),
+            hints: Number.isFinite(r.hints) && r.hints >= 0 ? Math.floor(r.hints) : 0,
+            ts: Number.isFinite(r.ts) ? r.ts : null
+          }))
+          .sort((a, b) => a.timeSecs - b.timeSecs || a.hints - b.hints)
+          .slice(0, 10);
+      }
+
+      function saveRun(name, timeSecs, hints) {
+        try {
+          const records = loadRecords();
+          records.push({
+            name:
+              String(name || "")
+                .trim()
+                .slice(0, 20) || "Anonymous",
+            timeSecs: Math.floor(timeSecs),
+            hints: hints,
+            ts: Date.now()
+          });
+          records.sort((a, b) => a.timeSecs - b.timeSecs || a.hints - b.hints);
+          localStorage.setItem(LB_KEY, JSON.stringify(records.slice(0, 10)));
+          renderLeaderboard();
+          return true;
+        } catch (e) {
+          return false;
+        }
+      }
+
+      function renderLeaderboard() {
+        leaderboardBody.replaceChildren();
+        let records = [];
+        let storageOk = true;
+        try {
+          localStorage.getItem(LB_KEY);
+          records = loadRecords();
+        } catch (e) {
+          storageOk = false;
+        }
+        if (!records.length) {
+          const tr = el("tr");
+          const td = el("td", "empty", storageOk ? "No escape records yet. Clear all " + CHAMBERS.length + " chambers and save your run!" : "Storage is unavailable in this browser.");
+          td.colSpan = 5;
+          tr.appendChild(td);
+          leaderboardBody.appendChild(tr);
+          return;
+        }
+        records.forEach((r, i) => {
+          const tr = el("tr");
+          tr.appendChild(el("td", null, "#" + (i + 1)));
+          tr.appendChild(el("td", null, r.name));
+          tr.appendChild(el("td", "lb-time", formatTime(r.timeSecs)));
+          tr.appendChild(el("td", null, String(r.hints)));
+          tr.appendChild(el("td", null, r.ts ? new Date(r.ts).toLocaleDateString() : "—"));
+          leaderboardBody.appendChild(tr);
+        });
+      }
+
+      btnLeaderboardToggle.addEventListener("click", () => {
+        leaderboardDrawer.hidden = !leaderboardDrawer.hidden;
+        btnLeaderboardToggle.setAttribute("aria-expanded", leaderboardDrawer.hidden ? "false" : "true");
+        if (!leaderboardDrawer.hidden) renderLeaderboard();
+      });
+
+      // Inline two-click confirmation for clearing records
+      let clearArmed = false;
+      let clearTimer = null;
+      function disarmClear() {
+        clearArmed = false;
+        clearTimeout(clearTimer);
+        btnClearLeaderboard.textContent = "Clear Records";
+        btnClearLeaderboard.classList.remove("btn-danger-armed");
+      }
+      btnClearLeaderboard.addEventListener("click", () => {
+        if (!clearArmed) {
+          clearArmed = true;
+          btnClearLeaderboard.textContent = "Click again to confirm";
+          btnClearLeaderboard.classList.add("btn-danger-armed");
+          clearTimer = setTimeout(disarmClear, 4000);
+          return;
+        }
+        disarmClear();
+        try {
+          localStorage.removeItem(LB_KEY);
+        } catch (e) {}
+        renderLeaderboard();
+      });
+      btnClearLeaderboard.addEventListener("blur", disarmClear);
+
+      /* Init */
+      renderLeaderboard();
+      loadChamber(0);
+      startTimer();
+    </script>
+  </body>
+</html>
