@@ -607,6 +607,20 @@
       display: block;
     }
 
+    .explainer-diagram {
+      margin: 0.85rem 0;
+      padding: 0.85rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      overflow-x: auto;
+      white-space: pre;
+      line-height: 1.45;
+      color: var(--cyan);
+    }
+
     @keyframes fadeIn {
       from {
         opacity: 0;
@@ -899,7 +913,7 @@
           <span id="audioIcon">🔊</span>
         </button>
         <button class="icon-btn" id="themeToggleBtn" aria-label="Toggle Dark / Light Theme" title="Toggle theme">
-          <span id="themeIcon">🌓</span>
+          <span id="themeIcon">☀️</span>
         </button>
         <button class="icon-btn" id="resetBtn" aria-label="Reset Quiz Progress" title="Reset progress">
           <span>↺</span>
@@ -1012,6 +1026,7 @@
       <div class="explainer-card" id="explainerCard" role="region" aria-label="Regex Engine Deep Dive">
         <span class="explainer-badge">Regex Engine Mechanics</span>
         <h3 class="explainer-title" id="explainerTitle">Engine Diagnostic</h3>
+        <div class="explainer-diagram" id="explainerDiagram" style="display:none;"></div>
         <div class="explainer-body" id="explainerBody"></div>
       </div>
 
@@ -1160,14 +1175,15 @@
           desc: 'Given the test HTML string, what is the extracted value of captured Group 1 (<code>match[1]</code>) using the <strong>lazy quantifier</strong> <code>.*?</code>?',
           options: [
             '<code>"Alpha"</code>',
-            '<code>"Alpha</div><div>Beta</div><div>Gamma"</code>',
-            '<code>"<div>Alpha</div>"</code>',
+            '<code>"Alpha&lt;/div&gt;&lt;div&gt;Beta&lt;/div&gt;&lt;div&gt;Gamma"</code>',
+            '<code>"&lt;div&gt;Alpha&lt;/div&gt;"</code>',
             '<code>"Gamma"</code>'
           ],
           correct: 0,
           hint: 'The question mark after an asterisk (*?) makes it lazy: it matches as few characters as possible until the nearest closing tag.',
           explainer: {
             title: 'Greedy Consumption vs Lazy Minimal Matching',
+            diagram: 'Greedy .*  : <div>Alpha</div><div>Beta</div><div>Gamma</div>\n             [======================================] matches all, backtracks to last </div>\n\nLazy   .*? : <div>Alpha</div><div>Beta</div><div>Gamma</div>\n             [======] stops at FIRST </div> encountered!',
             body: 'A standard greedy quantifier like <code>.*</code> consumes the entire rest of the string first, then backtracks until it hits the <em>last</em> <code>&lt;/div&gt;</code> (matching everything up to Gamma). The lazy quantifier <code>.*?</code> expands one character at a time and stops at the <em>first</em> matching delimiter (matching only Alpha).'
           }
         },
@@ -1181,38 +1197,40 @@
           title: 'Positive Lookahead Zero-Width Assertions',
           desc: 'Lookaheads are <strong>zero-width assertions</strong> that test upcoming characters without consuming them. What array of matches does <code>/\\d+(?=\\s*USD)/g</code> return from the target string?',
           options: [
-            '<code>["45", "80"]</code>',
             '<code>["45 USD", "80 USD"]</code>',
+            '<code>["45", "80"]</code>',
             '<code>["45", "120", "80"]</code>',
             '<code>[" USD", " USD"]</code>'
           ],
-          correct: 0,
+          correct: 1,
           hint: 'Positive lookahead (?=...) checks that USD follows, but zero characters of USD are included in the match itself.',
           explainer: {
             title: 'Zero-Width Assertions in NFA Engines',
+            diagram: '/\\d+(?=\\s*USD)/g\n"45 USD"  ──>  [\\d+: "45"] + [Lookahead: " USD" (zero-width assertion: NOT consumed)] ✓\n"120 EUR" ──>  [\\d+: "120"] + [Lookahead fails: " EUR" != "USD"] ──> Discarded ✗\n"80 USD"  ──>  [\\d+: "80"] + [Lookahead: " USD" matched] ✓',
             body: '<code>(?=\\s*USD)</code> asserts that the digits are followed by optional whitespace and "USD". Because lookaheads are zero-width, the string "USD" is not consumed into <code>match[0]</code>, and 120 EUR is discarded because EUR fails the lookahead assertion.'
           }
         },
         {
           id: 3,
-          category: 'Lookarounds',
-          topic: 'Negative Lookahead',
-          pattern: '/^(?!.*admin)[a-zA-Z0-9_]{5,15}$/',
-          regex: /^(?!.*admin)[a-zA-Z0-9_]{5,15}$/,
-          targetString: 'superuser_1',
-          title: 'Negative Lookahead for Sanitization',
-          desc: 'A registration system requires usernames between 5 and 15 alphanumeric characters, but forbids the word <code>admin</code> anywhere in the name. Which username successfully passes this pattern?',
+          category: 'Real-World',
+          topic: 'Email Sanitization',
+          pattern: '/^[a-z0-9._%+-]+@(?!tempmail\\.com|dispostable\\.com)[a-z0-9.-]+\\.[a-z]{2,}$/i',
+          regex: /^[a-z0-9._%+-]+@(?!tempmail\.com|dispostable\.com)[a-z0-9.-]+\.[a-z]{2,}$/i,
+          targetString: 'alex.dev+work@company.io',
+          title: 'Email Address Sanitization & Disposable Domain Filter',
+          desc: 'An email sanitization filter validates standard email format while using a negative lookahead to block disposable email domains (<code>tempmail.com</code> and <code>dispostable.com</code>). Which address successfully passes this sanitization filter?',
           options: [
-            '<code>"superuser_1"</code>',
-            '<code>"administrator"</code>',
-            '<code>"admin_root"</code>',
-            '<code>"super_admin"</code>'
+            '<code>"spammer@tempmail.com"</code>',
+            '<code>"bot@dispostable.com"</code>',
+            '<code>"alex.dev+work@company.io"</code>',
+            '<code>"invalid-user@.com"</code>'
           ],
-          correct: 0,
-          hint: 'The negative lookahead (?!.*admin) starts at the beginning (^) and rejects any string that contains "admin" anywhere.',
+          correct: 2,
+          hint: 'The negative lookahead (?!tempmail\\.com|dispostable\\.com) positioned right after the @ rejects blocked domain names before matching the domain tokens.',
           explainer: {
-            title: 'Preventing Substrings via Anchored Negative Lookahead',
-            body: '<code>^(?!.*admin)</code> acts as a gatekeeper at position 0. It scans forward to check if "admin" appears anywhere in the candidate string. If found, the assertion immediately fails before testing the character class constraint <code>[a-zA-Z0-9_]{5,15}</code>.'
+            title: 'Negative Lookahead for Domain Filtering',
+            diagram: '/^[a-z0-9._%+-]+@(?!tempmail\\.com|dispostable\\.com)[a-z0-9.-]+\\.[a-z]{2,}$/i\n"alex.dev@company.io" ──> [user: "alex.dev"] + [@: "@"] + [Lookahead: NOT tempmail] + [domain: "company.io"] ✓\n"bot@tempmail.com"    ──> [user: "bot"]      + [@: "@"] + [Lookahead FAILS: tempmail.com detected] ──> REJECTED ✗',
+            body: '<code>(?!tempmail\\.com|dispostable\\.com)</code> acts as a negative lookahead assertion right after the <code>@</code> symbol. It inspects the upcoming domain characters without consuming them. If either blacklisted domain matches, the assertion immediately fails, cleanly rejecting disposable inboxes.'
           }
         },
         {
@@ -1234,6 +1252,7 @@
           hint: '(?:...) is a non-capturing group. It groups tokens for quantification without storing them into numbered match indices.',
           explainer: {
             title: 'Memory Optimization with (?:...)',
+            diagram: '(?:https?:\\/\\/)?     (www\\.[a-z0-9-]+\\.[a-z]{2,})\n└── Non-capturing (?:...)  └── Group 1 (captured)\n    matched but not stored      match[1] = "www.github.com"',
             body: '<code>(?:https?:\\/\\/)</code> allows the scheme to be optional with <code>?</code> without polluting the group capture index. Thus, <code>match[1]</code> skips the scheme and cleanly captures only the domain <code>www.github.com</code>.'
           }
         },
@@ -1247,15 +1266,16 @@
           title: 'Word Boundary \\b with Punctuation & Hyphens',
           desc: 'Word boundary <code>\\b</code> asserts a position between a word character (<code>\\w</code>: letters, digits, underscore) and a non-word character (<code>\\W</code>). How many times does <code>/\\bpro\\b/gi</code> match in the test string?',
           options: [
-            '3 times (in <code>"pro"</code>, <code>"pro-active"</code>, and <code>"macbook-pro"</code>)',
             '1 time (only the isolated standalone word <code>"pro"</code>)',
             '2 times (only in <code>"pro"</code> and <code>"pro-active"</code>)',
+            '3 times (in <code>"pro"</code>, <code>"pro-active"</code>, and <code>"macbook-pro"</code>)',
             '4 times (in all occurrences including <code>"professional"</code>)'
           ],
-          correct: 0,
+          correct: 2,
           hint: 'Hyphens (-) are non-word characters in standard regex, meaning a word boundary exists between letters and hyphens!',
           explainer: {
             title: 'The ASCII \\w vs Hyphen Boundary Trap',
+            diagram: '"pro"          ──> \\b before \'p\' and \\b after \'o\' ──> Match 1 ✓\n"pro-active"   ──> \\b before \'p\' and \\b between \'o\' and \'-\' (non-word) ──> Match 2 ✓\n"professional" ──> \\b before \'p\', but \'f\' is a word char (no \\b after \'o\') ──> No Match ✗\n"macbook-pro"  ──> \\b between \'-\' and \'p\', and \\b after \'o\' ──> Match 3 ✓',
             body: 'In regex, <code>\\w</code> consists only of <code>[a-zA-Z0-9_]</code>. Hyphens <code>-</code> and periods <code>.</code> are non-word characters <code>\\W</code>. Therefore, the boundary between <code>o</code> and <code>-</code> in <code>pro-active</code> and between <code>-</code> and <code>p</code> in <code>macbook-pro</code> satisfies <code>\\b</code>, yielding 3 matches.'
           }
         },
@@ -1269,38 +1289,40 @@
           title: 'Backreferences and Matching Tag Enclosures',
           desc: 'The backreference <code>\\1</code> enforces that the closing tag matches the exact tag name captured in Group 1. Which tag pair will this pattern match, and which will it reject?',
           options: [
-            'Matches <code>&lt;p&gt;Paragraph&lt;/p&gt;</code>; rejects <code>&lt;h1&gt;Header&lt;/h2&gt;</code> because <code>h2</code> does not match backreference <code>\\1</code>.',
             'Matches both tag pairs because both tag names are letters/numbers.',
+            'Matches <code>&lt;p&gt;Paragraph&lt;/p&gt;</code>; rejects <code>&lt;h1&gt;Header&lt;/h2&gt;</code> because <code>h2</code> does not match backreference <code>\\1</code>.',
             'Rejects both tag pairs because backreferences cannot be used inside character classes.',
             'Matches only <code>&lt;h1&gt;Header&lt;/h2&gt;</code> because headers take priority.'
           ],
-          correct: 0,
+          correct: 1,
           hint: '\\1 requires the exact text captured by Group 1, not just another string matching the same subpattern.',
           explainer: {
             title: 'Strict String Equality via Backreferences',
+            diagram: '<([a-z1-6]+)>.*?<\\/\\1>\n<p>...</p>   ──> Group 1 captures "p"  ──> \\1 expects "p"  ──> </p> matches ✓\n<h1>...</h2>  ──> Group 1 captures "h1" ──> \\1 expects "h1" ──> </h2> fails ✗',
             body: 'When Group 1 captures <code>"p"</code>, <code>\\1</code> dynamically demands <code>"p"</code>. For <code>&lt;h1&gt;Header&lt;/h2&gt;</code>, Group 1 captured <code>"h1"</code>, so the engine demands <code>&lt;/h1&gt;</code>. Because it encountered <code>&lt;/h2&gt;</code>, the match fails.'
           }
         },
         {
           id: 7,
           category: 'Lookarounds',
-          topic: 'Lookbehinds',
-          pattern: '/(?<=\\$)\\d+(?:\\.\\d{2})?(?<!\\.00)/g',
-          regex: /(?<=\$)\d+(?:\.\d{2})?(?<!\.00)/g,
+          topic: 'Lookbehinds & Lookaheads',
+          pattern: '/(?<=\\$)(?!\\d+\\.00\\b)\\d+(?:\\.\\d{2})?/g',
+          regex: /(?<=\$)(?!\d+\.00\b)\d+(?:\.\d{2})?/g,
           targetString: 'Prices: $25.00, $49.99, €30.00, $15, $100.00',
-          title: 'Positive and Negative Lookbehinds',
-          desc: 'Positive lookbehind <code>(?&lt;=\\$)</code> ensures numbers are preceded by <code>$</code>, while negative lookbehind <code>(?&lt;!\\.00)</code> rejects numbers ending with <code>.00</code>. What matches are returned?',
+          title: 'Positive Lookbehind with Negative Lookahead',
+          desc: 'Positive lookbehind <code>(?&lt;=\\$)</code> ensures prices are preceded by <code>$</code>, while negative lookahead <code>(?!\\d+\\.00\\b)</code> rejects prices ending with <code>.00</code>. What matches are returned from the test string?',
           options: [
-            '<code>["49.99", "15"]</code>',
+            '<code>["25", "49.99", "15", "100"]</code>',
             '<code>["25.00", "49.99", "15", "100.00"]</code>',
-            '<code>["$49.99", "$15"]</code>',
-            '<code>["49.99"]</code>'
+            '<code>["49.99", "15"]</code>',
+            '<code>["$49.99", "$15"]</code>'
           ],
-          correct: 0,
-          hint: 'The euro price (€30.00) fails the leading lookbehind, and $25.00 and $100.00 fail the trailing negative lookbehind.',
+          correct: 2,
+          hint: 'The euro price (€30.00) fails the leading lookbehind, and $25.00 and $100.00 are rejected upfront by the negative lookahead (?!\\d+\\.00\\b).',
           explainer: {
-            title: 'Lookbehind Assertions in ECMAScript',
-            body: 'Lookbehinds inspect the text preceding the current match position. <code>(?&lt;=\\$)</code> asserts the currency symbol is <code>$</code> (excluding €30.00). <code>(?&lt;!\\.00)</code> discards matches where the final two digits are <code>.00</code>, leaving only <code>49.99</code> and <code>15</code>.'
+            title: 'Lookbehind with Negative Lookahead Guard',
+            diagram: '/(?<=\\$)(?!\\d+\\.00\\b)\\d+(?:\\.\\d{2})?/g\n"$25.00"   ──> [Lookbehind: $ ✓] + [Lookahead rejects: .00 detected ✗] ──> Discarded ✗\n"$49.99"   ──> [Lookbehind: $ ✓] + [Lookahead passes: not .00 ✓]      ──> Matched: "49.99" ✓\n"€30.00"   ──> [Lookbehind fails: currency is € ✗]                      ──> Discarded ✗\n"$15"      ──> [Lookbehind: $ ✓] + [Lookahead passes: not .00 ✓]      ──> Matched: "15" ✓\n"$100.00"  ──> [Lookbehind: $ ✓] + [Lookahead rejects: .00 detected ✗] ──> Discarded ✗',
+            body: '<code>(?&lt;=\\$)</code> verifies that a dollar sign precedes the digits (rejecting €30.00). The negative lookahead <code>(?!\\d+\\.00\\b)</code> inspects the upcoming number and decimal before matching digits, ensuring that prices ending in <code>.00</code> are rejected without allowing backtracking loopholes to peel off the <code>.00</code>. Only <code>"49.99"</code> and <code>"15"</code> survive.'
           }
         },
         {
@@ -1309,11 +1331,12 @@
           topic: 'Catastrophic ReDoS',
           pattern: '/^(a+)+$/',
           regex: /^(a+)+$/,
+          skipLiveEval: true,
           targetString: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaa!',
           title: 'Catastrophic Backtracking & ReDoS Vulnerability',
           desc: 'Why does evaluating <code>/^(a+)+$/</code> against a 28-character string of <code>a</code>\'s ending with an exclamation mark <code>!</code> freeze or crash browser threads?',
           options: [
-            'Nested overlapping quantifiers <code>(a+)+</code> force exponential $O(2^n)$ backtracking permutations before the engine can finally confirm failure on the <code>!</code>.',
+            'Nested overlapping quantifiers <code>(a+)+</code> force exponential O(2ⁿ) backtracking permutations before the engine can finally confirm failure on the <code>!</code>.',
             'Regular expression engines cap string lengths to 20 characters by default.',
             'The exclamation mark <code>!</code> is an unescaped reserved metacharacter.',
             'V8 engines cannot execute nested parentheses.'
@@ -1322,6 +1345,7 @@
           hint: 'Notice both the inner (a+) and outer (+)+ can match the same characters, creating 2^(n-1) possible ways to partition the string.',
           explainer: {
             title: 'ReDoS: Regular Expression Denial of Service',
+            diagram: '/^(a+)+$/ on "aaaa...!" (length N)\nStep 0: [ a a a a ... a ] (first (a+) consumes all characters)\nFailure on \'!\' triggers backtrack permutations:\nBranch 1: (a...a) + (a)\nBranch 2: (a...a) + (a) + (a)\nBranch 3: (a...a) + (a + a)\nTotal Permutations: 2^(N-1) branches = 134,217,728 operations for 28 \'a\'s!',
             body: 'When the engine fails on <code>!</code>, it backtracks. Because both <code>a+</code> and <code>(a+)+</code> match the letter "a", a 28-character sequence can be partitioned in over 134,000,000 different ways. The engine tries every single branch, blocking the event loop indefinitely.'
           }
         },
@@ -1329,22 +1353,23 @@
           id: 9,
           category: 'Real-World',
           topic: 'Semantic Versioning',
-          pattern: '/^v?(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-([0-9a-z.-]+))?$/i',
-          regex: /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9a-z.-]+))?$/i,
-          targetString: 'v2.14.0-rc.1',
+          pattern: '/^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?$/',
+          regex: /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?$/,
+          targetString: '2.14.0-rc.1',
           title: 'Semantic Versioning 2.0.0 Extraction',
-          desc: 'In accordance with SemVer 2.0 specifications, what are the extracted values of captured Groups 1, 2, 3, and 4 from <code>"v2.14.0-rc.1"</code>?',
+          desc: 'In accordance with official SemVer 2.0 specifications (which forbid "v" prefixes and leading zeros on numeric identifiers), what are the extracted values of captured Groups 1, 2, 3, and 4 from <code>"2.14.0-rc.1"</code>?',
           options: [
-            'Major: <code>"2"</code>, Minor: <code>"14"</code>, Patch: <code>"0"</code>, Prerelease: <code>"rc.1"</code>',
-            'Major: <code>"v2"</code>, Minor: <code>"14"</code>, Patch: <code>"0"</code>, Prerelease: <code>"-rc.1"</code>',
             'Major: <code>"2"</code>, Minor: <code>"14"</code>, Patch: <code>"0"</code>, Prerelease: undefined',
-            'Major: <code>"2"</code>, Minor: <code>"1"</code>, Patch: <code>"4"</code>, Prerelease: <code>"0-rc.1"</code>'
+            'Major: <code>"2"</code>, Minor: <code>"1"</code>, Patch: <code>"4"</code>, Prerelease: <code>"0-rc.1"</code>',
+            'Major: <code>"2"</code>, Minor: <code>"14"</code>, Patch: <code>"0"</code>, Prerelease: <code>"rc.1"</code>',
+            'Syntax error: SemVer does not allow hyphens in version strings'
           ],
-          correct: 0,
-          hint: 'The leading v? is uncaptured, and the hyphen in (?:-([0-9a-z.-]+)) is in a non-capturing group, so only rc.1 is captured in Group 4.',
+          correct: 2,
+          hint: 'The leading version segments capture major, minor, patch, and the hyphen in (?:-(...)) is in a non-capturing group so Group 4 captures only rc.1.',
           explainer: {
-            title: 'SemVer Grammar & Non-Capturing Discard',
-            body: '<code>0|[1-9]\\d*</code> enforces no leading zeros on version numbers (e.g. 01 is illegal). The optional prerelease tag uses <code>(?:-([0-9a-z.-]+))?</code> so that the leading dash is consumed by the non-capturing group while Group 4 captures only <code>"rc.1"</code>.'
+            title: 'SemVer 2.0 Grammar & Prerelease Extraction',
+            diagram: '^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-(...))?$\n  Group 1: "2" (Major)\n  Group 2: "14" (Minor)\n  Group 3: "0" (Patch)\n  Group 4: "rc.1" (Prerelease without leading hyphen)',
+            body: '<code>0|[1-9]\\d*</code> enforces non-negative integers with no leading zeros. SemVer 2.0 strictly disallows a <code>v</code> prefix (which is a Git tag convention, not part of the SemVer spec). The prerelease section allows dot-separated non-empty identifiers where purely numeric parts cannot have leading zeros.'
           }
         },
         {
@@ -1357,15 +1382,16 @@
           title: 'URL Slug Sanitization Pipeline',
           desc: 'A string undergoes two regex passes: first <code>.toLowerCase().replace(/[^a-z0-9]+/g, "-")</code>, followed by <code>.replace(/^-+|-+$/g, "")</code>. What is the final sanitized slug?',
           options: [
-            '<code>"hello-world-deep-dive-into-regex-v2-0"</code>',
             '<code>"-hello-world-deep-dive-into-regex-v2-0-"</code>',
             '<code>"hello-world!--deep-dive-into-regex-v2.0"</code>',
+            '<code>"hello-world-deep-dive-into-regex-v2-0"</code>',
             '<code>"hello_world_deep_dive_into_regex_v2_0"</code>'
           ],
-          correct: 0,
+          correct: 2,
           hint: 'The first pass turns all punctuation and whitespace into hyphens; the second pass trims leading and trailing hyphens.',
           explainer: {
             title: 'Idiomatic Slug Generation Pipeline',
+            diagram: '"  Hello World! -- Deep-Dive into Regex v2.0  "\nStep 1: .toLowerCase() ──> "  hello world! -- deep-dive into regex v2.0  "\nStep 2: .replace(/[^a-z0-9]+/g, "-") ──> "-hello-world-deep-dive-into-regex-v2-0-"\nStep 3: .replace(/^-+|-+$/g, "")    ──> "hello-world-deep-dive-into-regex-v2-0"',
             body: '<code>[^a-z0-9]+</code> matches any sequence of non-alphanumeric characters (spaces, punctuation) and consolidates them into a single <code>-</code>. <code>^-+|-+$</code> matches hyphens at the start (<code>^</code>) or end (<code>$</code>) of the string to trim them clean.'
           }
         },
@@ -1379,15 +1405,16 @@
           title: 'Markdown Inline Formatting Tokenizer',
           desc: 'Why are negative lookbehinds <code>(?&lt;!\\\\)</code> positioned before the opening and closing markdown delimiter tokens?',
           options: [
-            'To prevent matching formatting markers that are preceded by an escape backslash <code>\\</code>.',
             'To ensure that bold text always precedes italic text.',
+            'To prevent matching formatting markers that are preceded by an escape backslash <code>\\</code>.',
             'To convert all markdown characters into HTML entities.',
             'To restrict the regex engine to ASCII characters only.'
           ],
-          correct: 0,
+          correct: 1,
           hint: 'Backslashes in markdown prevent formatting from occurring; the negative lookbehind ensures the delimiter is not escaped.',
           explainer: {
             title: 'Handling Escapes with Negative Lookbehinds',
+            diagram: '/(?<!\\\\)([*_]{1,2})(.*?)(?<!\\\\)\\1/g\n"**bold**"    ──> [Not escaped: **] + [Content: bold] + [Not escaped: **] ──> Match ✓\n"\\*escaped\\*" ──> [Preceded by \\: Lookbehind (?<!\\\\) fails ✗]             ──> Ignored ✓',
             body: 'In Markdown, <code>\\*</code> tells the parser to treat the asterisk as a literal symbol rather than an emphasis tag. The negative lookbehind <code>(?&lt;!\\\\)</code> ensures the engine ignores delimiters that have a backslash immediately preceding them.'
           }
         },
@@ -1401,19 +1428,44 @@
           title: 'The Iconic Thousands Separator Regex',
           desc: 'What is the output of executing <code>"12500000".replace(/\\B(?=(\\d{3})+(?!\\d))/g, ",")</code> in JavaScript?',
           options: [
-            '<code>"12,500,000"</code> (inserts commas as thousands separators)',
             '<code>",000"</code>',
             '<code>"125-000-00"</code>',
+            '<code>"12,500,000"</code> (inserts commas as thousands separators)',
             'Syntax error: lookaheads cannot follow <code>\\B</code>'
           ],
-          correct: 0,
+          correct: 2,
           hint: '\\B matches positions between digits (not at word boundaries), and the lookahead asserts that the remaining count of digits is a multiple of 3.',
           explainer: {
             title: 'Zero-Width Replacement for Number Formatting',
+            diagram: '/\\B(?=(\\d{3})+(?!\\d))/g on "12500000"\nIndex:   1   2   5   0   0   0   0   0\n          ↑   ↑   ↑   ↑   ↑   ↑   ↑\nMatches:      ,       ,\nResult: "12 , 500 , 000"  ──>  "12,500,000"',
             body: '<code>\\B</code> ensures the match is strictly within a word (preventing a leading comma). The positive lookahead <code>(?=(\\d{3})+(?!\\d))</code> tests that the remaining digits form groups of 3 all the way to the end of the number. Replacing these zero-width positions with <code>","</code> formats the number as <code>"12,500,000"</code>.'
           }
         }
       ];
+
+      // --- Option Randomization & Tracking ---
+      function shuffleQuestion(q) {
+        if (!q.rawOptions) {
+          q.rawOptions = q.options.slice();
+          q.rawCorrect = q.correct;
+        }
+        var correctContent = q.rawOptions[q.rawCorrect];
+        var shuffled = q.rawOptions.slice();
+        for (var i = shuffled.length - 1; i > 0; i--) {
+          var j = Math.floor(Math.random() * (i + 1));
+          var temp = shuffled[i];
+          shuffled[i] = shuffled[j];
+          shuffled[j] = temp;
+        }
+        q.options = shuffled;
+        q.correct = shuffled.indexOf(correctContent);
+      }
+
+      function shuffleAllQuestions() {
+        QUESTIONS.forEach(function (q) {
+          shuffleQuestion(q);
+        });
+      }
 
       // --- State Management ---
       var STORAGE_KEY_STATE = 'regex_riddle_run_state';
@@ -1455,21 +1507,36 @@
           }
 
           var savedHigh = localStorage.getItem(STORAGE_KEY_HIGH);
-          if (savedHigh) {
-            highScore = parseInt(savedHigh, 10) || 0;
-            document.getElementById('highScoreDisplay').textContent = highScore.toLocaleString();
+          if (savedHigh !== null) {
+            var parsedHigh = parseInt(savedHigh, 10);
+            if (Number.isInteger(parsedHigh) && parsedHigh >= 0) {
+              highScore = parsedHigh;
+              document.getElementById('highScoreDisplay').textContent = highScore.toLocaleString();
+            }
           }
 
           var savedStateStr = localStorage.getItem(STORAGE_KEY_STATE);
           if (savedStateStr) {
             var parsed = JSON.parse(savedStateStr);
-            if (parsed && typeof parsed.levelIndex === 'number' && parsed.levelIndex < QUESTIONS.length) {
-              state.levelIndex = parsed.levelIndex;
-              state.score = parsed.score || 0;
-              state.streak = parsed.streak || 0;
-              state.maxStreak = parsed.maxStreak || 0;
-              state.correctAnswers = parsed.correctAnswers || 0;
-              state.totalAnswered = parsed.totalAnswered || 0;
+            if (parsed && typeof parsed === 'object') {
+              if (Number.isInteger(parsed.levelIndex) && parsed.levelIndex >= 0 && parsed.levelIndex < QUESTIONS.length) {
+                state.levelIndex = parsed.levelIndex;
+              }
+              if (typeof parsed.score === 'number' && Number.isFinite(parsed.score)) {
+                state.score = Math.max(0, parsed.score);
+              }
+              if (typeof parsed.streak === 'number' && Number.isFinite(parsed.streak)) {
+                state.streak = Math.max(0, parsed.streak);
+              }
+              if (typeof parsed.maxStreak === 'number' && Number.isFinite(parsed.maxStreak)) {
+                state.maxStreak = Math.max(0, parsed.maxStreak);
+              }
+              if (typeof parsed.correctAnswers === 'number' && Number.isFinite(parsed.correctAnswers)) {
+                state.correctAnswers = Math.max(0, parsed.correctAnswers);
+              }
+              if (typeof parsed.totalAnswered === 'number' && Number.isFinite(parsed.totalAnswered)) {
+                state.totalAnswered = Math.max(0, parsed.totalAnswered);
+              }
             }
           }
         } catch (e) { }
@@ -1493,12 +1560,42 @@
         } catch (e) { }
       }
 
+      var resetBtn = document.getElementById('resetBtn');
+      var resetConfirmTimeout = null;
+
+      function revertResetButton() {
+        if (resetConfirmTimeout) {
+          clearTimeout(resetConfirmTimeout);
+          resetConfirmTimeout = null;
+        }
+        resetBtn.innerHTML = '<span>↺</span>';
+        resetBtn.style.width = '';
+        resetBtn.style.padding = '';
+        resetBtn.style.borderColor = '';
+        resetBtn.style.color = '';
+        resetBtn.setAttribute('title', 'Reset progress');
+      }
+
       function resetProgress() {
-        if (!confirm('Reset your quiz progress and start from Level 1?')) return;
+        if (!resetConfirmTimeout) {
+          resetBtn.innerHTML = '<span style="font-size:0.75rem;font-weight:700;">Reset?</span>';
+          resetBtn.style.width = 'auto';
+          resetBtn.style.padding = '0 0.6rem';
+          resetBtn.style.borderColor = 'var(--danger)';
+          resetBtn.style.color = 'var(--danger)';
+          resetBtn.setAttribute('title', 'Click again to confirm reset');
+          resetConfirmTimeout = setTimeout(function () {
+            revertResetButton();
+          }, 3500);
+          return;
+        }
+
+        revertResetButton();
         try {
           localStorage.removeItem(STORAGE_KEY_STATE);
         } catch (e) { }
         clearInterval(timerInterval);
+        shuffleAllQuestions();
         state.levelIndex = 0;
         state.score = 0;
         state.streak = 0;
@@ -1546,6 +1643,7 @@
       var explainerCard = document.getElementById('explainerCard');
       var explainerTitle = document.getElementById('explainerTitle');
       var explainerBody = document.getElementById('explainerBody');
+      var explainerDiagram = document.getElementById('explainerDiagram');
 
       var summaryModal = document.getElementById('summaryModal');
       var summaryScore = document.getElementById('summaryScore');
@@ -1614,7 +1712,7 @@
       }
 
       // --- Dynamic Test String Highlighter ---
-      function highlightTargetString(str, regex) {
+      function highlightTargetString(str, regex, q) {
         while (targetStringStage.firstChild) {
           targetStringStage.removeChild(targetStringStage.firstChild);
         }
@@ -1625,6 +1723,12 @@
         if (!str) {
           targetStringStage.textContent = '(empty string)';
           matchCountBadge.textContent = '0 matches';
+          return;
+        }
+
+        if (q && q.skipLiveEval) {
+          targetStringStage.textContent = str;
+          matchCountBadge.textContent = 'Live eval skipped (ReDoS demonstration)';
           return;
         }
 
@@ -1711,6 +1815,10 @@
         hintBox.classList.remove('show');
         hintBtn.disabled = false;
         explainerCard.classList.remove('show');
+        if (explainerDiagram) {
+          explainerDiagram.style.display = 'none';
+          explainerDiagram.textContent = '';
+        }
 
         // Reset Action Button
         actionBtn.disabled = true;
@@ -1718,7 +1826,7 @@
 
         // Render Test String
         customTestInput.value = q.targetString;
-        highlightTargetString(q.targetString, q.regex);
+        highlightTargetString(q.targetString, q.regex, q);
 
         // Render Options
         while (optionsPanel.firstChild) {
@@ -1773,7 +1881,7 @@
       customTestInput.addEventListener('input', function () {
         var q = QUESTIONS[state.levelIndex];
         if (q && q.regex) {
-          highlightTargetString(customTestInput.value, q.regex);
+          highlightTargetString(customTestInput.value, q.regex, q);
         }
       });
 
@@ -1837,6 +1945,14 @@
         // Show Engine Explainer
         explainerTitle.textContent = q.explainer.title;
         explainerBody.innerHTML = q.explainer.body;
+        if (explainerDiagram) {
+          if (q.explainer && q.explainer.diagram) {
+            explainerDiagram.textContent = q.explainer.diagram;
+            explainerDiagram.style.display = 'block';
+          } else {
+            explainerDiagram.style.display = 'none';
+          }
+        }
         explainerCard.classList.add('show');
 
         // Update Action Button
@@ -1852,12 +1968,21 @@
       }
 
       function advanceToNextLevel() {
+        if (state.levelIndex + 1 >= QUESTIONS.length) {
+          state.levelIndex = QUESTIONS.length;
+          persistState();
+          showCompletionSummary();
+          return;
+        }
         state.levelIndex++;
         persistState();
         renderLevel();
       }
 
       actionBtn.addEventListener('click', function () {
+        if (state.levelIndex >= QUESTIONS.length) {
+          return;
+        }
         if (!state.isAnswered) {
           submitAnswer();
         } else {
@@ -1868,6 +1993,7 @@
       // --- Final Completion Summary ---
       function showCompletionSummary() {
         soundVictory();
+        actionBtn.disabled = true;
 
         var accuracy = state.totalAnswered > 0 ? Math.round((state.correctAnswers / state.totalAnswered) * 100) : 100;
         summaryScore.textContent = state.score.toLocaleString();
@@ -1895,9 +2021,11 @@
 
       document.getElementById('restartBtn').addEventListener('click', function () {
         closeSummaryModal();
+        shuffleAllQuestions();
         state.levelIndex = 0;
         state.score = 0;
         state.streak = 0;
+        state.maxStreak = 0;
         state.correctAnswers = 0;
         state.totalAnswered = 0;
         persistState();
@@ -1906,7 +2034,15 @@
 
       // --- Keyboard Shortcuts (1-4 answers, Enter proceed, H hint, T timer, M mute) ---
       document.addEventListener('keydown', function (e) {
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+        if (summaryModal.classList.contains('show')) {
+          if (e.key === 'Escape') {
+            closeSummaryModal();
+          }
+          return;
+        }
 
         // Number keys 1-4
         if (['1', '2', '3', '4'].indexOf(e.key) !== -1) {
@@ -1920,7 +2056,7 @@
 
         // Enter key
         if (e.key === 'Enter') {
-          if (!actionBtn.disabled) {
+          if (!actionBtn.disabled && state.levelIndex < QUESTIONS.length) {
             e.preventDefault();
             actionBtn.click();
           }
@@ -1976,6 +2112,9 @@
       }
 
       function toggleTimerMode() {
+        if (!state.isAnswered && state.levelIndex < QUESTIONS.length) {
+          return;
+        }
         state.timedMode = !state.timedMode;
         updateTimerButtonUI();
         try {
@@ -1995,7 +2134,7 @@
 
       function updateThemeIcon() {
         var current = document.documentElement.getAttribute('data-theme') || 'dark';
-        themeIcon.textContent = current === 'dark' ? '🌙' : '☀️';
+        themeIcon.textContent = current === 'dark' ? '☀️' : '🌙';
       }
 
       themeToggleBtn.addEventListener('click', function () {
@@ -2012,6 +2151,7 @@
       document.getElementById('resetBtn').addEventListener('click', resetProgress);
 
       // --- Initialize App ---
+      shuffleAllQuestions();
       updateThemeIcon();
       loadSavedState();
       renderLevel();
