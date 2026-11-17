@@ -584,7 +584,21 @@ When you open a PR, a **template** will be pre-filled with the required sections
 1. **What** — What does this tool do / what did you change? Link the related issue with `Closes #123`.
 2. **Type of Change** — Check whether it’s a new tool, enhancement, bug fix, or docs update.
 3. **Screenshot** — Required for new tools and UI changes.
-4. **Checklist** — Go through the checklist and confirm you’ve met the requirements.
+4. **How I tested** — Required. What you actually did to test it (see below).
+5. **Checklist** — Go through the checklist and confirm you’ve met the requirements.
+
+PRs with an empty or default description will not be reviewed.
+
+### Testing, AI use and honest PRs
+
+Using AI assistants is fine. Submitting their output without checking it is not. You are responsible for every line and every claim in your PR.
+
+- **Fill in “How I tested”.** Say what you did: browsers, light/dark theme, phone width.
+- **Games and quests:** play them to the end. Attach a GIF or recording showing both a **win and a loss**. A game that can’t be lost, or can’t be won, will not be merged.
+- **Quizzes:** check every correct answer yourself against the docs or in the console, and vary the position of the correct option.
+- **Descriptions must match the code.** Don’t list features, numbers or fixes that aren’t in the code.
+- **After review:** reply with each review point and the line number where you fixed it. Don’t write “all fixed” unless you’ve checked each one. A false “all fixed” claim gets the PR closed.
+- **Be ready to explain your code.** Reviewers may ask why something works the way it does. If you can’t answer, the PR won’t be merged.
 
 ### What happens after you submit
 
@@ -613,6 +627,7 @@ Difficulty labels are assigned by the maintainer ([@praveenscience](https://gith
 ### Review expectations
 
 - PRs are reviewed in the order they’re received.
+- **One open PR per contributor at a time.** Get your current PR merged (or closed) before opening another. Extra PRs may be closed without review.
 - Simple, clean PRs get merged faster within 48 hours or less.
 - If changes are requested, respond within **2 days** or the PR may be closed.
 - Be kind and respectful in all interactions.

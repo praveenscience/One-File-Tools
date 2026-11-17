@@ -9,6 +9,7 @@ Closes #
 <!-- Check the one that applies. -->
 
 - [ ] New tool
+- [ ] New quest / quiz / instrument / design system page
 - [ ] Enhancement to existing tool
 - [ ] Bug fix
 - [ ] Documentation update
@@ -18,6 +19,17 @@ Closes #
 
 <!-- Required for new tools and UI changes. Drag and drop an image here. -->
 
+## How I tested
+
+<!--
+Required. PRs without this section will not be reviewed.
+Describe what YOU did, not what the code is supposed to do:
+- Browser(s) used, light and dark theme, and phone width.
+- Games/quests: attach a GIF or recording of a full playthrough, showing both a win AND a loss.
+- Quizzes: confirm you checked every correct answer yourself, and how (docs link, console test, etc.).
+- When updating after review: list each review point with the line number where it is fixed.
+-->
+
 ## Checklist
 
 <!-- Check all that apply before requesting review. -->
@@ -25,6 +37,8 @@ Closes #
 - [ ] I have read the [Contributing Guide](https://github.com/praveenscience/One-File-Tools/blob/main/Contributing.md)
 - [ ] My branch follows the naming convention (`add/tool-name`, `feat/description`, or `fix/description`)
 - [ ] I have tested my changes locally in at least one modern browser
+- [ ] I have filled in "How I tested" above, and every claim in this description matches the code
+- [ ] This is my only open PR in this repository
 
 ### For new tools:
 
