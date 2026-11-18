@@ -1,0 +1,2606 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Interactive Rebase Simulator — One File Tools</title>
+    <meta name="description" content="Master git rebase -i interactively. Reorder, squash, fixup, edit, split, and drop commits through an interactive commit graph and real Git execution engine." />
+    <script>
+      (function () {
+        var theme;
+        try {
+          var t = localStorage.getItem("git_rebase_theme");
+          if (t === "dark" || t === "light") theme = t;
+        } catch (e) {}
+        if (!theme) {
+          theme = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+        }
+        document.documentElement.setAttribute("data-theme", theme);
+      })();
+    </script>
+    <style>
+      :root {
+        --bg-primary: #0d1117;
+        --bg-secondary: #161b22;
+        --bg-tertiary: #21262d;
+        --border-color: #30363d;
+        --border-muted: #21262d;
+        --text-primary: #f0f6fc;
+        --text-secondary: #8b949e;
+        --text-muted: #6e7681;
+        --accent-blue: #58a6ff;
+        --accent-cyan: #39c5cf;
+        --accent-green: #3fb950;
+        --accent-purple: #bc8cff;
+        --accent-amber: #d29922;
+        --accent-red: #f85149;
+        --accent-teal: #2ea043;
+        --action-pick: #58a6ff;
+        --action-reword: #bc8cff;
+        --action-edit: #d29922;
+        --action-squash: #3fb950;
+        --action-fixup: #238636;
+        --action-drop: #da3633;
+        --branch-main: #388bfd;
+        --branch-feat: #a371f7;
+        --diff-add-bg: rgba(46, 160, 67, 0.15);
+        --diff-add-text: #3fb950;
+        --diff-del-bg: rgba(248, 81, 73, 0.15);
+        --diff-del-text: #f85149;
+        --terminal-bg: #090d13;
+        --terminal-header: #131821;
+        --overlay-bg: rgba(13, 17, 23, 0.88);
+        --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+        --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+        --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+        --radius-sm: 4px;
+        --radius-md: 6px;
+        --radius-lg: 10px;
+      }
+
+      [data-theme="light"] {
+        --bg-primary: #f6f8fa;
+        --bg-secondary: #ffffff;
+        --bg-tertiary: #eaeef2;
+        --border-color: #d0d7de;
+        --border-muted: #e1e4e8;
+        --text-primary: #1f2328;
+        --text-secondary: #656d76;
+        --text-muted: #8c959f;
+        --accent-blue: #0969da;
+        --accent-cyan: #057a85;
+        --accent-green: #1a7f37;
+        --accent-purple: #8250df;
+        --accent-amber: #9a6700;
+        --accent-red: #cf222e;
+        --accent-teal: #116329;
+        --action-pick: #0969da;
+        --action-reword: #8250df;
+        --action-edit: #9a6700;
+        --action-squash: #1a7f37;
+        --action-fixup: #116329;
+        --action-drop: #cf222e;
+        --branch-main: #0969da;
+        --branch-feat: #8250df;
+        --diff-add-bg: rgba(26, 127, 55, 0.12);
+        --diff-add-text: #1a7f37;
+        --diff-del-bg: rgba(207, 34, 46, 0.12);
+        --diff-del-text: #cf222e;
+        --terminal-bg: #1f242c;
+        --terminal-header: #282f3a;
+        --overlay-bg: rgba(246, 248, 250, 0.92);
+        --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+        --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.12);
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        font-family: var(--font-sans);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        line-height: 1.5;
+        overflow-x: hidden;
+      }
+
+      header {
+        background: var(--bg-secondary);
+        border-bottom: 1px solid var(--border-color);
+        padding: 0.65rem 1rem;
+        position: sticky;
+        top: 0;
+        z-index: 50;
+      }
+
+      .header-container {
+        max-width: 1440px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+      }
+
+      .logo-area {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        text-decoration: none;
+        color: var(--text-primary);
+      }
+
+      .logo-badge {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        font-weight: 700;
+        font-size: 0.95rem;
+        letter-spacing: -0.01em;
+      }
+
+      .logo-badge span {
+        background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .hud-stats {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+
+      .stat-pill {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        border-radius: 9999px;
+        padding: 0.2rem 0.65rem;
+        font-size: 0.78rem;
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+      }
+
+      .stat-label {
+        color: var(--text-secondary);
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        font-weight: 600;
+      }
+
+      .stat-val {
+        font-family: var(--font-mono);
+        font-weight: 700;
+      }
+
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+      }
+
+      .icon-btn {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
+        width: 32px;
+        height: 32px;
+        border-radius: var(--radius-md);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 0.9rem;
+        transition: all 0.15s ease;
+      }
+
+      .icon-btn:hover {
+        background: var(--border-color);
+        border-color: var(--text-secondary);
+      }
+
+      .icon-btn:focus-visible {
+        outline: 2px solid var(--accent-blue);
+        outline-offset: 1px;
+      }
+
+      main {
+        flex: 1;
+        max-width: 1440px;
+        width: 100%;
+        margin: 0 auto;
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      /* Level Nav & Scenario Bar */
+      .scenario-bar {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        padding: 0.75rem 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+
+      .level-tabs {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        flex-wrap: wrap;
+      }
+
+      .level-tab {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        color: var(--text-secondary);
+        padding: 0.35rem 0.75rem;
+        border-radius: var(--radius-md);
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+      }
+
+      .level-tab:hover {
+        color: var(--text-primary);
+        border-color: var(--accent-blue);
+      }
+
+      .level-tab.is-active {
+        background: var(--accent-blue);
+        color: #ffffff;
+        border-color: var(--accent-blue);
+      }
+
+      .level-tab.is-completed::after {
+        content: "✓";
+        color: var(--accent-green);
+        font-weight: 800;
+      }
+
+      .level-tab.is-active.is-completed::after {
+        color: #ffffff;
+      }
+
+      .scenario-brief {
+        flex: 1;
+        min-width: 260px;
+      }
+
+      .scenario-title {
+        font-size: 0.92rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+      }
+
+      .scenario-desc {
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        margin-top: 0.15rem;
+      }
+
+      /* Grid Layout */
+      .workbench-grid {
+        display: grid;
+        grid-template-columns: 1.15fr 0.95fr;
+        gap: 1rem;
+        align-items: start;
+      }
+
+      @media (max-width: 1024px) {
+        .workbench-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        box-shadow: var(--shadow-sm);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .card-header {
+        background: var(--bg-tertiary);
+        border-bottom: 1px solid var(--border-color);
+        padding: 0.65rem 0.9rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 0.82rem;
+        font-weight: 700;
+      }
+
+      .card-title {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+      }
+
+      .card-body {
+        padding: 0.9rem;
+      }
+
+      /* Git DAG Visualizer */
+      .graph-container {
+        position: relative;
+        background: var(--bg-primary);
+        border: 1px solid var(--border-muted);
+        border-radius: var(--radius-md);
+        padding: 0.75rem;
+        min-height: 220px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        overflow-x: auto;
+      }
+
+      .graph-svg {
+        width: 100%;
+        min-width: 580px;
+        height: 180px;
+      }
+
+      .commit-node {
+        cursor: pointer;
+        transition: transform 0.2s ease;
+      }
+
+      .commit-node:hover circle {
+        stroke-width: 3px;
+        filter: brightness(1.2);
+      }
+
+      .commit-label {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        fill: var(--text-primary);
+        pointer-events: none;
+      }
+
+      .commit-sha {
+        font-family: var(--font-mono);
+        font-size: 9.5px;
+        fill: var(--text-secondary);
+        pointer-events: none;
+      }
+
+      .branch-tag {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        font-weight: 700;
+        fill: #ffffff;
+      }
+
+      /* Commit Inspector */
+      .inspector-panel {
+        margin-top: 0.75rem;
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        padding: 0.75rem;
+        font-size: 0.8rem;
+      }
+
+      .inspector-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 0.4rem;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+
+      .inspector-sha {
+        font-family: var(--font-mono);
+        color: var(--accent-blue);
+        font-weight: 700;
+      }
+
+      .diff-preview {
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-sm);
+        padding: 0.5rem;
+        font-family: var(--font-mono);
+        font-size: 0.74rem;
+        max-height: 130px;
+        overflow-y: auto;
+      }
+
+      .diff-line {
+        line-height: 1.4;
+        white-space: pre-wrap;
+      }
+
+      .diff-add {
+        background: var(--diff-add-bg);
+        color: var(--diff-add-text);
+      }
+
+      .diff-del {
+        background: var(--diff-del-bg);
+        color: var(--diff-del-text);
+      }
+
+      /* Rebase Todo Editor */
+      .editor-window {
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .editor-file-bar {
+        background: var(--bg-tertiary);
+        border-bottom: 1px solid var(--border-color);
+        padding: 0.4rem 0.75rem;
+        font-family: var(--font-mono);
+        font-size: 0.74rem;
+        color: var(--text-secondary);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .editor-help-comment {
+        padding: 0.5rem 0.75rem;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        background: rgba(0, 0, 0, 0.15);
+        border-bottom: 1px dashed var(--border-color);
+        line-height: 1.35;
+      }
+
+      .todo-list {
+        display: flex;
+        flex-direction: column;
+        padding: 0.4rem;
+        gap: 0.35rem;
+        min-height: 200px;
+      }
+
+      .todo-row {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        padding: 0.45rem 0.6rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all 0.15s ease;
+        user-select: none;
+      }
+
+      .todo-row:hover {
+        border-color: var(--text-secondary);
+      }
+
+      .todo-row.is-dragging {
+        opacity: 0.4;
+        border: 2px dashed var(--accent-blue);
+      }
+
+      .todo-row.drag-over {
+        border-top: 2px solid var(--accent-cyan);
+      }
+
+      .drag-handle {
+        cursor: grab;
+        color: var(--text-muted);
+        font-size: 0.95rem;
+        display: flex;
+        align-items: center;
+        padding: 0 0.2rem;
+      }
+
+      .drag-handle:active {
+        cursor: grabbing;
+      }
+
+      .row-reorder-btns {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .micro-btn {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        color: var(--text-secondary);
+        width: 18px;
+        height: 14px;
+        font-size: 8px;
+        border-radius: 2px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      }
+
+      .micro-btn:hover {
+        color: var(--text-primary);
+        background: var(--border-color);
+      }
+
+      .action-select {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
+        border-radius: var(--radius-sm);
+        padding: 0.25rem 0.45rem;
+        font-family: var(--font-mono);
+        font-size: 0.76rem;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .action-select.action-pick {
+        border-left: 4px solid var(--action-pick);
+        color: var(--action-pick);
+      }
+      .action-select.action-reword {
+        border-left: 4px solid var(--action-reword);
+        color: var(--action-reword);
+      }
+      .action-select.action-edit {
+        border-left: 4px solid var(--action-edit);
+        color: var(--action-edit);
+      }
+      .action-select.action-squash {
+        border-left: 4px solid var(--action-squash);
+        color: var(--action-squash);
+      }
+      .action-select.action-fixup {
+        border-left: 4px solid var(--action-fixup);
+        color: var(--action-fixup);
+      }
+      .action-select.action-drop {
+        border-left: 4px solid var(--action-drop);
+        color: var(--action-drop);
+      }
+
+      .todo-sha {
+        font-family: var(--font-mono);
+        font-size: 0.74rem;
+        color: var(--accent-blue);
+        font-weight: 600;
+        min-width: 55px;
+      }
+
+      .todo-msg {
+        flex: 1;
+        font-size: 0.78rem;
+        color: var(--text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .todo-row[data-action="drop"] .todo-msg,
+      .todo-row[data-action="drop"] .todo-sha {
+        text-decoration: line-through;
+        color: var(--text-muted);
+      }
+
+      .reword-btn {
+        background: transparent;
+        border: none;
+        color: var(--text-secondary);
+        cursor: pointer;
+        font-size: 0.8rem;
+        padding: 2px 5px;
+        border-radius: var(--radius-sm);
+      }
+
+      .reword-btn:hover {
+        color: var(--accent-purple);
+        background: var(--bg-tertiary);
+      }
+
+      .editor-warnings {
+        padding: 0.4rem 0.75rem;
+        background: rgba(210, 153, 34, 0.12);
+        border-top: 1px solid var(--accent-amber);
+        font-size: 0.73rem;
+        color: var(--accent-amber);
+        display: none;
+      }
+
+      .editor-actions {
+        padding: 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        border-top: 1px solid var(--border-color);
+        background: var(--bg-tertiary);
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.35rem;
+        padding: 0.45rem 0.9rem;
+        font-size: 0.8rem;
+        font-weight: 600;
+        border-radius: var(--radius-md);
+        border: 1px solid transparent;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+
+      .btn-primary {
+        background: var(--accent-blue);
+        color: #ffffff;
+      }
+
+      .btn-primary:hover {
+        background: #0969da;
+        box-shadow: 0 0 8px rgba(88, 166, 255, 0.4);
+      }
+
+      .btn-secondary {
+        background: var(--bg-secondary);
+        border-color: var(--border-color);
+        color: var(--text-primary);
+      }
+
+      .btn-secondary:hover {
+        background: var(--border-color);
+      }
+
+      .btn-danger {
+        background: rgba(248, 81, 73, 0.15);
+        border-color: var(--accent-red);
+        color: var(--accent-red);
+      }
+
+      .btn-danger:hover {
+        background: var(--accent-red);
+        color: #ffffff;
+      }
+
+      .btn-success {
+        background: var(--accent-green);
+        color: #ffffff;
+      }
+
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      /* Live Terminal Console */
+      .terminal-card {
+        background: var(--terminal-bg);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        font-family: var(--font-mono);
+        overflow: hidden;
+      }
+
+      .terminal-header {
+        background: var(--terminal-header);
+        border-bottom: 1px solid var(--border-color);
+        padding: 0.4rem 0.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 0.72rem;
+        color: var(--text-secondary);
+      }
+
+      .terminal-dots {
+        display: flex;
+        gap: 5px;
+      }
+
+      .terminal-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+      }
+
+      .dot-red {
+        background: #f85149;
+      }
+      .dot-yellow {
+        background: #d29922;
+      }
+      .dot-green {
+        background: #3fb950;
+      }
+
+      .terminal-body {
+        padding: 0.75rem;
+        font-size: 0.76rem;
+        height: 200px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+      }
+
+      .term-line {
+        line-height: 1.4;
+      }
+
+      .term-cmd {
+        color: var(--accent-cyan);
+        font-weight: 700;
+      }
+
+      .term-info {
+        color: var(--text-secondary);
+      }
+
+      .term-success {
+        color: var(--accent-green);
+        font-weight: 600;
+      }
+
+      .term-warn {
+        color: var(--accent-amber);
+      }
+
+      .term-error {
+        color: var(--accent-red);
+      }
+
+      /* Interactive Interruption Workspace (Edit Mode / Conflict Mode) */
+      .interrupt-box {
+        margin-top: 0.75rem;
+        background: var(--bg-tertiary);
+        border: 2px solid var(--accent-amber);
+        border-radius: var(--radius-md);
+        padding: 0.75rem;
+        display: none;
+      }
+
+      .interrupt-box.is-conflict {
+        border-color: var(--accent-red);
+      }
+
+      .interrupt-title {
+        font-size: 0.84rem;
+        font-weight: 700;
+        margin-bottom: 0.4rem;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+      }
+
+      .interrupt-desc {
+        font-size: 0.76rem;
+        color: var(--text-secondary);
+        margin-bottom: 0.6rem;
+      }
+
+      .conflict-viewer {
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-sm);
+        padding: 0.5rem;
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        margin-bottom: 0.6rem;
+      }
+
+      .conflict-marker {
+        font-weight: 700;
+      }
+
+      .conflict-head {
+        color: var(--accent-blue);
+      }
+      .conflict-mid {
+        color: var(--accent-amber);
+      }
+      .conflict-incoming {
+        color: var(--accent-green);
+      }
+
+      .split-stage-area {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+        margin-bottom: 0.6rem;
+      }
+
+      .stage-col {
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-sm);
+        padding: 0.5rem;
+        font-size: 0.72rem;
+      }
+
+      .stage-col h4 {
+        font-size: 0.74rem;
+        margin-bottom: 0.3rem;
+        color: var(--text-secondary);
+      }
+
+      .stage-item {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-sm);
+        padding: 0.25rem 0.45rem;
+        margin-bottom: 0.25rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-family: var(--font-mono);
+      }
+
+      /* Modals */
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: var(--overlay-bg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+        padding: 1rem;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+      }
+
+      .modal-backdrop.is-open {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .modal-dialog {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        width: 100%;
+        max-width: 560px;
+        box-shadow: var(--shadow-md);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .modal-header {
+        background: var(--bg-tertiary);
+        border-bottom: 1px solid var(--border-color);
+        padding: 0.75rem 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 0.9rem;
+        font-weight: 700;
+      }
+
+      .modal-body {
+        padding: 1rem;
+        font-size: 0.82rem;
+        line-height: 1.5;
+        max-height: 70vh;
+        overflow-y: auto;
+      }
+
+      .modal-footer {
+        background: var(--bg-tertiary);
+        border-top: 1px solid var(--border-color);
+        padding: 0.65rem 1rem;
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.5rem;
+      }
+
+      .cheatsheet-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 0.5rem;
+        font-family: var(--font-mono);
+        font-size: 0.76rem;
+      }
+
+      .cheatsheet-table th,
+      .cheatsheet-table td {
+        border: 1px solid var(--border-color);
+        padding: 0.4rem 0.6rem;
+        text-align: left;
+      }
+
+      .cheatsheet-table th {
+        background: var(--bg-tertiary);
+      }
+
+      .text-input {
+        width: 100%;
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-sm);
+        color: var(--text-primary);
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        padding: 0.5rem;
+        margin-top: 0.4rem;
+      }
+
+      .text-input:focus {
+        outline: 2px solid var(--accent-blue);
+      }
+
+      /* Sandbox Controls */
+      .sandbox-toolbar {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        padding: 0.5rem 0.75rem;
+        margin-bottom: 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        font-size: 0.78rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="header-container">
+        <a href="../index.html" class="logo-area" aria-label="Back to One File Tools">
+          <div class="logo-badge">🔀 <span>INTERACTIVE REBASE SIMULATOR</span></div>
+        </a>
+
+        <div class="hud-stats" aria-label="Game stats">
+          <div class="stat-pill">
+            <span class="stat-label">Scenario</span>
+            <span class="stat-val" id="hud-level">1 / 5</span>
+          </div>
+          <div class="stat-pill">
+            <span class="stat-label">Commits Cleaned</span>
+            <span class="stat-val" style="color: var(--accent-green)" id="hud-cleaned">0</span>
+          </div>
+          <div class="stat-pill">
+            <span class="stat-label">History Grade</span>
+            <span class="stat-val" style="color: var(--accent-purple)" id="hud-grade">A+</span>
+          </div>
+          <div class="stat-pill">
+            <span class="stat-label">Engine</span>
+            <span class="stat-val" style="color: var(--accent-cyan)" id="hud-status">READY</span>
+          </div>
+        </div>
+
+        <div class="header-actions">
+          <button class="icon-btn" id="btn-sound" type="button" aria-label="Toggle Sound" title="Sound SFX (On/Off)">🔊</button>
+          <button class="icon-btn" id="btn-cheatsheet" type="button" aria-label="Open Rebase Cheatsheet" title="Rebase Manual & Cheatsheet">📖</button>
+          <button class="icon-btn" id="btn-theme" type="button" aria-label="Switch Theme" title="Toggle Light/Dark Theme">☀️</button>
+          <button class="icon-btn" id="btn-reset" type="button" aria-label="Reset Level" title="Reset Current Level">↺</button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <!-- Scenario Selector & Info Bar -->
+      <section class="scenario-bar" aria-label="Scenario navigation">
+        <div class="level-tabs" id="level-tabs" role="tablist">
+          <button class="level-tab is-active" role="tab" aria-selected="true" data-lvl="0">1. Squash Typo</button>
+          <button class="level-tab" role="tab" aria-selected="false" data-lvl="1">2. Drop Secret</button>
+          <button class="level-tab" role="tab" aria-selected="false" data-lvl="2">3. Reorder</button>
+          <button class="level-tab" role="tab" aria-selected="false" data-lvl="3">4. Edit & Split</button>
+          <button class="level-tab" role="tab" aria-selected="false" data-lvl="4">5. Conflict</button>
+          <button class="level-tab" role="tab" aria-selected="false" data-lvl="5">⚡ Sandbox</button>
+        </div>
+
+        <div class="scenario-brief">
+          <div class="scenario-title" id="scenario-title">Level 1: The Atomic Squash (Linear Cleanup)</div>
+          <div class="scenario-desc" id="scenario-desc">Combine messy 'typo fix' commits into the main feature commit so your pull request has clean, atomic history.</div>
+        </div>
+      </section>
+
+      <!-- Sandbox Extra Toolbar (shown only in sandbox mode) -->
+      <section class="sandbox-toolbar" id="sandbox-toolbar" style="display: none" aria-label="Sandbox controls">
+        <span style="font-weight: 700; color: var(--accent-purple)">⚡ Custom Commit Builder:</span>
+        <input type="text" id="sandbox-msg" placeholder="Commit message (e.g. feat: add profile icon)" style="background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: var(--radius-sm); font-size: 0.76rem; flex: 1; min-width: 200px" />
+        <button class="btn btn-secondary" id="btn-add-commit" type="button">+ Add Commit</button>
+        <button class="btn btn-secondary" id="btn-reset-sandbox" type="button">Reset to Blank</button>
+      </section>
+
+      <!-- Two-Column Main Layout -->
+      <div class="workbench-grid">
+        <!-- LEFT COLUMN: Graph DAG & Commit Inspector -->
+        <div style="display: flex; flex-direction: column; gap: 1rem">
+          <!-- Commit Graph Card -->
+          <div class="card" aria-label="Commit Graph Visualizer">
+            <div class="card-header">
+              <div class="card-title"><span>📊</span> Git Commit Graph (DAG)</div>
+              <span style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-secondary)">Branch: feature &rarr; base: main</span>
+            </div>
+            <div class="card-body">
+              <div class="graph-container">
+                <svg class="graph-svg" id="graph-svg" viewBox="0 0 680 180" aria-label="Visual commit graph showing branches and commits"></svg>
+              </div>
+
+              <!-- Commit Inspector -->
+              <div class="inspector-panel" id="inspector-panel">
+                <div class="inspector-meta">
+                  <div>
+                    <span style="color: var(--text-secondary); margin-right: 4px">Commit:</span>
+                    <span class="inspector-sha" id="insp-sha">Select a node</span>
+                  </div>
+                  <div id="insp-author" style="color: var(--text-secondary); font-size: 0.75rem"></div>
+                </div>
+                <div id="insp-subject" style="font-weight: 700; margin-bottom: 0.4rem; color: var(--text-primary)">Click any commit node on the graph to inspect changes.</div>
+                <div class="diff-preview" id="insp-diff">
+                  <div class="diff-line" style="color: var(--text-muted)">// No commit selected</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Live Terminal Output -->
+          <div class="terminal-card" aria-label="Git Terminal Log">
+            <div class="terminal-header">
+              <div class="terminal-dots">
+                <div class="terminal-dot dot-red"></div>
+                <div class="terminal-dot dot-yellow"></div>
+                <div class="terminal-dot dot-green"></div>
+              </div>
+              <span>git-rebase-session — bash</span>
+              <button id="btn-clear-term" type="button" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.7rem">Clear</button>
+            </div>
+            <div class="terminal-body" id="terminal-output" role="log" aria-live="polite">
+              <div class="term-line term-info">Initializing Git Interactive Rebase Engine...</div>
+              <div class="term-line term-cmd">$ git checkout feature</div>
+              <div class="term-line term-cmd">$ git rebase -i main (Ready to execute)</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT COLUMN: Rebase Todo Editor & Interactive Resolver -->
+        <div style="display: flex; flex-direction: column; gap: 1rem">
+          <!-- git-rebase-todo Editor -->
+          <div class="card" aria-label="git-rebase-todo Editor">
+            <div class="card-header">
+              <div class="card-title">
+                <span>📝</span>
+                <span>git-rebase-todo</span>
+              </div>
+              <span style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--accent-cyan)" id="editor-status">EDITING TODO</span>
+            </div>
+
+            <div class="editor-window">
+              <div class="editor-file-bar">
+                <span>.git/rebase-merge/git-rebase-todo</span>
+                <span>UTF-8</span>
+              </div>
+
+              <div class="editor-help-comment">
+                # Commands:<br />
+                # p, pick &lt;commit&gt; = use commit<br />
+                # r, reword &lt;commit&gt; = use commit, but edit commit message<br />
+                # e, edit &lt;commit&gt; = use commit, but stop for amending/splitting<br />
+                # s, squash &lt;commit&gt; = meld into previous commit<br />
+                # f, fixup &lt;commit&gt; = like "squash", but discard commit log<br />
+                # d, drop &lt;commit&gt; = remove commit
+              </div>
+
+              <!-- Reorderable Rows -->
+              <div class="todo-list" id="todo-list" role="list">
+                <!-- Dynamically populated rows -->
+              </div>
+
+              <div class="editor-warnings" id="editor-warnings" role="alert">⚠️ Warning message here</div>
+
+              <!-- Editor Action Controls -->
+              <div class="editor-actions">
+                <button class="btn btn-primary" id="btn-start-rebase" type="button">▶ Start Rebase</button>
+                <button class="btn btn-secondary" id="btn-step-rebase" type="button" disabled>⏭ Step</button>
+                <button class="btn btn-danger" id="btn-abort-rebase" type="button" disabled>✖ Abort</button>
+                <span style="margin-left: auto; font-size: 0.74rem; color: var(--text-secondary)" id="rebase-progress-text"> Ready </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Interruption Workspace (Edit Mode / Conflict Mode) -->
+          <div class="interrupt-box" id="interrupt-box" role="region" aria-live="assertive">
+            <!-- Injected dynamically: either Edit Splitter or Conflict Resolver -->
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Reword Message Modal -->
+    <div class="modal-backdrop" id="modal-reword" role="dialog" aria-modal="true" aria-labelledby="reword-modal-title">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <span id="reword-modal-title">✏️ git commit --reword</span>
+          <button class="icon-btn" id="btn-close-reword" type="button" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body">
+          <p style="color: var(--text-secondary); font-size: 0.78rem">
+            Edit the commit subject for commit
+            <span id="reword-sha" style="font-family: var(--font-mono); color: var(--accent-blue)"></span>:
+          </p>
+          <input type="text" class="text-input" id="reword-input" maxlength="100" />
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="btn-cancel-reword" type="button">Cancel</button>
+          <button class="btn btn-primary" id="btn-save-reword" type="button">Save Message</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cheatsheet & Documentation Modal -->
+    <div class="modal-backdrop" id="modal-cheatsheet" role="dialog" aria-modal="true" aria-labelledby="cheatsheet-title">
+      <div class="modal-dialog" style="max-width: 680px">
+        <div class="modal-header">
+          <span id="cheatsheet-title">📖 Git Interactive Rebase Manual</span>
+          <button class="icon-btn" id="btn-close-cheatsheet" type="button" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body">
+          <h3 style="color: var(--accent-blue); font-size: 0.95rem; margin-bottom: 0.35rem">What is Interactive Rebase?</h3>
+          <p style="margin-bottom: 0.75rem; color: var(--text-secondary)">Interactive rebase (<code>git rebase -i &lt;base&gt;</code>) allows developers to rewrite commit history before sharing it publicly. You can alter order, combine commits into atomic units, discard accidental secrets, amend messages, and resolve conflicts.</p>
+
+          <h4 style="color: var(--accent-purple); font-size: 0.85rem; margin-bottom: 0.25rem">The Rebase Commands:</h4>
+          <table class="cheatsheet-table">
+            <thead>
+              <tr>
+                <th>Command</th>
+                <th>Keyword</th>
+                <th>Action Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="color: var(--action-pick); font-weight: 700">pick</td>
+                <td>p</td>
+                <td>Applies the commit without any changes.</td>
+              </tr>
+              <tr>
+                <td style="color: var(--action-reword); font-weight: 700">reword</td>
+                <td>r</td>
+                <td>Applies the commit but prompts to rewrite the commit message.</td>
+              </tr>
+              <tr>
+                <td style="color: var(--action-edit); font-weight: 700">edit</td>
+                <td>e</td>
+                <td>Pauses the rebase at this commit. Allows amending or splitting into multiple atomic commits.</td>
+              </tr>
+              <tr>
+                <td style="color: var(--action-squash); font-weight: 700">squash</td>
+                <td>s</td>
+                <td>Melds this commit into the preceding commit, combining both commit messages.</td>
+              </tr>
+              <tr>
+                <td style="color: var(--action-fixup); font-weight: 700">fixup</td>
+                <td>f</td>
+                <td>Melds this commit into the preceding commit, discarding this commit's message.</td>
+              </tr>
+              <tr>
+                <td style="color: var(--action-drop); font-weight: 700">drop</td>
+                <td>d</td>
+                <td>Deletes the commit entirely from history.</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div style="margin-top: 1rem; padding: 0.65rem; background: rgba(210, 153, 34, 0.1); border-left: 3px solid var(--accent-amber); border-radius: var(--radius-sm)">
+            <strong style="color: var(--accent-amber)">⚠️ The Golden Rule of Git Rebasing:</strong>
+            <p style="font-size: 0.76rem; margin-top: 0.25rem; color: var(--text-secondary)">Never rebase commits that have already been pushed to a shared, public branch (like <code>main</code> or <code>production</code>). Rebasing generates new commit SHAs, which causes divergence and headaches for your teammates. Only rebase your local private feature branches!</p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-primary" id="btn-cheatsheet-close-ok" type="button">Got It!</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Victory Level Modal -->
+    <div class="modal-backdrop" id="modal-victory" role="dialog" aria-modal="true" aria-labelledby="victory-title">
+      <div class="modal-dialog">
+        <div class="modal-header" style="background: rgba(63, 185, 80, 0.15); border-color: var(--accent-green)">
+          <span id="victory-title" style="color: var(--accent-green)">🎉 Scenario Completed!</span>
+          <button class="icon-btn" id="btn-close-victory" type="button" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body">
+          <div style="text-align: center; margin-bottom: 0.75rem">
+            <div style="font-size: 2.4rem; margin-bottom: 0.2rem">🏆</div>
+            <h3 id="victory-scenario-name" style="font-size: 1.1rem">Level 1 Complete!</h3>
+            <p id="victory-feedback" style="color: var(--text-secondary); font-size: 0.8rem">You successfully squashed the messy commits into an atomic history!</p>
+          </div>
+          <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.75rem">
+            <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700; margin-bottom: 0.4rem">Cleaned Git History:</div>
+            <div id="victory-commit-list" style="font-family: var(--font-mono); font-size: 0.75rem"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="btn-replay-level" type="button">Replay Level</button>
+          <button class="btn btn-primary" id="btn-next-level" type="button">Next Scenario &rarr;</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        "use strict";
+
+        // ==========================================
+        // 1. Web Audio Sound Engine (Synthesized)
+        // ==========================================
+        let audioCtx = null;
+        let isMuted = false;
+
+        try {
+          const storedMute = localStorage.getItem("git_rebase_muted");
+          if (storedMute === "true") isMuted = true;
+        } catch (e) {}
+
+        function getAudioContext() {
+          if (!audioCtx) {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (AudioContextClass) audioCtx = new AudioContextClass();
+          }
+          if (audioCtx && audioCtx.state === "suspended") {
+            audioCtx.resume();
+          }
+          return audioCtx;
+        }
+
+        function playSound(type) {
+          if (isMuted) return;
+          const ctx = getAudioContext();
+          if (!ctx) return;
+
+          const now = ctx.currentTime;
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+
+          if (type === "click") {
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(600, now);
+            osc.frequency.exponentialRampToValueAtTime(300, now + 0.04);
+            gain.gain.setValueAtTime(0.08, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+            osc.start(now);
+            osc.stop(now + 0.04);
+          } else if (type === "apply") {
+            osc.type = "triangle";
+            osc.frequency.setValueAtTime(440, now);
+            osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.12);
+            gain.gain.setValueAtTime(0.1, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+            osc.start(now);
+            osc.stop(now + 0.12);
+          } else if (type === "warn") {
+            osc.type = "sawtooth";
+            osc.frequency.setValueAtTime(220, now);
+            osc.frequency.setValueAtTime(196, now + 0.08);
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+            osc.start(now);
+            osc.stop(now + 0.18);
+          } else if (type === "victory") {
+            const notes = [523.25, 659.25, 783.99, 1046.5]; // C, E, G, High C
+            notes.forEach((freq, idx) => {
+              const o = ctx.createOscillator();
+              const g = ctx.createGain();
+              o.connect(g);
+              g.connect(ctx.destination);
+              o.type = "triangle";
+              o.frequency.setValueAtTime(freq, now + idx * 0.09);
+              g.gain.setValueAtTime(0.14, now + idx * 0.09);
+              g.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.09 + 0.25);
+              o.start(now + idx * 0.09);
+              o.stop(now + idx * 0.09 + 0.25);
+            });
+          }
+        }
+
+        // ==========================================
+        // 2. Scenario Definitions & Level Data
+        // ==========================================
+        const SCENARIOS = [
+          {
+            id: 0,
+            title: "Level 1: The Atomic Squash (Linear Cleanup)",
+            desc: "Combine messy 'typo fix' commits into the main feature commit so your pull request has clean, atomic history.",
+            baseCommit: {
+              sha: "1a8f9b2",
+              subject: "chore: initial project configuration",
+              author: "Lead Dev <lead@internal.io>",
+              files: ["package.json", "README.md"],
+              diff: '+ {\n+   "name": "auth-service",\n+   "version": "1.0.0"\n+ }'
+            },
+            featureCommits: [
+              {
+                sha: "4a1c0d2",
+                subject: "feat: add user login endpoint",
+                author: "You <you@internal.io>",
+                files: ["src/routes/auth.js"],
+                diff: "+ router.post('/login', async (req, res) => {\n+   const { email, password } = req.body;\n+   return res.json({ success: true });\n+ });"
+              },
+              {
+                sha: "9e3f1a4",
+                subject: "fix: typo in sql query parameter",
+                author: "You <you@internal.io>",
+                files: ["src/routes/auth.js"],
+                diff: "- const { email, password } = req.body;\n+ const { email, passwordHash } = req.body;"
+              },
+              {
+                sha: "8b2c5e1",
+                subject: "fix: syntax error in handler catch block",
+                author: "You <you@internal.io>",
+                files: ["src/routes/auth.js"],
+                diff: "+ try { ... } catch (err) { logger.error(err); }"
+              },
+              {
+                sha: "2d7a9b0",
+                subject: "test: add auth route integration tests",
+                author: "You <you@internal.io>",
+                files: ["tests/auth.test.js"],
+                diff: "+ describe('POST /login', () => {\n+   it('authenticates valid credentials', async () => {\n+     expect(res.status).toBe(200);\n+   });\n+ });"
+              }
+            ],
+            validateWin: (appliedCommits) => {
+              // Expected: typo fixes squashed or fixed up into feat: add user login endpoint,
+              // leaving 2 clean commits: auth endpoint + test.
+              if (appliedCommits.length !== 2) return false;
+              const c1 = appliedCommits[0].subject.toLowerCase();
+              const c2 = appliedCommits[1].subject.toLowerCase();
+              return c1.includes("login") && c2.includes("test") && !c1.includes("fix:") && !c2.includes("typo");
+            },
+            winFeedback: "Clean atomic history! The intermediate typos were folded into the main feature commit without cluttering Git log."
+          },
+          {
+            id: 1,
+            title: "Level 2: The Secret Leak (Drop Accidental Commit)",
+            desc: "A developer accidentally committed an active AWS API secret key! Use the 'drop' action to purge it completely from git history.",
+            baseCommit: {
+              sha: "6b2c9d0",
+              subject: "feat: add invoice billing router",
+              author: "Lead Dev <lead@internal.io>",
+              files: ["src/billing.js"],
+              diff: "+ class InvoiceService { ... }"
+            },
+            featureCommits: [
+              {
+                sha: "5f1a2b3",
+                subject: "feat: implement PDF invoice generator",
+                author: "You <you@internal.io>",
+                files: ["src/pdf.js"],
+                diff: "+ export function renderInvoicePDF(order) { ... }"
+              },
+              {
+                sha: "7c4d8e9",
+                subject: "chore: add aws secret key for testing (SECRET LEAK!)",
+                author: "You <you@internal.io>",
+                files: [".env"],
+                diff: "+ AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n+ AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+              },
+              {
+                sha: "1a9b3c4",
+                subject: "feat: send invoice email notifications via SMTP",
+                author: "You <you@internal.io>",
+                files: ["src/mailer.js"],
+                diff: "+ export async function notifyCustomer(invoice) { ... }"
+              }
+            ],
+            validateWin: (appliedCommits) => {
+              if (appliedCommits.length !== 2) return false;
+              const hasSecret = appliedCommits.some((c) => c.subject.toLowerCase().includes("secret") || c.subject.toLowerCase().includes("aws"));
+              return !hasSecret;
+            },
+            winFeedback: "Secret dropped! The credential leak has been cleanly excised from the Git tree before reaching upstream."
+          },
+          {
+            id: 2,
+            title: "Level 3: Chronological Reorder (Swap Commits)",
+            desc: "The documentation was committed before the implementation was even created! Reorder the commits so the feature lands before docs.",
+            baseCommit: {
+              sha: "3d4e5f6",
+              subject: "feat: base CLI scaffolding",
+              author: "Lead Dev <lead@internal.io>",
+              files: ["bin/cli.js"],
+              diff: "+ #!/usr/bin/env node\n+ console.log('CLI loaded');"
+            },
+            featureCommits: [
+              {
+                sha: "9a0b1c2",
+                subject: "docs: document deployment scripts and parameters",
+                author: "You <you@internal.io>",
+                files: ["docs/deploy.md"],
+                diff: "+ ## Deployment Guide\n+ Run `./scripts/deploy.sh --prod`"
+              },
+              {
+                sha: "8f7e6d5",
+                subject: "feat: create automated deployment bash script",
+                author: "You <you@internal.io>",
+                files: ["scripts/deploy.sh"],
+                diff: "+ #!/usr/bin/env bash\n+ echo 'Deploying cluster...'"
+              }
+            ],
+            validateWin: (appliedCommits) => {
+              if (appliedCommits.length !== 2) return false;
+              return appliedCommits[0].subject.toLowerCase().includes("feat:") && appliedCommits[1].subject.toLowerCase().includes("docs:");
+            },
+            winFeedback: "Logical order restored! Commits now tell a coherent, chronological story."
+          },
+          {
+            id: 3,
+            title: "Level 4: Edit & Split (Atomic Separation)",
+            desc: "A developer made a single megacommit combining a database migration AND a Stripe service. Set action to 'edit' to split it into two atomic commits.",
+            baseCommit: {
+              sha: "2b3c4d5",
+              subject: "feat: setup database connection pool",
+              author: "Lead Dev <lead@internal.io>",
+              files: ["src/db.js"],
+              diff: "+ const pool = new pg.Pool();"
+            },
+            featureCommits: [
+              {
+                sha: "7e8f9a0",
+                subject: "feat: add billing sql migrations and stripe payment service (MEGACOMMIT)",
+                author: "You <you@internal.io>",
+                files: ["migrations/001_billing.sql", "src/services/stripe.js"],
+                diff: "+ CREATE TABLE subscriptions (id UUID PRIMARY KEY);\n+ class StripePaymentService { ... }"
+              },
+              {
+                sha: "4e9c7d1",
+                subject: "test: verify customer checkout integration",
+                author: "You <you@internal.io>",
+                files: ["tests/checkout.test.js"],
+                diff: "+ test('charges valid credit card token', () => { ... });"
+              }
+            ],
+            validateWin: (appliedCommits) => {
+              // Should have 3 commits: database migration, stripe service, test
+              return appliedCommits.length === 3 && appliedCommits[0].subject.toLowerCase().includes("migration") && appliedCommits[1].subject.toLowerCase().includes("stripe");
+            },
+            winFeedback: "Masterful split! The database schema and payment service are now independent, easily reviewable atomic commits."
+          },
+          {
+            id: 4,
+            title: "Level 5: Conflict Crucible (Rebase Conflict Resolution)",
+            desc: "Upstream main changed config.js while you were working. A rebase conflict will occur during step 1. Resolve it interactively and continue!",
+            baseCommit: {
+              sha: "5a6b7c8",
+              subject: "feat(upstream): update production API cluster host",
+              author: "Maintainer <admin@internal.io>",
+              files: ["src/config.js"],
+              diff: "+ export const API_HOST = 'https://api.v2.internal';"
+            },
+            featureCommits: [
+              {
+                sha: "3c2b1a0",
+                subject: "feat: update staging API endpoint timeout",
+                author: "You <you@internal.io>",
+                files: ["src/config.js"],
+                diff: "- export const API_HOST = 'https://api.legacy.internal';\n+ export const API_HOST = 'https://api.staging.internal';"
+              },
+              {
+                sha: "6f5e4d3",
+                subject: "docs: update API client README instructions",
+                author: "You <you@internal.io>",
+                files: ["README.md"],
+                diff: "+ Check src/config.js for cluster targets."
+              }
+            ],
+            hasConflictAtStep: 0,
+            conflictFile: "src/config.js",
+            conflictData: {
+              head: "export const API_HOST = 'https://api.v2.internal'; // UPSTREAM CHANGE",
+              incoming: "export const API_HOST = 'https://api.staging.internal'; // YOUR BRANCH",
+              resolved: "export const API_HOST = process.env.STAGING ? 'https://api.staging.internal' : 'https://api.v2.internal';"
+            },
+            validateWin: (appliedCommits) => {
+              return appliedCommits.length === 2;
+            },
+            winFeedback: "Conflict cleanly resolved! The feature branch has been smoothly transplanted onto the latest upstream main."
+          },
+          {
+            id: 5,
+            title: "Sandbox Mode (Free Rebase Playground)",
+            desc: "Experiment freely! Add custom commits, reorder, squash, reword, and see real Git commands and graph animations.",
+            baseCommit: {
+              sha: "0000001",
+              subject: "chore: repository initialized",
+              author: "Lead Dev <lead@internal.io>",
+              files: ["README.md"],
+              diff: "+ # Git Sandbox Workspace"
+            },
+            featureCommits: [
+              {
+                sha: "1010101",
+                subject: "feat: add user profile picture upload",
+                author: "You <you@internal.io>",
+                files: ["src/profile.js"],
+                diff: "+ function uploadAvatar() { ... }"
+              },
+              {
+                sha: "2020202",
+                subject: "fix: resize large avatars before saving",
+                author: "You <you@internal.io>",
+                files: ["src/profile.js"],
+                diff: "+ sharp(avatar).resize(256, 256)"
+              },
+              {
+                sha: "3030303",
+                subject: "docs: update profile documentation",
+                author: "You <you@internal.io>",
+                files: ["docs/profile.md"],
+                diff: "+ Avatars are resized to 256x256."
+              }
+            ],
+            validateWin: () => true,
+            winFeedback: "Sandbox rebase completed successfully!"
+          }
+        ];
+
+        // ==========================================
+        // 3. State Management
+        // ==========================================
+        let currentLevelIdx = 0;
+        let currentTodo = [];
+        let executionState = "IDLE"; // "IDLE" | "RUNNING" | "STOPPED_EDIT" | "CONFLICT" | "COMPLETED"
+        let currentExecutionStep = 0;
+        let appliedCommits = [];
+        let rewordTargetIdx = null;
+        let cleanedCommitsCount = 0;
+
+        // Load completed levels from localStorage
+        let completedLevels = {};
+        try {
+          const stored = localStorage.getItem("git_rebase_completed");
+          if (stored) completedLevels = JSON.parse(stored);
+        } catch (e) {}
+
+        // ==========================================
+        // 4. DOM Elements
+        // ==========================================
+        const levelTabs = document.getElementById("level-tabs");
+        const scenarioTitle = document.getElementById("scenario-title");
+        const scenarioDesc = document.getElementById("scenario-desc");
+        const sandboxToolbar = document.getElementById("sandbox-toolbar");
+        const graphSvg = document.getElementById("graph-svg");
+        const todoList = document.getElementById("todo-list");
+        const editorWarnings = document.getElementById("editor-warnings");
+        const terminalOutput = document.getElementById("terminal-output");
+        const interruptBox = document.getElementById("interrupt-box");
+
+        // Buttons
+        const btnStartRebase = document.getElementById("btn-start-rebase");
+        const btnStepRebase = document.getElementById("btn-step-rebase");
+        const btnAbortRebase = document.getElementById("btn-abort-rebase");
+        const btnClearTerm = document.getElementById("btn-clear-term");
+        const btnSound = document.getElementById("btn-sound");
+        const btnTheme = document.getElementById("btn-theme");
+        const btnReset = document.getElementById("btn-reset");
+        const btnCheatsheet = document.getElementById("btn-cheatsheet");
+        const btnCloseCheatsheet = document.getElementById("btn-close-cheatsheet");
+        const btnCheatsheetOk = document.getElementById("btn-cheatsheet-close-ok");
+        const modalCheatsheet = document.getElementById("modal-cheatsheet");
+
+        // Reword Modal
+        const modalReword = document.getElementById("modal-reword");
+        const rewordSha = document.getElementById("reword-sha");
+        const rewordInput = document.getElementById("reword-input");
+        const btnSaveReword = document.getElementById("btn-save-reword");
+        const btnCancelReword = document.getElementById("btn-cancel-reword");
+        const btnCloseReword = document.getElementById("btn-close-reword");
+
+        // Victory Modal
+        const modalVictory = document.getElementById("modal-victory");
+        const victoryScenarioName = document.getElementById("victory-scenario-name");
+        const victoryFeedback = document.getElementById("victory-feedback");
+        const victoryCommitList = document.getElementById("victory-commit-list");
+        const btnNextLevel = document.getElementById("btn-next-level");
+        const btnReplayLevel = document.getElementById("btn-replay-level");
+        const btnCloseVictory = document.getElementById("btn-close-victory");
+
+        // HUD elements
+        const hudLevel = document.getElementById("hud-level");
+        const hudCleaned = document.getElementById("hud-cleaned");
+        const hudGrade = document.getElementById("hud-grade");
+        const hudStatus = document.getElementById("hud-status");
+        const rebaseProgressText = document.getElementById("rebase-progress-text");
+        const editorStatus = document.getElementById("editor-status");
+
+        // Inspector
+        const inspSha = document.getElementById("insp-sha");
+        const inspAuthor = document.getElementById("insp-author");
+        const inspSubject = document.getElementById("insp-subject");
+        const inspDiff = document.getElementById("insp-diff");
+
+        // Sandbox inputs
+        const sandboxMsg = document.getElementById("sandbox-msg");
+        const btnAddCommit = document.getElementById("btn-add-commit");
+        const btnResetSandbox = document.getElementById("btn-reset-sandbox");
+
+        // ==========================================
+        // 5. Level Loading & Rendering
+        // ==========================================
+        function initLevel(lvlIdx) {
+          currentLevelIdx = lvlIdx;
+          const scenario = SCENARIOS[lvlIdx];
+
+          scenarioTitle.textContent = scenario.title;
+          scenarioDesc.textContent = scenario.desc;
+          hudLevel.textContent = `${lvlIdx + 1} / ${SCENARIOS.length - 1}${lvlIdx === 5 ? " (Sandbox)" : ""}`;
+
+          sandboxToolbar.style.display = lvlIdx === 5 ? "flex" : "none";
+
+          // Deep clone feature commits into todo list
+          currentTodo = scenario.featureCommits.map((c, i) => ({
+            id: `todo-${i}-${Date.now()}`,
+            sha: c.sha,
+            originalSubject: c.subject,
+            subject: c.subject,
+            action: "pick",
+            author: c.author,
+            files: [...c.files],
+            diff: c.diff
+          }));
+
+          executionState = "IDLE";
+          currentExecutionStep = 0;
+          appliedCommits = [];
+
+          updateHudStatus("READY");
+          rebaseProgressText.textContent = "Ready";
+          editorStatus.textContent = "EDITING TODO";
+          editorStatus.style.color = "var(--accent-cyan)";
+
+          btnStartRebase.disabled = false;
+          btnStepRebase.disabled = true;
+          btnAbortRebase.disabled = true;
+
+          interruptBox.style.display = "none";
+          interruptBox.innerHTML = "";
+
+          renderLevelTabs();
+          renderTodoList();
+          validateTodoConstraints();
+          renderGraph();
+          inspectCommit(scenario.featureCommits[0]);
+
+          logTerminal(`\n=== Switched to ${scenario.title} ===`, "term-info");
+          logTerminal(`$ git checkout feature`, "term-cmd");
+          logTerminal(`$ git rebase -i main (~${currentTodo.length} commits in todo)`, "term-cmd");
+        }
+
+        function renderLevelTabs() {
+          const tabs = levelTabs.querySelectorAll(".level-tab");
+          tabs.forEach((tab, idx) => {
+            tab.classList.toggle("is-active", idx === currentLevelIdx);
+            tab.classList.toggle("is-completed", !!completedLevels[idx]);
+          });
+        }
+
+        // ==========================================
+        // 6. SVG Commit Graph Rendering
+        // ==========================================
+        function renderGraph() {
+          const scenario = SCENARIOS[currentLevelIdx];
+          const base = scenario.baseCommit;
+          const commits = executionState === "COMPLETED" ? appliedCommits : currentTodo;
+
+          const totalNodes = 1 + commits.length;
+          const spacingX = Math.min(100, Math.max(70, 560 / (totalNodes || 1)));
+          const startX = 60;
+          const mainY = 60;
+          const featY = 125;
+
+          let svgHtml = "";
+
+          // Draw main branch line
+          svgHtml += `<line x1="30" y1="${mainY}" x2="640" y2="${mainY}" stroke="var(--branch-main)" stroke-width="3" stroke-dasharray="none" />`;
+          // Main branch label
+          svgHtml += `<rect x="5" y="${mainY - 12}" width="48" height="22" rx="4" fill="var(--branch-main)" />`;
+          svgHtml += `<text x="29" y="${mainY + 3}" text-anchor="middle" class="branch-tag">main</text>`;
+
+          // Base commit node on main
+          svgHtml += `
+            <g class="commit-node" data-type="base" transform="translate(${startX}, ${mainY})">
+              <circle r="12" fill="var(--bg-secondary)" stroke="var(--branch-main)" stroke-width="3" />
+              <text y="4" text-anchor="middle" class="commit-sha" style="font-weight:700">${base.sha.slice(0, 4)}</text>
+              <text y="24" text-anchor="middle" class="commit-label">base</text>
+            </g>
+          `;
+
+          // Feature branch curve
+          const firstFeatX = startX + spacingX;
+          svgHtml += `
+            <path d="M ${startX} ${mainY} C ${startX + 30} ${mainY}, ${firstFeatX - 30} ${featY}, ${firstFeatX} ${featY}" 
+                  fill="none" stroke="var(--branch-feat)" stroke-width="2.5" />
+          `;
+
+          // Draw feature branch commits
+          commits.forEach((c, idx) => {
+            const x = firstFeatX + idx * spacingX;
+            const y = featY;
+
+            // Connecting line to next node
+            if (idx < commits.length - 1) {
+              const nextX = firstFeatX + (idx + 1) * spacingX;
+              svgHtml += `<line x1="${x}" y1="${y}" x2="${nextX}" y2="${y}" stroke="var(--branch-feat)" stroke-width="2.5" />`;
+            }
+
+            // Node colors based on rebase execution state
+            let strokeColor = "var(--branch-feat)";
+            let fillColor = "var(--bg-secondary)";
+            let nodeClass = "commit-node";
+
+            if (executionState === "RUNNING") {
+              if (idx < currentExecutionStep) {
+                strokeColor = "var(--accent-green)";
+              } else if (idx === currentExecutionStep) {
+                strokeColor = "var(--accent-cyan)";
+                fillColor = "rgba(57, 197, 207, 0.25)";
+              }
+            } else if (executionState === "COMPLETED") {
+              strokeColor = "var(--accent-green)";
+            }
+
+            if (c.action === "drop" && executionState !== "COMPLETED") {
+              strokeColor = "var(--action-drop)";
+            }
+
+            svgHtml += `
+              <g class="${nodeClass}" data-idx="${idx}" transform="translate(${x}, ${y})">
+                <circle r="13" fill="${fillColor}" stroke="${strokeColor}" stroke-width="3" />
+                <text y="4" text-anchor="middle" class="commit-sha" style="font-weight:700">${c.sha.slice(0, 4)}</text>
+                <text y="25" text-anchor="middle" class="commit-label" style="font-size:10px">${c.action ? c.action.toUpperCase() : "COMMIT"}</text>
+              </g>
+            `;
+          });
+
+          // Head Pointer
+          if (commits.length > 0) {
+            const tipX = firstFeatX + (commits.length - 1) * spacingX;
+            svgHtml += `
+              <rect x="${tipX - 25}" y="${featY - 32}" width="50" height="18" rx="4" fill="var(--branch-feat)" />
+              <text x="${tipX}" y="${featY - 20}" text-anchor="middle" class="branch-tag" style="font-size:9.5px">feature</text>
+            `;
+          }
+
+          graphSvg.innerHTML = svgHtml;
+
+          // Attach click listeners to graph nodes
+          graphSvg.querySelectorAll(".commit-node").forEach((node) => {
+            node.addEventListener("click", () => {
+              playSound("click");
+              const isBase = node.getAttribute("data-type") === "base";
+              if (isBase) {
+                inspectCommit(scenario.baseCommit);
+              } else {
+                const idx = parseInt(node.getAttribute("data-idx"), 10);
+                inspectCommit(commits[idx]);
+              }
+            });
+          });
+        }
+
+        function inspectCommit(c) {
+          if (!c) return;
+          inspSha.textContent = c.sha;
+          inspAuthor.textContent = c.author || "You <you@internal.io>";
+          inspSubject.textContent = c.subject;
+
+          const filesHtml = (c.files || []).map((f) => `<span style="color: var(--accent-cyan)">📄 ${f}</span>`).join("  ");
+
+          let diffLines = "";
+          if (c.diff) {
+            diffLines = c.diff
+              .split("\n")
+              .map((line) => {
+                if (line.startsWith("+")) {
+                  return `<div class="diff-line diff-add">${escapeHtml(line)}</div>`;
+                } else if (line.startsWith("-")) {
+                  return `<div class="diff-line diff-del">${escapeHtml(line)}</div>`;
+                }
+                return `<div class="diff-line">${escapeHtml(line)}</div>`;
+              })
+              .join("");
+          } else {
+            diffLines = `<div class="diff-line" style="color: var(--text-muted)">// Clean atomic tree</div>`;
+          }
+
+          inspDiff.innerHTML = `
+            <div style="margin-bottom: 0.35rem; font-size: 0.72rem">${filesHtml}</div>
+            ${diffLines}
+          `;
+        }
+
+        // ==========================================
+        // 7. Rebase Todo List Management & Drag-Drop
+        // ==========================================
+        let draggedItemIdx = null;
+
+        function renderTodoList() {
+          todoList.innerHTML = "";
+
+          currentTodo.forEach((item, idx) => {
+            const row = document.createElement("div");
+            row.className = "todo-row";
+            row.setAttribute("data-idx", idx);
+            row.setAttribute("data-action", item.action);
+            row.draggable = executionState === "IDLE";
+
+            row.innerHTML = `
+              <div class="drag-handle" title="Drag to reorder">⋮⋮</div>
+              <div class="row-reorder-btns">
+                <button type="button" class="micro-btn btn-move-up" title="Move Up" ${idx === 0 ? "disabled" : ""}>▲</button>
+                <button type="button" class="micro-btn btn-move-down" title="Move Down" ${idx === currentTodo.length - 1 ? "disabled" : ""}>▼</button>
+              </div>
+              <select class="action-select action-${item.action}" aria-label="Rebase action for commit ${item.sha}">
+                <option value="pick" ${item.action === "pick" ? "selected" : ""}>pick</option>
+                <option value="reword" ${item.action === "reword" ? "selected" : ""}>reword</option>
+                <option value="edit" ${item.action === "edit" ? "selected" : ""}>edit</option>
+                <option value="squash" ${item.action === "squash" ? "selected" : ""}>squash</option>
+                <option value="fixup" ${item.action === "fixup" ? "selected" : ""}>fixup</option>
+                <option value="drop" ${item.action === "drop" ? "selected" : ""}>drop</option>
+              </select>
+              <span class="todo-sha">${item.sha.slice(0, 7)}</span>
+              <span class="todo-msg" title="${escapeHtml(item.subject)}">${escapeHtml(item.subject)}</span>
+              <button type="button" class="reword-btn" title="Edit commit message">✏️</button>
+            `;
+
+            // Drag and Drop event listeners
+            row.addEventListener("dragstart", (e) => {
+              if (executionState !== "IDLE") return;
+              draggedItemIdx = idx;
+              row.classList.add("is-dragging");
+              e.dataTransfer.effectAllowed = "move";
+            });
+
+            row.addEventListener("dragend", () => {
+              row.classList.remove("is-dragging");
+              todoList.querySelectorAll(".todo-row").forEach((r) => r.classList.remove("drag-over"));
+            });
+
+            row.addEventListener("dragover", (e) => {
+              e.preventDefault();
+              row.classList.add("drag-over");
+            });
+
+            row.addEventListener("dragleave", () => {
+              row.classList.remove("drag-over");
+            });
+
+            row.addEventListener("drop", (e) => {
+              e.preventDefault();
+              row.classList.remove("drag-over");
+              if (draggedItemIdx === null || draggedItemIdx === idx) return;
+
+              playSound("click");
+              const [moved] = currentTodo.splice(draggedItemIdx, 1);
+              currentTodo.splice(idx, 0, moved);
+              draggedItemIdx = null;
+
+              renderTodoList();
+              validateTodoConstraints();
+              renderGraph();
+            });
+
+            // Button Move Up / Down
+            const btnUp = row.querySelector(".btn-move-up");
+            const btnDown = row.querySelector(".btn-move-down");
+            btnUp.addEventListener("click", () => {
+              if (idx > 0 && executionState === "IDLE") {
+                playSound("click");
+                const [moved] = currentTodo.splice(idx, 1);
+                currentTodo.splice(idx - 1, 0, moved);
+                renderTodoList();
+                validateTodoConstraints();
+                renderGraph();
+              }
+            });
+            btnDown.addEventListener("click", () => {
+              if (idx < currentTodo.length - 1 && executionState === "IDLE") {
+                playSound("click");
+                const [moved] = currentTodo.splice(idx, 1);
+                currentTodo.splice(idx + 1, 0, moved);
+                renderTodoList();
+                validateTodoConstraints();
+                renderGraph();
+              }
+            });
+
+            // Action Select Change
+            const select = row.querySelector(".action-select");
+            select.addEventListener("change", (e) => {
+              playSound("click");
+              item.action = e.target.value;
+              select.className = `action-select action-${item.action}`;
+              row.setAttribute("data-action", item.action);
+              validateTodoConstraints();
+              renderGraph();
+            });
+
+            // Reword Button Click
+            const btnReword = row.querySelector(".reword-btn");
+            btnReword.addEventListener("click", () => {
+              openRewordModal(idx);
+            });
+
+            todoList.appendChild(row);
+          });
+        }
+
+        function validateTodoConstraints() {
+          if (currentTodo.length === 0) {
+            showWarning("The todo list is empty! Add commits or reset.");
+            btnStartRebase.disabled = true;
+            return false;
+          }
+
+          // Rule 1: First commit cannot be squash or fixup
+          if (currentTodo[0].action === "squash" || currentTodo[0].action === "fixup") {
+            showWarning("⚠️ Cannot 'squash' or 'fixup' the very first commit! It has no preceding commit in this rebase.");
+            btnStartRebase.disabled = true;
+            return false;
+          }
+
+          // Rule 2: All commits dropped
+          const allDropped = currentTodo.every((c) => c.action === "drop");
+          if (allDropped) {
+            showWarning("⚠️ Dropping all commits will completely empty the branch!");
+            btnStartRebase.disabled = false;
+            return true;
+          }
+
+          hideWarning();
+          btnStartRebase.disabled = executionState !== "IDLE";
+          return true;
+        }
+
+        function showWarning(msg) {
+          editorWarnings.textContent = msg;
+          editorWarnings.style.display = "block";
+        }
+
+        function hideWarning() {
+          editorWarnings.textContent = "";
+          editorWarnings.style.display = "none";
+        }
+
+        // ==========================================
+        // 8. Rebase Execution Engine
+        // ==========================================
+        btnStartRebase.addEventListener("click", () => {
+          if (!validateTodoConstraints()) return;
+
+          playSound("click");
+          executionState = "RUNNING";
+          currentExecutionStep = 0;
+          appliedCommits = [];
+
+          updateHudStatus("REBASING");
+          editorStatus.textContent = "EXECUTING REBASE";
+          editorStatus.style.color = "var(--accent-amber)";
+
+          btnStartRebase.disabled = true;
+          btnStepRebase.disabled = false;
+          btnAbortRebase.disabled = false;
+
+          // Disable inputs in rows
+          todoList.querySelectorAll("select").forEach((s) => (s.disabled = true));
+          todoList.querySelectorAll("button").forEach((b) => (b.disabled = true));
+
+          logTerminal(`\nExecuting rebase commands on top of ${SCENARIOS[currentLevelIdx].baseCommit.sha.slice(0, 7)}:`, "term-cmd");
+
+          stepRebase();
+        });
+
+        btnStepRebase.addEventListener("click", () => {
+          if (executionState === "RUNNING") {
+            stepRebase();
+          }
+        });
+
+        btnAbortRebase.addEventListener("click", () => {
+          abortRebase();
+        });
+
+        function abortRebase() {
+          playSound("warn");
+          logTerminal(`$ git rebase --abort`, "term-cmd");
+          logTerminal(`Rebase aborted! Working tree and refs restored to original state.`, "term-error");
+          initLevel(currentLevelIdx);
+        }
+
+        function stepRebase() {
+          const scenario = SCENARIOS[currentLevelIdx];
+
+          if (currentExecutionStep >= currentTodo.length) {
+            finishRebase();
+            return;
+          }
+
+          const item = currentTodo[currentExecutionStep];
+          highlightCurrentRow(currentExecutionStep);
+
+          rebaseProgressText.textContent = `Applying ${currentExecutionStep + 1} of ${currentTodo.length}`;
+
+          // Check if scenario triggers a conflict
+          if (scenario.hasConflictAtStep !== undefined && currentExecutionStep === scenario.hasConflictAtStep) {
+            triggerConflict(scenario, item);
+            return;
+          }
+
+          // Handle action execution
+          switch (item.action) {
+            case "drop":
+              playSound("warn");
+              logTerminal(`Executing: drop ${item.sha.slice(0, 7)} ${item.subject}`, "term-warn");
+              logTerminal(`Dropped commit ${item.sha.slice(0, 7)}.`, "term-info");
+              currentExecutionStep++;
+              renderGraph();
+              setTimeout(advanceIfAuto, 400);
+              break;
+
+            case "squash":
+            case "fixup":
+              playSound("apply");
+              if (appliedCommits.length > 0) {
+                const prev = appliedCommits[appliedCommits.length - 1];
+                logTerminal(`Executing: ${item.action} ${item.sha.slice(0, 7)} ${item.subject}`, "term-cmd");
+                if (item.action === "squash") {
+                  prev.subject = `${prev.subject} + ${item.subject}`;
+                }
+                prev.files = Array.from(new Set([...prev.files, ...item.files]));
+                prev.diff = `${prev.diff}\n${item.diff}`;
+                // Re-hash parent
+                prev.sha = generateNewSha(prev.sha);
+                logTerminal(`Melded into [${prev.sha.slice(0, 7)}] (${item.action === "squash" ? "combined messages" : "discarded commit message"}).`, "term-success");
+              }
+              currentExecutionStep++;
+              renderGraph();
+              setTimeout(advanceIfAuto, 400);
+              break;
+
+            case "reword":
+              playSound("click");
+              logTerminal(`Executing: reword ${item.sha.slice(0, 7)} ${item.subject}`, "term-cmd");
+              const rewordedCommit = {
+                ...item,
+                sha: generateNewSha(item.sha)
+              };
+              appliedCommits.push(rewordedCommit);
+              logTerminal(`Committed new SHA [${rewordedCommit.sha.slice(0, 7)}] "${rewordedCommit.subject}"`, "term-success");
+              currentExecutionStep++;
+              renderGraph();
+              setTimeout(advanceIfAuto, 400);
+              break;
+
+            case "edit":
+              triggerEditStop(item);
+              break;
+
+            case "pick":
+            default:
+              playSound("apply");
+              logTerminal(`Executing: pick ${item.sha.slice(0, 7)} ${item.subject}`, "term-cmd");
+              const newCommit = {
+                ...item,
+                sha: generateNewSha(item.sha)
+              };
+              appliedCommits.push(newCommit);
+              logTerminal(`[feature ${newCommit.sha.slice(0, 7)}] ${newCommit.subject}`, "term-info");
+              currentExecutionStep++;
+              renderGraph();
+              setTimeout(advanceIfAuto, 400);
+              break;
+          }
+        }
+
+        function advanceIfAuto() {
+          if (executionState === "RUNNING") {
+            stepRebase();
+          }
+        }
+
+        function highlightCurrentRow(stepIdx) {
+          const rows = todoList.querySelectorAll(".todo-row");
+          rows.forEach((r, i) => {
+            if (i === stepIdx) {
+              r.style.borderColor = "var(--accent-cyan)";
+              r.style.background = "var(--bg-tertiary)";
+            } else if (i < stepIdx) {
+              r.style.opacity = "0.6";
+            }
+          });
+        }
+
+        // ==========================================
+        // 9. Interactive Edit Interruption
+        // ==========================================
+        function triggerEditStop(item) {
+          playSound("warn");
+          executionState = "STOPPED_EDIT";
+          updateHudStatus("STOPPED (EDIT)");
+          editorStatus.textContent = "STOPPED AT EDIT";
+          editorStatus.style.color = "var(--accent-amber)";
+          btnStepRebase.disabled = true;
+
+          logTerminal(`\nStopped at ${item.sha.slice(0, 7)}... ${item.subject}`, "term-warn");
+          logTerminal(`You can amend the commit now, split it, or stage changes.`, "term-info");
+          logTerminal(`When satisfied with changes, run 'git rebase --continue'.`, "term-info");
+
+          interruptBox.className = "interrupt-box";
+          interruptBox.style.display = "block";
+
+          if (currentLevelIdx === 3) {
+            // Level 4: Split Monolith
+            interruptBox.innerHTML = `
+              <div class="interrupt-title" style="color: var(--accent-amber)">
+                <span>✂️</span> Split Megacommit into Atomic Commits
+              </div>
+              <div class="interrupt-desc">
+                This commit bundled the SQL schema migration together with the Stripe payment service. Split them into 2 separate atomic commits!
+              </div>
+
+              <div class="split-stage-area">
+                <div class="stage-col">
+                  <h4>Commit 1: Database Migration</h4>
+                  <div class="stage-item">
+                    <span>📄 migrations/001_billing.sql</span>
+                    <span style="color: var(--accent-green)">STAGED</span>
+                  </div>
+                  <input type="text" class="text-input" id="split-msg-1" value="feat: add billing sql migrations schema" style="margin-top:4px" />
+                </div>
+                <div class="stage-col">
+                  <h4>Commit 2: Stripe Billing Service</h4>
+                  <div class="stage-item">
+                    <span>📄 src/services/stripe.js</span>
+                    <span style="color: var(--accent-green)">STAGED</span>
+                  </div>
+                  <input type="text" class="text-input" id="split-msg-2" value="feat: implement stripe payment service" style="margin-top:4px" />
+                </div>
+              </div>
+
+              <button class="btn btn-primary" id="btn-confirm-split" type="button">
+                Commit Both Separately & Continue Rebase
+              </button>
+            `;
+
+            document.getElementById("btn-confirm-split").addEventListener("click", () => {
+              playSound("apply");
+              const msg1 = document.getElementById("split-msg-1").value.trim();
+              const msg2 = document.getElementById("split-msg-2").value.trim();
+
+              const c1 = {
+                sha: generateNewSha(item.sha),
+                subject: msg1,
+                author: item.author,
+                files: ["migrations/001_billing.sql"],
+                diff: "+ CREATE TABLE subscriptions (id UUID PRIMARY KEY);"
+              };
+              const c2 = {
+                sha: generateNewSha(c1.sha),
+                subject: msg2,
+                author: item.author,
+                files: ["src/services/stripe.js"],
+                diff: "+ class StripePaymentService { ... }"
+              };
+
+              appliedCommits.push(c1, c2);
+
+              logTerminal(`$ git reset HEAD~`, "term-cmd");
+              logTerminal(`$ git add migrations/001_billing.sql`, "term-cmd");
+              logTerminal(`$ git commit -m "${c1.subject}" [${c1.sha.slice(0, 7)}]`, "term-success");
+              logTerminal(`$ git add src/services/stripe.js`, "term-cmd");
+              logTerminal(`$ git commit -m "${c2.subject}" [${c2.sha.slice(0, 7)}]`, "term-success");
+              logTerminal(`$ git rebase --continue`, "term-cmd");
+
+              interruptBox.style.display = "none";
+              interruptBox.innerHTML = "";
+              executionState = "RUNNING";
+              currentExecutionStep++;
+              renderGraph();
+              stepRebase();
+            });
+          } else {
+            // General Amend Option
+            interruptBox.innerHTML = `
+              <div class="interrupt-title" style="color: var(--accent-amber)">
+                <span>✏️</span> Amend Commit at HEAD
+              </div>
+              <div class="interrupt-desc">
+                Currently stopped at commit <code>${item.sha.slice(0, 7)}</code>. Amend message or stage changes.
+              </div>
+              <input type="text" class="text-input" id="amend-msg-input" value="${escapeHtml(item.subject)}" style="margin-bottom: 8px" />
+              <button class="btn btn-primary" id="btn-amend-continue" type="button">
+                git commit --amend & Continue
+              </button>
+            `;
+
+            document.getElementById("btn-amend-continue").addEventListener("click", () => {
+              playSound("apply");
+              const newSubject = document.getElementById("amend-msg-input").value.trim();
+              const amended = {
+                ...item,
+                subject: newSubject,
+                sha: generateNewSha(item.sha)
+              };
+              appliedCommits.push(amended);
+
+              logTerminal(`$ git commit --amend -m "${newSubject}" [${amended.sha.slice(0, 7)}]`, "term-success");
+              logTerminal(`$ git rebase --continue`, "term-cmd");
+
+              interruptBox.style.display = "none";
+              interruptBox.innerHTML = "";
+              executionState = "RUNNING";
+              currentExecutionStep++;
+              renderGraph();
+              stepRebase();
+            });
+          }
+        }
+
+        // ==========================================
+        // 10. Interactive Conflict Crucible
+        // ==========================================
+        function triggerConflict(scenario, item) {
+          playSound("warn");
+          executionState = "CONFLICT";
+          updateHudStatus("CONFLICT");
+          editorStatus.textContent = "MERGE CONFLICT";
+          editorStatus.style.color = "var(--accent-red)";
+          btnStepRebase.disabled = true;
+
+          logTerminal(`Auto-merging ${scenario.conflictFile}`, "term-info");
+          logTerminal(`CONFLICT (content): Merge conflict in ${scenario.conflictFile}`, "term-error");
+          logTerminal(`error: could not apply ${item.sha.slice(0, 7)}... ${item.subject}`, "term-error");
+          logTerminal(`Resolve all conflicts manually, mark them as resolved with 'git add', then run 'git rebase --continue'.`, "term-warn");
+
+          interruptBox.className = "interrupt-box is-conflict";
+          interruptBox.style.display = "block";
+
+          interruptBox.innerHTML = `
+            <div class="interrupt-title" style="color: var(--accent-red)">
+              <span>⚔️</span> Merge Conflict in ${scenario.conflictFile}
+            </div>
+            <div class="interrupt-desc">
+              Both upstream <code>HEAD</code> and your incoming commit changed the same line. Select your resolution:
+            </div>
+
+            <div class="conflict-viewer">
+              <div class="conflict-marker conflict-head">&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD (current change)</div>
+              <div>${escapeHtml(scenario.conflictData.head)}</div>
+              <div class="conflict-marker conflict-mid">=======</div>
+              <div>${escapeHtml(scenario.conflictData.incoming)}</div>
+              <div class="conflict-marker conflict-incoming">&gt;&gt;&gt;&gt;&gt;&gt;&gt; ${item.sha.slice(0, 7)} (${escapeHtml(item.subject)})</div>
+            </div>
+
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem">
+              <button class="btn btn-secondary" id="btn-conf-head" type="button">Keep Current (HEAD)</button>
+              <button class="btn btn-secondary" id="btn-conf-incoming" type="button">Accept Incoming</button>
+              <button class="btn btn-primary" id="btn-conf-merge" type="button">Merge Both Cleanly (Recommended)</button>
+            </div>
+
+            <div id="conflict-resolution-preview" style="font-family: var(--font-mono); font-size: 0.74rem; color: var(--accent-green); margin-bottom: 0.6rem; display: none">
+              ✓ Conflict marked resolved.
+            </div>
+
+            <button class="btn btn-success" id="btn-resolve-continue" type="button" disabled>
+              git add ${scenario.conflictFile} & git rebase --continue
+            </button>
+          `;
+
+          let chosenContent = null;
+          const preview = document.getElementById("conflict-resolution-preview");
+          const btnResolve = document.getElementById("btn-resolve-continue");
+
+          document.getElementById("btn-conf-head").addEventListener("click", () => {
+            playSound("click");
+            chosenContent = scenario.conflictData.head;
+            preview.textContent = `✓ Selected HEAD change.`;
+            preview.style.display = "block";
+            btnResolve.disabled = false;
+          });
+
+          document.getElementById("btn-conf-incoming").addEventListener("click", () => {
+            playSound("click");
+            chosenContent = scenario.conflictData.incoming;
+            preview.textContent = `✓ Selected Incoming change.`;
+            preview.style.display = "block";
+            btnResolve.disabled = false;
+          });
+
+          document.getElementById("btn-conf-merge").addEventListener("click", () => {
+            playSound("click");
+            chosenContent = scenario.conflictData.resolved;
+            preview.textContent = `✓ Combined cleanly into environment toggle.`;
+            preview.style.display = "block";
+            btnResolve.disabled = false;
+          });
+
+          btnResolve.addEventListener("click", () => {
+            playSound("apply");
+            logTerminal(`$ git add ${scenario.conflictFile}`, "term-cmd");
+            logTerminal(`$ git rebase --continue`, "term-cmd");
+
+            // Avoid repeating conflict on next step
+            scenario.hasConflictAtStep = -1;
+
+            const resolvedCommit = {
+              ...item,
+              sha: generateNewSha(item.sha),
+              diff: `+ ${chosenContent}`
+            };
+            appliedCommits.push(resolvedCommit);
+
+            interruptBox.style.display = "none";
+            interruptBox.innerHTML = "";
+            executionState = "RUNNING";
+            currentExecutionStep++;
+            renderGraph();
+            stepRebase();
+          });
+        }
+
+        // ==========================================
+        // 11. Completion & Win Evaluation
+        // ==========================================
+        function finishRebase() {
+          executionState = "COMPLETED";
+          updateHudStatus("COMPLETED");
+          editorStatus.textContent = "REBASE COMPLETE";
+          editorStatus.style.color = "var(--accent-green)";
+
+          btnStartRebase.disabled = true;
+          btnStepRebase.disabled = true;
+          btnAbortRebase.disabled = true;
+
+          logTerminal(`\nSuccessfully rebased and updated refs/heads/feature.`, "term-success");
+
+          renderGraph();
+
+          const scenario = SCENARIOS[currentLevelIdx];
+          const isWin = scenario.validateWin(appliedCommits);
+
+          cleanedCommitsCount += Math.max(1, scenario.featureCommits.length - appliedCommits.length);
+          hudCleaned.textContent = cleanedCommitsCount;
+
+          if (isWin) {
+            playSound("victory");
+            completedLevels[currentLevelIdx] = true;
+            try {
+              localStorage.setItem("git_rebase_completed", JSON.stringify(completedLevels));
+            } catch (e) {}
+
+            renderLevelTabs();
+
+            // Populate Victory Modal
+            victoryScenarioName.textContent = scenario.title;
+            victoryFeedback.textContent = scenario.winFeedback;
+
+            victoryCommitList.innerHTML = appliedCommits
+              .map(
+                (c) => `
+                <div style="padding: 2px 0; display: flex; gap: 0.5rem">
+                  <span style="color: var(--accent-green); font-weight: 700">${c.sha.slice(0, 7)}</span>
+                  <span>${escapeHtml(c.subject)}</span>
+                </div>
+              `
+              )
+              .join("");
+
+            setTimeout(() => {
+              modalVictory.classList.add("is-open");
+            }, 600);
+          } else {
+            playSound("warn");
+            logTerminal(`⚠️ The rebase finished, but did not satisfy the scenario goal! Check the instructions and try resetting.`, "term-warn");
+          }
+        }
+
+        btnNextLevel.addEventListener("click", () => {
+          modalVictory.classList.remove("is-open");
+          const nextIdx = (currentLevelIdx + 1) % SCENARIOS.length;
+          initLevel(nextIdx);
+        });
+
+        btnReplayLevel.addEventListener("click", () => {
+          modalVictory.classList.remove("is-open");
+          initLevel(currentLevelIdx);
+        });
+
+        btnCloseVictory.addEventListener("click", () => {
+          modalVictory.classList.remove("is-open");
+        });
+
+        // ==========================================
+        // 12. Reword Modal Handlers
+        // ==========================================
+        function openRewordModal(idx) {
+          rewordTargetIdx = idx;
+          const item = currentTodo[idx];
+          rewordSha.textContent = item.sha.slice(0, 7);
+          rewordInput.value = item.subject;
+          modalReword.classList.add("is-open");
+          setTimeout(() => rewordInput.focus(), 50);
+        }
+
+        btnSaveReword.addEventListener("click", () => {
+          if (rewordTargetIdx !== null && rewordInput.value.trim()) {
+            playSound("click");
+            currentTodo[rewordTargetIdx].subject = rewordInput.value.trim();
+            modalReword.classList.remove("is-open");
+            renderTodoList();
+            renderGraph();
+          }
+        });
+
+        btnCancelReword.addEventListener("click", () => {
+          modalReword.classList.remove("is-open");
+        });
+
+        btnCloseReword.addEventListener("click", () => {
+          modalReword.classList.remove("is-open");
+        });
+
+        // ==========================================
+        // 13. Cheatsheet Modal Handlers
+        // ==========================================
+        btnCheatsheet.addEventListener("click", () => {
+          playSound("click");
+          modalCheatsheet.classList.add("is-open");
+        });
+
+        btnCloseCheatsheet.addEventListener("click", () => {
+          modalCheatsheet.classList.remove("is-open");
+        });
+
+        btnCheatsheetOk.addEventListener("click", () => {
+          modalCheatsheet.classList.remove("is-open");
+        });
+
+        // ==========================================
+        // 14. Global Actions: Reset, Sound, Theme, Terminal Clear
+        // ==========================================
+        btnReset.addEventListener("click", () => {
+          playSound("click");
+          initLevel(currentLevelIdx);
+        });
+
+        btnClearTerm.addEventListener("click", () => {
+          terminalOutput.innerHTML = "";
+        });
+
+        btnSound.addEventListener("click", () => {
+          isMuted = !isMuted;
+          btnSound.textContent = isMuted ? "🔇" : "🔊";
+          try {
+            localStorage.setItem("git_rebase_muted", isMuted ? "true" : "false");
+          } catch (e) {}
+        });
+
+        btnTheme.addEventListener("click", () => {
+          playSound("click");
+          const current = document.documentElement.getAttribute("data-theme");
+          const next = current === "light" ? "dark" : "light";
+          document.documentElement.setAttribute("data-theme", next);
+          btnTheme.textContent = next === "light" ? "🌙" : "☀️";
+          try {
+            localStorage.setItem("git_rebase_theme", next);
+          } catch (e) {}
+        });
+
+        // Level Tabs Click
+        levelTabs.addEventListener("click", (e) => {
+          const tab = e.target.closest(".level-tab");
+          if (!tab) return;
+          const idx = parseInt(tab.getAttribute("data-lvl"), 10);
+          if (!isNaN(idx) && idx !== currentLevelIdx) {
+            playSound("click");
+            initLevel(idx);
+          }
+        });
+
+        // Sandbox Add Commit
+        btnAddCommit.addEventListener("click", () => {
+          const msg = sandboxMsg.value.trim();
+          if (!msg) return;
+          playSound("apply");
+          const sha = Math.random().toString(16).substring(2, 9);
+          currentTodo.push({
+            id: `todo-${Date.now()}`,
+            sha,
+            originalSubject: msg,
+            subject: msg,
+            action: "pick",
+            author: "You <you@internal.io>",
+            files: ["src/custom.js"],
+            diff: `+ // Added in sandbox: ${msg}`
+          });
+          sandboxMsg.value = "";
+          renderTodoList();
+          validateTodoConstraints();
+          renderGraph();
+          logTerminal(`Added sandbox commit [${sha}]: "${msg}"`, "term-info");
+        });
+
+        btnResetSandbox.addEventListener("click", () => {
+          playSound("click");
+          currentTodo = [];
+          renderTodoList();
+          validateTodoConstraints();
+          renderGraph();
+        });
+
+        // Keyboard Shortcut Esc to close modals
+        window.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") {
+            modalReword.classList.remove("is-open");
+            modalCheatsheet.classList.remove("is-open");
+            modalVictory.classList.remove("is-open");
+          }
+        });
+
+        // ==========================================
+        // 15. Helper Utilities
+        // ==========================================
+        function logTerminal(text, className = "term-info") {
+          const line = document.createElement("div");
+          line.className = `term-line ${className}`;
+          line.textContent = text;
+          terminalOutput.appendChild(line);
+          terminalOutput.scrollTop = terminalOutput.scrollHeight;
+        }
+
+        function updateHudStatus(status) {
+          hudStatus.textContent = status;
+          if (status === "READY") hudStatus.style.color = "var(--accent-cyan)";
+          else if (status === "REBASING") hudStatus.style.color = "var(--accent-amber)";
+          else if (status === "COMPLETED") hudStatus.style.color = "var(--accent-green)";
+          else if (status === "CONFLICT") hudStatus.style.color = "var(--accent-red)";
+        }
+
+        function generateNewSha(oldSha) {
+          // Re-hashes like Git does when commits are rebased
+          return (parseInt(oldSha.slice(0, 4), 16) + Math.floor(Math.random() * 8999 + 1000)).toString(16).padEnd(7, "f");
+        }
+
+        function escapeHtml(str) {
+          if (!str) return "";
+          return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        // Initialize first level
+        initLevel(0);
+      })();
+    </script>
+  </body>
+</html>
