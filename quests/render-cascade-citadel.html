@@ -1,0 +1,2235 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Render Cascade Citadel</title>
+    <meta name="description" content="A React memoization quest: diagnose wasted re-renders across 10 sectors and pick the correct React.memo, useCallback, useMemo or dependency fix." />
+    <meta name="color-scheme" content="dark light" />
+
+    <!-- Google Fonts aligned with scripts/index-template.txt -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;600;700;800&family=Nunito:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <!-- Dark mode FOUC prevention -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("cascade_citadel_theme");
+          if (t !== "light" && t !== "dark") {
+            t = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+          }
+          document.documentElement.setAttribute("data-theme", t);
+        } catch (e) {
+          document.documentElement.setAttribute("data-theme", "dark");
+        }
+      })();
+    </script>
+
+    <style>
+      /* ============================================================
+         Design Tokens & Cyberpunk Theme System
+         ============================================================ */
+      :root {
+        --font-heading: "Oxanium", -apple-system, BlinkMacSystemFont, sans-serif;
+        --font-sans: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+        --cyan: #00f0ff;
+        --cyan-glow: rgba(0, 240, 255, 0.35);
+        --magenta: #ff0055;
+        --magenta-glow: rgba(255, 0, 85, 0.35);
+        --green: #34c98a;
+        --green-glow: rgba(52, 201, 138, 0.35);
+        --amber: #e7a13a;
+        --amber-glow: rgba(231, 161, 58, 0.35);
+        --accent: #6d5efc;
+        --accent-glow: rgba(109, 94, 252, 0.4);
+
+        --radius-sm: 6px;
+        --radius: 12px;
+        --radius-lg: 18px;
+
+        --ease: cubic-bezier(0.22, 1, 0.36, 1);
+        --t-fast: 140ms;
+        --t: 240ms;
+      }
+
+      [data-theme="dark"] {
+        --bg: #07080c;
+        --bg-elev: #0e1017;
+        --surface: #12151f;
+        --surface-2: #181d2b;
+        --surface-hover: #1e2436;
+        --border: rgba(0, 240, 255, 0.12);
+        --border-strong: rgba(0, 240, 255, 0.28);
+        --text: #f0f4fc;
+        --text-muted: #8e9bb3;
+        --text-faint: #59657d;
+        --canvas-bg: #090b12;
+        --shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      }
+
+      [data-theme="light"] {
+        --bg: #f5f7fb;
+        --bg-elev: #ffffff;
+        --surface: #ffffff;
+        --surface-2: #edf1f8;
+        --surface-hover: #e2e8f4;
+        --border: rgba(109, 94, 252, 0.15);
+        --border-strong: rgba(109, 94, 252, 0.3);
+        --text: #0d121f;
+        --text-muted: #53607a;
+        --text-faint: #7f8ca3;
+        --canvas-bg: #f0f3fa;
+        --shadow: 0 4px 16px rgba(13, 18, 31, 0.08);
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg);
+        color: var(--text);
+        line-height: 1.55;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        transition:
+          background-color var(--t) var(--ease),
+          color var(--t) var(--ease);
+      }
+
+      .app-wrap {
+        max-width: 1260px;
+        width: 100%;
+        margin: 0 auto;
+        padding: 1.25rem 1.25rem 3.5rem;
+        flex: 1;
+      }
+
+      /* Top Header */
+      .top-nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-bottom: 1.25rem;
+        padding-bottom: 0.85rem;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .breadcrumbs {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.85rem;
+        font-family: var(--font-mono);
+      }
+
+      .breadcrumbs a {
+        color: var(--text-muted);
+        text-decoration: none;
+        transition: color var(--t-fast) var(--ease);
+      }
+
+      .breadcrumbs a:hover {
+        color: var(--cyan);
+      }
+
+      .breadcrumbs .sep {
+        color: var(--text-faint);
+      }
+
+      .breadcrumbs .current {
+        color: var(--text);
+        font-weight: 600;
+      }
+
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .icon-btn {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        color: var(--text);
+        border-radius: var(--radius-sm);
+        padding: 0.45rem 0.75rem;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+        transition: all var(--t-fast) var(--ease);
+        min-height: 36px;
+      }
+
+      .icon-btn:hover {
+        background: var(--surface-hover);
+        border-color: var(--border-strong);
+      }
+
+      .icon-btn:focus-visible {
+        outline: 2px solid var(--cyan);
+        outline-offset: 2px;
+      }
+
+      /* HUD Mission Status Bar */
+      .hud-bar {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+        gap: 0.75rem;
+        margin-bottom: 1.25rem;
+      }
+
+      .hud-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 0.7rem 0.9rem;
+        box-shadow: var(--shadow);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .hud-card::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: var(--cyan);
+        opacity: 0.4;
+      }
+
+      .hud-label {
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+      }
+
+      .hud-value {
+        font-family: var(--font-heading);
+        font-size: 1.15rem;
+        font-weight: 700;
+        margin-top: 0.2rem;
+      }
+
+      .hud-value.glow-cyan {
+        color: var(--cyan);
+        text-shadow: 0 0 10px var(--cyan-glow);
+      }
+      .hud-value.glow-green {
+        color: var(--green);
+        text-shadow: 0 0 10px var(--green-glow);
+      }
+      .hud-value.glow-magenta {
+        color: var(--magenta);
+        text-shadow: 0 0 10px var(--magenta-glow);
+      }
+      .hud-value.glow-amber {
+        color: var(--amber);
+        text-shadow: 0 0 10px var(--amber-glow);
+      }
+
+      /* Mission Banner */
+      .mission-header {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1.25rem 1.5rem;
+        margin-bottom: 1.25rem;
+        box-shadow: var(--shadow);
+        position: relative;
+      }
+
+      .sector-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+        padding: 0.25rem 0.6rem;
+        border-radius: 4px;
+        background: rgba(0, 240, 255, 0.1);
+        color: var(--cyan);
+        border: 1px solid rgba(0, 240, 255, 0.25);
+        margin-bottom: 0.6rem;
+      }
+
+      .mission-title {
+        font-family: var(--font-heading);
+        font-size: 1.6rem;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+        margin-bottom: 0.4rem;
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+      }
+
+      .mission-desc {
+        color: var(--text-muted);
+        font-size: 0.95rem;
+        line-height: 1.5;
+        max-width: 950px;
+      }
+
+      /* Main Stage Grid */
+      .stage-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.25rem;
+        align-items: start;
+      }
+
+      @media (max-width: 980px) {
+        .stage-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* Cards */
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1.25rem;
+        box-shadow: var(--shadow);
+        position: relative;
+      }
+
+      .card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .card-title {
+        font-family: var(--font-heading);
+        font-size: 1.05rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      /* Interactive Canvas Visualizer */
+      .canvas-container {
+        position: relative;
+        width: 100%;
+        background: var(--canvas-bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+        margin-bottom: 1rem;
+      }
+
+      canvas#fiberCanvas {
+        display: block;
+        width: 100%;
+        height: 280px;
+      }
+
+      .canvas-overlay {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        display: flex;
+        gap: 0.5rem;
+      }
+
+      .badge-indicator {
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        padding: 0.2rem 0.55rem;
+        border-radius: 4px;
+        background: rgba(0, 0, 0, 0.65);
+        backdrop-filter: blur(4px);
+        border: 1px solid var(--border);
+        color: var(--text);
+      }
+
+      /* Virtual React Profiler */
+      .profiler-box {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 0.85rem;
+        margin-bottom: 1rem;
+      }
+
+      .profiler-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        margin-bottom: 0.65rem;
+      }
+
+      .flame-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+      }
+
+      .flame-item {
+        display: grid;
+        grid-template-columns: 140px 1fr 90px;
+        align-items: center;
+        gap: 0.75rem;
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        background: var(--bg);
+        padding: 0.35rem 0.6rem;
+        border-radius: 4px;
+        border: 1px solid var(--border);
+      }
+
+      .flame-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 600;
+      }
+
+      .flame-bar-track {
+        background: rgba(255, 255, 255, 0.06);
+        height: 8px;
+        border-radius: 4px;
+        overflow: hidden;
+        position: relative;
+      }
+
+      .flame-bar-fill {
+        height: 100%;
+        border-radius: 4px;
+        transition:
+          width 0.3s var(--ease),
+          background-color 0.3s var(--ease);
+      }
+
+      .flame-bar-fill.wasted {
+        background: var(--magenta);
+        box-shadow: 0 0 8px var(--magenta-glow);
+      }
+
+      .flame-bar-fill.memoized {
+        background: var(--green);
+        box-shadow: 0 0 8px var(--green-glow);
+      }
+
+      .flame-status {
+        text-align: right;
+        font-size: 0.7rem;
+        font-weight: 700;
+      }
+
+      .flame-status.wasted {
+        color: var(--magenta);
+      }
+      .flame-status.memoized {
+        color: var(--green);
+      }
+
+      /* Code Editor Panel */
+      .code-panel {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 1rem;
+        font-family: var(--font-mono);
+        font-size: 0.82rem;
+        line-height: 1.5;
+        overflow-x: auto;
+        color: var(--text);
+        margin-bottom: 1rem;
+        max-height: 310px;
+        overflow-y: auto;
+        white-space: pre;
+      }
+
+      .code-line-highlight {
+        background: rgba(255, 0, 85, 0.15);
+        color: #ff6b8b;
+        display: block;
+        border-left: 3px solid var(--magenta);
+        padding-left: 0.5rem;
+        margin-left: -0.5rem;
+      }
+
+      /* Refactor Option Cards */
+      .solutions-title {
+        font-size: 0.82rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+        margin-bottom: 0.65rem;
+      }
+
+      .options-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+        margin-bottom: 1.25rem;
+      }
+
+      .solution-option {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 0.85rem 1rem;
+        cursor: pointer;
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        transition: all var(--t-fast) var(--ease);
+      }
+
+      .solution-option:hover {
+        background: var(--surface-hover);
+        border-color: var(--border-strong);
+        transform: translateY(-1px);
+      }
+
+      .solution-option.selected {
+        border-color: var(--cyan);
+        background: rgba(0, 240, 255, 0.08);
+        box-shadow: 0 0 14px var(--cyan-glow);
+      }
+
+      .solution-option.correct {
+        border-color: var(--green);
+        background: rgba(52, 201, 138, 0.1);
+      }
+
+      .solution-option.wrong {
+        border-color: var(--magenta);
+        background: rgba(255, 0, 85, 0.1);
+      }
+
+      .option-key {
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        font-weight: 700;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        padding: 0.15rem 0.45rem;
+        border-radius: 4px;
+        color: var(--cyan);
+      }
+
+      .option-body {
+        flex: 1;
+      }
+
+      .option-text {
+        font-size: 0.88rem;
+        font-weight: 600;
+        line-height: 1.4;
+      }
+
+      .option-text code {
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        color: var(--cyan);
+        background: rgba(0, 240, 255, 0.08);
+        padding: 0.1rem 0.35rem;
+        border-radius: 3px;
+      }
+
+      /* Control Actions */
+      .action-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+      }
+
+      .primary-btn {
+        background: var(--cyan);
+        color: #07080c;
+        border: none;
+        padding: 0.65rem 1.4rem;
+        border-radius: var(--radius-sm);
+        font-family: var(--font-heading);
+        font-size: 0.95rem;
+        font-weight: 800;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all var(--t-fast) var(--ease);
+        box-shadow: 0 0 16px var(--cyan-glow);
+      }
+
+      .primary-btn:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 0 24px var(--cyan-glow);
+      }
+
+      .primary-btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+        box-shadow: none;
+      }
+
+      .ghost-btn {
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--text-muted);
+        padding: 0.6rem 1rem;
+        border-radius: var(--radius-sm);
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        transition: all var(--t-fast) var(--ease);
+      }
+
+      .ghost-btn:hover {
+        color: var(--text);
+        background: var(--surface-hover);
+        border-color: var(--border-strong);
+      }
+
+      /* Explainer Callout Card */
+      .explainer-card {
+        margin-top: 1.25rem;
+        background: var(--surface-2);
+        border-left: 3px solid var(--cyan);
+        padding: 1rem;
+        border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+        display: none;
+      }
+
+      .explainer-card.show {
+        display: block;
+        animation: fadeIn 0.3s var(--ease);
+      }
+
+      .explainer-title {
+        font-family: var(--font-heading);
+        font-size: 0.92rem;
+        font-weight: 700;
+        color: var(--cyan);
+        margin-bottom: 0.3rem;
+      }
+
+      .explainer-body {
+        font-size: 0.85rem;
+        color: var(--text);
+        line-height: 1.5;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(6px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      /* Modal Dialog (Victory / Completion) */
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.75);
+        backdrop-filter: blur(8px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity var(--t) var(--ease);
+        z-index: 9999;
+      }
+
+      .modal-backdrop.show {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .modal-box {
+        background: var(--surface);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius);
+        max-width: 520px;
+        width: 100%;
+        padding: 2rem;
+        box-shadow: 0 0 40px rgba(0, 240, 255, 0.25);
+        text-align: center;
+        transform: scale(0.95);
+        transition: transform var(--t) var(--ease);
+      }
+
+      .modal-backdrop.show .modal-box {
+        transform: scale(1);
+      }
+
+      .modal-trophy {
+        font-size: 3.5rem;
+        line-height: 1;
+        margin-bottom: 1rem;
+        animation: floatTrophy 2s ease-in-out infinite;
+      }
+
+      @keyframes floatTrophy {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(-8px);
+        }
+      }
+
+      .modal-title {
+        font-family: var(--font-heading);
+        font-size: 1.6rem;
+        font-weight: 800;
+        margin-bottom: 0.5rem;
+        color: var(--cyan);
+      }
+
+      .modal-text {
+        color: var(--text-muted);
+        font-size: 0.95rem;
+        margin-bottom: 1.5rem;
+        line-height: 1.5;
+      }
+
+      /* Toast Notification */
+      .toast {
+        position: fixed;
+        bottom: 2rem;
+        right: 2rem;
+        background: var(--cyan);
+        color: #07080c;
+        padding: 0.65rem 1.15rem;
+        border-radius: var(--radius-sm);
+        font-family: var(--font-heading);
+        font-size: 0.88rem;
+        font-weight: 800;
+        box-shadow: 0 0 20px var(--cyan-glow);
+        opacity: 0;
+        transform: translateY(10px);
+        pointer-events: none;
+        transition: all 0.2s var(--ease);
+        z-index: 10000;
+      }
+
+      .toast.show {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      /* Integrity meter */
+      .integrity-pips {
+        display: inline-flex;
+        gap: 0.3rem;
+        align-items: center;
+      }
+
+      .pip {
+        width: 0.85rem;
+        height: 0.85rem;
+        border-radius: 3px;
+        transform: rotate(45deg);
+        background: var(--green);
+        box-shadow: 0 0 8px var(--green-glow);
+        transition:
+          background-color var(--t-fast) var(--ease),
+          box-shadow var(--t-fast) var(--ease);
+      }
+
+      .pip.lost {
+        background: transparent;
+        border: 1px solid var(--magenta);
+        box-shadow: none;
+      }
+
+      .solution-option.eliminated {
+        opacity: 0.45;
+        cursor: not-allowed;
+        text-decoration: line-through;
+        text-decoration-color: var(--magenta);
+      }
+
+      .solution-option.eliminated:hover {
+        transform: none;
+        background: var(--surface-2);
+        border-color: var(--border);
+      }
+
+      .solution-option.locked {
+        cursor: default;
+      }
+
+      .solution-option.locked:hover {
+        transform: none;
+      }
+
+      .solution-option:focus-visible {
+        outline: 2px solid var(--cyan);
+        outline-offset: 2px;
+      }
+
+      .code-line {
+        display: block;
+        min-height: 1.5em;
+      }
+
+      .flame-mid {
+        min-width: 0;
+      }
+
+      .flame-cause {
+        display: block;
+        margin-top: 0.2rem;
+        font-size: 0.68rem;
+        color: var(--text-muted);
+        white-space: normal;
+      }
+
+      .flame-bar-fill.needed {
+        background: var(--cyan);
+        box-shadow: 0 0 8px var(--cyan-glow);
+      }
+
+      .flame-bar-fill.stale {
+        background: var(--amber);
+        box-shadow: 0 0 8px var(--amber-glow);
+      }
+
+      .flame-status.needed {
+        color: var(--cyan);
+      }
+      .flame-status.stale {
+        color: var(--amber);
+      }
+
+      .explainer-card.fail {
+        border-left-color: var(--magenta);
+      }
+
+      .explainer-card.fail .explainer-title {
+        color: var(--magenta);
+      }
+
+      .explainer-card.warn {
+        border-left-color: var(--amber);
+      }
+
+      .explainer-card.warn .explainer-title {
+        color: var(--amber);
+      }
+
+      .modal-text code {
+        font-family: var(--font-mono);
+        color: var(--cyan);
+      }
+
+      @media (max-width: 560px) {
+        .app-wrap {
+          padding-inline: 1rem;
+        }
+        .mission-header,
+        .card {
+          padding: 1rem;
+        }
+        .mission-title {
+          font-size: 1.3rem;
+        }
+        .flame-item {
+          grid-template-columns: 1fr auto;
+        }
+        .flame-mid {
+          grid-column: 1 / -1;
+          grid-row: 2;
+        }
+        .profiler-header span:nth-child(2) {
+          display: none;
+        }
+        .toast {
+          left: 1rem;
+          right: 1rem;
+          bottom: 1rem;
+        }
+        .card-header {
+          flex-wrap: wrap;
+          gap: 0.5rem;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.01ms !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-wrap">
+      <!-- Top Navigation -->
+      <nav class="top-nav" aria-label="Quest breadcrumbs and controls">
+        <div class="breadcrumbs">
+          <a href="/">One File Tools</a>
+          <span class="sep">/</span>
+          <a href="/#quests">Quests</a>
+          <span class="sep">/</span>
+          <span class="current">Render Cascade Citadel</span>
+        </div>
+        <div class="header-actions">
+          <button class="icon-btn" id="audioToggleBtn" type="button" aria-label="Mute sound effects" title="Toggle audio feedback (M)">
+            <span id="audioIcon" aria-hidden="true">🔊</span>
+          </button>
+          <button class="icon-btn" id="themeToggleBtn" type="button" aria-label="Toggle theme" title="Toggle dark/light theme">
+            <span id="themeIcon" aria-hidden="true">☀️</span>
+          </button>
+          <button class="icon-btn" id="resetProgressBtn" type="button" title="Reset quest progress">
+            <span id="resetBtnLabel">Reset</span>
+          </button>
+        </div>
+      </nav>
+
+      <!-- HUD Stats Bar -->
+      <section class="hud-bar" aria-label="Citadel HUD telemetry">
+        <div class="hud-card">
+          <div class="hud-label">⚡ Grid Sector</div>
+          <div class="hud-value glow-cyan" id="hudSector">1 / 10</div>
+        </div>
+        <div class="hud-card">
+          <div class="hud-label">🛡️ Integrity</div>
+          <div class="hud-value" id="hudIntegrity" aria-live="polite">
+            <span class="integrity-pips" id="integrityPips" aria-hidden="true"></span>
+            <span class="sr-only" id="integrityText" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">3 of 3</span>
+          </div>
+        </div>
+        <div class="hud-card">
+          <div class="hud-label">🔥 Core Thermal</div>
+          <div class="hud-value glow-magenta" id="hudThermal">82°C (Critical)</div>
+        </div>
+        <div class="hud-card">
+          <div class="hud-label">📶 Citadel Stability</div>
+          <div class="hud-value glow-amber" id="hudStability">0%</div>
+        </div>
+        <div class="hud-card">
+          <div class="hud-label">🏆 Total Score</div>
+          <div class="hud-value glow-cyan" id="hudScore">0 PTS</div>
+        </div>
+      </section>
+
+      <!-- Mission Sector Header -->
+      <header class="mission-header">
+        <div class="sector-tag" id="missionSectorTag">SECTOR 01</div>
+        <h1 class="mission-title" id="missionTitle">Render Cascade Citadel</h1>
+        <p class="mission-desc" id="missionDesc"></p>
+      </header>
+
+      <!-- Main Interactive Stage Grid -->
+      <main class="stage-grid">
+        <!-- Left Column: Fiber Tree Visualizer & Profiler -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">📡 Component Tree</h2>
+            <div class="badge-indicator" id="fiberStatusBadge">PULSE: Brownout Active</div>
+          </div>
+
+          <div class="canvas-container">
+            <canvas id="fiberCanvas" role="img" aria-label="Component tree diagram for the current sector"></canvas>
+          </div>
+
+          <!-- Simulated profiler (scripted per level) -->
+          <div class="profiler-box">
+            <div class="profiler-header">
+              <span>Component</span>
+              <span>Render cause &amp; duration</span>
+              <span>Status</span>
+            </div>
+            <div class="flame-list" id="flameList"></div>
+          </div>
+        </div>
+
+        <!-- Right Column: Code & Options -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">💻 Component Code</h2>
+            <span class="badge-indicator" id="reactHookBadge"></span>
+          </div>
+
+          <pre class="code-panel" id="codePanel" tabindex="0" aria-label="Component source code"><code></code></pre>
+
+          <div class="solutions-title" id="optionsLabel">Pick the fix (keys 1–4, Enter submits):</div>
+          <div class="options-stack" id="optionsStack" role="radiogroup" aria-labelledby="optionsLabel"></div>
+
+          <div class="action-row">
+            <button class="ghost-btn" id="btnHint" type="button">💡 Hint (H)</button>
+            <button class="primary-btn" id="btnAction" type="button" disabled>⚡ Stabilize &amp; Re-evaluate</button>
+          </div>
+
+          <div class="explainer-card" id="explainerCard" aria-live="polite">
+            <div class="explainer-title" id="explainerTitle"></div>
+            <div class="explainer-body" id="explainerBody"></div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Victory Modal -->
+    <div class="modal-backdrop" id="victoryModal" role="dialog" aria-modal="true" aria-labelledby="modalHeading" aria-hidden="true">
+      <div class="modal-box">
+        <div class="modal-trophy" aria-hidden="true">⚡🏆⚡</div>
+        <h2 class="modal-title" id="modalHeading">Citadel Grid Stabilized!</h2>
+        <p class="modal-text" id="modalText"></p>
+        <button class="primary-btn" id="btnPlayAgain" type="button" style="margin: 0 auto">🔄 Play Again</button>
+      </div>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script>
+      (function () {
+        "use strict";
+
+        /* @engine-start */
+        // ---------------------------------------------------------------
+        // Level data. Option text uses `backticks` for inline code; it is
+        // rendered with text nodes, never innerHTML. Code is plain text and
+        // is HTML-escaped before the highlight spans are applied.
+        // Profiler rows: [name, duration, kind, cause]
+        //   kind: needed | wasted | skipped | stale
+        // ---------------------------------------------------------------
+        var LEVELS = [
+          {
+            sector: "SECTOR 01: SUBSTATION ALPHA",
+            title: "The Raw Callback Leak",
+            hookBadge: "useCallback",
+            desc: "Substation re-renders on every heartbeat tick and passes handleAlert to the memoized GridTerminal. handleAlert is an arrow function created in the component body, so every tick produces a new function object. React.memo sees a changed onAlert prop and GridTerminal, plus both relays below it, re-render for nothing.",
+            code: ["function Substation() {", "  const [tick, setTick] = useState(0);", "  const [alert, setAlert] = useState(false);", "", "  // BUG: a brand-new function on every render", "  const handleAlert = () => setAlert(true);", "", "  return (", "    <div>", "      <button onClick={() => setTick(t => t + 1)}>Heartbeat: {tick}</button>", "      <GridTerminal onAlert={handleAlert} />", "    </div>", "  );", "}", "", "const GridTerminal = React.memo(function GridTerminal({ onAlert }) {", "  return <Panel><RelayA /><RelayB /></Panel>;", "});"],
+            hl: [5],
+            nodes: [
+              { id: "Substation", label: "<Substation>", x: 300, y: 40 },
+              { id: "GridTerminal", label: "<GridTerminal> memo", x: 300, y: 130 },
+              { id: "RelayA", label: "<RelayA>", x: 190, y: 220 },
+              { id: "RelayB", label: "<RelayB>", x: 410, y: 220 }
+            ],
+            edges: [
+              ["Substation", "GridTerminal"],
+              ["GridTerminal", "RelayA"],
+              ["GridTerminal", "RelayB"]
+            ],
+            profilerBroken: [
+              ["<Substation>", "0.8ms", "needed", "State update: tick (expected render)"],
+              ["<GridTerminal>", "4.2ms", "wasted", "Props changed: onAlert (new function reference)"],
+              ["<RelayA>", "2.1ms", "wasted", "Parent GridTerminal re-rendered"],
+              ["<RelayB>", "2.0ms", "wasted", "Parent GridTerminal re-rendered"]
+            ],
+            profilerFixed: [
+              ["<Substation>", "0.8ms", "needed", "State update: tick (expected render)"],
+              ["<GridTerminal>", "0.0ms", "skipped", "React.memo: all props equal"],
+              ["<RelayA>", "0.0ms", "skipped", "Not rendered: parent bailed out"],
+              ["<RelayB>", "0.0ms", "skipped", "Not rendered: parent bailed out"]
+            ],
+            options: [
+              { t: "Wrap it: `const handleAlert = useCallback(() => setAlert(true), []);` (the `setAlert` setter is already stable).", ok: true },
+              { t: "Cache it with `const handleAlert = useMemo(() => setAlert(true), []);`", why: "useMemo caches the value its function returns. This calls setAlert(true) during render and caches undefined, so GridTerminal gets no handler at all, and the alert fires during the first render instead of on an event." },
+              { t: "Use `useCallback(() => setAlert(true), [tick])` so the handler always sees the latest tick.", why: "tick changes on every heartbeat, so the callback is recreated exactly as often as before and React.memo still sees a new onAlert." },
+              { t: "Use a declaration, `function handleAlert() { setAlert(true); }`, because hoisted functions are reused across renders.", why: "Hoisting only changes where the name is usable inside one call. Every render runs the component body again and creates a new function object, whether it is a declaration or an arrow." }
+            ],
+            hint: "React.memo only helps when every prop is the same reference as last render. Which hook keeps a function’s identity between renders?",
+            explainer: "React.memo compares each prop with Object.is against the previous render. A function created in the component body is a new object on every render, so onAlert never compares equal and GridTerminal (and its children) re-render on every tick. useCallback returns the same function until one of its dependencies changes; with [] it stays the same for the life of the component. State setters from useState are guaranteed stable, so they do not need to be listed."
+          },
+          {
+            sector: "SECTOR 02: POWER MATRIX NEXUS",
+            title: "The Inline Object Literal Trap",
+            hookBadge: "Stable object",
+            desc: 'PowerNexus re-renders on every pulse and builds config = { mode: "cyber", voltage: 120 } inside its body. The memoized PowerRelay compares config by reference, and two separately created object literals are never the same reference, even when their contents are identical.',
+            code: ["function PowerNexus() {", "  const [pulse, setPulse] = useState(0);   // ticks several times a second", "", "  // BUG: a new object literal on every render", '  const config = { mode: "cyber", voltage: 120 };', "", "  return (", "    <>", "      <PulseMeter value={pulse} />", "      <PowerRelay config={config} />   {/* PowerRelay is React.memo */}", "    </>", "  );", "}"],
+            hl: [4],
+            nodes: [
+              { id: "PowerNexus", label: "<PowerNexus>", x: 300, y: 40 },
+              { id: "PowerRelay", label: "<PowerRelay> memo", x: 300, y: 130 },
+              { id: "Capacitor", label: "<Capacitor>", x: 300, y: 220 }
+            ],
+            edges: [
+              ["PowerNexus", "PowerRelay"],
+              ["PowerRelay", "Capacitor"]
+            ],
+            profilerBroken: [
+              ["<PowerNexus>", "0.6ms", "needed", "State update: pulse"],
+              ["<PowerRelay>", "3.6ms", "wasted", "Props changed: config ({...} !== {...})"],
+              ["<Capacitor>", "1.9ms", "wasted", "Parent PowerRelay re-rendered"]
+            ],
+            profilerFixed: [
+              ["<PowerNexus>", "0.6ms", "needed", "State update: pulse"],
+              ["<PowerRelay>", "0.0ms", "skipped", "React.memo: config is the same reference"],
+              ["<Capacitor>", "0.0ms", "skipped", "Not rendered: parent bailed out"]
+            ],
+            options: [
+              { t: 'Hoist `config` to a constant outside the component, or create it with `useMemo(() => ({ mode: "cyber", voltage: 120 }), [])`.', ok: true },
+              { t: 'Use `useMemo(() => ({ mode: "cyber", voltage: 120 }))` with no dependency array.', why: "Without a dependency array useMemo recomputes on every render, so config is still a new object each time." },
+              { t: 'Define `const makeConfig = useCallback(() => ({ mode: "cyber", voltage: 120 }), []);` and pass `config={makeConfig()}`.', why: "makeConfig is stable, but calling it during render runs the arrow again and returns a fresh object every time. useCallback caches the function, not what it returns." },
+              { t: "Keep the object in a ref and pass a copy: `config={{ ...configRef.current }}`.", why: "Spreading builds a new object on every render. The ref is stable but the copy is not, so PowerRelay still sees a changed prop." }
+            ],
+            hint: "{ a: 1 } === { a: 1 } is false in JavaScript. How do you hand PowerRelay the same object every time?",
+            explainer: "Objects are compared by reference: two literals with the same contents are still different objects. A literal inside the component body is rebuilt on every render. If the values never change, hoist the object outside the component; if they depend on props or state, useMemo with those values as dependencies returns the cached object until one of them changes."
+          },
+          {
+            sector: "SECTOR 03: CYBER-CORE REACTOR",
+            title: "Uncached Heavy Telemetry Filtering",
+            hookBadge: "useMemo",
+            desc: "Typing in the search box updates search, which re-renders ReactorTelemetry. The filter-and-sort over about 50,000 packets does not use search at all, yet it runs again on every keystroke, blocks the main thread, and hands the memoized TopNodes a new array each time.",
+            code: ["function ReactorTelemetry({ packets }) {   // ~50,000 packets", '  const [search, setSearch] = useState("");', "", "  // BUG: filters and sorts 50,000 packets on every keystroke", "  const active = packets.filter(p => p.active).sort((a, b) => b.hz - a.hz);", "", "  return (", "    <>", "      <input value={search} onChange={e => setSearch(e.target.value)} />", "      <TopNodes nodes={active} />   {/* TopNodes is React.memo */}", "    </>", "  );", "}"],
+            hl: [4],
+            nodes: [
+              { id: "Reactor", label: "<ReactorTelemetry>", x: 300, y: 40 },
+              { id: "Compute", label: "filter + sort (50k)", x: 300, y: 130 },
+              { id: "TopNodes", label: "<TopNodes> memo", x: 300, y: 220 }
+            ],
+            edges: [
+              ["Reactor", "Compute"],
+              ["Compute", "TopNodes"]
+            ],
+            profilerBroken: [
+              ["<ReactorTelemetry>", "1.1ms", "needed", "State update: search (keystroke)"],
+              ["filter().sort() 50k", "34.2ms", "wasted", "Recomputed although packets did not change"],
+              ["<TopNodes>", "2.5ms", "wasted", "Props changed: nodes (new array)"]
+            ],
+            profilerFixed: [
+              ["<ReactorTelemetry>", "1.1ms", "needed", "State update: search (keystroke)"],
+              ["filter().sort() 50k", "0.0ms", "skipped", "useMemo: same packets reference, cached result reused"],
+              ["<TopNodes>", "0.0ms", "skipped", "React.memo: same nodes array"]
+            ],
+            options: [
+              { t: "`const active = useMemo(() => packets.filter(p => p.active).sort((a, b) => b.hz - a.hz), [packets]);`", ok: true },
+              { t: "The same `useMemo`, but with `[search]` as the dependency array.", why: "search changes on every keystroke, so the work still re-runs on every keystroke, and when packets changes the list goes stale." },
+              { t: "The same `useMemo`, with an empty `[]` dependency array.", why: "It computes once and never again: when the parent passes a new packets array, active keeps showing the old results." },
+              { t: "`const active = useCallback(() => packets.filter(p => p.active).sort((a, b) => b.hz - a.hz), [packets]);`", why: "useCallback caches the function itself, not its result. active becomes a function, TopNodes receives a function instead of an array, and nothing is computed or skipped." }
+            ],
+            hint: "The expensive line only reads packets. Cache its result and list exactly what it reads.",
+            explainer: "useMemo(calculate, deps) returns the cached result while every dependency is the same (compared with Object.is) and runs calculate again when one differs. With [packets], keystrokes reuse the cached list, and the sort only runs again when the parent passes a new packets array. React does not detect in-place mutation: pushing into the same array keeps the same reference, so the cached result would be reused. Update packets immutably. (filter() returns a new array, so the sort() here does not mutate the prop.)"
+          },
+          {
+            sector: "SECTOR 04: DEFENSE TURRET ARRAY",
+            title: "Missing React.memo on Pure Nodes",
+            hookBadge: "React.memo",
+            desc: "RadarStation updates its sweep angle about 30 times a second. Its two TurretUnit children always get the same primitive props, but TurretUnit is a plain function component, so both turrets re-render on every sweep tick.",
+            code: ["// BUG: not memoized, so it re-renders whenever RadarStation does", "function TurretUnit({ turretId, sector }) {", '  return <div className="turret">Turret #{turretId} ({sector})</div>;', "}", "", "function RadarStation() {", "  const [angle, setAngle] = useState(0);   // a sweep effect updates this ~30x/s", "  return (", "    <>", "      <RadarSweep angle={angle} />", '      <TurretUnit turretId={1} sector="North" />', '      <TurretUnit turretId={2} sector="East" />', "    </>", "  );", "}"],
+            hl: [1],
+            nodes: [
+              { id: "RadarStation", label: "<RadarStation>", x: 300, y: 45 },
+              { id: "RadarSweep", label: "<RadarSweep>", x: 110, y: 175 },
+              { id: "Turret1", label: "<TurretUnit #1>", x: 300, y: 175 },
+              { id: "Turret2", label: "<TurretUnit #2>", x: 490, y: 175 }
+            ],
+            hot: ["Turret1", "Turret2"],
+            edges: [
+              ["RadarStation", "RadarSweep"],
+              ["RadarStation", "Turret1"],
+              ["RadarStation", "Turret2"]
+            ],
+            profilerBroken: [
+              ["<RadarStation>", "0.7ms", "needed", "State update: angle"],
+              ["<RadarSweep>", "1.2ms", "needed", "Props changed: angle"],
+              ["<TurretUnit #1>", "3.1ms", "wasted", "Parent re-rendered (props unchanged)"],
+              ["<TurretUnit #2>", "2.9ms", "wasted", "Parent re-rendered (props unchanged)"]
+            ],
+            profilerFixed: [
+              ["<RadarStation>", "0.7ms", "needed", "State update: angle"],
+              ["<RadarSweep>", "1.2ms", "needed", "Props changed: angle"],
+              ["<TurretUnit #1>", "0.0ms", "skipped", "React.memo: props equal"],
+              ["<TurretUnit #2>", "0.0ms", "skipped", "React.memo: props equal"]
+            ],
+            options: [
+              { t: "Wrap the component: `const TurretUnit = React.memo(function TurretUnit({ turretId, sector }) { ... });`", ok: true },
+              { t: 'Give each turret a stable `key` (for example `key="north"`) so React reuses its rendered output.', why: "Keys tell React which element is which across renders so it keeps the right state and DOM. They do not let a component skip rendering." },
+              { t: 'In RadarStation, build the props with `useMemo(() => ({ turretId: 1, sector: "North" }), [])` and spread them onto each turret.', why: "The props were already equal primitives. Without React.memo on TurretUnit, React re-renders it whenever its parent renders, however stable the props are." },
+              { t: "Stabilize the component with `const Turret = useCallback(TurretUnit, []);` inside RadarStation and render `<Turret ... />`.", why: "That only keeps the same function reference; React still calls it on every parent render. A hook cannot make a component skip rendering; React.memo does." }
+            ],
+            hint: "Keys, stable props and hooks in the parent do not stop a child from rendering. What tells React to compare props first?",
+            explainer: "By default, when a component re-renders, React re-renders all of its children too, even if their props did not change. React.memo(Component) lets React skip the re-render when every new prop is equal (Object.is) to the previous one. TurretUnit only receives a number and a string, so the comparison passes and both turrets are skipped on each sweep tick. Rendering is usually cheap; memo pays off for components that re-render often with the same props."
+          },
+          {
+            sector: "SECTOR 05: SHIELD HARMONIZER",
+            title: "Object vs Primitive Dependency Trap",
+            hookBadge: "Narrow dependencies",
+            desc: "The parent stores settings immutably, so changing an unrelated field such as avatar produces a new settings object. calibrate lists [settings] as its dependency, so it is recreated whenever any setting changes, and the memoized ShieldEmitter re-renders even though frequency stayed the same.",
+            code: ["function ShieldHarmonizer({ settings }) {   // { frequency, avatar, ... }", "  // BUG: depends on the whole settings object", "  const calibrate = useCallback(() => {", "    syncShield(settings.frequency);", "  }, [settings]);", "", "  return <ShieldEmitter onCalibrate={calibrate} />;   // ShieldEmitter is React.memo", "}"],
+            hl: [2, 3, 4],
+            nodes: [
+              { id: "Harmonizer", label: "<ShieldHarmonizer>", x: 300, y: 50 },
+              { id: "ShieldEmitter", label: "<ShieldEmitter> memo", x: 300, y: 170 }
+            ],
+            edges: [["Harmonizer", "ShieldEmitter"]],
+            profilerBroken: [
+              ["<ShieldHarmonizer>", "0.9ms", "needed", "New settings object from parent (avatar changed)"],
+              ["<ShieldEmitter>", "5.4ms", "wasted", "Props changed: onCalibrate (settings reference changed)"]
+            ],
+            profilerFixed: [
+              ["<ShieldHarmonizer>", "0.9ms", "needed", "New settings object from parent (avatar changed)"],
+              ["<ShieldEmitter>", "0.0ms", "skipped", "onCalibrate unchanged (frequency is the same)"]
+            ],
+            options: [
+              { t: "List only what the callback reads: `[settings.frequency]` (or destructure `frequency` first and use `[frequency]`).", ok: true },
+              { t: "Use `[JSON.stringify(settings)]` as the dependency.", why: "Changing avatar changes the JSON string too, so calibrate is still recreated, and you pay to serialize settings on every render." },
+              { t: "Use `[]` and keep reading `settings.frequency` inside the callback.", why: "calibrate would keep the first render’s settings forever and sync a stale frequency after the user changes it." },
+              { t: "Drop the dependency array: `useCallback(() => syncShield(settings.frequency))`.", why: "Without a dependency array useCallback returns a new function on every render, which is worse than before." }
+            ],
+            hint: "The callback reads a single number. Make the dependency array list exactly that.",
+            explainer: "Hooks compare each dependency with Object.is. [settings] changes whenever the parent passes a new settings object, even if only avatar differs. [settings.frequency] is a number, so it only changes when the frequency itself changes. The comparison is by reference, not by contents: a settings object mutated in place keeps the same reference and would not invalidate [settings] at all, which is why state should always be updated with new objects."
+          },
+          {
+            sector: "SECTOR 06: CENTRAL GRID DISPATCH",
+            title: "Context Provider Value Thrashing",
+            hookBadge: "useMemo on context value",
+            desc: "CitadelShell re-renders every second for its clock, which also re-renders GridProvider. The provider builds value={{ state, dispatch }} inline, so each clock tick gives the context a new object, and both memoized consumers re-render even though the grid state did not change.",
+            code: ["function CitadelShell() {", "  const [clock, setClock] = useState(0);   // ticks every second", "  return (", "    <>", "      <ClockDisplay time={clock} />", "      <GridProvider>", "        <StatusConsumer />     {/* React.memo + useContext(GridContext) */}", "        <DispatchConsumer />   {/* React.memo + useContext(GridContext) */}", "      </GridProvider>", "    </>", "  );", "}", "", "function GridProvider({ children }) {", "  const [state, dispatch] = useReducer(gridReducer, initialGrid);", "  // BUG: a new value object every time GridProvider renders", "  return (", "    <GridContext.Provider value={{ state, dispatch }}>", "      {children}", "    </GridContext.Provider>", "  );", "}"],
+            hl: [17],
+            nodes: [
+              { id: "CitadelShell", label: "<CitadelShell>", x: 300, y: 32 },
+              { id: "GridProvider", label: "<GridProvider>", x: 300, y: 118 },
+              { id: "StatusConsumer", label: "<StatusConsumer> memo", x: 160, y: 206 },
+              { id: "DispatchConsumer", label: "<DispatchConsumer> memo", x: 440, y: 206 }
+            ],
+            hot: ["StatusConsumer", "DispatchConsumer"],
+            edges: [
+              ["CitadelShell", "GridProvider"],
+              ["GridProvider", "StatusConsumer"],
+              ["GridProvider", "DispatchConsumer"]
+            ],
+            profilerBroken: [
+              ["<CitadelShell>", "0.6ms", "needed", "State update: clock"],
+              ["<GridProvider>", "0.4ms", "needed", "Parent re-rendered"],
+              ["<StatusConsumer>", "4.8ms", "wasted", "Context value changed (new object, same state)"],
+              ["<DispatchConsumer>", "3.9ms", "wasted", "Context value changed (new object, same state)"]
+            ],
+            profilerFixed: [
+              ["<CitadelShell>", "0.6ms", "needed", "State update: clock"],
+              ["<GridProvider>", "0.4ms", "needed", "Parent re-rendered"],
+              ["<StatusConsumer>", "0.0ms", "skipped", "Context value is the same reference"],
+              ["<DispatchConsumer>", "0.0ms", "skipped", "Context value is the same reference"]
+            ],
+            options: [
+              { t: "`const value = useMemo(() => ({ state, dispatch }), [state, dispatch]);` and pass `value={value}`.", ok: true },
+              { t: "`const value = useMemo(() => ({ state, dispatch }), []);`", why: "The value never updates, so consumers keep reading the initial grid state after every dispatch." },
+              { t: "Wrap GridProvider in `React.memo`.", why: "GridProvider receives children, and CitadelShell creates new child elements on every render, so the memo comparison fails and the inline value is rebuilt anyway." },
+              { t: "Switch from `useReducer` to `useState`, since context compares the inline `{ state, setState }` object by its contents.", why: "Context compares the value with Object.is, which is reference equality for objects no matter which hook produced the fields. A new literal is always a new reference." }
+            ],
+            hint: "Ask why the provider re-rendered: because of its own state, or because of its parent? Only one of those should reach the consumers.",
+            explainer: "Every component that reads a context re-renders when the provider’s value changes per Object.is, and React.memo cannot block that. Memoizing the value with [state, dispatch] keeps the same reference when GridProvider re-renders only because its parent did (the clock tick). When the grid state really changes, the memoized value changes too and the consumers re-render, which is correct: useMemo removes the re-renders caused by the parent, not the ones caused by the provider’s own state. dispatch from useReducer is stable, so listing it costs nothing."
+          },
+          {
+            sector: "SECTOR 07: DRONE UPLINK TOWER",
+            title: "Stale Closure in a Single Interval",
+            hookBadge: "Updater function",
+            desc: "The uplink must keep one interval alive for its whole lifetime: tearing it down and recreating it every tick drops telemetry frames. The effect runs once ([]), so its callback closes over the first render’s count, 0. Every tick calls setCount(0 + 1): the first tick renders count 1, after that React sees the same value (Object.is(1, 1)) and skips the re-render, so the counter freezes at 1.",
+            code: ["function DroneUplink() {", "  const [count, setCount] = useState(0);", "", "  useEffect(() => {", "    const timer = setInterval(() => {", "      // BUG: this closure always sees count = 0", "      setCount(count + 1);", "    }, 1000);", "    return () => clearInterval(timer);", "  }, []);   // requirement: subscribe once, never re-create the interval", "", "  return <TelemetryRadio count={count} />;", "}"],
+            hl: [6],
+            nodes: [
+              { id: "DroneUplink", label: "<DroneUplink>", x: 300, y: 60 },
+              { id: "TelemetryRadio", label: "<TelemetryRadio>", x: 300, y: 180 }
+            ],
+            hot: ["DroneUplink", "TelemetryRadio"],
+            edges: [["DroneUplink", "TelemetryRadio"]],
+            profilerBroken: [
+              ["<DroneUplink>", "0.5ms", "stale", "Tick 1 renders count 1; later setCount(1) calls bail out (Object.is)"],
+              ["<TelemetryRadio>", "0.4ms", "stale", "Frozen at count = 1"]
+            ],
+            profilerFixed: [
+              ["<DroneUplink>", "0.5ms", "needed", "Updater c => c + 1: count advances every tick"],
+              ["<TelemetryRadio>", "0.4ms", "needed", "Props changed: count (real update)"]
+            ],
+            options: [
+              { t: "Use an updater function, `setCount(c => c + 1);`, and keep the `[]` dependency array.", ok: true },
+              { t: "Add `count` to the dependency array: `}, [count]);`", why: "That does fix the stale value and is valid React in general, but the effect then clears and recreates the interval every second, which breaks this sector’s one-interval requirement." },
+              { t: "Replace `setInterval` with `setTimeout` inside the same effect.", why: "The timeout fires once and still reads count from the first render, so the counter stops at 1 even sooner." },
+              { t: "Define `const tick = useCallback(() => setCount(count + 1), [count]);` and call `setInterval(tick, 1000)` in the `[]` effect.", why: "The effect only runs once, so the interval keeps the first tick function, which still closes over count = 0. Later versions of tick never reach the running interval." }
+            ],
+            hint: "You may not re-create the interval. Is there a way to update state without reading count inside the closure?",
+            explainer: "Each render has its own count. An effect with [] runs after the first render only, so the interval callback closes over count = 0 and keeps calling setCount(1). After the first update React compares the new state with the current one using Object.is, sees 1 and 1, and bails out, so nothing changes. setCount(c => c + 1) passes an updater: React calls it with the latest state, so the callback no longer reads count and the single interval keeps working. Adding count to the dependencies is also a correct fix in general; it just re-subscribes on every tick."
+          },
+          {
+            sector: "SECTOR 08: PLASMA CONDUIT VAULT",
+            title: "Children Prop Element Re-creation",
+            hookBadge: "Stable children",
+            desc: "ConduitVault re-renders on every flow update. Card is wrapped in React.memo, but its children prop is the JSX <HeavyConduit flowRatio={0.5} />, which creates a new element object each time it runs. Card’s memo sees a changed children prop, so Card and the expensive HeavyConduit render again on every tick.",
+            code: ["function ConduitVault() {", "  const [flow, setFlow] = useState(100);   // updates many times a second", "", "  return (", "    <>", "      <FlowGauge value={flow} />", "      <Card>                               {/* Card is React.memo */}", "        <HeavyConduit flowRatio={0.5} />   {/* BUG: new element object every render */}", "      </Card>", "    </>", "  );", "}"],
+            hl: [7],
+            nodes: [
+              { id: "ConduitVault", label: "<ConduitVault>", x: 300, y: 40 },
+              { id: "Card", label: "<Card> memo", x: 300, y: 130 },
+              { id: "HeavyConduit", label: "<HeavyConduit>", x: 300, y: 220 }
+            ],
+            edges: [
+              ["ConduitVault", "Card"],
+              ["Card", "HeavyConduit"]
+            ],
+            profilerBroken: [
+              ["<ConduitVault>", "0.6ms", "needed", "State update: flow"],
+              ["<Card>", "4.5ms", "wasted", "Props changed: children (new element object)"],
+              ["<HeavyConduit>", "7.8ms", "wasted", "Parent Card re-rendered"]
+            ],
+            profilerFixed: [
+              ["<ConduitVault>", "0.6ms", "needed", "State update: flow"],
+              ["<Card>", "0.0ms", "skipped", "React.memo: same children element"],
+              ["<HeavyConduit>", "0.0ms", "skipped", "Not rendered: parent bailed out"]
+            ],
+            options: [
+              { t: "Keep the element stable: `const conduit = useMemo(() => <HeavyConduit flowRatio={0.5} />, []);` and render `<Card>{conduit}</Card>` (or move `flow` into its own component so a parent that does not re-render creates the element).", ok: true },
+              { t: "Memoize it with the state it sits next to: `useMemo(() => <HeavyConduit flowRatio={0.5} />, [flow])`.", why: "flow changes on every tick, so the element is recreated as often as before." },
+              { t: 'Add a stable key: `<HeavyConduit key="conduit" flowRatio={0.5} />`.', why: "A key identifies the element during reconciliation, but the JSX still produces a new element object, so Card’s children prop still changes." },
+              { t: "`const conduit = useCallback(() => <HeavyConduit flowRatio={0.5} />, []);` and render `<Card>{conduit}</Card>`.", why: "That passes a function as a child. React cannot render a function child (it warns and renders nothing), so the conduit disappears." }
+            ],
+            hint: "children is a prop like any other. Does the JSX inside <Card> produce the same object twice?",
+            explainer: "JSX compiles to a function call (jsx() or React.createElement) that returns a new plain object every time it runs. children is just a prop, so React.memo on Card compares it by reference and sees a change on every render. Caching the element with useMemo, or creating it in a component that does not re-render (move the changing state down and pass the element in as children from above), gives Card the same children reference, and React skips the whole subtree."
+          },
+          {
+            sector: "SECTOR 09: QUANTUM FIREWALL",
+            title: "Custom Hook Callback Drift",
+            hookBadge: "useCallback in a custom hook",
+            desc: "useQuantumFirewall returns a verify function created fresh on every render. PacketFilter lists verify as an effect dependency, so the effect re-runs after every render. On its own that is only wasted work, but this effect also sets state to a new array, which causes another render, which creates another verify: an endless render loop.",
+            code: ["function useQuantumFirewall(protocol) {", "  // BUG: a new verify function every time the host component renders", "  const verify = (packet) => packet.protocol === protocol;", "  return { verify };", "}", "", "function PacketFilter({ protocol, packets }) {", "  const { verify } = useQuantumFirewall(protocol);", "  const [allowed, setAllowed] = useState([]);", "", "  useEffect(() => {", "    setAllowed(packets.filter(verify));   // a new array on every run", "  }, [packets, verify]);", "", "  return <AllowedList items={allowed} />;", "}"],
+            hl: [2],
+            nodes: [
+              { id: "Firewall", label: "<FirewallGateway>", x: 300, y: 40 },
+              { id: "PacketFilter", label: "<PacketFilter>", x: 300, y: 130 },
+              { id: "AllowedList", label: "<AllowedList>", x: 300, y: 220 }
+            ],
+            edges: [
+              ["Firewall", "PacketFilter"],
+              ["PacketFilter", "AllowedList"]
+            ],
+            profilerBroken: [
+              ["<FirewallGateway>", "0.7ms", "needed", "Initial render"],
+              ["<PacketFilter>", "2.8ms", "wasted", "Loop: effect dep verify is new each render, setAllowed re-renders"],
+              ["<AllowedList>", "6.2ms", "wasted", "Props changed: items (new array every loop)"]
+            ],
+            profilerFixed: [
+              ["<FirewallGateway>", "0.7ms", "needed", "Initial render"],
+              ["<PacketFilter>", "0.9ms", "needed", "Effect runs only when packets or protocol change"],
+              ["<AllowedList>", "1.1ms", "needed", "Props changed: items (real update)"]
+            ],
+            options: [
+              { t: "Inside the hook: `const verify = useCallback((packet) => packet.protocol === protocol, [protocol]);`", ok: true },
+              { t: "Inside the hook, wrap verify in `useCallback(..., [])`.", why: "verify would keep the first protocol forever, so switching protocols keeps filtering with the old one." },
+              { t: "Remove `verify` from the effect’s dependency array and silence the lint warning.", why: "The loop stops, but the effect now ignores protocol changes and keeps a stale verify: a closure bug hidden by the disabled lint rule." },
+              { t: "Wrap PacketFilter in `React.memo`.", why: "memo only skips renders caused by the parent when props are equal. This loop comes from PacketFilter’s own effect setting its own state, which memo does not stop." }
+            ],
+            hint: "The effect is right to depend on verify. Make verify change only when protocol does.",
+            explainer: "A function created during render is a new object every time, so an effect that depends on it runs after every render. That alone is wasted work; it becomes an infinite loop only when the effect sets state that triggers another render, as setAllowed with a new array does here. Custom hooks that return functions should wrap them in useCallback with the values they read ([protocol]) so callers can safely list them as dependencies."
+          },
+          {
+            sector: "SECTOR 10: CITADEL APEX AI CORE",
+            title: "The Master Cascade Overload",
+            hookBadge: "Combined memoization",
+            desc: "Clicking a node updates selected, which re-renders ApexCore. heat has not changed, yet the 40 ms simulation runs again, the context value is a new object (so MatrixPanel re-renders despite memo), and every NodeCard re-renders because it is not memoized and gets a new onSelect anyway.",
+            code: ["function ApexCore({ nodes }) {", "  const [heat, setHeat] = useState(100);", "  const [selected, setSelected] = useState(null);", "", "  const matrix = heavySimulation(heat);         // ~40ms, runs on every render", "  const selectNode = (id) => setSelected(id);   // new function every render", "  const ctxValue = { heat, matrix };            // new object every render", "", "  return (", "    <ApexContext.Provider value={ctxValue}>", "      <MatrixPanel />   {/* React.memo + useContext(ApexContext) */}", "      {/* NodeCard is not memoized */}", "      {nodes.map(n => <NodeCard key={n.id} node={n} onSelect={selectNode} />)}", "    </ApexContext.Provider>", "  );", "}"],
+            hl: [4, 5, 6],
+            nodes: [
+              { id: "ApexCore", label: "<ApexCore>", x: 300, y: 38 },
+              { id: "MatrixPanel", label: "<MatrixPanel> memo", x: 95, y: 175 },
+              { id: "Node1", label: "<NodeCard #1>", x: 255, y: 175 },
+              { id: "Node2", label: "<NodeCard #2>", x: 385, y: 175 },
+              { id: "Node3", label: "<NodeCard #3>", x: 515, y: 175 }
+            ],
+            edges: [
+              ["ApexCore", "MatrixPanel"],
+              ["ApexCore", "Node1"],
+              ["ApexCore", "Node2"],
+              ["ApexCore", "Node3"]
+            ],
+            profilerBroken: [
+              ["<ApexCore>", "1.4ms", "needed", "State update: selected"],
+              ["heavySimulation(heat)", "40.2ms", "wasted", "Recomputed although heat did not change"],
+              ["<MatrixPanel>", "6.8ms", "wasted", "Context value changed (new object)"],
+              ["<NodeCard> x3", "9.3ms", "wasted", "Not memoized, and onSelect is new anyway"]
+            ],
+            profilerFixed: [
+              ["<ApexCore>", "1.4ms", "needed", "State update: selected"],
+              ["heavySimulation(heat)", "0.0ms", "skipped", "useMemo: same heat, cached matrix"],
+              ["<MatrixPanel>", "0.0ms", "skipped", "Context value is the same reference"],
+              ["<NodeCard> x3", "0.0ms", "skipped", "React.memo: node and onSelect unchanged"]
+            ],
+            options: [
+              { t: "All four: `useMemo` for `matrix` with `[heat]`, `useMemo` for the context value with `[heat, matrix]`, `useCallback` for `selectNode` with `[]`, and `React.memo` on `NodeCard`.", ok: true },
+              { t: "Only wrap `NodeCard` in `React.memo`.", why: "onSelect is still a new function every render, so every NodeCard fails the memo comparison, and the simulation and context value are untouched." },
+              { t: "`useMemo` for `matrix` and `useCallback` for `selectNode`, but leave `NodeCard` unmemoized and the context value inline.", why: "NodeCard re-renders with its parent however stable its props are, and the inline context object still re-renders MatrixPanel." },
+              { t: "Wrap `matrix`, `ctxValue` and `selectNode` in `useMemo`/`useCallback` with empty `[]` deps, plus `React.memo` on `NodeCard`.", why: "No wasted renders, but wrong: matrix and the context value freeze at the first heat value, so the UI stops reflecting real heat changes." }
+            ],
+            hint: "Each fix only works if the others are in place. Check every value ApexCore creates while rendering.",
+            explainer: "Memoization works as a chain: React.memo on a child only helps if every prop it gets is stable, and stable props only help if the child is memoized. useMemo with [heat] skips the simulation unless heat changes; a memoized context value keeps MatrixPanel quiet when only selected changes; useCallback keeps onSelect stable so the memoized NodeCards can bail out. Components still re-render when the data they use really changes, and that is the goal: remove the unnecessary renders, not all of them."
+          }
+        ];
+
+        var MAX_INTEGRITY = 3;
+        var POINTS_PER_INTEGRITY = 50;
+        var MAX_SCORE = LEVELS.length * MAX_INTEGRITY * POINTS_PER_INTEGRITY;
+
+        // Unbiased Fisher-Yates shuffle; returns a new array.
+        function shuffle(arr, rng) {
+          var a = arr.slice();
+          var rand = rng || Math.random;
+          for (var i = a.length - 1; i > 0; i--) {
+            var j = Math.floor(rand() * (i + 1));
+            var tmp = a[i];
+            a[i] = a[j];
+            a[j] = tmp;
+          }
+          return a;
+        }
+
+        // Validate a saved-progress string. Returns { levelIndex, score } or null.
+        // levelIndex === LEVELS.length means the run is complete.
+        function parseSave(raw) {
+          if (typeof raw !== "string" || !raw) return null;
+          var parsed;
+          try {
+            parsed = JSON.parse(raw);
+          } catch (e) {
+            return null;
+          }
+          if (!parsed || typeof parsed !== "object") return null;
+          var li = parsed.levelIndex;
+          if (!Number.isInteger(li) || li < 0 || li > LEVELS.length) return null;
+          var sc = parsed.score;
+          if (typeof sc !== "number" || !isFinite(sc)) sc = 0;
+          sc = Math.max(0, Math.min(Math.floor(sc), li * MAX_INTEGRITY * POINTS_PER_INTEGRITY));
+          return { levelIndex: li, score: sc };
+        }
+
+        // Game state machine. phase: playing | stable | failed | complete
+        function createGame() {
+          return {
+            levelIndex: 0,
+            progress: 0, // number of levels cleared (persisted); points only for levelIndex >= progress
+            score: 0,
+            phase: "playing",
+            integrity: MAX_INTEGRITY,
+            order: [],
+            tried: [],
+            selected: null,
+            lastPoints: 0
+          };
+        }
+
+        function startLevel(g, rng) {
+          var level = LEVELS[g.levelIndex];
+          g.phase = "playing";
+          g.integrity = MAX_INTEGRITY;
+          g.order = shuffle(
+            level.options.map(function (_, i) {
+              return i;
+            }),
+            rng
+          );
+          g.tried = [];
+          g.selected = null;
+          g.lastPoints = 0;
+          return g;
+        }
+
+        function applySave(g, save, rng) {
+          if (save && save.levelIndex >= LEVELS.length) {
+            g.levelIndex = LEVELS.length - 1;
+            g.progress = LEVELS.length;
+            g.score = save.score;
+            startLevel(g, rng);
+            g.phase = "complete";
+          } else {
+            g.levelIndex = save ? save.levelIndex : 0;
+            g.progress = g.levelIndex;
+            g.score = save ? save.score : 0;
+            startLevel(g, rng);
+          }
+          return g;
+        }
+
+        function optionAt(g, pos) {
+          return LEVELS[g.levelIndex].options[g.order[pos]];
+        }
+
+        function canSelect(g, pos) {
+          return g.phase === "playing" && pos >= 0 && pos < g.order.length && g.tried.indexOf(pos) === -1;
+        }
+
+        function select(g, pos) {
+          if (!canSelect(g, pos)) return false;
+          g.selected = pos;
+          return true;
+        }
+
+        // Returns { type: 'correct'|'wrong'|'failed'|'ignored', points, save, option }
+        function submit(g) {
+          if (g.phase !== "playing" || g.selected === null) return { type: "ignored" };
+          var pos = g.selected;
+          var opt = optionAt(g, pos);
+          if (opt.ok) {
+            var points = g.levelIndex >= g.progress ? g.integrity * POINTS_PER_INTEGRITY : 0;
+            g.score += points;
+            g.progress = Math.max(g.progress, g.levelIndex + 1);
+            g.phase = "stable";
+            g.lastPoints = points;
+            // Score and progress are persisted together, atomically.
+            return { type: "correct", points: points, option: opt, save: { levelIndex: g.progress, score: g.score } };
+          }
+          g.tried.push(pos);
+          g.selected = null;
+          g.integrity -= 1;
+          if (g.integrity <= 0) {
+            g.integrity = 0;
+            g.phase = "failed";
+            return { type: "failed", points: 0, option: opt };
+          }
+          return { type: "wrong", points: 0, option: opt };
+        }
+
+        function advance(g, rng) {
+          if (g.phase !== "stable") return false;
+          if (g.levelIndex < LEVELS.length - 1) {
+            g.levelIndex += 1;
+            startLevel(g, rng);
+          } else {
+            g.phase = "complete";
+          }
+          return true;
+        }
+
+        function retry(g, rng) {
+          if (g.phase !== "failed") return false;
+          startLevel(g, rng);
+          return true;
+        }
+
+        function resetRun(g, rng) {
+          g.levelIndex = 0;
+          g.progress = 0;
+          g.score = 0;
+          startLevel(g, rng);
+          return { levelIndex: 0, score: 0 };
+        }
+        /* @engine-end */
+
+        // --- Procedural Sound Effects ---
+        var audioCtx = null;
+        var isMuted = false;
+
+        function getAudioContext() {
+          if (!audioCtx && (window.AudioContext || window.webkitAudioContext)) {
+            var AudioCtx = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioCtx();
+          }
+          if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+          return audioCtx;
+        }
+
+        function playSound(type) {
+          if (isMuted) return;
+          try {
+            var ac = getAudioContext();
+            if (!ac) return;
+            var now = ac.currentTime;
+            var osc = ac.createOscillator();
+            var gain = ac.createGain();
+            osc.connect(gain);
+            gain.connect(ac.destination);
+            var dur = 0.04;
+            if (type === "click") {
+              osc.type = "sine";
+              osc.frequency.setValueAtTime(800, now);
+              osc.frequency.exponentialRampToValueAtTime(400, now + 0.04);
+              gain.gain.setValueAtTime(0.08, now);
+            } else if (type === "surge") {
+              dur = 0.2;
+              osc.type = "sawtooth";
+              osc.frequency.setValueAtTime(140, now);
+              osc.frequency.linearRampToValueAtTime(280, now + 0.15);
+              gain.gain.setValueAtTime(0.12, now);
+            } else if (type === "fail") {
+              dur = 0.5;
+              osc.type = "sawtooth";
+              osc.frequency.setValueAtTime(220, now);
+              osc.frequency.exponentialRampToValueAtTime(55, now + 0.5);
+              gain.gain.setValueAtTime(0.14, now);
+            } else if (type === "stable") {
+              dur = 0.35;
+              osc.type = "triangle";
+              osc.frequency.setValueAtTime(440, now);
+              osc.frequency.setValueAtTime(554.37, now + 0.08);
+              osc.frequency.setValueAtTime(659.25, now + 0.16);
+              gain.gain.setValueAtTime(0.12, now);
+            } else if (type === "victory") {
+              dur = 0.6;
+              osc.type = "sine";
+              osc.frequency.setValueAtTime(523.25, now);
+              osc.frequency.setValueAtTime(659.25, now + 0.1);
+              osc.frequency.setValueAtTime(783.99, now + 0.2);
+              osc.frequency.setValueAtTime(1046.5, now + 0.3);
+              gain.gain.setValueAtTime(0.15, now);
+            }
+            gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+            osc.start(now);
+            osc.stop(now + dur);
+          } catch (e) {
+            /* audio unavailable */
+          }
+        }
+
+        // --- Persistence ---
+        var STORAGE_KEY = "render_cascade_citadel_save_v2";
+
+        function loadSave() {
+          try {
+            return parseSave(localStorage.getItem(STORAGE_KEY));
+          } catch (e) {
+            return null;
+          }
+        }
+
+        function writeSave(save) {
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ levelIndex: save.levelIndex, score: save.score }));
+          } catch (e) {
+            /* storage unavailable */
+          }
+        }
+
+        // --- DOM ---
+        function $(id) {
+          return document.getElementById(id);
+        }
+        var hudSector = $("hudSector");
+        var hudThermal = $("hudThermal");
+        var hudStability = $("hudStability");
+        var hudScore = $("hudScore");
+        var integrityPips = $("integrityPips");
+        var integrityText = $("integrityText");
+        var missionSectorTag = $("missionSectorTag");
+        var missionTitle = $("missionTitle");
+        var missionDesc = $("missionDesc");
+        var reactHookBadge = $("reactHookBadge");
+        var fiberStatusBadge = $("fiberStatusBadge");
+        var flameList = $("flameList");
+        var codePanel = $("codePanel");
+        var optionsStack = $("optionsStack");
+        var btnHint = $("btnHint");
+        var btnAction = $("btnAction");
+        var explainerCard = $("explainerCard");
+        var explainerTitle = $("explainerTitle");
+        var explainerBody = $("explainerBody");
+        var victoryModal = $("victoryModal");
+        var modalText = $("modalText");
+        var btnPlayAgain = $("btnPlayAgain");
+        var toast = $("toast");
+
+        var game = createGame();
+        var toastTimer = null;
+
+        function showToast(msg) {
+          toast.textContent = msg;
+          toast.classList.add("show");
+          clearTimeout(toastTimer);
+          toastTimer = setTimeout(function () {
+            toast.classList.remove("show");
+          }, 2600);
+        }
+
+        function escapeHtml(s) {
+          return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+
+        // Render `backtick` markup as text + <code> nodes (no innerHTML).
+        function fillRich(el, text) {
+          el.textContent = "";
+          String(text)
+            .split("`")
+            .forEach(function (part, i) {
+              if (!part) return;
+              if (i % 2 === 1) {
+                var c = document.createElement("code");
+                c.textContent = part;
+                el.appendChild(c);
+              } else {
+                el.appendChild(document.createTextNode(part));
+              }
+            });
+        }
+
+        // --- Canvas ---
+        var canvas = $("fiberCanvas");
+        var ctx = canvas.getContext("2d");
+        var CSS_HEIGHT = 280;
+        var LOGICAL_W = 600;
+        var cssW = LOGICAL_W;
+        var pulsePhase = 0;
+        var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+        function resizeCanvas() {
+          var rect = canvas.getBoundingClientRect();
+          var dpr = window.devicePixelRatio || 1;
+          cssW = Math.max(200, Math.round(rect.width || LOGICAL_W));
+          canvas.style.height = CSS_HEIGHT + "px";
+          canvas.width = Math.round(cssW * dpr);
+          canvas.height = Math.round(CSS_HEIGHT * dpr);
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        }
+
+        function isHot(level, node, idx) {
+          if (level.hot) return level.hot.indexOf(node.id) !== -1;
+          return idx > 0;
+        }
+
+        function renderCanvas() {
+          var w = cssW;
+          var h = CSS_HEIGHT;
+          var sx = w / LOGICAL_W; // x scales with width; y and text stay at 1:1 so nothing distorts
+          var isDark = document.documentElement.getAttribute("data-theme") !== "light";
+          var stable = game.phase === "stable" || game.phase === "complete";
+          var failed = game.phase === "failed";
+          var level = LEVELS[game.levelIndex];
+
+          ctx.clearRect(0, 0, w, h);
+          ctx.strokeStyle = isDark ? "rgba(0, 240, 255, 0.04)" : "rgba(109, 94, 252, 0.08)";
+          ctx.lineWidth = 1;
+          for (var x = 0; x < w; x += 30) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, h);
+            ctx.stroke();
+          }
+          for (var y = 0; y < h; y += 30) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(w, y);
+            ctx.stroke();
+          }
+
+          if (level) {
+            if (!reduceMotion) pulsePhase += failed ? 0.02 : 0.05;
+            var byId = {};
+            level.nodes.forEach(function (n) {
+              byId[n.id] = n;
+            });
+
+            level.edges.forEach(function (e) {
+              var a = byId[e[0]];
+              var b = byId[e[1]];
+              if (!a || !b) return;
+              var ax = a.x * sx,
+                bx = b.x * sx;
+              ctx.beginPath();
+              ctx.moveTo(ax, a.y);
+              ctx.lineTo(bx, b.y);
+              ctx.strokeStyle = stable ? "rgba(52, 201, 138, 0.5)" : failed ? "rgba(128, 128, 140, 0.4)" : "rgba(255, 0, 85, 0.4)";
+              ctx.lineWidth = 2;
+              ctx.stroke();
+              if (failed) return;
+              var t = stable ? (pulsePhase % 2) / 2 : pulsePhase % 1;
+              ctx.fillStyle = stable ? "#00c2d1" : "#ff0055";
+              ctx.beginPath();
+              ctx.arc(ax + (bx - ax) * t, a.y + (b.y - a.y) * t, stable ? 3 : 4, 0, Math.PI * 2);
+              ctx.fill();
+            });
+
+            var fontSize = w < 460 ? 9 : 10;
+            level.nodes.forEach(function (node, idx) {
+              var nx = node.x * sx;
+              var hot = !stable && isHot(level, node, idx);
+              var radius = w < 460 ? 18 : 22;
+              var ring = stable ? "#34c98a" : failed ? "#8e9bb3" : hot ? "#ff0055" : "#00c2d1";
+
+              ctx.beginPath();
+              ctx.arc(nx, node.y, radius + 4, 0, Math.PI * 2);
+              ctx.fillStyle = stable ? "rgba(52, 201, 138, 0.15)" : hot ? "rgba(255, 0, 85, 0.2)" : "rgba(0, 240, 255, 0.15)";
+              ctx.fill();
+
+              ctx.beginPath();
+              ctx.arc(nx, node.y, radius, 0, Math.PI * 2);
+              ctx.fillStyle = isDark ? "#12151f" : "#ffffff";
+              ctx.fill();
+              ctx.lineWidth = 2;
+              ctx.strokeStyle = ring;
+              ctx.stroke();
+
+              ctx.textAlign = "center";
+              ctx.textBaseline = "middle";
+              ctx.font = fontSize + 'px "JetBrains Mono", ui-monospace, monospace';
+              ctx.fillStyle = isDark ? "#f0f4fc" : "#0d121f";
+              ctx.fillText(node.label, nx, node.y + radius + 13);
+
+              ctx.font = "12px sans-serif";
+              ctx.fillText(stable ? "⚡" : failed ? "✖" : hot ? "🔥" : "⚛️", nx, node.y);
+            });
+          }
+          requestAnimationFrame(renderCanvas);
+        }
+
+        // --- Rendering ---
+        function renderHUD() {
+          var level = LEVELS[game.levelIndex];
+          var stable = game.phase === "stable" || game.phase === "complete";
+          hudSector.textContent = game.levelIndex + 1 + " / " + LEVELS.length;
+          hudScore.textContent = game.score + " PTS";
+
+          integrityPips.textContent = "";
+          for (var i = 0; i < MAX_INTEGRITY; i++) {
+            var pip = document.createElement("span");
+            pip.className = "pip" + (i < game.integrity ? "" : " lost");
+            integrityPips.appendChild(pip);
+          }
+          integrityText.textContent = game.integrity + " of " + MAX_INTEGRITY + " integrity";
+
+          hudStability.textContent = Math.round((game.progress / LEVELS.length) * 100) + "%";
+          hudStability.className = "hud-value " + (game.progress >= LEVELS.length ? "glow-green" : "glow-amber");
+
+          if (stable) {
+            hudThermal.className = "hud-value glow-green";
+            hudThermal.textContent = "32°C (Optimal)";
+            fiberStatusBadge.textContent = "STATUS: Sector stabilized ✅";
+            fiberStatusBadge.style.color = "var(--green)";
+          } else if (game.phase === "failed") {
+            hudThermal.className = "hud-value glow-magenta";
+            hudThermal.textContent = "MELTDOWN";
+            fiberStatusBadge.textContent = "STATUS: Grid collapsed ✖";
+            fiberStatusBadge.style.color = "var(--magenta)";
+          } else {
+            hudThermal.className = "hud-value glow-magenta";
+            hudThermal.textContent = 82 + game.levelIndex * 2 + (MAX_INTEGRITY - game.integrity) * 4 + "°C (Critical)";
+            fiberStatusBadge.textContent = "PULSE: Brownout active ⚠️";
+            fiberStatusBadge.style.color = "var(--magenta)";
+          }
+          if (level) reactHookBadge.textContent = level.hookBadge;
+        }
+
+        var STATUS_LABEL = { needed: "RENDERED", wasted: "WASTED", skipped: "SKIPPED", stale: "STALE" };
+        var BAR_WIDTH = { needed: "35%", wasted: "85%", skipped: "6%", stale: "60%" };
+
+        function renderProfiler() {
+          var level = LEVELS[game.levelIndex];
+          var stable = game.phase === "stable" || game.phase === "complete";
+          var rows = stable ? level.profilerFixed : level.profilerBroken;
+          flameList.textContent = "";
+          rows.forEach(function (r) {
+            var kind = r[2];
+            var row = document.createElement("div");
+            row.className = "flame-item";
+
+            var name = document.createElement("span");
+            name.className = "flame-name";
+            name.textContent = r[0];
+            name.title = r[0];
+
+            var mid = document.createElement("div");
+            mid.className = "flame-mid";
+            var track = document.createElement("div");
+            track.className = "flame-bar-track";
+            var fill = document.createElement("div");
+            fill.className = "flame-bar-fill " + (kind === "skipped" ? "memoized" : kind);
+            fill.style.width = BAR_WIDTH[kind] || "20%";
+            track.appendChild(fill);
+            var cause = document.createElement("span");
+            cause.className = "flame-cause";
+            cause.textContent = r[1] + " · " + r[3];
+            mid.appendChild(track);
+            mid.appendChild(cause);
+
+            var status = document.createElement("span");
+            status.className = "flame-status " + (kind === "skipped" ? "memoized" : kind);
+            status.textContent = STATUS_LABEL[kind] || kind;
+
+            row.appendChild(name);
+            row.appendChild(mid);
+            row.appendChild(status);
+            flameList.appendChild(row);
+          });
+        }
+
+        function renderCode(level) {
+          var hl = level.hl || [];
+          var html = level.code
+            .map(function (line, i) {
+              var cls = hl.indexOf(i) !== -1 ? "code-line code-line-highlight" : "code-line";
+              return '<span class="' + cls + '">' + escapeHtml(line) + "</span>";
+            })
+            .join("");
+          codePanel.innerHTML = "<code>" + html + "</code>";
+        }
+
+        function renderOptions() {
+          var level = LEVELS[game.levelIndex];
+          optionsStack.textContent = "";
+          var locked = game.phase !== "playing";
+          game.order.forEach(function (optIdx, pos) {
+            var opt = level.options[optIdx];
+            var card = document.createElement("div");
+            card.className = "solution-option";
+            card.setAttribute("role", "radio");
+            card.dataset.pos = String(pos);
+            var tried = game.tried.indexOf(pos) !== -1;
+            if (tried) {
+              card.classList.add("eliminated");
+              card.setAttribute("aria-disabled", "true");
+            }
+            if (locked) card.classList.add("locked");
+            if (game.selected === pos) card.classList.add("selected");
+            if (game.phase === "stable" && opt.ok) card.classList.add("correct");
+            card.setAttribute("aria-checked", game.selected === pos ? "true" : "false");
+            card.tabIndex = tried || locked ? -1 : 0;
+
+            var key = document.createElement("span");
+            key.className = "option-key";
+            key.textContent = String(pos + 1);
+            var body = document.createElement("div");
+            body.className = "option-body";
+            var text = document.createElement("div");
+            text.className = "option-text";
+            fillRich(text, opt.t);
+            body.appendChild(text);
+            card.appendChild(key);
+            card.appendChild(body);
+
+            card.addEventListener("click", function () {
+              choose(pos);
+            });
+            card.addEventListener("keydown", function (e) {
+              if (e.key === "Enter" || e.key === " ") {
+                // Selecting must never also submit/advance via the document handler.
+                e.preventDefault();
+                e.stopPropagation();
+                if (e.repeat) return;
+                choose(pos);
+              }
+            });
+            optionsStack.appendChild(card);
+          });
+        }
+
+        function choose(pos) {
+          if (!select(game, pos)) return;
+          optionsStack.querySelectorAll(".solution-option").forEach(function (el) {
+            var p = Number(el.dataset.pos);
+            el.classList.remove("wrong");
+            el.classList.toggle("selected", p === pos);
+            el.setAttribute("aria-checked", p === pos ? "true" : "false");
+          });
+          btnAction.disabled = false;
+          playSound("click");
+        }
+
+        function setExplainer(kind, title, body) {
+          explainerCard.className = "explainer-card show" + (kind ? " " + kind : "");
+          explainerTitle.textContent = title;
+          explainerBody.textContent = body;
+        }
+
+        function hideExplainer() {
+          explainerCard.className = "explainer-card";
+          explainerTitle.textContent = "";
+          explainerBody.textContent = "";
+        }
+
+        function updateActionButton() {
+          if (game.phase === "playing") {
+            btnAction.textContent = "⚡ Stabilize & Re-evaluate";
+            btnAction.disabled = game.selected === null;
+          } else if (game.phase === "stable") {
+            btnAction.textContent = game.levelIndex < LEVELS.length - 1 ? "⏩ Advance to Next Sector" : "🏆 Complete Grid Defense";
+            btnAction.disabled = false;
+          } else if (game.phase === "failed") {
+            btnAction.textContent = "↻ Retry Sector";
+            btnAction.disabled = false;
+          } else {
+            btnAction.textContent = "🏆 View Results";
+            btnAction.disabled = false;
+          }
+        }
+
+        function renderLevel() {
+          var level = LEVELS[game.levelIndex];
+          missionSectorTag.textContent = level.sector;
+          missionTitle.textContent = level.title;
+          missionDesc.textContent = level.desc;
+          renderCode(level);
+          renderOptions();
+          hideExplainer();
+          if (game.phase === "complete") {
+            setExplainer("", "All sectors stabilized", level.explainer);
+          }
+          updateActionButton();
+          renderHUD();
+          renderProfiler();
+        }
+
+        // --- Actions ---
+        function onAction() {
+          var level = LEVELS[game.levelIndex];
+          if (game.phase === "stable") {
+            advance(game);
+            if (game.phase === "complete") {
+              updateActionButton();
+              renderHUD();
+              showVictoryModal();
+              playSound("victory");
+            } else {
+              renderLevel();
+              playSound("click");
+            }
+            return;
+          }
+          if (game.phase === "failed") {
+            retry(game);
+            renderLevel();
+            playSound("click");
+            return;
+          }
+          if (game.phase === "complete") {
+            showVictoryModal();
+            return;
+          }
+
+          var res = submit(game);
+          if (res.type === "ignored") return;
+          if (res.type === "correct") {
+            writeSave(res.save);
+            playSound("stable");
+            setExplainer("", "⚡ Stabilization verified", level.explainer);
+            showToast(res.points > 0 ? "Sector stabilized! +" + res.points + " PTS" : "Sector stabilized!");
+          } else if (res.type === "wrong") {
+            playSound("surge");
+            setExplainer("warn", "Cascade surge: integrity −1", res.option.why);
+            showToast("Stabilization failed: " + game.integrity + " integrity left");
+          } else if (res.type === "failed") {
+            playSound("fail");
+            setExplainer("fail", "Grid collapse: sector failed", res.option.why + " The core ran out of integrity. Review the code and the hint, then retry the sector (options are reshuffled).");
+            showToast("Grid collapse! Retry the sector.");
+          }
+          renderOptions();
+          if (res.type === "wrong") {
+            var el = optionsStack.querySelector('[data-pos="' + game.tried[game.tried.length - 1] + '"]');
+            if (el) el.classList.add("wrong");
+          }
+          updateActionButton();
+          renderHUD();
+          renderProfiler();
+        }
+
+        btnAction.addEventListener("click", onAction);
+
+        btnHint.addEventListener("click", function () {
+          showToast("Hint: " + LEVELS[game.levelIndex].hint);
+          playSound("click");
+        });
+
+        // --- Victory modal ---
+        var lastFocus = null;
+        function showVictoryModal() {
+          modalText.textContent = "All " + LEVELS.length + " sectors stabilized with React.memo, useCallback, useMemo and correct dependency arrays. Final score: " + game.score + " / " + MAX_SCORE + " PTS.";
+          lastFocus = document.activeElement;
+          victoryModal.classList.add("show");
+          victoryModal.setAttribute("aria-hidden", "false");
+          btnPlayAgain.focus();
+        }
+
+        function hideVictoryModal() {
+          victoryModal.classList.remove("show");
+          victoryModal.setAttribute("aria-hidden", "true");
+          if (lastFocus && lastFocus.focus) lastFocus.focus();
+        }
+
+        function startOver() {
+          writeSave(resetRun(game));
+          renderLevel();
+        }
+
+        btnPlayAgain.addEventListener("click", function () {
+          hideVictoryModal();
+          startOver();
+          playSound("click");
+        });
+
+        victoryModal.addEventListener("click", function (e) {
+          if (e.target === victoryModal) hideVictoryModal();
+        });
+
+        // --- Two-click reset ---
+        var resetBtn = $("resetProgressBtn");
+        var resetLabel = $("resetBtnLabel");
+        var resetPending = false;
+        var resetTimer = null;
+
+        function clearResetPending() {
+          resetPending = false;
+          resetLabel.textContent = "Reset";
+          resetBtn.style.borderColor = "";
+          resetBtn.style.color = "";
+        }
+
+        resetBtn.addEventListener("click", function () {
+          if (!resetPending) {
+            resetPending = true;
+            resetLabel.textContent = "Confirm?";
+            resetBtn.style.borderColor = "var(--magenta)";
+            resetBtn.style.color = "var(--magenta)";
+            playSound("click");
+            resetTimer = setTimeout(clearResetPending, 3500);
+          } else {
+            clearTimeout(resetTimer);
+            clearResetPending();
+            if (victoryModal.classList.contains("show")) hideVictoryModal();
+            startOver();
+            showToast("Quest progress reset.");
+            playSound("click");
+          }
+        });
+
+        // --- Keyboard ---
+        document.addEventListener("keydown", function (e) {
+          if (e.ctrlKey || e.metaKey || e.altKey) return;
+          var tag = e.target && e.target.tagName;
+          if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+          var modalOpen = victoryModal.classList.contains("show");
+
+          if (e.key === "Escape" && modalOpen) {
+            hideVictoryModal();
+            return;
+          }
+          if (modalOpen) return;
+
+          if (/^[1-9]$/.test(e.key)) {
+            var pos = parseInt(e.key, 10) - 1;
+            if (canSelect(game, pos)) {
+              e.preventDefault();
+              choose(pos);
+              var el = optionsStack.querySelector('[data-pos="' + pos + '"]');
+              if (el) el.focus();
+            }
+            return;
+          }
+
+          if (e.key === "Enter") {
+            // Only when nothing interactive has focus: buttons handle Enter natively,
+            // and options stop propagation after selecting.
+            if (e.repeat) return;
+            if (e.target && e.target.closest && e.target.closest('button, a, .solution-option, [role="dialog"]')) return;
+            if (!btnAction.disabled) {
+              e.preventDefault();
+              onAction();
+            }
+            return;
+          }
+
+          if (e.key === "h" || e.key === "H") {
+            e.preventDefault();
+            btnHint.click();
+          } else if (e.key === "m" || e.key === "M") {
+            e.preventDefault();
+            toggleAudio();
+          }
+        });
+
+        // --- Audio & theme ---
+        var audioToggleBtn = $("audioToggleBtn");
+        var audioIcon = $("audioIcon");
+
+        function updateAudioUI() {
+          audioIcon.textContent = isMuted ? "🔇" : "🔊";
+          audioToggleBtn.setAttribute("aria-label", isMuted ? "Unmute sound effects" : "Mute sound effects");
+        }
+
+        function toggleAudio() {
+          isMuted = !isMuted;
+          updateAudioUI();
+          try {
+            localStorage.setItem("cascade_citadel_audio", isMuted ? "true" : "false");
+          } catch (e) {
+            /* ignore */
+          }
+          if (!isMuted) playSound("click");
+        }
+
+        audioToggleBtn.addEventListener("click", toggleAudio);
+
+        var themeToggleBtn = $("themeToggleBtn");
+        var themeIcon = $("themeIcon");
+
+        function currentTheme() {
+          return document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+        }
+
+        function updateThemeIcon() {
+          themeIcon.textContent = currentTheme() === "dark" ? "☀️" : "🌙";
+          themeToggleBtn.setAttribute("aria-label", currentTheme() === "dark" ? "Switch to light theme" : "Switch to dark theme");
+        }
+
+        themeToggleBtn.addEventListener("click", function () {
+          var next = currentTheme() === "dark" ? "light" : "dark";
+          document.documentElement.setAttribute("data-theme", next);
+          updateThemeIcon();
+          try {
+            localStorage.setItem("cascade_citadel_theme", next);
+          } catch (e) {
+            /* ignore */
+          }
+          playSound("click");
+        });
+
+        // --- Init ---
+        try {
+          isMuted = localStorage.getItem("cascade_citadel_audio") === "true";
+        } catch (e) {
+          isMuted = false;
+        }
+        updateAudioUI();
+        updateThemeIcon();
+
+        applySave(game, loadSave());
+        renderLevel();
+        if (game.phase === "complete") setTimeout(showVictoryModal, 300);
+
+        resizeCanvas();
+        if (window.ResizeObserver) {
+          new ResizeObserver(resizeCanvas).observe(canvas);
+        } else {
+          window.addEventListener("resize", resizeCanvas);
+        }
+        requestAnimationFrame(renderCanvas);
+      })();
+    </script>
+  </body>
+</html>
