@@ -627,7 +627,6 @@ Difficulty labels are assigned by the maintainer ([@praveenscience](https://gith
 ### Review expectations
 
 - PRs are reviewed in the order they’re received.
-- **One open PR per contributor at a time.** Get your current PR merged (or closed) before opening another. Extra PRs may be closed without review.
 - Simple, clean PRs get merged faster within 48 hours or less.
 - If changes are requested, respond within **2 days** or the PR may be closed.
 - Be kind and respectful in all interactions.

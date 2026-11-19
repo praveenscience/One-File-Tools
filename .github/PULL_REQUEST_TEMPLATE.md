@@ -38,7 +38,6 @@ Describe what YOU did, not what the code is supposed to do:
 - [ ] My branch follows the naming convention (`add/tool-name`, `feat/description`, or `fix/description`)
 - [ ] I have tested my changes locally in at least one modern browser
 - [ ] I have filled in "How I tested" above, and every claim in this description matches the code
-- [ ] This is my only open PR in this repository
 
 ### For new tools:
 
