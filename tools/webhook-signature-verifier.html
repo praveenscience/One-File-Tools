@@ -1,0 +1,2010 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Webhook Signature Signer &amp; Verifier — One File Tools</title>
+    <meta
+      name="description"
+      content="A local-first cryptographic utility for debugging, generating, and verifying HMAC webhook signatures across popular cloud services (GitHub, Stripe, Shopify, Slack, Twilio) with simulated timestamp drift and replay attack mitigation testing."
+    />
+    <meta name="color-scheme" content="dark light" />
+
+    <!-- Google Fonts aligned with scripts/index-template.txt -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;600;700;800&family=Nunito:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Dark mode FOUC prevention -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("webhook_verifier_theme");
+          if (!t) {
+            t = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+          }
+          document.documentElement.setAttribute("data-theme", t);
+        } catch (e) {
+          document.documentElement.setAttribute("data-theme", "dark");
+        }
+      })();
+    </script>
+
+    <style>
+      /* ============================================================
+         Design tokens aligned with scripts/index-template.txt
+         ============================================================ */
+      :root {
+        --font-heading: "Oxanium", -apple-system, BlinkMacSystemFont, sans-serif;
+        --font-sans: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+        --accent: #6d5efc;
+        --accent-hover: #5a4bf0;
+        --accent-soft: rgba(109, 94, 252, 0.14);
+        --accent-ring: rgba(109, 94, 252, 0.45);
+
+        --green: #34c98a;
+        --green-soft: rgba(52, 201, 138, 0.14);
+        --amber: #e7a13a;
+        --amber-soft: rgba(231, 161, 58, 0.16);
+        --red: #f85149;
+        --red-soft: rgba(248, 81, 73, 0.14);
+        --blue: #38bdf8;
+        --blue-soft: rgba(56, 189, 248, 0.14);
+
+        --radius-sm: 6px;
+        --radius: 12px;
+        --radius-lg: 18px;
+
+        --maxw: 1200px;
+        --ease: cubic-bezier(0.22, 1, 0.36, 1);
+        --t-fast: 140ms;
+        --t: 240ms;
+      }
+
+      [data-theme="dark"] {
+        --bg: #08080a;
+        --bg-elev: #0f0f12;
+        --surface: #131317;
+        --surface-2: #18181d;
+        --surface-hover: #1c1c22;
+        --border: rgba(255, 255, 255, 0.08);
+        --border-strong: rgba(255, 255, 255, 0.15);
+        --text: #f1f1f4;
+        --text-muted: #9a9aa6;
+        --text-faint: #6a6a76;
+        --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 30px -12px rgba(0, 0, 0, 0.6);
+        --shadow-lift: 0 1px 2px rgba(0, 0, 0, 0.4), 0 20px 48px -16px rgba(0, 0, 0, 0.75);
+      }
+
+      [data-theme="light"] {
+        --bg: #fafafa;
+        --bg-elev: #ffffff;
+        --surface: #ffffff;
+        --surface-2: #f6f6f7;
+        --surface-hover: #f1f1f3;
+        --border: rgba(9, 9, 11, 0.09);
+        --border-strong: rgba(9, 9, 11, 0.16);
+        --text: #131316;
+        --text-muted: #61616b;
+        --text-faint: #8c8c96;
+        --shadow: 0 1px 2px rgba(9, 9, 11, 0.06), 0 12px 28px -14px rgba(9, 9, 11, 0.18);
+        --shadow-lift: 0 1px 2px rgba(9, 9, 11, 0.06), 0 22px 48px -18px rgba(9, 9, 11, 0.24);
+      }
+
+      *, *::before, *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        background-color: var(--bg);
+        color: var(--text);
+        line-height: 1.55;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        transition: background-color var(--t) var(--ease), color var(--t) var(--ease);
+      }
+
+      .container {
+        max-width: var(--maxw);
+        width: 100%;
+        margin: 0 auto;
+        padding: 1.5rem 1.25rem 3.5rem;
+        flex: 1;
+      }
+
+      /* Top Navigation Bar */
+      .top-nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .breadcrumbs {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.88rem;
+        font-family: var(--font-mono);
+      }
+
+      .breadcrumbs a {
+        color: var(--text-muted);
+        text-decoration: none;
+        transition: color var(--t-fast) var(--ease);
+      }
+
+      .breadcrumbs a:hover {
+        color: var(--accent);
+      }
+
+      .breadcrumbs span.sep {
+        color: var(--text-faint);
+      }
+
+      .breadcrumbs span.current {
+        color: var(--text);
+        font-weight: 600;
+      }
+
+      .nav-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .privacy-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-size: 0.75rem;
+        padding: 0.3rem 0.65rem;
+        border-radius: 9999px;
+        background: var(--green-soft);
+        color: var(--green);
+        font-weight: 600;
+        border: 1px solid rgba(52, 201, 138, 0.25);
+      }
+
+      .icon-btn {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        color: var(--text);
+        border-radius: var(--radius-sm);
+        padding: 0.45rem 0.7rem;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+        font-size: 0.88rem;
+        font-weight: 600;
+        transition: all var(--t-fast) var(--ease);
+        min-height: 36px;
+      }
+
+      .icon-btn:hover {
+        background: var(--surface-hover);
+        border-color: var(--border-strong);
+      }
+
+      .icon-btn:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      /* Hero Header */
+      .hero {
+        margin-bottom: 1.75rem;
+      }
+
+      .hero h1 {
+        font-family: var(--font-heading);
+        font-size: 1.85rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        line-height: 1.25;
+        margin-bottom: 0.4rem;
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+      }
+
+      .hero h1 .icon-tag {
+        font-size: 1.5rem;
+      }
+
+      .hero p {
+        color: var(--text-muted);
+        font-size: 0.95rem;
+        max-width: 850px;
+      }
+
+      /* Preset Selector Bar */
+      .preset-bar {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 0.85rem 1rem;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        box-shadow: var(--shadow);
+      }
+
+      .preset-label {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--text-muted);
+        font-weight: 700;
+      }
+
+      .preset-pills {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+      }
+
+      .preset-pill {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        color: var(--text-muted);
+        border-radius: 9999px;
+        padding: 0.35rem 0.85rem;
+        font-size: 0.82rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all var(--t-fast) var(--ease);
+      }
+
+      .preset-pill:hover {
+        color: var(--text);
+        background: var(--surface-hover);
+        border-color: var(--border-strong);
+      }
+
+      .preset-pill.active {
+        background: var(--accent);
+        color: #ffffff;
+        border-color: var(--accent);
+        box-shadow: 0 0 14px var(--accent-ring);
+      }
+
+      /* Mode Tabs */
+      .mode-tabs {
+        display: flex;
+        gap: 0.5rem;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 1.5rem;
+      }
+
+      .tab-btn {
+        background: transparent;
+        border: none;
+        border-bottom: 2px solid transparent;
+        color: var(--text-muted);
+        padding: 0.65rem 1.1rem;
+        font-size: 0.92rem;
+        font-weight: 700;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        transition: all var(--t-fast) var(--ease);
+      }
+
+      .tab-btn:hover {
+        color: var(--text);
+      }
+
+      .tab-btn.active {
+        color: var(--accent);
+        border-bottom-color: var(--accent);
+      }
+
+      /* Main Grid Layout */
+      .workbench-grid {
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 1.5rem;
+        align-items: start;
+      }
+
+      @media (max-width: 960px) {
+        .workbench-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* Panel Cards */
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1.25rem;
+        box-shadow: var(--shadow);
+        position: relative;
+      }
+
+      .card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .card-title {
+        font-size: 0.95rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .card-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+      }
+
+      /* Form Controls */
+      .form-group {
+        margin-bottom: 1rem;
+      }
+
+      .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+      }
+
+      @media (max-width: 600px) {
+        .form-row {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      label {
+        display: block;
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.35rem;
+      }
+
+      input[type="text"],
+      input[type="password"],
+      input[type="number"],
+      select,
+      textarea {
+        width: 100%;
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        color: var(--text);
+        padding: 0.55rem 0.75rem;
+        font-family: var(--font-sans);
+        font-size: 0.88rem;
+        transition: border-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease);
+      }
+
+      input[type="text"]:focus,
+      input[type="password"]:focus,
+      input[type="number"]:focus,
+      select:focus,
+      textarea:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-ring);
+      }
+
+      .mono {
+        font-family: var(--font-mono) !important;
+      }
+
+      textarea {
+        resize: vertical;
+        min-height: 140px;
+        line-height: 1.45;
+      }
+
+      .input-with-action {
+        position: relative;
+        display: flex;
+      }
+
+      .input-with-action input {
+        padding-right: 5rem;
+      }
+
+      .input-btn-inline {
+        position: absolute;
+        right: 4px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        color: var(--text-muted);
+        font-size: 0.72rem;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 600;
+      }
+
+      .input-btn-inline:hover {
+        color: var(--text);
+        background: var(--surface-hover);
+      }
+
+      /* Quick Buttons Strip */
+      .quick-strip {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        margin-top: 0.35rem;
+      }
+
+      .pill-btn-sm {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        color: var(--text-muted);
+        border-radius: 4px;
+        padding: 0.2rem 0.5rem;
+        font-size: 0.72rem;
+        font-family: var(--font-mono);
+        cursor: pointer;
+        transition: all var(--t-fast) var(--ease);
+      }
+
+      .pill-btn-sm:hover {
+        background: var(--surface-hover);
+        color: var(--text);
+        border-color: var(--border-strong);
+      }
+
+      /* Result Displays */
+      .result-block {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 0.85rem;
+        margin-bottom: 0.85rem;
+        position: relative;
+      }
+
+      .result-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 0.4rem;
+      }
+
+      .result-label {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+      }
+
+      .result-value {
+        font-family: var(--font-mono);
+        font-size: 0.82rem;
+        word-break: break-all;
+        color: var(--text);
+        user-select: all;
+      }
+
+      .canonical-box {
+        font-family: var(--font-mono);
+        font-size: 0.76rem;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        padding: 0.6rem;
+        border-radius: 4px;
+        color: var(--text-muted);
+        white-space: pre-wrap;
+        word-break: break-all;
+        max-height: 120px;
+        overflow-y: auto;
+      }
+
+      /* Verification Verdict Banner */
+      .verdict-banner {
+        border-radius: var(--radius);
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        border: 1px solid transparent;
+        transition: all var(--t) var(--ease);
+      }
+
+      .verdict-banner.valid {
+        background: var(--green-soft);
+        border-color: rgba(52, 201, 138, 0.35);
+      }
+
+      .verdict-banner.invalid {
+        background: var(--red-soft);
+        border-color: rgba(248, 81, 73, 0.35);
+      }
+
+      .verdict-banner.idle {
+        background: var(--surface-2);
+        border-color: var(--border);
+      }
+
+      .verdict-icon {
+        font-size: 2.2rem;
+        line-height: 1;
+      }
+
+      .verdict-text h3 {
+        font-size: 1.15rem;
+        font-weight: 800;
+        margin-bottom: 0.2rem;
+      }
+
+      .verdict-banner.valid h3 { color: var(--green); }
+      .verdict-banner.invalid h3 { color: var(--red); }
+      .verdict-banner.idle h3 { color: var(--text-muted); }
+
+      .verdict-text p {
+        font-size: 0.84rem;
+        color: var(--text);
+      }
+
+      /* Metric Grid */
+      .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        gap: 0.65rem;
+        margin-bottom: 1rem;
+      }
+
+      .metric-card {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 0.65rem 0.75rem;
+      }
+
+      .metric-title {
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        margin-bottom: 0.2rem;
+      }
+
+      .metric-val {
+        font-family: var(--font-mono);
+        font-size: 0.9rem;
+        font-weight: 700;
+      }
+
+      .metric-val.ok { color: var(--green); }
+      .metric-val.warn { color: var(--amber); }
+      .metric-val.err { color: var(--red); }
+
+      /* Code Snippet Box */
+      .code-container {
+        position: relative;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+      }
+
+      .code-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: var(--surface-2);
+        padding: 0.5rem 0.85rem;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .lang-pills {
+        display: flex;
+        gap: 0.35rem;
+      }
+
+      .lang-pill {
+        background: transparent;
+        border: 1px solid transparent;
+        color: var(--text-muted);
+        border-radius: 4px;
+        padding: 0.2rem 0.5rem;
+        font-size: 0.75rem;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .lang-pill.active {
+        background: var(--surface);
+        border-color: var(--border);
+        color: var(--accent);
+      }
+
+      pre.code-body {
+        padding: 1rem;
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        color: var(--text);
+        line-height: 1.5;
+        overflow-x: auto;
+        white-space: pre;
+      }
+
+      /* History Table */
+      .history-section {
+        margin-top: 2rem;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1.25rem;
+        box-shadow: var(--shadow);
+      }
+
+      .history-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.82rem;
+        margin-top: 0.75rem;
+      }
+
+      .history-table th {
+        text-align: left;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .history-table td {
+        padding: 0.6rem 0.75rem;
+        border-bottom: 1px solid var(--border);
+        color: var(--text);
+      }
+
+      .history-table tr:hover td {
+        background: var(--surface-2);
+      }
+
+      /* Toast Notification */
+      .toast {
+        position: fixed;
+        bottom: 2rem;
+        right: 2rem;
+        background: var(--accent);
+        color: #ffffff;
+        padding: 0.65rem 1.15rem;
+        border-radius: var(--radius-sm);
+        font-size: 0.85rem;
+        font-weight: 700;
+        box-shadow: var(--shadow-lift);
+        opacity: 0;
+        transform: translateY(10px);
+        pointer-events: none;
+        transition: all 0.2s var(--ease);
+        z-index: 9999;
+      }
+
+      .toast.show {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      /* Diff Highlighting */
+      .diff-view {
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 0.6rem;
+        margin-top: 0.5rem;
+      }
+
+      .diff-row {
+        display: flex;
+        gap: 0.5rem;
+      }
+
+      .diff-match { color: var(--green); }
+      .diff-mismatch { color: var(--red); font-weight: 700; background: var(--red-soft); }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <!-- Top Navigation Bar -->
+      <nav class="top-nav" aria-label="Breadcrumb and settings">
+        <div class="breadcrumbs">
+          <a href="/">One File Tools</a>
+          <span class="sep">/</span>
+          <a href="/#utilities">Developer Utilities</a>
+          <span class="sep">/</span>
+          <span class="current">Webhook Signature Signer &amp; Verifier</span>
+        </div>
+        <div class="nav-actions">
+          <span class="privacy-badge" title="All signing and verification occurs entirely client-side">
+            <span>🛡️</span> 100% Local Web Crypto
+          </span>
+          <button class="icon-btn" id="audioToggleBtn" aria-label="Toggle Sound Effects" title="Toggle audio feedback">
+            <span id="audioIcon">🔊</span>
+          </button>
+          <button class="icon-btn" id="themeToggleBtn" aria-label="Toggle Theme" title="Toggle dark/light mode">
+            <span id="themeIcon">☀️</span>
+          </button>
+        </div>
+      </nav>
+
+      <!-- Hero Header -->
+      <header class="hero">
+        <h1><span class="icon-tag">🔐</span> Webhook Signature Signer &amp; Verifier</h1>
+        <p>
+          A client-side cryptographic workbench to generate, debug, and audit HMAC signatures for GitHub, Stripe,
+          Slack, Shopify, and Twilio webhooks with simulated replay drift protection and instant polyglot code snippets.
+        </p>
+      </header>
+
+      <!-- Provider Preset Selector Bar -->
+      <section class="preset-bar" aria-label="Provider Presets">
+        <span class="preset-label">Provider Presets:</span>
+        <div class="preset-pills" role="radiogroup" aria-label="Select provider preset">
+          <button class="preset-pill active" data-preset="github" role="radio" aria-checked="true">GitHub (sha256=)</button>
+          <button class="preset-pill" data-preset="stripe" role="radio" aria-checked="false">Stripe (t=,v1=)</button>
+          <button class="preset-pill" data-preset="slack" role="radio" aria-checked="false">Slack (v0=)</button>
+          <button class="preset-pill" data-preset="shopify" role="radio" aria-checked="false">Shopify (Base64)</button>
+          <button class="preset-pill" data-preset="twilio" role="radio" aria-checked="false">Twilio (SHA1)</button>
+          <button class="preset-pill" data-preset="custom" role="radio" aria-checked="false">Custom HMAC</button>
+        </div>
+      </section>
+
+      <!-- Mode Switcher Tabs -->
+      <div class="mode-tabs" role="tablist">
+        <button class="tab-btn active" id="tabSignBtn" role="tab" aria-selected="true" aria-controls="panelSign">
+          ✍️ Sign &amp; Generate
+        </button>
+        <button class="tab-btn" id="tabVerifyBtn" role="tab" aria-selected="false" aria-controls="panelVerify">
+          🔍 Verify &amp; Audit Drift
+        </button>
+        <button class="tab-btn" id="tabCodeBtn" role="tab" aria-selected="false" aria-controls="panelCode">
+          💻 Verification Code
+        </button>
+      </div>
+
+      <!-- TAB 1: SIGN & GENERATE -->
+      <div id="panelSign" role="tabpanel" aria-labelledby="tabSignBtn">
+        <div class="workbench-grid">
+          <!-- Left Column: Input Form -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">📝 Signing Parameters</h2>
+              <div class="card-actions">
+                <button class="pill-btn-sm" id="btnSamplePayload">Load Sample</button>
+                <button class="pill-btn-sm" id="btnFormatJson">Format JSON</button>
+                <button class="pill-btn-sm" id="btnMinifyJson">Minify</button>
+              </div>
+            </div>
+
+            <!-- Algorithm and Header row -->
+            <div class="form-row">
+              <div class="form-group">
+                <label for="signAlgorithm">HMAC Algorithm</label>
+                <select id="signAlgorithm">
+                  <option value="SHA-256" selected>HMAC-SHA256 (Standard)</option>
+                  <option value="SHA-384">HMAC-SHA384</option>
+                  <option value="SHA-512">HMAC-SHA512</option>
+                  <option value="SHA-1">HMAC-SHA1 (Legacy/Twilio)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="signHeaderName">Header Name</label>
+                <input type="text" id="signHeaderName" class="mono" value="X-Hub-Signature-256" />
+              </div>
+            </div>
+
+            <!-- Secret Key -->
+            <div class="form-group">
+              <label for="signSecret">Webhook Secret Key</label>
+              <div class="input-with-action">
+                <input
+                  type="password"
+                  id="signSecret"
+                  class="mono"
+                  placeholder="Enter webhook secret or signing key..."
+                  value="mock_github_webhook_secret_key"
+                />
+                <button type="button" class="input-btn-inline" id="toggleSecretVisibility">Show</button>
+              </div>
+              <div class="quick-strip">
+                <button type="button" class="pill-btn-sm" id="btnGenSecret">Generate Random Secret</button>
+                <button type="button" class="pill-btn-sm" id="btnClearSecret">Clear</button>
+              </div>
+            </div>
+
+            <!-- Timestamp Controls (for Stripe/Slack/Custom) -->
+            <div class="form-group" id="timestampGroup">
+              <label for="signTimestamp">Timestamp (Unix Seconds)</label>
+              <div class="input-with-action">
+                <input type="number" id="signTimestamp" class="mono" placeholder="Auto-populated with current epoch..." />
+                <button type="button" class="input-btn-inline" id="btnSetNow">Set Now</button>
+              </div>
+              <div class="quick-strip">
+                <button type="button" class="pill-btn-sm" id="btnTimeSub30">-30s</button>
+                <button type="button" class="pill-btn-sm" id="btnTimeSub5m">-5m (Expired)</button>
+                <button type="button" class="pill-btn-sm" id="btnTimeSub1h">-1h</button>
+                <button type="button" class="pill-btn-sm" id="btnTimePlus1m">+1m (Future)</button>
+              </div>
+            </div>
+
+            <!-- Payload Body -->
+            <div class="form-group">
+              <label for="signPayload">Raw Request Body (Exact Bytes)</label>
+              <textarea
+                id="signPayload"
+                class="mono"
+                spellcheck="false"
+                placeholder='Paste raw JSON or form-encoded payload here...'
+              >{"event":"push","ref":"refs/heads/main","repository":{"full_name":"octocat/hello-world"},"sender":{"login":"octocat"}}</textarea>
+            </div>
+          </div>
+
+          <!-- Right Column: Computed Output -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">⚡ Generated Signature &amp; Header</h2>
+              <div class="card-actions">
+                <button class="pill-btn-sm" id="btnSaveFixture">Save to Fixtures</button>
+              </div>
+            </div>
+
+            <!-- Complete Header String -->
+            <div class="result-block">
+              <div class="result-header">
+                <span class="result-label">Full HTTP Header</span>
+                <button class="pill-btn-sm" id="copyFullHeader">Copy Header</button>
+              </div>
+              <div class="result-value" id="outFullHeader">X-Hub-Signature-256: sha256=...</div>
+            </div>
+
+            <!-- Raw Signature Value -->
+            <div class="result-block">
+              <div class="result-header">
+                <span class="result-label">Signature Hash Digest</span>
+                <button class="pill-btn-sm" id="copySignatureOnly">Copy Digest</button>
+              </div>
+              <div class="result-value" id="outSignatureOnly">computing...</div>
+            </div>
+
+            <!-- Canonical Signed String -->
+            <div class="result-block">
+              <div class="result-header">
+                <span class="result-label">Canonical Signed Payload String</span>
+                <button class="pill-btn-sm" id="copyCanonical">Copy</button>
+              </div>
+              <div class="canonical-box" id="outCanonical">...</div>
+            </div>
+
+            <!-- Ready-to-Run cURL Command -->
+            <div class="result-block">
+              <div class="result-header">
+                <span class="result-label">Reproduce with cURL</span>
+                <button class="pill-btn-sm" id="copyCurl">Copy cURL</button>
+              </div>
+              <div class="canonical-box" id="outCurl">curl -X POST https://your-server.com/webhook ...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: VERIFY & AUDIT DRIFT -->
+      <div id="panelVerify" role="tabpanel" aria-labelledby="tabVerifyBtn" style="display: none">
+        <div class="workbench-grid">
+          <!-- Left Column: Verification Inputs -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">📥 Incoming Webhook Inspection</h2>
+              <div class="card-actions">
+                <button class="pill-btn-sm" id="btnSyncFromSign">Import from Signer</button>
+              </div>
+            </div>
+
+            <!-- Incoming Header / Signature Input -->
+            <div class="form-group">
+              <label for="verifyIncomingHeader">Received Signature Header Value</label>
+              <input
+                type="text"
+                id="verifyIncomingHeader"
+                class="mono"
+                placeholder="e.g. sha256=9a8b... or t=1700000000,v1=9a8b..."
+              />
+            </div>
+
+            <!-- Secret Key -->
+            <div class="form-group">
+              <label for="verifySecret">Endpoint Webhook Secret</label>
+              <input
+                type="password"
+                id="verifySecret"
+                class="mono"
+                placeholder="Secret key configured on your endpoint..."
+              />
+            </div>
+
+            <!-- Max Replay Tolerance -->
+            <div class="form-group">
+              <label for="verifyTolerance">Replay Drift Tolerance Window (Seconds)</label>
+              <div class="input-with-action">
+                <input type="number" id="verifyTolerance" value="300" min="5" max="86400" />
+                <span class="input-btn-inline" style="pointer-events: none">± seconds</span>
+              </div>
+              <div class="quick-strip">
+                <button type="button" class="pill-btn-sm" onclick="setTolerance(60)">1 min</button>
+                <button type="button" class="pill-btn-sm" onclick="setTolerance(300)">5 min (Standard)</button>
+                <button type="button" class="pill-btn-sm" onclick="setTolerance(600)">10 min</button>
+                <button type="button" class="pill-btn-sm" onclick="setTolerance(3600)">1 hour</button>
+              </div>
+            </div>
+
+            <!-- Raw Request Body -->
+            <div class="form-group">
+              <label for="verifyPayload">Received Raw Body (Exact Unmodified Bytes)</label>
+              <textarea
+                id="verifyPayload"
+                class="mono"
+                spellcheck="false"
+                placeholder="Paste the raw incoming request payload body..."
+              ></textarea>
+            </div>
+          </div>
+
+          <!-- Right Column: Verification Results & Drift Audit -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">🛡️ Cryptographic &amp; Replay Audit</h2>
+            </div>
+
+            <!-- Verdict Banner -->
+            <div class="verdict-banner idle" id="verdictBanner">
+              <div class="verdict-icon" id="verdictIcon">⏳</div>
+              <div class="verdict-text">
+                <h3 id="verdictHeading">Awaiting Input</h3>
+                <p id="verdictSub">Enter the signature, secret, and payload to verify authenticity.</p>
+              </div>
+            </div>
+
+            <!-- Metrics Grid -->
+            <div class="metric-grid">
+              <div class="metric-card">
+                <div class="metric-title">Crypto Match</div>
+                <div class="metric-val" id="metricCrypto">--</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-title">Request Age</div>
+                <div class="metric-val" id="metricAge">--</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-title">Replay Safety</div>
+                <div class="metric-val" id="metricReplay">--</div>
+              </div>
+            </div>
+
+            <!-- Signature Comparison -->
+            <div class="result-block">
+              <div class="result-header">
+                <span class="result-label">Computed Expected Signature</span>
+              </div>
+              <div class="result-value" id="verifyExpectedSig">--</div>
+            </div>
+
+            <div class="result-block">
+              <div class="result-header">
+                <span class="result-label">Received Incoming Signature</span>
+              </div>
+              <div class="result-value" id="verifyReceivedSig">--</div>
+            </div>
+
+            <!-- Drift Diagnostics -->
+            <div class="result-block">
+              <div class="result-header">
+                <span class="result-label">Timestamp Analysis</span>
+              </div>
+              <div class="result-value" id="verifyTimestampNotes">
+                No timestamp parameter in header (standard payload signature).
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: POLYGLOT CODE GENERATOR -->
+      <div id="panelCode" role="tabpanel" aria-labelledby="tabCodeBtn" style="display: none">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">💻 Verification Code Generator</h2>
+            <div class="card-actions">
+              <button class="icon-btn" id="btnCopySnippet">📋 Copy Code</button>
+            </div>
+          </div>
+          <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 1rem">
+            Production-ready verification middleware with timing-safe comparison (<code class="mono">crypto.timingSafeEqual</code>)
+            and replay attack prevention configured for the active preset.
+          </p>
+
+          <div class="code-container">
+            <div class="code-header">
+              <div class="lang-pills" role="tablist">
+                <button class="lang-pill active" data-lang="node">Node.js (Express)</button>
+                <button class="lang-pill" data-lang="python">Python (FastAPI / Flask)</button>
+                <button class="lang-pill" data-lang="go">Go</button>
+                <button class="lang-pill" data-lang="ruby">Ruby</button>
+              </div>
+              <span style="font-size: 0.75rem; color: var(--text-muted)" id="codePresetIndicator">GitHub Preset</span>
+            </div>
+            <pre class="code-body" id="codeSnippetBody">// Select a language above</pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Saved Fixtures & History Section -->
+      <section class="history-section" aria-label="Recent Signatures and Fixtures">
+        <div class="card-header" style="margin-bottom: 0.5rem; padding-bottom: 0.5rem">
+          <h2 class="card-title" style="font-size: 0.95rem">🕒 Local Test Fixtures &amp; History</h2>
+          <div class="card-actions">
+            <button class="pill-btn-sm" id="btnClearHistory">Clear History</button>
+          </div>
+        </div>
+        <p style="color: var(--text-muted); font-size: 0.8rem">
+          Your saved test fixtures and recent signing attempts stored strictly in local browser storage.
+        </p>
+        <div style="overflow-x: auto">
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Provider</th>
+                <th>Header / Digest</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="historyTableBody">
+              <tr>
+                <td colspan="5" style="text-align: center; color: var(--text-faint); padding: 1.5rem">
+                  No fixtures saved yet. Click "Save to Fixtures" above.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast">Copied to clipboard!</div>
+
+    <script>
+      (function () {
+        'use strict';
+
+        // --- Sound Effects Synthesizer ---
+        var audioCtx = null;
+        var isMuted = false;
+
+        function getAudioContext() {
+          if (!audioCtx && (window.AudioContext || window.webkitAudioContext)) {
+            var AudioCtx = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioCtx();
+          }
+          if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume();
+          }
+          return audioCtx;
+        }
+
+        function playSound(type) {
+          if (isMuted) return;
+          try {
+            var ctx = getAudioContext();
+            if (!ctx) return;
+            var now = ctx.currentTime;
+            var osc = ctx.createOscillator();
+            var gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            if (type === 'click') {
+              osc.type = 'triangle';
+              osc.frequency.setValueAtTime(600, now);
+              osc.frequency.exponentialRampToValueAtTime(300, now + 0.05);
+              gain.gain.setValueAtTime(0.08, now);
+              gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+              osc.start(now);
+              osc.stop(now + 0.05);
+            } else if (type === 'success') {
+              osc.type = 'sine';
+              osc.frequency.setValueAtTime(523.25, now); // C5
+              osc.frequency.setValueAtTime(659.25, now + 0.08); // E5
+              gain.gain.setValueAtTime(0.12, now);
+              gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+              osc.start(now);
+              osc.stop(now + 0.25);
+            } else if (type === 'fail') {
+              osc.type = 'sawtooth';
+              osc.frequency.setValueAtTime(260, now);
+              osc.frequency.exponentialRampToValueAtTime(140, now + 0.18);
+              gain.gain.setValueAtTime(0.1, now);
+              gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+              osc.start(now);
+              osc.stop(now + 0.18);
+            }
+          } catch (e) { }
+        }
+
+        // --- Provider Configuration Presets ---
+        var PROVIDERS = {
+          github: {
+            name: 'GitHub',
+            header: 'X-Hub-Signature-256',
+            algo: 'SHA-256',
+            encoding: 'hex',
+            prefix: 'sha256=',
+            hasTimestamp: false,
+            secretPlaceholder: 'mock_github_webhook_secret_key',
+            samplePayload: JSON.stringify({
+              event: "push",
+              ref: "refs/heads/main",
+              repository: { full_name: "octocat/hello-world" },
+              sender: { login: "octocat" }
+            }, null, 2)
+          },
+          stripe: {
+            name: 'Stripe',
+            header: 'Stripe-Signature',
+            algo: 'SHA-256',
+            encoding: 'hex',
+            prefix: '',
+            hasTimestamp: true,
+            timestampStyle: 'stripe', // t=...,v1=...
+            secretPlaceholder: 'mock_stripe_webhook_secret_key',
+            samplePayload: JSON.stringify({
+              id: "evt_1MvXYZ2eZvKYlo2C",
+              object: "event",
+              type: "payment_intent.succeeded",
+              data: {
+                object: {
+                  id: "pi_3MvXYZ2eZvKYlo2C0123",
+                  amount: 4999,
+                  currency: "usd",
+                  status: "succeeded"
+                }
+              }
+            }, null, 2)
+          },
+          slack: {
+            name: 'Slack',
+            header: 'X-Slack-Signature',
+            algo: 'SHA-256',
+            encoding: 'hex',
+            prefix: 'v0=',
+            hasTimestamp: true,
+            timestampStyle: 'slack', // v0:t:body
+            secretPlaceholder: 'mock_slack_signing_secret_example',
+            samplePayload: "command=%2Fdeploy&text=production&user_id=U123456&channel_id=C123456"
+          },
+          shopify: {
+            name: 'Shopify',
+            header: 'X-Shopify-Hmac-Sha256',
+            algo: 'SHA-256',
+            encoding: 'base64',
+            prefix: '',
+            hasTimestamp: false,
+            secretPlaceholder: 'mock_shopify_secret_key_example',
+            samplePayload: JSON.stringify({
+              id: 820982911946154508,
+              email: "customer@example.com",
+              total_price: "199.00",
+              currency: "USD",
+              line_items: [{ title: "Developer Mech Keyboard", price: "199.00" }]
+            }, null, 2)
+          },
+          twilio: {
+            name: 'Twilio',
+            header: 'X-Twilio-Signature',
+            algo: 'SHA-1',
+            encoding: 'base64',
+            prefix: '',
+            hasTimestamp: false,
+            secretPlaceholder: 'mock_twilio_auth_token_example',
+            samplePayload: "AccountSid=AC123456789&From=%2B15551234567&To=%2B15557654321&Body=Verification+Code%3A+849201"
+          },
+          custom: {
+            name: 'Custom HMAC',
+            header: 'X-Signature',
+            algo: 'SHA-256',
+            encoding: 'hex',
+            prefix: '',
+            hasTimestamp: false,
+            secretPlaceholder: 'my_custom_webhook_secret_key',
+            samplePayload: JSON.stringify({
+              message: "Custom webhook event",
+              timestamp: Date.now()
+            }, null, 2)
+          }
+        };
+
+        var currentPreset = 'github';
+        var currentLang = 'node';
+
+        // --- DOM Elements ---
+        var presetPills = document.querySelectorAll('.preset-pill');
+        var tabSignBtn = document.getElementById('tabSignBtn');
+        var tabVerifyBtn = document.getElementById('tabVerifyBtn');
+        var tabCodeBtn = document.getElementById('tabCodeBtn');
+        var panelSign = document.getElementById('panelSign');
+        var panelVerify = document.getElementById('panelVerify');
+        var panelCode = document.getElementById('panelCode');
+
+        // Sign Panel Elements
+        var signAlgorithm = document.getElementById('signAlgorithm');
+        var signHeaderName = document.getElementById('signHeaderName');
+        var signSecret = document.getElementById('signSecret');
+        var toggleSecretVisibility = document.getElementById('toggleSecretVisibility');
+        var signTimestamp = document.getElementById('signTimestamp');
+        var timestampGroup = document.getElementById('timestampGroup');
+        var signPayload = document.getElementById('signPayload');
+        var outFullHeader = document.getElementById('outFullHeader');
+        var outSignatureOnly = document.getElementById('outSignatureOnly');
+        var outCanonical = document.getElementById('outCanonical');
+        var outCurl = document.getElementById('outCurl');
+
+        // Verify Panel Elements
+        var verifyIncomingHeader = document.getElementById('verifyIncomingHeader');
+        var verifySecret = document.getElementById('verifySecret');
+        var verifyTolerance = document.getElementById('verifyTolerance');
+        var verifyPayload = document.getElementById('verifyPayload');
+        var verdictBanner = document.getElementById('verdictBanner');
+        var verdictIcon = document.getElementById('verdictIcon');
+        var verdictHeading = document.getElementById('verdictHeading');
+        var verdictSub = document.getElementById('verdictSub');
+        var metricCrypto = document.getElementById('metricCrypto');
+        var metricAge = document.getElementById('metricAge');
+        var metricReplay = document.getElementById('metricReplay');
+        var verifyExpectedSig = document.getElementById('verifyExpectedSig');
+        var verifyReceivedSig = document.getElementById('verifyReceivedSig');
+        var verifyTimestampNotes = document.getElementById('verifyTimestampNotes');
+
+        // Code Panel Elements
+        var codeSnippetBody = document.getElementById('codeSnippetBody');
+        var codePresetIndicator = document.getElementById('codePresetIndicator');
+        var langPills = document.querySelectorAll('.lang-pill');
+
+        // History
+        var historyTableBody = document.getElementById('historyTableBody');
+        var toast = document.getElementById('toast');
+
+        // --- Helper Functions ---
+        function showToast(msg) {
+          toast.textContent = msg;
+          toast.classList.add('show');
+          setTimeout(function () {
+            toast.classList.remove('show');
+          }, 2200);
+        }
+
+        function bufferToHex(buffer) {
+          var bytes = new Uint8Array(buffer);
+          var hex = '';
+          for (var i = 0; i < bytes.length; i++) {
+            hex += bytes[i].toString(16).padStart(2, '0');
+          }
+          return hex;
+        }
+
+        function bufferToBase64(buffer) {
+          var binary = '';
+          var bytes = new Uint8Array(buffer);
+          var chunkSize = 8192;
+          for (var i = 0; i < bytes.length; i += chunkSize) {
+            var chunk = bytes.subarray(i, i + chunkSize);
+            binary += String.fromCharCode.apply(null, chunk);
+          }
+          return btoa(binary);
+        }
+
+        // Timing-Safe String Equality (simulating crypto.timingSafeEqual)
+        function timingSafeEqual(a, b) {
+          if (typeof a !== 'string' || typeof b !== 'string') return false;
+          var diff = a.length ^ b.length;
+          var maxLen = Math.max(a.length, b.length);
+          for (var i = 0; i < maxLen; i++) {
+            var ca = i < a.length ? a.charCodeAt(i) : 0;
+            var cb = i < b.length ? b.charCodeAt(i) : 0;
+            diff |= (ca ^ cb);
+          }
+          return diff === 0;
+        }
+
+        // Native Web Crypto HMAC implementation
+        async function computeHMAC(algorithm, secret, payload) {
+          if (!secret) return '';
+          var enc = new TextEncoder();
+          var key = await window.crypto.subtle.importKey(
+            'raw',
+            enc.encode(secret),
+            { name: 'HMAC', hash: { name: algorithm } },
+            false,
+            ['sign']
+          );
+          var signatureBuffer = await window.crypto.subtle.sign('HMAC', key, enc.encode(payload));
+          return signatureBuffer;
+        }
+
+        // Build canonical signed payload based on provider
+        function buildCanonicalPayload(presetKey, payload, timestamp) {
+          if (presetKey === 'stripe') {
+            return (timestamp || Math.floor(Date.now() / 1000)) + '.' + payload;
+          } else if (presetKey === 'slack') {
+            return 'v0:' + (timestamp || Math.floor(Date.now() / 1000)) + ':' + payload;
+          }
+          return payload;
+        }
+
+        // --- Core Signer Logic ---
+        async function updateSigner() {
+          var preset = PROVIDERS[currentPreset];
+          var algo = signAlgorithm.value;
+          var secret = signSecret.value;
+          var payload = signPayload.value;
+          var timestamp = parseInt(signTimestamp.value, 10);
+          if (isNaN(timestamp)) timestamp = Math.floor(Date.now() / 1000);
+
+          var canonical = buildCanonicalPayload(currentPreset, payload, timestamp);
+          outCanonical.textContent = canonical;
+
+          if (!secret) {
+            outSignatureOnly.textContent = '(Enter a secret key)';
+            outFullHeader.textContent = signHeaderName.value + ': (No secret)';
+            return;
+          }
+
+          try {
+            var rawSig = await computeHMAC(algo, secret, canonical);
+            var sigFormatted = '';
+
+            if (preset.encoding === 'base64') {
+              sigFormatted = bufferToBase64(rawSig);
+            } else {
+              sigFormatted = bufferToHex(rawSig);
+            }
+
+            var fullHeaderVal = '';
+            if (currentPreset === 'stripe') {
+              fullHeaderVal = 't=' + timestamp + ',v1=' + sigFormatted;
+            } else if (currentPreset === 'slack') {
+              fullHeaderVal = 'v0=' + sigFormatted;
+            } else if (preset.prefix) {
+              fullHeaderVal = preset.prefix + sigFormatted;
+            } else {
+              fullHeaderVal = sigFormatted;
+            }
+
+            outSignatureOnly.textContent = sigFormatted;
+            outFullHeader.textContent = signHeaderName.value + ': ' + fullHeaderVal;
+
+            // Update cURL sample
+            var curlCmd = 'curl -X POST https://api.your-domain.com/webhook \\\n' +
+              '  -H "' + signHeaderName.value + ': ' + fullHeaderVal + '" \\\n' +
+              '  -H "Content-Type: ' + (payload.trim().startsWith('{') ? 'application/json' : 'application/x-www-form-urlencoded') + '" \\\n' +
+              '  -d \'' + payload.replace(/'/g, "'\\''") + '\'';
+            outCurl.textContent = curlCmd;
+
+          } catch (err) {
+            outSignatureOnly.textContent = 'Error: ' + err.message;
+            outFullHeader.textContent = 'Error computing HMAC';
+          }
+        }
+
+        // --- Core Verifier Logic ---
+        async function updateVerifier() {
+          var rawHeaderInput = verifyIncomingHeader.value.trim();
+          var secret = verifySecret.value;
+          var payload = verifyPayload.value;
+          var toleranceSec = parseInt(verifyTolerance.value, 10) || 300;
+
+          if (!rawHeaderInput || !payload || !secret) {
+            verdictBanner.className = 'verdict-banner idle';
+            verdictIcon.textContent = '⏳';
+            verdictHeading.textContent = 'Awaiting Complete Inputs';
+            verdictSub.textContent = 'Please provide the signature header, secret key, and raw payload body.';
+            metricCrypto.textContent = '--';
+            metricAge.textContent = '--';
+            metricReplay.textContent = '--';
+            verifyExpectedSig.textContent = '--';
+            verifyReceivedSig.textContent = '--';
+            verifyTimestampNotes.textContent = 'Enter values to evaluate timestamp and signature authenticity.';
+            return;
+          }
+
+          var extractedSig = '';
+          var extractedTs = null;
+          var canonical = payload;
+          var algo = signAlgorithm.value || 'SHA-256';
+          var nowEpoch = Math.floor(Date.now() / 1000);
+
+          // Parse Provider-Specific Header Patterns
+          if (rawHeaderInput.includes('t=') && rawHeaderInput.includes('v1=')) {
+            // Stripe style
+            var parts = rawHeaderInput.split(',');
+            for (var i = 0; i < parts.length; i++) {
+              var p = parts[i].trim();
+              if (p.startsWith('t=')) extractedTs = parseInt(p.substring(2), 10);
+              if (p.startsWith('v1=')) extractedSig = p.substring(3);
+            }
+            if (extractedTs) {
+              canonical = extractedTs + '.' + payload;
+            }
+          } else if (rawHeaderInput.startsWith('v0=')) {
+            // Slack style: search for timestamp in secondary header or default
+            extractedSig = rawHeaderInput.substring(3);
+            // Check if current signTimestamp can be used
+            extractedTs = parseInt(signTimestamp.value, 10) || nowEpoch;
+            canonical = 'v0:' + extractedTs + ':' + payload;
+          } else if (rawHeaderInput.startsWith('sha256=')) {
+            // GitHub style
+            extractedSig = rawHeaderInput.substring(7);
+            canonical = payload;
+          } else if (rawHeaderInput.startsWith('sha1=')) {
+            extractedSig = rawHeaderInput.substring(5);
+            canonical = payload;
+          } else {
+            extractedSig = rawHeaderInput;
+            canonical = payload;
+          }
+
+          // Compute expected signature
+          try {
+            var rawExpected = await computeHMAC(algo, secret, canonical);
+            var preset = PROVIDERS[currentPreset];
+            var expectedFormatted = (preset.encoding === 'base64') ? bufferToBase64(rawExpected) : bufferToHex(rawExpected);
+
+            verifyExpectedSig.textContent = expectedFormatted;
+            verifyReceivedSig.textContent = extractedSig;
+
+            // Crypto Match Check
+            var isCryptoValid = timingSafeEqual(expectedFormatted, extractedSig);
+
+            // Replay & Timestamp Check
+            var isTimestampValid = true;
+            var ageSec = 0;
+            var timeNotes = '';
+
+            if (extractedTs) {
+              ageSec = nowEpoch - extractedTs;
+              if (ageSec < -10) {
+                isTimestampValid = false;
+                timeNotes = 'Clock Skew Alert: Header timestamp is ' + Math.abs(ageSec) + 's in the future.';
+                metricAge.className = 'metric-val warn';
+                metricAge.textContent = '+' + Math.abs(ageSec) + 's (Future)';
+              } else if (ageSec > toleranceSec) {
+                isTimestampValid = false;
+                timeNotes = 'Replay Window Expired: Request is ' + ageSec + 's old (exceeds ' + toleranceSec + 's tolerance window).';
+                metricAge.className = 'metric-val err';
+                metricAge.textContent = ageSec + 's (Expired)';
+              } else {
+                timeNotes = 'Timestamp Fresh: Request is ' + ageSec + 's old (within ' + toleranceSec + 's tolerance window).';
+                metricAge.className = 'metric-val ok';
+                metricAge.textContent = ageSec + 's ago';
+              }
+            } else {
+              timeNotes = 'No timestamp header present. Cryptographic signature matches raw payload body.';
+              metricAge.className = 'metric-val';
+              metricAge.textContent = 'N/A';
+            }
+
+            verifyTimestampNotes.textContent = timeNotes;
+
+            if (isCryptoValid) {
+              metricCrypto.className = 'metric-val ok';
+              metricCrypto.textContent = 'VALID ✅';
+            } else {
+              metricCrypto.className = 'metric-val err';
+              metricCrypto.textContent = 'MISMATCH ❌';
+            }
+
+            if (!extractedTs) {
+              metricReplay.className = 'metric-val';
+              metricReplay.textContent = 'Untracked';
+            } else if (isTimestampValid) {
+              metricReplay.className = 'metric-val ok';
+              metricReplay.textContent = 'SAFE ✅';
+            } else {
+              metricReplay.className = 'metric-val err';
+              metricReplay.textContent = 'RISK ⚠️';
+            }
+
+            // Overall Verdict Banner
+            if (isCryptoValid && isTimestampValid) {
+              verdictBanner.className = 'verdict-banner valid';
+              verdictIcon.textContent = '✅';
+              verdictHeading.textContent = 'Webhook Verified Authentically';
+              verdictSub.textContent = 'Cryptographic signature is identical and the timestamp is fresh within the tolerance window.';
+              playSound('success');
+            } else if (isCryptoValid && !isTimestampValid) {
+              verdictBanner.className = 'verdict-banner invalid';
+              verdictIcon.textContent = '⚠️';
+              verdictHeading.textContent = 'Signature Matches but Timestamp Expired';
+              verdictSub.textContent = 'Potential replay attack: The HMAC matches, but the timestamp falls outside the ' + toleranceSec + 's tolerance window.';
+              playSound('fail');
+            } else {
+              verdictBanner.className = 'verdict-banner invalid';
+              verdictIcon.textContent = '❌';
+              verdictHeading.textContent = 'Verification Failed: Signature Mismatch';
+              verdictSub.textContent = 'The received signature does not match the computed HMAC. Ensure the secret key and raw body are exact.';
+              playSound('fail');
+            }
+
+          } catch (e) {
+            verdictBanner.className = 'verdict-banner invalid';
+            verdictIcon.textContent = '⚠️';
+            verdictHeading.textContent = 'Error During Verification';
+            verdictSub.textContent = e.message;
+          }
+        }
+
+        // --- Code Snippets Generator ---
+        function generateCodeSnippet(lang, presetKey) {
+          var headerName = signHeaderName.value;
+          var algo = signAlgorithm.value || 'SHA-256';
+
+          if (lang === 'node') {
+            if (presetKey === 'stripe') {
+              return `const crypto = require('crypto');\n\n` +
+                `function verifyStripeWebhook(rawBody, signatureHeader, secret, toleranceSec = 300) {\n` +
+                `  const parts = signatureHeader.split(',').reduce((acc, part) => {\n` +
+                `    const [k, v] = part.split('=');\n` +
+                `    acc[k] = v;\n` +
+                `    return acc;\n` +
+                `  }, {});\n\n` +
+                `  const timestamp = parseInt(parts.t, 10);\n` +
+                `  const receivedSig = parts.v1;\n` +
+                `  if (!timestamp || !receivedSig) return false;\n\n` +
+                `  // 1. Replay attack window check\n` +
+                `  const now = Math.floor(Date.now() / 1000);\n` +
+                `  if (Math.abs(now - timestamp) > toleranceSec) return false;\n\n` +
+                `  // 2. Compute canonical HMAC\n` +
+                `  const signedPayload = \`\${timestamp}.\${rawBody}\`;\n` +
+                `  const expectedSig = crypto.createHmac('sha256', secret).update(signedPayload).digest('hex');\n\n` +
+                `  // 3. Timing-safe comparison\n` +
+                `  return crypto.timingSafeEqual(Buffer.from(expectedSig), Buffer.from(receivedSig));\n` +
+                `}`;
+            } else if (presetKey === 'slack') {
+              return `const crypto = require('crypto');\n\n` +
+                `function verifySlackWebhook(rawBody, signature, timestamp, secret, toleranceSec = 300) {\n` +
+                `  const now = Math.floor(Date.now() / 1000);\n` +
+                `  if (Math.abs(now - parseInt(timestamp, 10)) > toleranceSec) return false;\n\n` +
+                `  const sigBase = \`v0:\${timestamp}:\${rawBody}\`;\n` +
+                `  const expectedSig = 'v0=' + crypto.createHmac('sha256', secret).update(sigBase).digest('hex');\n\n` +
+                `  return crypto.timingSafeEqual(Buffer.from(expectedSig), Buffer.from(signature));\n` +
+                `}`;
+            } else {
+              var hashAlgo = algo.toLowerCase().replace('-', '');
+              return `const crypto = require('crypto');\n\n` +
+                `function verifyWebhook(rawBody, signatureHeader, secret) {\n` +
+                `  const expected = 'sha256=' + crypto.createHmac('${hashAlgo}', secret).update(rawBody).digest('hex');\n` +
+                `  const expectedBuf = Buffer.from(expected);\n` +
+                `  const receivedBuf = Buffer.from(signatureHeader);\n` +
+                `  if (expectedBuf.length !== receivedBuf.length) return false;\n` +
+                `  return crypto.timingSafeEqual(expectedBuf, receivedBuf);\n` +
+                `}\n\n` +
+                `// Express.js Middleware usage note:\n` +
+                `// Ensure express.raw({ type: 'application/json' }) is used to capture unmodified raw bytes!`;
+            }
+          } else if (lang === 'python') {
+            if (presetKey === 'stripe') {
+              return `import hmac\nimport hashlib\nimport time\n\ndef verify_stripe_webhook(raw_body: bytes, signature_header: str, secret: str, tolerance: int = 300) -> bool:\n` +
+                `    parts = dict(x.split("=") for x in signature_header.split(","))\n` +
+                `    timestamp = int(parts.get("t", 0))\n` +
+                `    received_sig = parts.get("v1", "")\n` +
+                `    if not timestamp or not received_sig:\n` +
+                `        return False\n\n` +
+                `    if abs(int(time.time()) - timestamp) > tolerance:\n` +
+                `        return False\n\n` +
+                `    signed_payload = f"{timestamp}.".encode("utf-8") + raw_body\n` +
+                `    expected_sig = hmac.new(secret.encode("utf-8"), signed_payload, hashlib.sha256).hexdigest()\n` +
+                `    return hmac.compare_digest(expected_sig, received_sig)`;
+            } else {
+              return `import hmac\nimport hashlib\n\ndef verify_webhook(raw_body: bytes, signature_header: str, secret: str) -> bool:\n` +
+                `    expected_sig = "sha256=" + hmac.new(secret.encode("utf-8"), raw_body, hashlib.sha256).hexdigest()\n` +
+                `    return hmac.compare_digest(expected_sig, signature_header)`;
+            }
+          } else if (lang === 'go') {
+            return `package main\n\nimport (\n\t"crypto/hmac"\n\t"crypto/sha256"\n\t"encoding/hex"\n)\n\n` +
+              `func VerifyWebhook(rawBody []byte, signatureHeader, secret string) bool {\n` +
+              `\tmac := hmac.New(sha256.New, []byte(secret))\n` +
+              `\tmac.Write(rawBody)\n` +
+              `\texpected := "sha256=" + hex.EncodeToString(mac.Sum(nil))\n` +
+              `\treturn hmac.Equal([]byte(expected), []byte(signatureHeader))\n` +
+              `}`;
+          } else if (lang === 'ruby') {
+            return `require 'openssl'\n\ndef verify_webhook(raw_body, signature_header, secret)\n` +
+              `  expected = 'sha256=' + OpenSSL::HMAC.hexdigest(OpenSSL::Digest.new('sha256'), secret, raw_body)\n` +
+              `  Rack::Utils.secure_compare(expected, signature_header)\n` +
+              `end`;
+          }
+          return '// Code snippet generator';
+        }
+
+        function updateCodeSnippet() {
+          codeSnippetBody.textContent = generateCodeSnippet(currentLang, currentPreset);
+          codePresetIndicator.textContent = PROVIDERS[currentPreset].name + ' Preset';
+        }
+
+        // --- Preset Switcher Handler ---
+        function applyPreset(key) {
+          currentPreset = key;
+          var p = PROVIDERS[key];
+          if (!p) return;
+
+          presetPills.forEach(function (pill) {
+            var isCurrent = pill.getAttribute('data-preset') === key;
+            pill.classList.toggle('active', isCurrent);
+            pill.setAttribute('aria-checked', isCurrent ? 'true' : 'false');
+          });
+
+          signHeaderName.value = p.header;
+          signAlgorithm.value = p.algo;
+          signSecret.value = p.secretPlaceholder;
+          signPayload.value = p.samplePayload;
+          timestampGroup.style.display = p.hasTimestamp ? 'block' : 'none';
+
+          if (p.hasTimestamp) {
+            signTimestamp.value = Math.floor(Date.now() / 1000);
+          }
+
+          // Pre-populate verifier
+          verifySecret.value = p.secretPlaceholder;
+          verifyPayload.value = p.samplePayload;
+
+          updateSigner();
+          updateVerifier();
+          updateCodeSnippet();
+          playSound('click');
+        }
+
+        presetPills.forEach(function (pill) {
+          pill.addEventListener('click', function () {
+            applyPreset(this.getAttribute('data-preset'));
+          });
+        });
+
+        // --- Tabs Navigation ---
+        function switchTab(tab) {
+          tabSignBtn.classList.toggle('active', tab === 'sign');
+          tabVerifyBtn.classList.toggle('active', tab === 'verify');
+          tabCodeBtn.classList.toggle('active', tab === 'code');
+
+          panelSign.style.display = tab === 'sign' ? 'block' : 'none';
+          panelVerify.style.display = tab === 'verify' ? 'block' : 'none';
+          panelCode.style.display = tab === 'code' ? 'block' : 'none';
+          playSound('click');
+        }
+
+        tabSignBtn.addEventListener('click', function () { switchTab('sign'); });
+        tabVerifyBtn.addEventListener('click', function () { switchTab('verify'); });
+        tabCodeBtn.addEventListener('click', function () { switchTab('code'); });
+
+        // --- Quick Actions in Sign Panel ---
+        document.getElementById('btnSamplePayload').addEventListener('click', function () {
+          signPayload.value = PROVIDERS[currentPreset].samplePayload;
+          updateSigner();
+          playSound('click');
+        });
+
+        document.getElementById('btnFormatJson').addEventListener('click', function () {
+          try {
+            var parsed = JSON.parse(signPayload.value);
+            signPayload.value = JSON.stringify(parsed, null, 2);
+            updateSigner();
+            playSound('click');
+          } catch (e) {
+            showToast('Invalid JSON: Cannot format');
+            playSound('fail');
+          }
+        });
+
+        document.getElementById('btnMinifyJson').addEventListener('click', function () {
+          try {
+            var parsed = JSON.parse(signPayload.value);
+            signPayload.value = JSON.stringify(parsed);
+            updateSigner();
+            playSound('click');
+          } catch (e) {
+            showToast('Invalid JSON: Cannot minify');
+            playSound('fail');
+          }
+        });
+
+        toggleSecretVisibility.addEventListener('click', function () {
+          if (signSecret.type === 'password') {
+            signSecret.type = 'text';
+            toggleSecretVisibility.textContent = 'Hide';
+          } else {
+            signSecret.type = 'password';
+            toggleSecretVisibility.textContent = 'Show';
+          }
+        });
+
+        document.getElementById('btnGenSecret').addEventListener('click', function () {
+          var arr = new Uint8Array(24);
+          window.crypto.getRandomValues(arr);
+          signSecret.value = 'mock_sec_' + Array.from(arr, function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+          updateSigner();
+          playSound('click');
+        });
+
+        document.getElementById('btnClearSecret').addEventListener('click', function () {
+          signSecret.value = '';
+          updateSigner();
+          playSound('click');
+        });
+
+        document.getElementById('btnSetNow').addEventListener('click', function () {
+          signTimestamp.value = Math.floor(Date.now() / 1000);
+          updateSigner();
+          playSound('click');
+        });
+
+        document.getElementById('btnTimeSub30').addEventListener('click', function () {
+          signTimestamp.value = Math.floor(Date.now() / 1000) - 30;
+          updateSigner();
+          playSound('click');
+        });
+
+        document.getElementById('btnTimeSub5m').addEventListener('click', function () {
+          signTimestamp.value = Math.floor(Date.now() / 1000) - 301;
+          updateSigner();
+          playSound('click');
+        });
+
+        document.getElementById('btnTimeSub1h').addEventListener('click', function () {
+          signTimestamp.value = Math.floor(Date.now() / 1000) - 3600;
+          updateSigner();
+          playSound('click');
+        });
+
+        document.getElementById('btnTimePlus1m').addEventListener('click', function () {
+          signTimestamp.value = Math.floor(Date.now() / 1000) + 60;
+          updateSigner();
+          playSound('click');
+        });
+
+        // --- Copy Handlers ---
+        document.getElementById('copyFullHeader').addEventListener('click', function () {
+          navigator.clipboard.writeText(outFullHeader.textContent);
+          showToast('Copied full header!');
+          playSound('click');
+        });
+
+        document.getElementById('copySignatureOnly').addEventListener('click', function () {
+          navigator.clipboard.writeText(outSignatureOnly.textContent);
+          showToast('Copied signature hash!');
+          playSound('click');
+        });
+
+        document.getElementById('copyCanonical').addEventListener('click', function () {
+          navigator.clipboard.writeText(outCanonical.textContent);
+          showToast('Copied canonical payload string!');
+          playSound('click');
+        });
+
+        document.getElementById('copyCurl').addEventListener('click', function () {
+          navigator.clipboard.writeText(outCurl.textContent);
+          showToast('Copied cURL command!');
+          playSound('click');
+        });
+
+        document.getElementById('btnCopySnippet').addEventListener('click', function () {
+          navigator.clipboard.writeText(codeSnippetBody.textContent);
+          showToast('Copied code snippet!');
+          playSound('click');
+        });
+
+        // --- Verifier Action Handlers ---
+        document.getElementById('btnSyncFromSign').addEventListener('click', function () {
+          var headerParts = outFullHeader.textContent.split(': ');
+          if (headerParts.length > 1) {
+            verifyIncomingHeader.value = headerParts[1];
+          }
+          verifySecret.value = signSecret.value;
+          verifyPayload.value = signPayload.value;
+          updateVerifier();
+          showToast('Synced active payload and signature into verifier!');
+          playSound('click');
+        });
+
+        window.setTolerance = function (seconds) {
+          verifyTolerance.value = seconds;
+          updateVerifier();
+          playSound('click');
+        };
+
+        // Code Language Selector
+        langPills.forEach(function (pill) {
+          pill.addEventListener('click', function () {
+            langPills.forEach(function (p) { p.classList.remove('active'); });
+            this.classList.add('active');
+            currentLang = this.getAttribute('data-lang');
+            updateCodeSnippet();
+            playSound('click');
+          });
+        });
+
+        // --- History / Fixtures Storage ---
+        var STORAGE_KEY_HISTORY = 'webhook_verifier_history_v1';
+
+        function loadHistory() {
+          try {
+            var raw = localStorage.getItem(STORAGE_KEY_HISTORY);
+            return raw ? JSON.parse(raw) : [];
+          } catch (e) {
+            return [];
+          }
+        }
+
+        function saveHistory(list) {
+          try {
+            localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(list.slice(0, 10)));
+          } catch (e) { }
+        }
+
+        function renderHistory() {
+          var list = loadHistory();
+          historyTableBody.innerHTML = '';
+          if (list.length === 0) {
+            historyTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-faint); padding: 1.5rem">No fixtures saved yet. Click "Save to Fixtures" above.</td></tr>';
+            return;
+          }
+
+          list.forEach(function (item, idx) {
+            var tr = document.createElement('tr');
+            tr.innerHTML =
+              '<td>' + new Date(item.time).toLocaleTimeString() + '</td>' +
+              '<td><strong>' + item.provider.toUpperCase() + '</strong></td>' +
+              '<td class="mono" style="max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">' + item.header + '</td>' +
+              '<td><span class="privacy-badge" style="background: var(--surface-hover); color: var(--accent);">' + item.algo + '</span></td>' +
+              '<td><button class="pill-btn-sm btn-restore-hist" data-index="' + idx + '">Restore</button></td>';
+            historyTableBody.appendChild(tr);
+          });
+
+          document.querySelectorAll('.btn-restore-hist').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+              var idx = parseInt(this.getAttribute('data-index'), 10);
+              var hist = loadHistory();
+              var target = hist[idx];
+              if (target) {
+                applyPreset(target.provider);
+                signSecret.value = target.secret;
+                signPayload.value = target.payload;
+                updateSigner();
+                showToast('Restored fixture: ' + target.provider);
+                playSound('click');
+              }
+            });
+          });
+        }
+
+        document.getElementById('btnSaveFixture').addEventListener('click', function () {
+          var list = loadHistory();
+          list.unshift({
+            time: Date.now(),
+            provider: currentPreset,
+            header: outFullHeader.textContent,
+            algo: signAlgorithm.value,
+            secret: signSecret.value,
+            payload: signPayload.value
+          });
+          saveHistory(list);
+          renderHistory();
+          showToast('Saved fixture to local storage!');
+          playSound('success');
+        });
+
+        document.getElementById('btnClearHistory').addEventListener('click', function () {
+          saveHistory([]);
+          renderHistory();
+          showToast('History cleared.');
+          playSound('click');
+        });
+
+        // --- Live Event Listeners ---
+        [signAlgorithm, signHeaderName, signSecret, signTimestamp, signPayload].forEach(function (el) {
+          el.addEventListener('input', updateSigner);
+        });
+
+        [verifyIncomingHeader, verifySecret, verifyTolerance, verifyPayload].forEach(function (el) {
+          el.addEventListener('input', updateVerifier);
+        });
+
+        // --- Audio & Theme Controls ---
+        var audioToggleBtn = document.getElementById('audioToggleBtn');
+        var audioIcon = document.getElementById('audioIcon');
+
+        function updateAudioButtonUI() {
+          audioIcon.textContent = isMuted ? '🔇' : '🔊';
+          audioToggleBtn.setAttribute('aria-label', isMuted ? 'Unmute Sound Effects' : 'Mute Sound Effects');
+        }
+
+        audioToggleBtn.addEventListener('click', function () {
+          isMuted = !isMuted;
+          updateAudioButtonUI();
+          try {
+            localStorage.setItem('webhook_verifier_muted', isMuted ? 'true' : 'false');
+          } catch (e) { }
+          if (!isMuted) playSound('click');
+        });
+
+        var themeToggleBtn = document.getElementById('themeToggleBtn');
+        var themeIcon = document.getElementById('themeIcon');
+
+        function updateThemeIcon() {
+          var current = document.documentElement.getAttribute('data-theme') || 'dark';
+          themeIcon.textContent = current === 'dark' ? '☀️' : '🌙';
+        }
+
+        themeToggleBtn.addEventListener('click', function () {
+          var current = document.documentElement.getAttribute('data-theme') || 'dark';
+          var next = current === 'dark' ? 'light' : 'dark';
+          document.documentElement.setAttribute('data-theme', next);
+          updateThemeIcon();
+          try {
+            localStorage.setItem('webhook_verifier_theme', next);
+          } catch (e) { }
+          playSound('click');
+        });
+
+        // --- Initialization ---
+        try {
+          isMuted = localStorage.getItem('webhook_verifier_muted') === 'true';
+          updateAudioButtonUI();
+        } catch (e) { }
+
+        updateThemeIcon();
+        signTimestamp.value = Math.floor(Date.now() / 1000);
+        applyPreset('github');
+        renderHistory();
+
+      })();
+    </script>
+  </body>
+</html>
