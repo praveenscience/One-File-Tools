@@ -1,0 +1,1307 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Merge CI Lab — One File Tools</title>
+    <meta name="description" content="A Git merge conflict quest: resolve conflicts with Accept Current, Incoming, Both or a hand edit, then run a CI pipeline (lint, build, tests) to prove the merged code actually works." />
+    <script>
+      (function () {
+        var t = null;
+        try {
+          t = localStorage.getItem("merge_ci_lab_theme");
+        } catch (e) {}
+        if (t !== "light" && t !== "dark") {
+          t = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        }
+        document.documentElement.setAttribute("data-theme", t);
+      })();
+    </script>
+    <style>
+      :root {
+        --bg: #ebe8fb;
+        --c: #fff;
+        --ink: #22203a;
+        --mu: #6b6890;
+        --v: #6a48f0;
+        --v2: #e4defc;
+        --pe: #fcdcd2;
+        --sk: #d3e8f8;
+        --g: #0f8a68;
+        --r: #d43a55;
+        --ln: #e6e2f7;
+        --cur: #dff5ea;
+        --inc: #dfeafb;
+        --code: #faf9ff;
+        --star: #b86e00;
+        --sh: 0 10px 30px rgba(110, 90, 200, 0.1);
+        color-scheme: light;
+      }
+      :root[data-theme="dark"] {
+        --bg: #17152b;
+        --c: #221f40;
+        --ink: #eceaff;
+        --mu: #a5a2cc;
+        --v: #9b82ff;
+        --v2: #352f66;
+        --pe: #4a2f38;
+        --sk: #274260;
+        --g: #3fd6aa;
+        --r: #ff7d92;
+        --ln: #37326a;
+        --cur: #133a2f;
+        --inc: #182c4f;
+        --code: #1b1934;
+        --star: #f5b041;
+        --sh: 0 10px 30px rgba(0, 0, 0, 0.3);
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      body {
+        margin: 0;
+        color: var(--ink);
+        font:
+          15px/1.5 ui-rounded,
+          "SF Pro Rounded",
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
+        background: radial-gradient(600px 300px at 0 0, var(--sk), transparent 70%), var(--bg);
+        min-height: 100vh;
+      }
+      button {
+        font: inherit;
+        cursor: pointer;
+        border: 0;
+        background: var(--v2);
+        color: var(--ink);
+        border-radius: 999px;
+        padding: 7px 14px;
+        transition:
+          transform 0.15s,
+          background 0.15s;
+      }
+      button:hover:not(:disabled) {
+        transform: translateY(-1px);
+        background: var(--v);
+        color: #fff;
+      }
+      button:focus-visible,
+      textarea:focus-visible {
+        outline: 3px solid var(--v);
+        outline-offset: 2px;
+      }
+      .hero button:focus-visible {
+        outline-color: #fff;
+      }
+      button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      .app {
+        max-width: 1120px;
+        margin: auto;
+        padding: 18px;
+      }
+      .top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+      .topr {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .logo {
+        font-size: 21px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        margin: 0;
+      }
+      .logo b {
+        color: var(--v);
+      }
+      #theme {
+        background: var(--c);
+        box-shadow: var(--sh);
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        font-size: 18px;
+      }
+      .seg {
+        display: flex;
+        gap: 4px;
+        background: var(--c);
+        padding: 4px;
+        border-radius: 999px;
+        box-shadow: var(--sh);
+      }
+      .seg button {
+        background: none;
+        padding: 6px 16px;
+      }
+      .seg button.on {
+        background: var(--v);
+        color: #fff;
+      }
+      .card {
+        background: var(--c);
+        border-radius: 24px;
+        padding: 18px;
+        box-shadow: var(--sh);
+      }
+      .grid {
+        display: grid;
+        gap: 14px;
+      }
+      .g2 {
+        grid-template-columns: 1.4fr 1fr;
+      }
+      .g3 {
+        grid-template-columns: repeat(4, 1fr);
+      }
+      @media (max-width: 860px) {
+        .g2,
+        .g3 {
+          grid-template-columns: 1fr 1fr;
+        }
+        .play {
+          grid-template-columns: 1fr !important;
+        }
+      }
+      @media (max-width: 520px) {
+        .g2,
+        .g3 {
+          grid-template-columns: 1fr;
+        }
+      }
+      .hero {
+        background: var(--v);
+        color: #fff;
+      }
+      .hero p {
+        opacity: 0.92;
+      }
+      .hero h2 {
+        font-size: 27px;
+        line-height: 1.15;
+        margin: 0 0 8px;
+        letter-spacing: -0.02em;
+      }
+      .hero button {
+        background: #fff;
+        color: #4b35c9;
+        font-weight: 700;
+        margin: 6px 8px 0 0;
+      }
+      .tiles {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+      .tile {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        align-items: flex-start;
+      }
+      .tile.p {
+        background: var(--v2);
+      }
+      .tile small {
+        color: var(--mu);
+      }
+      .rg {
+        position: relative;
+        width: 64px;
+        height: 64px;
+      }
+      .rg svg {
+        width: 100%;
+        transform: rotate(-90deg);
+      }
+      .rg circle {
+        fill: none;
+        stroke-width: 4;
+      }
+      .rb {
+        stroke: var(--ln);
+      }
+      .rf {
+        stroke: var(--v);
+        stroke-linecap: round;
+        transition: stroke-dasharray 0.8s;
+      }
+      .rg b {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        font-size: 14px;
+      }
+      .qa {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        text-align: center;
+        padding: 14px 8px;
+        color: var(--ink);
+        background: var(--c);
+        border-radius: 20px;
+        box-shadow: var(--sh);
+      }
+      .qa span {
+        font-size: 22px;
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+        display: grid;
+        place-items: center;
+        background: var(--v2);
+      }
+      .qa:nth-child(2) span {
+        background: var(--pe);
+      }
+      .qa:nth-child(3) span {
+        background: var(--sk);
+      }
+      h3 {
+        margin: 18px 0 8px;
+        font-size: 17px;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        background: var(--c);
+        border-radius: 18px;
+        margin-bottom: 8px;
+        box-shadow: var(--sh);
+      }
+      .row .n {
+        width: 42px;
+        height: 42px;
+        border-radius: 14px;
+        display: grid;
+        place-items: center;
+        font-weight: 700;
+        background: var(--v2);
+        flex: none;
+      }
+      .row:nth-child(3n + 2) .n {
+        background: var(--pe);
+      }
+      .row:nth-child(3n) .n {
+        background: var(--sk);
+      }
+      .row div {
+        flex: 1;
+        min-width: 0;
+      }
+      .row small {
+        color: var(--mu);
+        display: block;
+      }
+      .st {
+        color: var(--star);
+        letter-spacing: 2px;
+      }
+      .mu {
+        color: var(--mu);
+        font-size: 13px;
+      }
+      .chip {
+        display: inline-block;
+        background: var(--v2);
+        border-radius: 999px;
+        padding: 2px 10px;
+        font-size: 12px;
+        margin: 0 4px 4px 0;
+      }
+      .play {
+        display: grid;
+        grid-template-columns: 1.6fr 1fr;
+        gap: 14px;
+        align-items: start;
+      }
+      .steps {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-bottom: 10px;
+      }
+      .steps button {
+        padding: 5px 12px;
+        font-size: 13px;
+      }
+      .steps button.on {
+        background: var(--v);
+        color: #fff;
+      }
+      .bar {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin: 10px 0;
+      }
+      #tabs {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      #tabs button {
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        font-size: 13px;
+      }
+      #tabs button.on {
+        background: var(--ink);
+        color: var(--c);
+      }
+      #tabs i {
+        font-style: normal;
+        margin-left: 6px;
+        background: var(--r);
+        color: #fff;
+        border-radius: 99px;
+        padding: 0 6px;
+        font-size: 11px;
+      }
+      #code,
+      #ed {
+        background: var(--code);
+        border-radius: 16px;
+        border: 1px solid var(--ln);
+        font:
+          13px/1.55 ui-monospace,
+          Menlo,
+          Consolas,
+          monospace;
+      }
+      #code {
+        padding: 8px 0;
+        overflow: auto;
+        max-height: 420px;
+      }
+      .r {
+        display: grid;
+        grid-template-columns: 42px 1fr;
+        white-space: pre;
+      }
+      .r i {
+        color: var(--mu);
+        text-align: right;
+        padding-right: 12px;
+        font-style: normal;
+        user-select: none;
+      }
+      .cf {
+        margin: 6px 8px;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid var(--ln);
+      }
+      .lens {
+        background: var(--v2);
+        padding: 6px 12px;
+        font: 12px system-ui;
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .lens span {
+        color: var(--mu);
+        margin-right: 4px;
+      }
+      .lens button {
+        padding: 3px 10px;
+        font-size: 12px;
+        background: var(--c);
+      }
+      .cur {
+        background: var(--cur);
+      }
+      .inc {
+        background: var(--inc);
+      }
+      .mk {
+        color: var(--mu);
+      }
+      .cu code::after {
+        content: "   Current Change";
+        color: var(--g);
+      }
+      .in code::after {
+        content: "   Incoming Change";
+        color: var(--v);
+      }
+      .cu {
+        background: var(--cur);
+      }
+      .in {
+        background: var(--inc);
+      }
+      #ed {
+        width: 100%;
+        height: 330px;
+        padding: 12px;
+        color: var(--ink);
+        resize: vertical;
+        tab-size: 2;
+      }
+      .ok {
+        color: var(--g);
+        font-weight: 600;
+        padding: 6px 14px;
+        font-family: system-ui;
+      }
+      svg.gr {
+        width: 100%;
+      }
+      svg.gr text {
+        fill: var(--mu);
+        font: 11px system-ui;
+      }
+      .gl {
+        stroke: var(--ln);
+        stroke-width: 3;
+        fill: none;
+      }
+      .cm {
+        fill: var(--c);
+        stroke: var(--v);
+        stroke-width: 3;
+      }
+      .mn {
+        fill: #f0a020;
+        transition: fill 0.4s;
+      }
+      .mn.pass {
+        fill: var(--g);
+      }
+      .mn.fail {
+        fill: var(--r);
+      }
+      #run {
+        background: var(--v);
+        color: #fff;
+        font-weight: 700;
+        padding: 9px 18px;
+      }
+      #ci {
+        list-style: none;
+        margin: 8px 0 0;
+        padding: 0;
+      }
+      #ci li {
+        display: grid;
+        grid-template-columns: 24px 1fr;
+        padding: 6px 0;
+        border-bottom: 1px dashed var(--ln);
+        animation: in 0.25s both;
+      }
+      #ci small {
+        grid-column: 2;
+        color: var(--r);
+        font-family: ui-monospace, monospace;
+        font-size: 12px;
+        word-break: break-word;
+      }
+      #ci .p b {
+        color: var(--g);
+      }
+      #ci .f b {
+        color: var(--r);
+      }
+      @keyframes in {
+        from {
+          opacity: 0;
+          transform: translateX(-8px);
+        }
+      }
+      #win {
+        display: none;
+        margin-top: 12px;
+        padding: 14px;
+        border-radius: 18px;
+        background: var(--v2);
+      }
+      #win.show {
+        display: block;
+      }
+      #win h4 {
+        margin: 0 0 4px;
+        font-size: 17px;
+      }
+      pre.cmd {
+        background: var(--ink);
+        color: var(--c);
+        padding: 10px 12px;
+        border-radius: 12px;
+        margin: 8px 0 0;
+        font:
+          12.5px ui-monospace,
+          monospace;
+        overflow: auto;
+      }
+      .an .anl {
+        display: block;
+        width: 100%;
+        text-align: left;
+        padding: 6px 12px;
+        border-radius: 10px;
+        font:
+          13px ui-monospace,
+          monospace;
+        margin: 3px 0;
+        background: var(--code);
+        color: var(--ink);
+        border: 2px solid transparent;
+        white-space: pre;
+        overflow-x: auto;
+      }
+      .an .anl:hover {
+        transform: none;
+        background: var(--v2);
+        color: var(--ink);
+      }
+      .an .anl.on {
+        border-color: var(--v);
+      }
+      .ck {
+        display: flex;
+        gap: 10px;
+        padding: 10px;
+        background: var(--code);
+        margin-bottom: 6px;
+        width: 100%;
+        text-align: left;
+        border-radius: 14px;
+        color: var(--ink);
+      }
+      .ck.on {
+        opacity: 0.55;
+        text-decoration: line-through;
+      }
+      .ck:hover:not(:disabled) {
+        background: var(--v2);
+        color: var(--ink);
+        transform: none;
+      }
+      .hud {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-bottom: 8px;
+      }
+      .hud .chip {
+        font-weight: 700;
+        margin: 0;
+      }
+      .tb {
+        height: 8px;
+        border-radius: 99px;
+        background: var(--ln);
+        overflow: hidden;
+        margin-bottom: 10px;
+      }
+      .tb i {
+        display: block;
+        height: 100%;
+        width: 100%;
+        background: var(--g);
+        transition: width 0.25s linear;
+      }
+      .tb.low i {
+        background: var(--r);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation: none !important;
+          transition: none !important;
+          scroll-behavior: auto !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <div class="top">
+        <h1 class="logo">Merge<b>CI</b> Lab</h1>
+        <div class="topr">
+          <nav class="seg" id="nav" aria-label="Sections"></nav>
+          <button id="theme" type="button" aria-label="Switch theme" title="Switch theme"></button>
+        </div>
+      </div>
+      <main id="view"></main>
+    </div>
+    <script>
+      "use strict";
+      // ---- pure:start (data and pure helpers; also loaded by test.js) ----
+      const LV = [
+        {
+          n: "Tax and discount",
+          ex: "total",
+          brief: "main applies 18% tax. feature/bulk-discount gives 10% off when the subtotal is over 1000. Both rules ship: discount first, then tax on the result.",
+          hint: "Neither side is complete. Compute a discounted amount first, then round that amount times 1.18.",
+          real: "Neither Accept button is right. In VS Code you would edit the lines by hand so the discount feeds into the tax.",
+          files: [
+            [
+              "price.js",
+              `function total(items) {
+  const sum = items.reduce((s, i) => s + i.price * i.qty, 0);
+<<<<<<< HEAD
+  return Math.round(sum * 1.18);
+=======
+  return sum > 1000 ? sum * 0.9 : sum;
+>>>>>>> feature/bulk-discount
+}`
+            ]
+          ],
+          tests: [
+            ["Small cart: 200 becomes 236", (o) => o.total([{ price: 100, qty: 2 }]) === 236],
+            ["Big cart: 1500 becomes 1593", (o) => o.total([{ price: 500, qty: 3 }]) === 1593],
+            ["Exactly 1000 gets no discount: 1180", (o) => o.total([{ price: 250, qty: 4 }]) === 1180],
+            ["Empty cart is 0", (o) => o.total([]) === 0]
+          ]
+        },
+        {
+          n: "Config twins",
+          ex: "config",
+          brief: "Two branches both edited the config. Production needs the new host, retries and timeout, and must not ship with debug logging on.",
+          hint: "The first conflict adds different keys on each side, so both belong. The second is one key with two values.",
+          real: "Accept Both is right when each side adds something different. When both set the same key, pick one.",
+          files: [
+            [
+              "config.js",
+              `const config = {
+  port: 3000,
+<<<<<<< HEAD
+  host: "0.0.0.0",
+  retries: 3,
+=======
+  timeout: 5000,
+>>>>>>> feat/timeout
+<<<<<<< HEAD
+  debug: false,
+=======
+  debug: true,
+>>>>>>> chore/local-debug
+};`
+            ]
+          ],
+          tests: [
+            ["port is 3000", (o) => o.config.port === 3000],
+            ["host is 0.0.0.0", (o) => o.config.host === "0.0.0.0"],
+            ["retries is 3", (o) => o.config.retries === 3],
+            ["timeout is 5000", (o) => o.config.timeout === 5000],
+            ["debug is off", (o) => o.config.debug === false]
+          ]
+        },
+        {
+          n: "Two files",
+          ex: "pageCount,safePage",
+          brief: "Release notes say the page size is now 25. Two files conflict and must load together. Watch for names declared twice.",
+          hint: "The two clamp versions behave the same, so keep one. Keeping both redeclares the constant and breaks the build.",
+          real: "Git cannot see that two files now declare the same name. Always run the build after Accept Both.",
+          files: [
+            [
+              "utils.js",
+              `<<<<<<< HEAD
+const clamp = (n, lo, hi) => Math.min(Math.max(n, lo), hi);
+=======
+const clamp = (n, lo, hi) => Math.max(lo, Math.min(n, hi));
+>>>>>>> refactor/clamp
+const sum = (a) => a.reduce((x, y) => x + y, 0);`
+            ],
+            [
+              "app.js",
+              `<<<<<<< HEAD
+const PAGE_SIZE = 10;
+=======
+const PAGE_SIZE = 25;
+>>>>>>> feat/bigger-pages
+const pageCount = (n) => Math.ceil(n / PAGE_SIZE);
+const safePage = (p, n) => clamp(p, 1, pageCount(n));`
+            ]
+          ],
+          tests: [
+            ["100 items make 4 pages", (o) => o.pageCount(100) === 4],
+            ["page 9 clamps to 4", (o) => o.safePage(9, 100) === 4],
+            ["page 0 clamps to 1", (o) => o.safePage(0, 100) === 1]
+          ]
+        },
+        {
+          n: "Slug surgery",
+          ex: "slugify",
+          brief: "fix/non-strings makes slugify accept numbers. fix/edge-dashes trims stray dashes. Both fixes are needed and the two conflicts must agree.",
+          hint: "Take the incoming side of each conflict. Lowercasing moves to the return line, so the early lowercase is no longer needed.",
+          real: "Conflicts in one file can need different answers. Resolve them one at a time, then test the whole file.",
+          files: [
+            [
+              "slugify.js",
+              `function slugify(s) {
+<<<<<<< HEAD
+  s = s.trim().toLowerCase();
+=======
+  s = String(s).trim();
+>>>>>>> fix/non-strings
+  s = s.replace(/[^a-z0-9]+/gi, "-");
+<<<<<<< HEAD
+  return s;
+=======
+  return s.toLowerCase().replace(/^-+|-+$/g, "");
+>>>>>>> fix/edge-dashes
+}`
+            ]
+          ],
+          tests: [
+            ["Hello World! becomes hello-world", (o) => o.slugify("  Hello World! ") === "hello-world"],
+            ["Numbers work: 42", (o) => o.slugify(42) === "42"],
+            ["Edge dashes trimmed", (o) => o.slugify("--A--b") === "a-b"]
+          ]
+        },
+        {
+          n: "Stock room",
+          ex: "order,stock",
+          brief: "Final boss. reserve() must reject unknown items, non-positive amounts and over-ordering. order() returns OK, SOLD_OUT or UNKNOWN. Stock must never change on a rejected order.",
+          hint: "Write one reserve() with all three checks in a single if. In order(), check for the unknown item first, then fall through to SOLD_OUT.",
+          real: "Real conflicts often need a hand-written merge of both intentions. Trust the tests, not the missing markers.",
+          files: [
+            [
+              "inventory.js",
+              `const stock = { apple: 5, pear: 2 };
+<<<<<<< HEAD
+function reserve(item, n) {
+  if (stock[item] < n) return false;
+  stock[item] -= n;
+  return true;
+}
+=======
+function reserve(item, n) {
+  if (!(item in stock) || n <= 0) return false;
+  stock[item] -= n;
+  return true;
+}
+>>>>>>> fix/validate-input`
+            ],
+            [
+              "orders.js",
+              `function order(item, n) {
+<<<<<<< HEAD
+  return reserve(item, n) ? "OK" : "SOLD_OUT";
+=======
+  if (!(item in stock)) return "UNKNOWN";
+  return reserve(item, n) ? "OK" : "FAILED";
+>>>>>>> feat/unknown-status
+}`
+            ]
+          ],
+          // Tests run in order on one fresh namespace per CI run, so the final stock check sees the earlier orders.
+          tests: [
+            ["apple x2 is OK", (o) => o.order("apple", 2) === "OK"],
+            ["apple x9 is SOLD_OUT", (o) => o.order("apple", 9) === "SOLD_OUT"],
+            ["kiwi is UNKNOWN", (o) => o.order("kiwi", 1) === "UNKNOWN"],
+            ["pear x-1 is rejected", (o) => o.order("pear", -1) !== "OK"],
+            ["pear x3 is SOLD_OUT", (o) => o.order("pear", 3) === "SOLD_OUT"],
+            ["rejected orders leave stock alone", (o) => o.stock.apple === 3 && o.stock.pear === 2 && !("kiwi" in o.stock)]
+          ]
+        }
+      ];
+
+      function parse(t) {
+        const L = t.split("\n"),
+          H = [];
+        let s = -1,
+          m = -1;
+        L.forEach((l, i) => {
+          if (l.startsWith("<<<<<<<")) {
+            s = i;
+            m = -1;
+          } else if (l.trim() === "=======" && s >= 0) m = i;
+          else if (l.startsWith(">>>>>>>") && s >= 0 && m >= 0) {
+            H.push({ s, m, e: i });
+            s = -1;
+            m = -1;
+          }
+        });
+        return { L, H };
+      }
+
+      // mode: "o" = Accept Current (ours), "t" = Accept Incoming (theirs), "b" = Accept Both
+      function take(t, k, mode) {
+        const { L, H } = parse(t),
+          h = H[k];
+        if (!h) return t;
+        const o = L.slice(h.s + 1, h.m),
+          n = L.slice(h.m + 1, h.e);
+        L.splice(h.s, h.e - h.s + 1, ...(mode === "o" ? o : mode === "t" ? n : [...o, ...n]));
+        return L.join("\n");
+      }
+
+      const hasMarkers = (files) => files.some((t) => /^(<{7}|={7}\s*$|>{7})/m.test(t));
+
+      // Builds the merged files and runs each test (given as source text) against a fresh namespace.
+      // Self-contained so it can be shipped into a Web Worker via Function.prototype.toString().
+      // Returns [[buildOk, buildMsg], [testOk, testMsg], ...].
+      function evaluate(code, ex, testSrcs) {
+        const msg = (err) => {
+          try {
+            return err && err.message !== undefined ? (err.name || "Error") + ": " + err.message : "Thrown: " + String(err);
+          } catch (_) {
+            return "Error";
+          }
+        };
+        const out = [];
+        let ns = null;
+        try {
+          ns = new Function(code + "\nreturn {" + ex + "};")();
+          out.push([true, ""]);
+        } catch (err) {
+          out.push([false, msg(err)]);
+        }
+        testSrcs.forEach((src) => {
+          let p = false,
+            m = "Skipped";
+          if (ns) {
+            try {
+              p = !!new Function("return (" + src + ");")()(ns);
+              m = "";
+            } catch (err) {
+              m = msg(err);
+            }
+          }
+          out.push([p, p ? "" : m]);
+        });
+        return out;
+      }
+      // ---- pure:end ----
+
+      const $ = (s) => document.querySelector(s);
+      const E = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+      const KEY = "merge-ci-lab";
+      const THEME_KEY = "merge_ci_lab_theme";
+      const RUN_LIMIT_MS = 2000;
+      const TM = [75, 100, 120, 120, 180];
+      const WHY = ["Both branches changed the same line, so Git cannot guess. Tax and discount are two separate rules that must be chained, so neither side alone is correct.", "The two conflicts look alike but differ. The first adds different keys on each side (keep both). The second sets one key twice (pick one, and production must keep debug off).", "Both branches touched the same lines, and Git only compares text. It cannot see that keeping both clamp versions declares the same name twice and breaks the build.", "Two fixes edited neighbouring lines of one function. Each conflict needed the incoming side because the lowercasing moved to the return line, so the two resolutions must agree.", "Different branches added validation and a new status to the same functions. The fix is one hand-written reserve() with every check, plus an order() that returns consistent statuses."];
+      const AN = [
+        ["<<<<<<< HEAD", "Start of the conflict. HEAD is the branch you are on, shown as the Current Change."],
+        ['const mode = "dark";', "Current Change: your version of these lines."],
+        ["=======", "The divider. Above it is yours, below it is theirs."],
+        ['const mode = "light";', "Incoming Change: the version from the branch being merged in."],
+        [">>>>>>> feature/theme", "End of the conflict, labelled with the incoming branch name."]
+      ];
+      const CK = [
+        ["Merge and read the message", "git merge feature prints CONFLICT (content). Git paused the merge and is waiting for you."],
+        ["Find the files", "git status lists them as both modified. In VS Code they show a ! in the Source Control panel."],
+        ["Resolve each conflict", "Use Accept Current, Incoming or Both, or edit by hand. Delete every marker line."],
+        ["Prove it works", "Run the build and tests. Git only checks text, not whether the code still works."],
+        ["Stage and finish", "git add the file, then git commit (or git merge --continue). On GitHub: Mark as resolved, then Commit merge."]
+      ];
+
+      // Stored progress: P[i] = best stars (0-3), SC[i] = best points (non-negative integer).
+      function loadArr(key, ok) {
+        let a = null;
+        try {
+          a = JSON.parse(localStorage.getItem(key));
+        } catch (e) {}
+        return LV.map((_, i) => (Array.isArray(a) && ok(a[i]) ? a[i] : 0));
+      }
+      let P = loadArr(KEY, (v) => Number.isInteger(v) && v >= 0 && v <= 3);
+      let SC = loadArr(KEY + "-sc", (v) => Number.isInteger(v) && v >= 0 && v <= 100000);
+      const save = () => {
+        try {
+          localStorage.setItem(KEY, JSON.stringify(P));
+          localStorage.setItem(KEY + "-sc", JSON.stringify(SC));
+        } catch (e) {}
+      };
+
+      const S = { i: 0, f: 0, files: [], runs: 0, hint: false, hinted: false, hp: 0, left: 0, over: false, done: false, score: 0, streak: 0, md: "v", armed: false, wipe: false, busy: false, token: 0, ci: "", win: "", mn: "", mt: "conflict" };
+      let V = "home",
+        AI = 0;
+      const CKD = [];
+
+      const locked = (i) => i > 0 && !P[i - 1];
+      const stars = (n) => `<span class="st" role="img" aria-label="${n} of 3 stars">${"★".repeat(n)}${"☆".repeat(3 - n)}</span>`;
+      const ring = (p, t) => `<div class="rg"><svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15" class="rb"/><circle cx="18" cy="18" r="15" class="rf" stroke-dasharray="${p * 94.2} 94.2"/></svg><b>${t}</b></div>`;
+
+      function load(i) {
+        // Abandoning an unfinished level breaks the clean-run streak.
+        if (!S.done && S.runs > 0) S.streak = 0;
+        Object.assign(S, { i, f: 0, runs: 0, hint: false, hinted: false, hp: 0, left: TM[i], over: false, done: false, md: "v", armed: false, busy: false, ci: "", win: "", mn: "", mt: "conflict", files: LV[i].files.map((x) => x[1]) });
+        S.token++;
+      }
+      function nextLv() {
+        const n = LV.findIndex((_, i) => !P[i]);
+        return n < 0 ? 0 : n;
+      }
+
+      function themeIcon() {
+        const dark = document.documentElement.getAttribute("data-theme") === "dark";
+        const b = $("#theme");
+        b.textContent = dark ? "☀️" : "🌙";
+        b.title = dark ? "Switch to light theme" : "Switch to dark theme";
+        b.setAttribute("aria-label", b.title);
+      }
+
+      function render() {
+        $("#nav").innerHTML = [
+          ["home", "Home"],
+          ["learn", "Learn"],
+          ["play", "Play"]
+        ]
+          .map((a) => `<button type="button" data-v="${a[0]}" class="${V === a[0] ? "on" : ""}"${V === a[0] ? ' aria-current="page"' : ""}>${a[1]}</button>`)
+          .join("");
+        $("#view").innerHTML = V === "home" ? home() : V === "learn" ? learn() : play();
+        if (V === "play") drawPlay();
+      }
+
+      function home() {
+        const d = P.filter(Boolean).length,
+          st = P.reduce((a, b) => a + b, 0),
+          n = nextLv();
+        return `<div class="grid g2"><div class="card hero"><h2>Resolve real merge conflicts with confidence</h2><p>Practise the exact choices you will see in VS Code and GitHub, then run CI to prove your merge actually works. The timer pauses while you are on Home or Learn.</p><button type="button" data-go="${n}">${d ? "Continue: level " + (n + 1) : "Start level 1"}</button><button type="button" data-v="learn">Learn the basics</button></div>
+  <div class="tiles"><div class="card tile p">${ring(d / LV.length, d + "/" + LV.length)}<strong>Levels cleared</strong><small>Pass CI to clear</small></div><div class="card tile">${ring(st / (LV.length * 3), st)}<strong>Stars earned</strong><small>of ${LV.length * 3} possible</small></div></div></div>
+  <h3>Quick actions</h3><div class="grid g3"><button type="button" class="qa" data-go="${n}"><span aria-hidden="true">▶</span>Play next</button><button type="button" class="qa" data-v="learn"><span aria-hidden="true">🧩</span>Conflict anatomy</button><button type="button" class="qa" data-v="learn"><span aria-hidden="true">✅</span>Real-world checklist</button><button type="button" class="qa" id="wipe"><span aria-hidden="true">↺</span>${S.wipe ? "Click to confirm" : "Reset progress"}</button></div>
+  <h3>Missions</h3>${LV.map((l, i) => {
+    const lk = locked(i);
+    const conflicts = l.files.reduce((a, f) => a + parse(f[1]).H.length, 0);
+    return `<div class="row"><span class="n">${i + 1}</span><div><strong>${E(l.n)}</strong><small>${l.files.length} file${l.files.length > 1 ? "s" : ""}, ${conflicts} conflict${conflicts === 1 ? "" : "s"}${SC[i] ? ", best " + SC[i] + " pts" : ""}</small></div>${stars(P[i])}<button type="button" data-go="${i}" ${lk ? "disabled" : ""}>${lk ? "Locked" : P[i] ? "Replay" : "Play"}</button></div>`;
+  }).join("")}`;
+      }
+
+      function learn() {
+        return `<div class="grid g2"><div class="card an"><h3 style="margin-top:0">Anatomy of a conflict</h3><p class="mu">Select each line to see what it means.</p>${AN.map((a, i) => `<button type="button" class="anl ${i === AI ? "on" : ""}" data-an="${i}" aria-pressed="${i === AI}">${E(a[0])}</button>`).join("")}<p style="margin:12px 0 0" aria-live="polite"><strong>${E(AN[AI][1])}</strong></p><p class="mu">To resolve: keep the code you want and delete all three marker lines.</p></div>
+  <div class="card"><h3 style="margin-top:0">Where the buttons live</h3><span class="chip">VS Code</span><p class="mu" style="margin-top:0">Open a conflicted file. Accept Current Change, Accept Incoming Change and Accept Both Changes appear right above each conflict, exactly like in this lab.</p><span class="chip">GitHub</span><p class="mu" style="margin-top:0">On a pull request choose Resolve conflicts. Edit the file in the web editor, click Mark as resolved, then Commit merge.</p></div></div>
+  <h3>Real-world checklist</h3>${CK.map((c, i) => `<button type="button" class="ck ${CKD[i] ? "on" : ""}" data-ck="${i}" aria-pressed="${!!CKD[i]}"><span aria-hidden="true">${CKD[i] ? "✅" : "⬜"}</span><span><strong>${E(c[0])}</strong><br><span class="mu">${E(c[1])}</span></span></button>`).join("")}<p><button type="button" data-go="${nextLv()}">Practise now</button></p>`;
+      }
+
+      function play() {
+        return `<div class="steps">${LV.map((l, i) => `<button type="button" data-go="${i}" class="${i === S.i ? "on" : ""}" ${locked(i) ? 'disabled title="Clear the previous level first"' : ""}>${i + 1}. ${E(l.n)}</button>`).join("")}</div>
+  <div class="play"><section><div class="card" id="brief"></div><div class="card" style="margin-top:14px"><div class="bar"><div id="tabs" role="group" aria-label="Files"></div><div class="seg" id="mode" role="group" aria-label="Editor mode"></div></div><div id="code"></div><textarea id="ed" spellcheck="false" hidden aria-label="Final file content (Ctrl+Enter runs CI)"></textarea></div></section>
+  <aside><div class="card"><div class="hud"><span class="chip" id="tl"></span><span class="chip" id="sc"></span><span class="chip" id="sk"></span></div><div class="tb" id="tb"><i id="tf"></i></div><svg class="gr" viewBox="0 0 240 78" role="img" aria-label="Branch graph"><path class="gl" d="M12 58H228"/><path class="gl" d="M52 58C66 58 66 20 86 20H140C160 20 160 58 176 58"/><circle class="cm" cx="30" cy="58" r="6"/><circle class="cm" cx="52" cy="58" r="6"/><circle class="cm" cx="96" cy="20" r="6"/><circle class="cm" cx="130" cy="20" r="6"/><circle class="cm" cx="150" cy="58" r="6"/><circle class="mn" id="mn" cx="196" cy="58" r="9"/><text x="8" y="76">main</text><text x="98" y="8">feature</text><text id="mt" x="170" y="76">conflict</text></svg>
+  <div class="bar"><button type="button" id="run" title="Ctrl+Enter">Mark as resolved and run CI</button><button type="button" id="hint">Hint</button><button type="button" id="reset">Reset</button></div><p class="mu" id="hb" aria-live="polite"></p></div>
+  <div class="card" style="margin-top:14px"><strong>CI pipeline</strong><ul id="ci" aria-live="polite"></ul><div id="win" role="status"></div></div></aside></div>`;
+      }
+
+      function tabsHtml() {
+        return LV[S.i].files
+          .map((f, i) => {
+            const n = parse(S.files[i]).H.length;
+            return `<button type="button" data-f="${i}" class="${i === S.f ? "on" : ""}" aria-pressed="${i === S.f}">${E(f[0])}${n ? `<i aria-label="${n} conflicts">${n}</i>` : ""}</button>`;
+          })
+          .join("");
+      }
+
+      function drawPlay() {
+        const lv = LV[S.i];
+        $("#brief").innerHTML = `<strong style="font-size:18px">Level ${S.i + 1}: ${E(lv.n)}</strong><p class="mu" style="margin:4px 0 0">${E(lv.brief)}</p>`;
+        $("#tabs").innerHTML = tabsHtml();
+        $("#mode").innerHTML = [
+          ["v", "Visual"],
+          ["e", "Edit text"]
+        ]
+          .map((a) => `<button type="button" data-md="${a[0]}" class="${S.md === a[0] ? "on" : ""}" aria-pressed="${S.md === a[0]}">${a[1]}</button>`)
+          .join("");
+        const lock = S.over || S.done;
+        const ed = S.md === "e";
+        $("#ed").hidden = !ed;
+        $("#code").hidden = ed;
+        if (!ed) {
+          const { L, H } = parse(S.files[S.f]);
+          let h = "",
+            i = 0,
+            k = 0;
+          const row = (j, c) => `<div class="r ${c}"><i>${j + 1}</i><code>${E(L[j]) || " "}</code></div>`;
+          while (i < L.length) {
+            const c = H.find((x) => x.s === i);
+            if (c) {
+              h += `<div class="cf"><div class="lens"><span>Conflict ${k + 1}</span>${[
+                ["o", "Accept Current Change"],
+                ["t", "Accept Incoming Change"],
+                ["b", "Accept Both Changes"]
+              ]
+                .map((a) => `<button type="button" data-k="${k}" data-m="${a[0]}" ${lock ? "disabled" : ""}>${a[1]}</button>`)
+                .join("")}</div>`;
+              for (let j = c.s; j <= c.e; j++) h += row(j, j === c.s ? "mk cu" : j < c.m ? "cur" : j === c.m ? "mk" : j < c.e ? "inc" : "mk in");
+              h += "</div>";
+              i = c.e + 1;
+              k++;
+            } else {
+              h += row(i, "");
+              i++;
+            }
+          }
+          $("#code").innerHTML = h + (H.length ? "" : '<div class="ok">No conflict markers left in this file.</div>');
+        } else if ($("#ed").value !== S.files[S.f]) $("#ed").value = S.files[S.f];
+        $("#hb").textContent = S.hint ? lv.hint : "";
+        $("#hint").textContent = S.hint ? "Hide hint" : S.hinted ? "Show hint" : "Hint (-50)";
+        $("#ed").disabled = lock;
+        $("#run").disabled = lock || S.busy;
+        $("#run").textContent = S.busy ? "Running CI…" : "Mark as resolved and run CI";
+        $("#reset").disabled = lock;
+        $("#reset").textContent = S.armed ? "Sure?" : "Reset";
+        $("#ci").innerHTML = S.ci || '<li><b></b><span class="mu">Resolve every conflict, then run CI.</span></li>';
+        const w = $("#win");
+        w.className = S.win ? "show" : "";
+        w.innerHTML = S.win;
+        $("#mn").setAttribute("class", "mn" + (S.mn ? " " + S.mn : ""));
+        $("#mt").textContent = S.mt;
+        hud();
+      }
+
+      let worker = null,
+        workerUrl = null,
+        runTimer = 0;
+      function stopWorker() {
+        clearTimeout(runTimer);
+        if (worker) {
+          worker.terminate();
+          worker = null;
+        }
+      }
+      // Player code runs in a throwaway Web Worker so an infinite loop cannot freeze the page:
+      // it is terminated after RUN_LIMIT_MS. If Workers are unavailable, it falls back to the main thread.
+      function execute(code, ex, srcs, done) {
+        stopWorker();
+        try {
+          if (!workerUrl) {
+            const src = "const evaluate = " + evaluate.toString() + ";\nself.onmessage = (e) => { self.postMessage(evaluate(e.data.code, e.data.ex, e.data.srcs)); };";
+            workerUrl = URL.createObjectURL(new Blob([src], { type: "text/javascript" }));
+          }
+          worker = new Worker(workerUrl);
+        } catch (e) {
+          worker = null;
+          done(evaluate(code, ex, srcs));
+          return;
+        }
+        const w = worker;
+        const finish = (res) => {
+          if (w !== worker) return;
+          stopWorker();
+          done(res);
+        };
+        w.onmessage = (e) => finish(Array.isArray(e.data) && e.data.length === srcs.length + 1 ? e.data : null);
+        w.onerror = (e) => {
+          e.preventDefault();
+          finish([[false, e.message || "Build crashed"]].concat(srcs.map(() => [false, "Skipped"])));
+        };
+        runTimer = setTimeout(() => finish([[false, "Timed out after " + RUN_LIMIT_MS / 1000 + " s. Is there an infinite loop?"]].concat(srcs.map(() => [false, "Skipped"]))), RUN_LIMIT_MS);
+        w.postMessage({ code, ex, srcs });
+      }
+
+      function run() {
+        if (S.over || S.done || S.busy || V !== "play") return;
+        S.runs++;
+        S.armed = false;
+        const lv = LV[S.i],
+          token = S.token,
+          out = [];
+        const stray = hasMarkers(S.files);
+        out.push(["Lint: no conflict markers", !stray, stray ? "Conflict markers remain. Remove every <<<<<<<, ======= and >>>>>>> line." : ""]);
+        if (stray) {
+          out.push(["Build: files load together", false, "Skipped"]);
+          lv.tests.forEach(([n]) => out.push(["Test: " + n, false, "Skipped"]));
+          finishRun(out);
+          return;
+        }
+        S.busy = true;
+        drawPlay();
+        execute(
+          S.files.join("\n"),
+          lv.ex,
+          lv.tests.map((t) => t[1].toString()),
+          (res) => {
+            if (token !== S.token) return; // level was changed while CI was running
+            S.busy = false;
+            if (!res) res = [[false, "CI returned an unexpected result"]].concat(lv.tests.map(() => [false, "Skipped"]));
+            out.push(["Build: files load together", !!res[0][0], String(res[0][1] || "")]);
+            lv.tests.forEach(([n], i) => out.push(["Test: " + n, !!res[i + 1][0], String(res[i + 1][1] || "")]));
+            if (S.over) {
+              if (V === "play") drawPlay();
+              return;
+            } // time ran out while CI was running
+            finishRun(out);
+          }
+        );
+      }
+
+      function finishRun(out) {
+        const ok = out.every((x) => x[1]);
+        S.ci = out.map((x, i) => `<li class="${x[1] ? "p" : "f"}" style="animation-delay:${i * 70}ms"><b aria-hidden="true">${x[1] ? "✓" : "✗"}</b><span>${x[1] ? "Passed" : "Failed"}: ${E(x[0])}</span>${x[2] ? `<small>${E(x[2])}</small>` : ""}</li>`).join("");
+        S.mn = ok ? "pass" : "fail";
+        S.mt = ok ? "merged" : "red build";
+        if (ok) {
+          let s = S.runs === 1 ? 3 : S.runs <= 3 ? 2 : 1;
+          if (S.hinted) s = Math.min(s, 2);
+          S.done = true;
+          const clean = S.runs === 1 && !S.hinted;
+          S.streak = clean ? S.streak + 1 : 0;
+          const bonus = clean ? 25 * (S.streak - 1) : 0;
+          const left = Math.round(S.left);
+          const pts = Math.max(10, 100 + left * 2 - S.hp * 50 - (S.runs - 1) * 20 + bonus);
+          S.score += pts;
+          P[S.i] = Math.max(P[S.i], s);
+          SC[S.i] = Math.max(SC[S.i], pts);
+          save();
+          const last = S.i === LV.length - 1,
+            tot = P.reduce((a, b) => a + b, 0),
+            lv = LV[S.i];
+          S.win = `<h4>CI is green ${stars(s)}</h4><p class="mu" style="margin:0">${S.runs} run${S.runs > 1 ? "s" : ""}${S.hinted ? ", hint used" : ""}. ${last ? "All levels cleared with " + tot + " of " + LV.length * 3 + " stars." : ""}</p><p style="margin:8px 0 0"><strong>+${pts} points</strong> <span class="mu">(${bonus ? "streak bonus +" + bonus + ", " : ""}${left}s left${S.hp ? ", hint -" + S.hp * 50 : ""}${S.runs > 1 ? ", extra runs -" + (S.runs - 1) * 20 : ""})</span></p><p style="margin:8px 0 0"><strong>Why:</strong> ${E(WHY[S.i])}</p><p style="margin:8px 0 0"><strong>In VS Code or GitHub:</strong> ${E(lv.real)}</p><p class="mu" style="margin:8px 0 0">Then finish the merge:</p><pre class="cmd">git add ${lv.files.map((f) => E(f[0])).join(" ")}\ngit commit</pre><p style="margin:10px 0 0">${last ? '<button type="button" data-v="home">Back to home</button>' : '<button type="button" data-go="' + (S.i + 1) + '">Next level</button>'}</p>`;
+        } else {
+          S.streak = 0;
+        }
+        if (V !== "play") return;
+        drawPlay();
+        if (ok) {
+          const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+          $("#win").scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" });
+        }
+      }
+
+      function hud() {
+        const t = $("#tl");
+        if (!t) return;
+        t.textContent = "⏱ " + Math.max(0, Math.ceil(S.left)) + "s";
+        $("#sc").textContent = "Score " + S.score;
+        $("#sk").textContent = "🔥 Streak " + S.streak;
+        $("#tb").className = "tb" + (S.left <= 15 && !S.done ? " low" : "");
+        $("#tf").style.width = Math.max(0, (S.left / TM[S.i]) * 100) + "%";
+      }
+
+      function over() {
+        S.over = true;
+        S.busy = false;
+        S.streak = 0;
+        S.token++;
+        stopWorker();
+        S.mn = "fail";
+        S.mt = "timed out";
+        S.win = `<h4>Time's up</h4><p class="mu" style="margin:0">The merge window closed before CI went green.</p><p style="margin:8px 0 0"><strong>Why:</strong> ${E(WHY[S.i])}</p><p style="margin:10px 0 0"><button type="button" data-go="${S.i}">Retry level</button></p>`;
+        drawPlay();
+      }
+
+      // The level timer only runs while the Play view is open and the tab is visible;
+      // leaving for Home or Learn pauses it, and the Play tab resumes the same level.
+      setInterval(() => {
+        if (V !== "play" || S.over || S.done || document.hidden) return;
+        S.left = Math.max(0, S.left - 0.25);
+        hud();
+        if (S.left <= 0) over();
+      }, 250);
+
+      document.addEventListener("click", (e) => {
+        const b = e.target.closest("button");
+        if (!b || b.disabled) return;
+        const d = b.dataset;
+        const lock = S.over || S.done;
+        if (b.id === "theme") {
+          const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+          document.documentElement.setAttribute("data-theme", next);
+          try {
+            localStorage.setItem(THEME_KEY, next);
+          } catch (err) {}
+          themeIcon();
+        } else if (d.v) {
+          V = d.v;
+          S.wipe = false;
+          render();
+        } else if (d.go !== undefined) {
+          const i = +d.go;
+          if (!(i >= 0 && i < LV.length) || locked(i)) return;
+          load(i);
+          V = "play";
+          S.wipe = false;
+          render();
+        } else if (d.an !== undefined) {
+          AI = +d.an;
+          render();
+          $(`[data-an="${AI}"]`).focus();
+        } else if (d.ck !== undefined) {
+          CKD[d.ck] = !CKD[d.ck];
+          render();
+          $(`[data-ck="${d.ck}"]`).focus();
+        } else if (b.id === "wipe") {
+          if (S.wipe) {
+            P = LV.map(() => 0);
+            SC = LV.map(() => 0);
+            try {
+              localStorage.removeItem(KEY);
+              localStorage.removeItem(KEY + "-sc");
+            } catch (err) {}
+            S.wipe = false;
+          } else S.wipe = true;
+          render();
+          $("#wipe").focus();
+        } else if (d.f !== undefined) {
+          S.f = +d.f;
+          drawPlay();
+          $(`[data-f="${S.f}"]`).focus();
+        } else if (d.md) {
+          S.md = d.md;
+          drawPlay();
+          $(`[data-md="${S.md}"]`).focus();
+        } else if (d.m) {
+          if (lock) return;
+          S.files[S.f] = take(S.files[S.f], +d.k, d.m);
+          S.armed = false;
+          drawPlay();
+          const next = $("#code .lens button");
+          (next || $("#tabs .on")).focus();
+        } else if (b.id === "run") run();
+        else if (b.id === "hint") {
+          if (!S.hint && !S.hinted && !lock) {
+            S.hinted = true;
+            S.hp++;
+          }
+          S.hint = !S.hint;
+          drawPlay();
+          $("#hint").focus();
+        } else if (b.id === "reset") {
+          if (lock) return;
+          if (S.armed) {
+            S.files = LV[S.i].files.map((x) => x[1]);
+            S.f = 0;
+            S.armed = false;
+          } else S.armed = true;
+          drawPlay();
+          $("#reset").focus();
+        }
+      });
+
+      // Edit-text mode writes straight into the current file; Visual mode re-parses it on the next draw.
+      document.addEventListener("input", (e) => {
+        if (e.target.id !== "ed" || S.over || S.done) return;
+        S.files[S.f] = e.target.value;
+        S.armed = false;
+        $("#tabs").innerHTML = tabsHtml();
+        $("#reset").textContent = "Reset";
+      });
+
+      document.addEventListener("keydown", (e) => {
+        if (V === "play" && (e.ctrlKey || e.metaKey) && e.key === "Enter") {
+          e.preventDefault();
+          run();
+        }
+      });
+
+      themeIcon();
+      load(0);
+      render();
+    </script>
+  </body>
+</html>
